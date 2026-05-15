@@ -1,0 +1,35 @@
+{
+    "python-envs.defaultEnvManager": "ms-python.python:venv",
+    "java.jdt.ls.java.home": "/home/kwon/.local/share/jdks/jdk-17.0.19+10",
+    "java.configuration.runtimes": [
+        {
+            "name": "JavaSE-17",
+            "path": "/home/kwon/.local/share/jdks/jdk-17.0.19+10",
+            "default": true
+        }
+    ],
+    // 1. 탐색기 및 검색에서 제외할 폴더 (CPU 부하 감소의 핵심)
+    "files.exclude": {
+        "**/.git": true,
+        "**/.DS_Store": true,
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/build": true,
+        "**/.next": true,
+        "**/__pycache__": true
+    },
+    // 2. 검색(Ctrl+Shift+F) 시 ripgrep이 무시할 경로
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/build": true,
+        "**/.next": true,
+        "**/*.map": true
+    },
+    // 3. 파일 변화 감시(Watcher) 제외 (서버 리소스 절약)
+    "files.watcherExclude": {
+        "**/node_modules/**": true,
+        "**/dist/**": true,
+        "**/.git/objects/**": true
+    }
+}

@@ -1,0 +1,9 @@
+model = "gpt-5.5"
+ask_for_approval = "never"
+sandbox = "workspace-write"
+
+[projects."/home/kwon/Flownote/service"]
+trust_level = "trusted"
+
+[features]
+goals=true

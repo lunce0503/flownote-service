@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS stock_cash_balances (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    amount NUMERIC(20, 4) NOT NULL DEFAULT 0,
+    currency TEXT NOT NULL DEFAULT 'KRW',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
