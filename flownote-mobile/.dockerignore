@@ -1,7 +1,9 @@
 node_modules
 .expo
+.git
 dist
 build
 *.log
 .env
-yarn-error.log
+npm-debug.log*
+yarn-error.log*
