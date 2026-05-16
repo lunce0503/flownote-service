@@ -16,3 +16,6 @@ dependencies = [
     "uvicorn>=0.41.0",
     "yfinance>=0.2.66",
 ]
+
+[project.scripts]
+app = "app.main:app"
