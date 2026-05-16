@@ -1,10 +1,8 @@
-import React from "react";
-import Chat from "../../../widgets/SocialWidget/Chat";
+import { SocialPage } from "../../../pages";
+
 const Social = () => {
     return(
-        <div>
-            <Chat />
-        </div>
+        <SocialPage />
     );  
 };
 

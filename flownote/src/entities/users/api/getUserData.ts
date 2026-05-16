@@ -1,9 +1,9 @@
 import axios from "axios";
-import { API_BASE_URL2 } from "../../../shared/api";
+import { API_CORE_BASE_URL } from "../../../shared/api";
 
 const getUserData = async () => {
     try {
-            const response = await axios.get(`${API_BASE_URL2}/api/users`);
+            const response = await axios.get(`${API_CORE_BASE_URL}/api/users`);
             console.log("Fetched users:", response.data);
             return response.data;
         } catch (error) {

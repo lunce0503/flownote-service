@@ -1,11 +1,11 @@
 import axios from "axios";
-import { API_BASE_URL2, authHeaders } from "../../shared/api";
-import type { BlockDataProps } from "../../widgets/BlogWidget/BlockNote/BlockNote";
+import { API_CORE_BASE_URL, authHeaders } from "../../shared/api";
+import type { BlockDataProps } from "./model/types";
 
 const updateNoteData = async (title: string, updatenoteData: BlockDataProps) => {
     try {
         const response = await axios.patch(`
-            ${API_BASE_URL2}/api/notes/${title}`
+            ${API_CORE_BASE_URL}/api/notes/${title}`
             , updatenoteData,
             { headers: authHeaders() }
         );

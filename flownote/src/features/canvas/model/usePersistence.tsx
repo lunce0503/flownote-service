@@ -1,13 +1,24 @@
 import { useCallback } from 'react';
-import type { LineElement, ImageElement, TextBoxElement, CanvasLoadData, CanvasSavePayload } from '../types/types';
+import type { LineElement, ImageElement, TextBoxElement, CanvasLoadData, CanvasSavePayload } from '../../../entities/canvas/model/types';
 import { v4 as uuidv4 } from 'uuid';
 import type { Dispatch, SetStateAction } from 'react';
-import { API_BASE_URL, API_BASE_URL2, authHeaders } from '../../../../shared/api';
+import { API_CORE_BASE_URL, authHeaders, resolveBrowserReachableUrl } from '../../../shared/api';
 
 // React.Dispatch 함수 타입을 명확히 정의
 type SetLines = Dispatch<SetStateAction<LineElement[]>>;
 type SetImages = Dispatch<SetStateAction<ImageElement[]>>;
 type SetTextBoxes = Dispatch<SetStateAction<TextBoxElement[]>>;
+
+const createHeaders = (contentType?: string) => {
+  const headers = new Headers();
+  if (contentType) {
+    headers.set("Content-Type", contentType);
+  }
+  Object.entries(authHeaders()).forEach(([key, value]) => {
+    headers.set(key, value);
+  });
+  return headers;
+};
 
 export const usePersistence = (
   drawnLines: LineElement[],
@@ -18,8 +29,8 @@ export const usePersistence = (
   setTextBoxes: SetTextBoxes
 ) => {
 
-  const CANVAS_API_URL = import.meta.env.VITE_CANVAS_API_URL || API_BASE_URL2;
-  const UPLOAD_API_URL = import.meta.env.VITE_UPLOAD_API_URL || API_BASE_URL;
+  const CANVAS_API_URL = resolveBrowserReachableUrl(import.meta.env.VITE_CANVAS_API_URL) || API_CORE_BASE_URL;
+  const UPLOAD_API_URL = resolveBrowserReachableUrl(import.meta.env.VITE_UPLOAD_API_URL) || API_CORE_BASE_URL;
 
   const handleSave = useCallback(async () => {
     const lineData = drawnLines.map(line => {
@@ -106,7 +117,7 @@ export const usePersistence = (
     try {
       const res = await fetch(`${CANVAS_API_URL}/api/canvas/save`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
+        headers: createHeaders("application/json"),
         body: JSON.stringify(payload),
       });
 
@@ -115,16 +126,25 @@ export const usePersistence = (
       }
       console.log("Canvas data saved successfully!");
       console.log("저장된 데이터:", payload);
+      setDrawnLines(prev => prev
+        .filter(line => line.status !== 'deleted')
+        .map(line => ({ ...line, status: 'unchanged' })));
+      setImages(prev => prev
+        .filter(image => image.status !== 'deleted')
+        .map(image => ({ ...image, status: 'unchanged' })));
+      setTextBoxes(prev => prev
+        .filter(textBox => textBox.status !== 'deleted')
+        .map(textBox => ({ ...textBox, status: 'unchanged' })));
     } catch (err) {
       console.error("저장 실패:", err);
     }
-  }, [drawnLines, images, textBoxes, CANVAS_API_URL]);
+  }, [drawnLines, images, textBoxes, CANVAS_API_URL, setDrawnLines, setImages, setTextBoxes]);
 
 
   const handleLoad = useCallback(async () => {
     try {
       const res = await fetch(`${CANVAS_API_URL}/api/canvas/load`, {
-        headers: authHeaders(),
+        headers: createHeaders(),
       });
       if (!res.ok) throw new Error("데이터 로드 실패");
       const data: CanvasLoadData = await res.json();
@@ -199,14 +219,14 @@ export const usePersistence = (
     try {
       const res = await fetch(`${UPLOAD_API_URL}/api/upload`, {
         method: "POST",
-        headers: authHeaders(),
+        headers: createHeaders(),
         body: formData,
       });
 
       if (!res.ok) throw new Error("이미지 업로드 실패");
 
       const data = await res.json();
-      const imageUrl = `${UPLOAD_API_URL}/uploads/${data.filename}`;
+      const imageUrl = data.fileUrl ? `${UPLOAD_API_URL}${data.fileUrl}` : `${UPLOAD_API_URL}/uploads/${data.filename}`;
 
       const img = new Image();
       img.onload = () => {

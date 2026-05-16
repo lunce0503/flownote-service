@@ -1,5 +1,5 @@
 import axios from "axios";
-import { API_BASE_URL2 } from "../../../shared/api";
+import { API_CORE_BASE_URL } from "../../../shared/api";
 
 interface LoginUserData {
   email: string;
@@ -17,7 +17,7 @@ interface LoginUserResponse {
 }
 
 const loginUserData = async (loginData: LoginUserData): Promise<LoginUserResponse> => {
-  const response = await axios.post(`${API_BASE_URL2}/api/users/login`, loginData);
+  const response = await axios.post(`${API_CORE_BASE_URL}/api/users/login`, loginData);
   return response.data;
 };
 

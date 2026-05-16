@@ -1,8 +1,28 @@
 import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-const API_BASE_URL2 = import.meta.env.VITE_API_BASE_URL2;
-const API_AI_BASE_URL = import.meta.env.VITE_AI_BASE_URL ?? API_BASE_URL;
+const resolveBrowserReachableUrl = (configuredUrl: string | undefined) => {
+  if (!configuredUrl || typeof window === "undefined") return configuredUrl;
+
+  try {
+    const url = new URL(configuredUrl, window.location.origin);
+    const webHost = window.location.hostname;
+    const apiHost = url.hostname;
+    const localHosts = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
+
+    if (localHosts.has(apiHost) && webHost && !localHosts.has(webHost)) {
+      url.hostname = webHost;
+    }
+
+    return url.origin;
+  } catch {
+    return configuredUrl;
+  }
+};
+
+const API_BASE_URL = resolveBrowserReachableUrl(import.meta.env.VITE_API_BASE_URL);
+const API_BASE_URL2 = resolveBrowserReachableUrl(import.meta.env.VITE_API_BASE_URL2);
+const API_CORE_BASE_URL = resolveBrowserReachableUrl(import.meta.env.VITE_CORE_API_URL) ?? API_BASE_URL2;
+const API_AI_BASE_URL = resolveBrowserReachableUrl(import.meta.env.VITE_AI_BASE_URL) ?? API_BASE_URL;
 const AUTH_TOKEN_KEY = "flownote_auth_token";
 const AUTH_USER_KEY = "flownote_auth_user";
 
@@ -58,7 +78,9 @@ const authHeaders = () => {
 export {
   API_BASE_URL,
   API_BASE_URL2,
+  API_CORE_BASE_URL,
   API_AI_BASE_URL,
+  resolveBrowserReachableUrl,
   DEFAULT_HEADERS,
   axios,
   getAuthToken,

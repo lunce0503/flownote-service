@@ -1,5 +1,5 @@
-import Canvas from "../../../widgets/CanvasWidget/InfiniteCanvas";
+import { CanvasWidget } from "../../../widgets";
 
 export default function CanvasRoute() {
-    return <Canvas />
+    return <CanvasWidget />
 }

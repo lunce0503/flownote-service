@@ -1,16 +1,21 @@
 import React,{useRef, useEffect, useState} from "react";
-import { useCanvasState } from '../hooks/useCanvasState';
-import { useDrawing } from '../hooks/useDrawing';
-import { useElementManipulation } from '../hooks/useElementManipulation';
-import { usePersistence } from '../hooks/usePersistence';
-import { useCanvasRendering } from '../hooks/useCanvasRendering';
+import { useCanvasState } from '../../../../features/canvas/model/useCanvasState';
+import { useDrawing } from '../../../../features/canvas/model/useDrawing';
+import { useElementManipulation } from '../../../../features/canvas/model/useElementManipulation';
+import { usePersistence } from '../../../../features/canvas/model/usePersistence';
+import { useCanvasRendering } from '../../../../features/canvas/model/useCanvasRendering';
+import { useCanvasHistory } from '../../../../features/canvas/model/useCanvasHistory';
 import { Toolbar } from './Toolbar';
 import '../index.css';
-import type { Point, LineElement } from '../types/types';
+import type { Point, LineElement } from '../../../../entities/canvas/model/types';
 import { v4 as uuidv4 } from 'uuid';
 
 const Canvas = () => {
     const canvasRef = useRef<HTMLCanvasElement|null>(null);
+    const [viewport, setViewport] = useState(() => ({
+        width: window.innerWidth,
+        height: Math.max(window.innerHeight - 56, 320),
+    }));
 
     // 1. 기본 상태 관리 - 오프셋, 스케일, 도구
     const { 
@@ -33,6 +38,7 @@ const Canvas = () => {
         images,setImages,
         textBoxes,setTextBoxes,
         movingObject,setMovingObject,
+        eraseElementAtPointer,
         handleTextTool,
         moveElement,
     } = useElementManipulation(getCanvasCoords, tool);
@@ -46,6 +52,20 @@ const Canvas = () => {
         setImages,
         setTextBoxes,
     );
+
+    const {
+        canUndo,
+        clearHistory,
+        recordHistory,
+        undo,
+    } = useCanvasHistory({
+        lines: drawnLines,
+        images,
+        textBoxes,
+        setDrawnLines,
+        setImages,
+        setTextBoxes,
+    });
 
     // 5. 캔버스 렌더링 로직 관리
     const { redrawWith } = useCanvasRendering(
@@ -63,8 +83,8 @@ const Canvas = () => {
 
     // 자동 로드
     useEffect(() => {
-        handleLoad();
-    }, [handleLoad]); // handleLoad가 변경될 때마다 호출 (useCallback으로 감싸면 안정적)
+        handleLoad().then(clearHistory);
+    }, [clearHistory, handleLoad]); // handleLoad가 변경될 때마다 호출 (useCallback으로 감싸면 안정적)
 
     // 자동 저장
     useEffect(() => {
@@ -78,6 +98,11 @@ const Canvas = () => {
     // 키보드 단축키
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            undo();
+            return;
+        }
         if (e.key === 'e') setTool('eraser');
         else if (e.key === 'p') setTool('pen');
         else if (e.key === 'h') setTool('handle');
@@ -85,7 +110,19 @@ const Canvas = () => {
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [setTool]); // setTool이 변경될 때마다 호출
+    }, [setTool, undo]); // setTool이 변경될 때마다 호출
+
+    useEffect(() => {
+        const handleResize = () => {
+            setViewport({
+                width: window.innerWidth,
+                height: Math.max(window.innerHeight - 56, 320),
+            });
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // 마우스/터치 이벤트 핸들러 (핵심 로직은 훅 내부로 이동)
     const pointers = useRef<Map<number, Point>>(new Map()); // 포인터 추적은 여기에 유지
@@ -113,10 +150,13 @@ const Canvas = () => {
         // 도구별 로직 호출
         // 지우개 도구
         if (tool === 'eraser') {
+            recordHistory();
             eraseAtPointer(e);
+            eraseElementAtPointer(e);
         } 
         // 펜 도구
         else if (tool === 'pen') {
+            recordHistory();
             const { x, y } = getCanvasCoords(e);
             currentLine.current = [{ x, y }];
             setIsDrawing(true);
@@ -128,7 +168,9 @@ const Canvas = () => {
             // 이미지 클릭 감지
             for (let i = images.length - 1; i >= 0; i--) {
                 const img = images[i];
+                if (img.status === 'deleted') continue;
                 if (x >= img.x && x <= img.x + img.width && y >= img.y && y <= img.y + img.height) {
+                    recordHistory();
                     setMovingObject({ type: 'image', index: i , id: img.id, status: img.status || 'new' });
                     return;
                     }
@@ -136,12 +178,15 @@ const Canvas = () => {
             // 텍스트 박스 클릭 감지
             for (let i = textBoxes.length - 1; i >= 0; i--) {
                 const box = textBoxes[i];
+                if (box.status === 'deleted') continue;
                 if (x >= box.x && x <= box.x + box.width && y >= box.y && y <= box.y + box.height) {
+                    recordHistory();
                     setMovingObject({ type: 'text', index: i, id: box.id, status: box.status || 'new' });
                     return;
                 }
             }
         } else if (tool === 'text') {
+            recordHistory();
             handleTextTool(e); // 텍스트 툴 로직 호출
         }
     };
@@ -176,6 +221,7 @@ const Canvas = () => {
         lastTouchCenter.current = newCenter;
         } else if (tool === 'eraser') {
             eraseAtPointer(e);
+            eraseElementAtPointer(e);
         } else if (tool === 'pen' && isDrawing) {
             const { x, y } = getCanvasCoords(e);
             currentLine.current.push({ x, y });
@@ -230,20 +276,28 @@ const Canvas = () => {
 
 
     return (
-        <div className="bg-amber-100">
+        <div className="relative h-[calc(100vh-56px)] overflow-hidden bg-white">
             {/* Toolbar */}
             <Toolbar
                 tool={tool}
                 setTool={setTool}
-                handleImageUpload={handleImageUpload}
+                handleImageUpload={async (event) => {
+                    if (event.target.files?.[0]) {
+                        recordHistory();
+                    }
+                    await handleImageUpload(event);
+                }}
                 handleSave={handleSave}
                 handleLoad={handleLoad}
+                handleUndo={undo}
+                canUndo={canUndo}
             />
             {/* Canvas */}
             <canvas
                 ref={canvasRef}
-                width={window.innerWidth}
-                height={window.innerHeight}
+                width={viewport.width}
+                height={viewport.height}
+                className="block"
                 style={{
                 border: '1px solid white',
                 touchAction: 'none',

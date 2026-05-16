@@ -1,7 +1,7 @@
-import BanPickPage from "../../../pages/LolBanpick";
+import { LolBanpickPage } from "../../../pages";
 
 export default function LolBanPickRoute() {
     return (
-        <BanPickPage />
+        <LolBanpickPage />
     );
 }

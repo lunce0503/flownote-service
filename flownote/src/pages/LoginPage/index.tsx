@@ -38,45 +38,6 @@ export default function LoginPage() {
     }
   };
 
-  // Chrome 아이콘을 위한 인라인 SVG
-  const ChromeIcon = () => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <circle cx="12" cy="12" r="4" />
-      <line x1="21.17" y1="8" x2="12" y2="8" />
-      <line x1="3.95" y1="6.06" x2="8.54" y2="14" />
-      <line x1="10.88" y1="21.94" x2="15.46" y2="14" />
-    </svg>
-  );
-
-  // Github 아이콘을 위한 인라인 SVG (임포트 오류 방지)
-  const GithubIcon = () => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
-      <path d="M9 18c-4.51 2-5-2-7-2" />
-    </svg>
-  );
-
   return (
     <div className="min-h-screen bg-amber-100 flex flex-col justify-center items-center p-4 font-sans">
       {/* 로고 섹션 */}
@@ -88,7 +49,7 @@ export default function LoginPage() {
         <p className="text-stone-600 text-sm">생각의 흐름을 기록하세요</p>
       </div>
 
-      {/* 로그인 카드 */}
+      {/* 로그인 폼 */}
       <div className="w-full max-w-md bg-stone-50 rounded-3xl shadow-xl overflow-hidden">
         <div className="p-8">
           <h2 className="text-2xl font-bold text-stone-800 mb-6 text-center">로그인</h2>
@@ -165,11 +126,9 @@ export default function LoginPage() {
           {/* 소셜 로그인 버튼 */}
           <div className="grid grid-cols-2 gap-4">
             <button className="flex items-center justify-center gap-2 py-2.5 border border-stone-200 rounded-xl hover:bg-stone-100 transition-colors">
-              <ChromeIcon />
               <span className="text-sm font-medium text-stone-700">Google</span>
             </button>
             <button className="flex items-center justify-center gap-2 py-2.5 border border-stone-200 rounded-xl hover:bg-stone-100 transition-colors">
-              <GithubIcon />
               <span className="text-sm font-medium text-stone-700">Github</span>
             </button>
           </div>

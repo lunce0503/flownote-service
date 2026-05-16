@@ -8,10 +8,15 @@ import {
   BookOpen, 
   Users, 
   X,
-  User
+  User,
+  Bot,
+  Palette,
+  TrendingUp,
+  Settings
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../shared/auth/AuthContext";
+import { ThemeModeControl } from "../features/theme";
 
 export default function Header() {
   // 사이드바 상태 관리
@@ -42,13 +47,20 @@ export default function Header() {
   const navLinks = [
     { name: "Blog", href: "/blog", icon: <BookOpen size={22} /> },
     { name: "Social", href: "/social", icon: <Users size={22} /> },
+    { name: "Agent", href: "/agent", icon: <Bot size={22} /> },
+    { name: "Canvas", href: "/canvas", icon: <Palette size={22} /> },
     { name: "Task", href: "/task", icon: <CheckSquare size={22} /> },
+    { name: "Stocks", href: "/stocks", icon: <TrendingUp size={22} /> },
+    { name: "Settings", href: "/settings", icon: <Settings size={22} /> },
   ];
 
   const profileLinks = [
-    { name: "Canvas", href: "/canvas", icon: <Notebook size={18} /> },
+    { name: "Canvas", href: "/canvas", icon: <Palette size={18} /> },
     { name: "Social", href: "/social", icon: <Users size={18} /> },
+    { name: "Agent", href: "/agent", icon: <Bot size={18} /> },
     { name: "Task", href: "/task", icon: <CheckSquare size={18} /> },
+    { name: "Stocks", href: "/stocks", icon: <TrendingUp size={18} /> },
+    { name: "Settings", href: "/settings", icon: <Settings size={18} /> },
   ];
 
   return (
@@ -132,6 +144,8 @@ export default function Header() {
                         <span>{link.name}</span>
                       </a>
                     ))}
+                    <div className="my-2 border-t border-stone-200" />
+                    <ThemeModeControl />
                     <div className="my-2 border-t border-stone-200" />
                     <button
                       type="button"
