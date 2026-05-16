@@ -14,4 +14,4 @@ COPY . .
 
 # 5. FastAPI 실행 (이미지상 app 폴더 내 main.py가 있다고 가정)
 # 만약 실행 파일 위치가 다르다면 app.main:app 등으로 수정하세요.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
