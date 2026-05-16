@@ -1,0 +1,32 @@
+# Product Specs Index
+
+제품 사양은 사용자 입장에서 보이는 행동을 기록한다. 구현 파일 목록보다 성공 기준, 데이터 흐름, 예외 상태를 먼저 쓴다.
+
+## Existing Specs
+
+- `mobile-was-architecture.md`: Expo 모바일 앱이 Spring WAS 설정을 통해 WebView를 여는 구조.
+
+## Spec Criteria
+
+새 product spec은 다음 상황에서 작성한다.
+
+- 사용자가 보는 주요 기능이 추가된다.
+- 기존 화면의 핵심 흐름이 바뀐다.
+- 외부 API나 모바일 앱처럼 실패 모드가 많은 기능이다.
+- 에이전트가 사용자 맥락을 해석하는 방식이 바뀐다.
+
+## Recommended Shape
+
+```md
+# Feature Name
+
+## Goal
+
+## User Flow
+
+## Data And API
+
+## Empty, Loading, Error States
+
+## Verification
+```
