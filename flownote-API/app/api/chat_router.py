@@ -1,27 +1,27 @@
 import uuid
-from typing import List
+import asyncio
+from typing import Any, List
 
-from fastapi import APIRouter, Query, Body
+from fastapi import APIRouter, Header
 
-from app.schemas import ChatMessageBase, ChatMessageCreate, ChatMessageDelete
-from app.models import ChatMessage
-from app.services.chat_service import ChatService
+from app.schemas import ChatMessageCreate, ChatMessageRead
+from app.core_api import forward_request
 
 router = APIRouter(prefix="/api/chat")
-chat_service = ChatService()
 
-@router.get("/", response_model=List[ChatMessageBase])
-async def get_chat_history():
-    return await chat_service.get_messages()
+@router.get("/", response_model=List[ChatMessageRead])
+async def get_chat_history(authorization: str | None = Header(default=None)):
+    return await asyncio.to_thread(forward_request, "GET", "/api/chat/", authorization)
 
-@router.post("/", response_model=ChatMessageBase)
-async def post_chat_message(user_text: ChatMessage):
-    return await chat_service.save_message(user_text)
+@router.post("/", response_model=ChatMessageRead)
+async def post_chat_message(user_text: ChatMessageCreate, authorization: str | None = Header(default=None)):
+    return await asyncio.to_thread(forward_request, "POST", "/api/chat/", authorization, user_text.model_dump(mode="json"))
 
-@router.delete("/{message_id}", response_model=ChatMessage)
-async def delete_chat_message(message_id: str):
-    return await chat_service.delete_message(uuid.UUID(message_id))
+@router.delete("/{message_id}", response_model=ChatMessageRead)
+async def delete_chat_message(message_id: str, authorization: str | None = Header(default=None)):
+    uuid.UUID(message_id)
+    return await asyncio.to_thread(forward_request, "DELETE", f"/api/chat/{message_id}", authorization)
 
-@router.delete("/", response_model=List[ChatMessage])
-async def delete_all_chat_messages():
-    return await chat_service.delete_all_chat()
+@router.delete("/", response_model=dict[str, Any])
+async def delete_all_chat_messages(authorization: str | None = Header(default=None)):
+    return await asyncio.to_thread(forward_request, "DELETE", "/api/chat/", authorization)

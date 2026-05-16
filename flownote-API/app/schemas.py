@@ -1,7 +1,8 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 class ChatMessageBase(BaseModel):
     sender: str
@@ -12,31 +13,38 @@ class ChatMessageCreate(ChatMessageBase):
     pass
 
 class ChatMessageRead(ChatMessageBase):
-    id: str
-    model_config = ConfigDict(from_attributes=True) 
+    id: UUID
 
-class ChatMessageDelete(BaseModel):
-    id: str
-    model_config = ConfigDict(from_attributes=True)
+class SocialMessageBase(BaseModel):
+    message: str
+    timestamp: Optional[datetime] = None
 
-    
-class TaskBase(BaseModel):
-    task_name: str
-    category: str = ""
-    difficulty_level: int = 1
-    status: str = 'TODO'
-    estimated_minutes: int = 0
-    actual_minutes: int = 0
-    due_date: str = "2026-03-31T00:00:00"
-    memo: str = ""
-    tags: list[str] = []
-    
-class TaskCreate(TaskBase):
-    pass
+class SocialMessageCreate(SocialMessageBase):
+    id: Optional[UUID] = None
 
-class TaskRead(TaskBase):
-    id: str
-    created_at: datetime
-    updated_at: datetime
-    
-    model_config = ConfigDict(from_attributes=True)
+class SocialRoomCreate(BaseModel):
+    id: Optional[UUID] = None
+    name: Optional[str] = None
+    participantIds: Optional[List[UUID]] = None
+    participantEmails: Optional[List[str]] = None
+
+class SocialRoomMemberRead(BaseModel):
+    id: UUID
+    username: str
+    nickname: str
+
+class SocialRoomRead(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: UUID
+    name: Optional[str] = None
+    members: List[SocialRoomMemberRead]
+    lastMessage: Optional[str] = Field(default=None, validation_alias="last_message")
+    updatedAt: datetime = Field(validation_alias="updated_at")
+
+class SocialMessageRead(SocialMessageBase):
+    id: UUID
+    room_id: UUID
+    user_id: UUID
+    nickname: str
+    mine: bool

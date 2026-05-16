@@ -3,12 +3,6 @@ FROM ghcr.io/astral-sh/uv:python3.12-alpine
 
 WORKDIR /app
 
-RUN apk add --no-cache \
-    postgresql-dev \
-    gcc \
-    musl-dev \
-    libffi-dev
-
 # 2. 의존성 파일 먼저 복사 (캐싱 효율화)
 COPY pyproject.toml uv.lock ./
 
