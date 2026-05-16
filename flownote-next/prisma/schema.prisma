@@ -11,3 +11,41 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+model Social {
+  id        String   @id @default(uuid()) @db.Uuid
+  roomId    String   @map("room_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  message   String
+  timestamp DateTime @default(now()) @db.Timestamptz(6)
+
+  room SocialRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([timestamp], map: "idx_social_timestamp")
+  @@index([userId, timestamp], map: "idx_social_user_timestamp")
+  @@index([roomId, timestamp], map: "idx_social_room_timestamp")
+  @@map("social")
+}
+
+model SocialRoom {
+  id        String             @id @default(uuid()) @db.Uuid
+  name      String?
+  createdBy String             @map("created_by") @db.Uuid
+  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime           @default(now()) @map("updated_at") @db.Timestamptz(6)
+  messages  Social[]
+  members   SocialRoomMember[]
+
+  @@map("social_rooms")
+}
+
+model SocialRoomMember {
+  roomId   String   @map("room_id") @db.Uuid
+  userId   String   @map("user_id") @db.Uuid
+  joinedAt DateTime @default(now()) @map("joined_at") @db.Timestamptz(6)
+  room     SocialRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, userId])
+  @@index([userId, roomId], map: "idx_social_room_members_user")
+  @@map("social_room_members")
+}

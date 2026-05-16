@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { corsHeaders, optionsResponse } from '../../../lib/cors';
+import { corsHeaders } from './cors';
 
 const coreApiBaseUrl = () => {
   const url = process.env.CORE_API_URL || process.env.SPRING_API_URL || process.env.NEXT_PUBLIC_API_URL;
@@ -9,17 +9,30 @@ const coreApiBaseUrl = () => {
   return url.replace(/\/$/, '');
 };
 
-const POST = async (request: Request) => {
-  const headers: HeadersInit = {};
+const proxyCoreApi = async (
+  request: Request,
+  path: string,
+  options: { method?: string; body?: unknown } = {}
+) => {
+  const method = options.method ?? request.method;
+  const headers: HeadersInit = {
+    Accept: 'application/json',
+  };
   const authorization = request.headers.get('authorization');
   if (authorization) {
     headers.Authorization = authorization;
   }
 
-  const response = await fetch(`${coreApiBaseUrl()}/api/notes/upload`, {
-    method: 'POST',
+  let body: BodyInit | undefined;
+  if (options.body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    body = JSON.stringify(options.body);
+  }
+
+  const response = await fetch(`${coreApiBaseUrl()}${path}`, {
+    method,
     headers,
-    body: await request.formData(),
+    body,
     cache: 'no-store',
   });
   const text = await response.text();
@@ -31,6 +44,4 @@ const POST = async (request: Request) => {
   });
 };
 
-const OPTIONS = async () => optionsResponse();
-
-export { POST, OPTIONS };
+export { proxyCoreApi };
