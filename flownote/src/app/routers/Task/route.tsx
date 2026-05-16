@@ -1,4 +1,4 @@
-import TaskPage from "../../../pages/TaskPage/page";
+import { TaskPage } from "../../../pages";
 
 const TaskRoute = () => {
     return(
