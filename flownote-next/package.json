@@ -1,0 +1,39 @@
+{
+  "name": "flownote-next",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -H 192.168.0.18",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "bcrypt-ts": "^8.0.1",
+    "bcryptjs": "^3.0.3",
+    "next": "16.1.6",
+    "pg": "^8.20.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "uuid": "^14.0.0"
+  },
+  "devDependencies": {
+    "@prisma/client": "^7.7.0",
+    "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^3.0.0",
+    "@types/node": "^20",
+    "@types/pg": "^8.20.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "prisma": "^7.7.0",
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5"
+  },
+  "main": "index.js",
+  "repository": "https://github.com/lunce0503/flownote-next.git",
+  "author": "lunce0503",
+  "license": "MIT"
+}

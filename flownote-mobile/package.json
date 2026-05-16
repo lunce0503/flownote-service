@@ -1,0 +1,33 @@
+{
+  "name": "flownote-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "packageManager": "yarn@1.22.22",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "eas": "npx --yes eas-cli@latest",
+    "eas:configure": "npx --yes eas-cli@latest build:configure",
+    "build:android": "npx --yes eas-cli@latest build -p android --profile preview",
+    "build:ios": "npx --yes eas-cli@latest build -p ios --profile preview",
+    "typecheck": "tsc --noEmit",
+    "verify:contract": "node scripts/verify-mobile-contract.mjs",
+    "verify:local-types": "node scripts/verify-local-types.mjs",
+    "verify": "yarn verify:contract && yarn verify:local-types"
+  },
+  "dependencies": {
+    "expo": "~55.0.0",
+    "react": "19.2.0",
+    "react-native": "0.83.6",
+    "react-native-webview": "13.16.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "typescript": "^5.9.3"
+  }
+}

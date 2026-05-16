@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Flownote",
+    "slug": "flownote-mobile",
+    "version": "0.1.0",
+    "runtimeVersion": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "flownote",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      },
+      "bundleIdentifier": "com.flownote.mobile"
+    },
+    "android": {
+      "package": "com.flownote.mobile",
+      "permissions": [],
+      "usesCleartextTraffic": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0026ed46-eac0-4368-88ec-51f945829eb0"
+      }
+    }
+  }
+}
