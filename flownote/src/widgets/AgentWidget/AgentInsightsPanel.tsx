@@ -1,4 +1,5 @@
 import { FileText, Lightbulb, Link2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import type { KnowledgeNote } from "./model";
 import { getNotePreview } from "./model";
 import type { TaskProps } from "../../entities/task";
@@ -50,9 +51,9 @@ const AgentInsightsPanel = ({ activeTasks, recentNotes, knowledgeThemes }: Agent
             <div className="space-y-2">
                 {recentNotes.length > 0 ? (
                     recentNotes.map((note) => (
-                        <a
+                        <Link
                             key={note.id}
-                            href={`/blog/${encodeURIComponent(note.title)}`}
+                            to={`/blog/${encodeURIComponent(note.title)}`}
                             className="block rounded-md border border-stone-200 p-3 hover:bg-stone-50"
                         >
                             <p className="flex items-center gap-2 truncate text-sm font-semibold">
@@ -60,7 +61,7 @@ const AgentInsightsPanel = ({ activeTasks, recentNotes, knowledgeThemes }: Agent
                                 <span className="truncate">{note.title}</span>
                             </p>
                             <p className="mt-1 line-clamp-2 text-xs text-stone-500">{getNotePreview(note)}</p>
-                        </a>
+                        </Link>
                     ))
                 ) : (
                     <p className="rounded-md bg-stone-50 p-4 text-sm text-stone-500">작성된 노트가 없습니다.</p>

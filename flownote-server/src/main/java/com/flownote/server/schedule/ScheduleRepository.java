@@ -4,6 +4,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
+import com.flownote.canvas.CanvasAssetStorage;
+import com.flownote.canvas.CanvasAssetStorage.StoredCanvasAsset;
+
 import java.sql.Array;
 import java.sql.PreparedStatement;
 import java.sql.Time;
@@ -17,6 +20,7 @@ import java.util.UUID;
 @Repository
 public class ScheduleRepository {
     private final JdbcTemplate jdbcTemplate;
+    private final CanvasAssetStorage assetStorage;
 
     private final RowMapper<ScheduleItem> rowMapper = (rs, rowNum) -> {
         Array daysArray = rs.getArray("days_of_week");
@@ -32,21 +36,22 @@ public class ScheduleRepository {
                 rs.getTime("end_time").toLocalTime(),
                 rs.getString("category"),
                 rs.getString("color"),
-                rs.getString("memo"),
+                readMemo(rs.getString("memo"), rs.getString("memo_object_key")),
                 rs.getBoolean("is_active"),
                 rs.getTimestamp("created_at").toInstant(),
                 rs.getTimestamp("updated_at").toInstant()
         );
     };
 
-    public ScheduleRepository(JdbcTemplate jdbcTemplate) {
+    public ScheduleRepository(JdbcTemplate jdbcTemplate, CanvasAssetStorage assetStorage) {
         this.jdbcTemplate = jdbcTemplate;
+        this.assetStorage = assetStorage;
     }
 
     public List<ScheduleItem> findAll(UUID userId) {
         return jdbcTemplate.query("""
                 SELECT id, title, days_of_week, start_time, end_time, category,
-                       color, memo, is_active, created_at, updated_at
+                       color, memo, memo_object_key, is_active, created_at, updated_at
                 FROM daily_schedule_items
                 WHERE user_id = ?
                 ORDER BY start_time ASC, created_at DESC
@@ -54,25 +59,30 @@ public class ScheduleRepository {
     }
 
     public ScheduleItem create(UUID userId, ScheduleItemRequest request) {
+        String itemId = UUID.randomUUID().toString();
+        StoredCanvasAsset storedMemo = storeMemo(userId, itemId, request.memo());
         List<ScheduleItem> items = jdbcTemplate.query(connection -> {
             PreparedStatement ps = connection.prepareStatement("""
                     INSERT INTO daily_schedule_items (
-                        user_id, title, days_of_week, start_time, end_time,
-                        category, color, memo, is_active
+                        id, user_id, title, days_of_week, start_time, end_time,
+                        category, color, memo, memo_object_key, memo_byte_size, memo_public_url, is_active
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?::uuid, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
                     RETURNING id, title, days_of_week, start_time, end_time, category,
-                              color, memo, is_active, created_at, updated_at
+                              color, memo, memo_object_key, is_active, created_at, updated_at
                     """);
-            ps.setObject(1, userId);
-            ps.setString(2, request.title());
-            ps.setArray(3, connection.createArrayOf("text", request.daysOfWeek().toArray(String[]::new)));
-            ps.setTime(4, Time.valueOf(request.startTime()));
-            ps.setTime(5, Time.valueOf(request.endTime()));
-            setNullableString(ps, 6, request.category());
-            ps.setString(7, request.color());
-            setNullableString(ps, 8, request.memo());
-            ps.setBoolean(9, Boolean.TRUE.equals(request.isActive()));
+            ps.setString(1, itemId);
+            ps.setObject(2, userId);
+            ps.setString(3, request.title());
+            ps.setArray(4, connection.createArrayOf("text", request.daysOfWeek().toArray(String[]::new)));
+            ps.setTime(5, Time.valueOf(request.startTime()));
+            ps.setTime(6, Time.valueOf(request.endTime()));
+            setNullableString(ps, 7, request.category());
+            ps.setString(8, request.color());
+            ps.setString(9, storedMemo.objectKey());
+            ps.setLong(10, storedMemo.byteSize());
+            ps.setString(11, storedMemo.publicUrl());
+            ps.setBoolean(12, Boolean.TRUE.equals(request.isActive()));
             return ps;
         }, rowMapper);
 
@@ -96,9 +106,17 @@ public class ScheduleRepository {
                 DELETE FROM daily_schedule_items
                 WHERE id = ? AND user_id = ?
                 RETURNING id, title, days_of_week, start_time, end_time, category,
-                          color, memo, is_active, created_at, updated_at
+                          color, memo, memo_object_key, is_active, created_at, updated_at
                 """, rowMapper, id, userId);
         return items.stream().findFirst();
+    }
+
+    public StoredCanvasAsset storeMemo(UUID userId, String itemId, String memo) {
+        return assetStorage.putText("schedule-payloads/%s/%s/memo.txt".formatted(userId, itemId), memo);
+    }
+
+    private String readMemo(String fallback, String objectKey) {
+        return objectKey == null || objectKey.isBlank() ? fallback : assetStorage.readText(objectKey);
     }
 
     private static void setNullableString(PreparedStatement ps, int index, String value) throws java.sql.SQLException {
@@ -109,7 +127,7 @@ public class ScheduleRepository {
         }
     }
 
-    public sealed interface SqlValue permits StringValue, TimeValue, DaysValue, BooleanValue, UuidValue {
+    public sealed interface SqlValue permits StringValue, LongValue, TimeValue, DaysValue, BooleanValue, UuidValue {
         void bind(PreparedStatement ps, int index) throws java.sql.SQLException;
     }
 
@@ -117,6 +135,17 @@ public class ScheduleRepository {
         @Override
         public void bind(PreparedStatement ps, int index) throws java.sql.SQLException {
             setNullableString(ps, index, value);
+        }
+    }
+
+    public record LongValue(Long value) implements SqlValue {
+        @Override
+        public void bind(PreparedStatement ps, int index) throws java.sql.SQLException {
+            if (value == null) {
+                ps.setNull(index, Types.BIGINT);
+            } else {
+                ps.setLong(index, value);
+            }
         }
     }
 

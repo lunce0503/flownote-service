@@ -2,7 +2,7 @@ import "@blocknote/core/fonts/inter.css";
 import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
 import { useCreateBlockNote } from "@blocknote/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import {
   BlockNoteSchema,
   defaultBlockSpecs,
@@ -18,8 +18,13 @@ import { LatexInline } from "./LatexInline";
 import { transformLatexInlineContent } from "./latexTransform";
 import NoteDrawingPad from "./NoteDrawingPad";
 import { updateNoteTitle } from "../../../entities/blog/noteDataActions";
+import { subscribeSyncEvents } from "../../../shared/sync";
 
 const uploadFile = async (file: File) => {
+  if (!API_CORE_BASE_URL) {
+    throw new Error("노트 업로드 API 기본 URL이 설정되지 않았습니다.");
+  }
+
   const body = new FormData();
   body.append("file", file);
 
@@ -55,6 +60,7 @@ const  BlockNote = () => {
   const [isLoading,setIsLoading] = useState<boolean>(true);
   const [isDrawingOpen, setIsDrawingOpen] = useState(false);
   const [isDrawingSaving, setIsDrawingSaving] = useState(false);
+  const [editingDrawingBlockId, setEditingDrawingBlockId] = useState<string | null>(null);
   const noteDataRef = useRef<BlockDataProps | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -95,6 +101,24 @@ const  BlockNote = () => {
     fetchData();
   }, [title, editor]);
 
+  useEffect(() => subscribeSyncEvents((event) => {
+    if (event.resource !== "notes" && event.resource !== "all") return;
+    if (!title) return;
+
+    const refreshNote = async () => {
+      const decodedTitle = decodeURIComponent(title);
+      const data: BlockDataProps[] = await getNoteData();
+      const targetData = data.find((note) => note.title === decodedTitle || note.id === noteDataRef.current?.id);
+      if (!targetData) return;
+
+      setNoteData(targetData);
+      noteDataRef.current = targetData;
+      editor.replaceBlocks(editor.document, targetData.content);
+    };
+
+    void refreshNote();
+  }), [editor, title]);
+
   const normalizeLatexInBlocks = useCallback((blocks: BlockDataProps["content"]) => {
     for (const block of blocks) {
       if (Array.isArray(block.content)) {
@@ -128,7 +152,7 @@ const  BlockNote = () => {
 
   const saveNoteData = useCallback(async () => {
     const blockData = buildCurrentNoteData();
-    if (!blockData) return;
+    if (!blockData || !API_CORE_BASE_URL) return;
 
     noteDataRef.current = blockData;
     await postNoteData(blockData);
@@ -274,29 +298,70 @@ const  BlockNote = () => {
     }
   };
 
+  const findImageBlockByUrl = useCallback((url: string) => {
+    const visit = (blocks: typeof editor.document): any => {
+      for (const block of blocks) {
+        if (block.type === "image" && (block.props as any)?.url === url) {
+          return block;
+        }
+
+        const found = visit(block.children as typeof editor.document);
+        if (found) return found;
+      }
+
+      return null;
+    };
+
+    return visit(editor.document);
+  }, [editor]);
+
+  const handleEditorClick = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    const image = target?.closest("img") as HTMLImageElement | null;
+    if (!image?.src) return;
+
+    const block = findImageBlockByUrl(image.src);
+    if (!block) return;
+
+    setEditingDrawingBlockId(block.id);
+    setIsDrawingOpen(true);
+  };
+
   const handleSaveDrawing = async (file: File) => {
     setIsDrawingSaving(true);
     try {
       const imageUrl = await uploadFile(file);
-      const referenceBlock = editor.getTextCursorPosition().block;
-
-      editor.insertBlocks(
-        [
-          {
-            type: "image",
-            props: {
-              url: imageUrl,
-              name: file.name,
-              caption: "드로잉 필기",
-              showPreview: true,
-            },
+      if (editingDrawingBlockId) {
+        editor.updateBlock(editingDrawingBlockId, {
+          props: {
+            url: imageUrl,
+            name: file.name,
+            caption: "드로잉 필기 수정본",
+            showPreview: true,
           },
-        ] as any,
-        referenceBlock,
-        "after",
-      );
+        } as any);
+      } else {
+        const referenceBlock = editor.getTextCursorPosition().block;
+
+        editor.insertBlocks(
+          [
+            {
+              type: "image",
+              props: {
+                url: imageUrl,
+                name: file.name,
+                caption: "드로잉 필기",
+                showPreview: true,
+              },
+            },
+          ] as any,
+          referenceBlock,
+          "after",
+        );
+      }
 
       setIsDrawingOpen(false);
+      setEditingDrawingBlockId(null);
       await flushSave();
     } finally {
       setIsDrawingSaving(false);
@@ -321,14 +386,17 @@ const  BlockNote = () => {
         />
         <button
           type="button"
-          onClick={() => setIsDrawingOpen(true)}
+          onClick={() => {
+            setEditingDrawingBlockId(null);
+            setIsDrawingOpen(true);
+          }}
           className="rounded-lg bg-stone-950 px-4 py-2 text-sm font-semibold text-white"
         >
           드로잉 필기
         </button>
       </div>
       
-      <div onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd}>
+      <div onClick={handleEditorClick} onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd}>
         <BlockNoteView 
           editor={editor} 
           onChange={handleNoteData}
@@ -339,7 +407,10 @@ const  BlockNote = () => {
       {isDrawingOpen ? (
         <NoteDrawingPad
           isSaving={isDrawingSaving}
-          onClose={() => setIsDrawingOpen(false)}
+          onClose={() => {
+            setEditingDrawingBlockId(null);
+            setIsDrawingOpen(false);
+          }}
           onSave={handleSaveDrawing}
         />
       ) : null}

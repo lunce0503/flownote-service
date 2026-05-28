@@ -4,6 +4,7 @@ import {
   Check,
   ClipboardList,
   HelpCircle,
+  Languages,
   Mail,
   MessageSquare,
   Moon,
@@ -18,6 +19,7 @@ import { useAuth } from "../../shared/auth/AuthContext";
 
 type FontScale = "normal" | "large";
 type Density = "comfortable" | "compact";
+type Language = "ko" | "en";
 
 type UserPreferences = {
   fontScale: FontScale;
@@ -104,6 +106,9 @@ const SettingsPage = () => {
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
   const [preferences, setPreferences] = useState<UserPreferences>(readPreferences);
+  const [language, setLanguage] = useState<Language>(() => (
+    window.localStorage.getItem("flownote_language") === "en" ? "en" : "ko"
+  ));
   const [feedback, setFeedback] = useState({
     category: "사용 어려움",
     message: "",
@@ -117,6 +122,12 @@ const SettingsPage = () => {
       window.localStorage.setItem(PREF_STORAGE_KEY, JSON.stringify(merged));
       return merged;
     });
+  };
+
+  const updateLanguage = (nextLanguage: Language) => {
+    window.localStorage.setItem("flownote_language", nextLanguage);
+    setLanguage(nextLanguage);
+    window.dispatchEvent(new Event("flownote-language-change"));
   };
 
   useEffect(() => {
@@ -180,6 +191,21 @@ const SettingsPage = () => {
                 <OptionButton active={theme === "dark"} onClick={() => setTheme("dark" as ThemeMode)}>
                   <Moon size={18} />
                   다크 모드
+                </OptionButton>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-stone-200 bg-white p-4">
+              <div className="mb-4 flex items-center gap-2">
+                <Languages size={20} className="text-emerald-700" />
+                <h2 className="text-lg font-black text-stone-950">언어</h2>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <OptionButton active={language === "ko"} onClick={() => updateLanguage("ko")}>
+                  한국어
+                </OptionButton>
+                <OptionButton active={language === "en"} onClick={() => updateLanguage("en")}>
+                  English
                 </OptionButton>
               </div>
             </section>

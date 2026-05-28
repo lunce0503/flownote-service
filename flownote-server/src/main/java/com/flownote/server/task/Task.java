@@ -15,7 +15,16 @@ public record Task(
         LocalDate dueDate,
         String memo,
         List<String> tags,
+        List<String> links,
+        List<TaskTimeLog> timeLogs,
         Instant createdAt,
         Instant updatedAt
 ) {
+    public record TaskTimeLog(
+            String id,
+            String label,
+            Integer minutes,
+            LocalDate performedDate
+    ) {
+    }
 }

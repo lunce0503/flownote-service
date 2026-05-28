@@ -7,7 +7,9 @@ import { useDrawing } from "../../../../features/canvas/model/useDrawing";
 import { useElementManipulation } from "../../../../features/canvas/model/useElementManipulation";
 import { useCanvasRendering } from "../../../../features/canvas/model/useCanvasRendering";
 import { useCanvasHistory } from "../../../../features/canvas/model/useCanvasHistory";
+import { CANVAS_PENCIL_ONLY_MODE_STORAGE_KEY } from "../../../../features/canvas/model/canvasConstants";
 import type { LineElement, Point, ToolType } from "../../../../entities/canvas/model/types";
+import { useLocalStorageBoolean } from "../../../../shared/lib/useLocalStorageBoolean";
 
 type NoteDrawingCanvasProps = {
   isSaving: boolean;
@@ -19,8 +21,10 @@ const CANVAS_WIDTH = 960;
 const CANVAS_HEIGHT = 540;
 
 const NoteDrawingCanvas = ({ isSaving, onCancel, onSave }: NoteDrawingCanvasProps) => {
+  const rendererRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pointers = useRef<Map<number, Point>>(new Map());
+  const [pencilOnlyMode, setPencilOnlyMode] = useLocalStorageBoolean(CANVAS_PENCIL_ONLY_MODE_STORAGE_KEY, true);
 
   const { offset, scale, tool, setTool, getCanvasCoords } = useCanvasState(canvasRef);
   const {
@@ -29,6 +33,8 @@ const NoteDrawingCanvas = ({ isSaving, onCancel, onSave }: NoteDrawingCanvasProp
     drawnLines,
     setDrawnLines,
     currentLine,
+    appendPointerToCurrentLine,
+    finishCurrentLine,
     eraseAtPointer,
   } = useDrawing(getCanvasCoords, tool);
   const {
@@ -50,16 +56,31 @@ const NoteDrawingCanvas = ({ isSaving, onCancel, onSave }: NoteDrawingCanvasProp
     setImages,
     setTextBoxes,
   });
-  const { redrawWith } = useCanvasRendering(canvasRef, offset, scale, currentLine.current);
+  const { redrawWith } = useCanvasRendering(
+    rendererRef,
+    offset,
+    scale,
+    currentLine.current,
+    { color: "#000000", strokeWidth: 2 },
+    { width: CANVAS_WIDTH, height: CANVAS_HEIGHT },
+  );
 
   useEffect(() => {
     redrawWith(drawnLines, images, textBoxes);
   }, [drawnLines, images, redrawWith, textBoxes]);
 
+  const blocksTouchDrawing = (event: PointerEvent<HTMLCanvasElement>) => (
+    pencilOnlyMode && event.pointerType === "touch" && (tool === "pen" || tool === "eraser")
+  );
+
+  const togglePencilOnlyMode = () => setPencilOnlyMode((current) => !current);
+
   const handlePointerDown = (event: PointerEvent<HTMLCanvasElement>) => {
     const pos = { x: event.clientX, y: event.clientY };
     pointers.current.set(event.pointerId, pos);
     event.currentTarget.setPointerCapture(event.pointerId);
+
+    if (blocksTouchDrawing(event)) return;
 
     if (tool === "eraser") {
       recordHistory();
@@ -70,8 +91,8 @@ const NoteDrawingCanvas = ({ isSaving, onCancel, onSave }: NoteDrawingCanvasProp
 
     if (tool === "pen") {
       recordHistory();
-      const { x, y } = getCanvasCoords(event);
-      currentLine.current = [{ x, y }];
+      currentLine.current = [];
+      appendPointerToCurrentLine(event);
       setIsDrawing(true);
     }
   };
@@ -80,6 +101,8 @@ const NoteDrawingCanvas = ({ isSaving, onCancel, onSave }: NoteDrawingCanvasProp
     if (!pointers.current.has(event.pointerId)) return;
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
 
+    if (blocksTouchDrawing(event)) return;
+
     if (tool === "eraser") {
       eraseAtPointer(event);
       eraseElementAtPointer(event);
@@ -87,8 +110,7 @@ const NoteDrawingCanvas = ({ isSaving, onCancel, onSave }: NoteDrawingCanvasProp
     }
 
     if (tool === "pen" && isDrawing) {
-      const { x, y } = getCanvasCoords(event);
-      currentLine.current.push({ x, y });
+      appendPointerToCurrentLine(event);
       redrawWith(drawnLines, images, textBoxes);
     }
   };
@@ -101,9 +123,8 @@ const NoteDrawingCanvas = ({ isSaving, onCancel, onSave }: NoteDrawingCanvasProp
 
     if (!isDrawing) return;
 
-    setIsDrawing(false);
-    const finishedLine = [...currentLine.current];
-    currentLine.current = [];
+    appendPointerToCurrentLine(event);
+    const finishedLine = finishCurrentLine();
 
     if (finishedLine.length < 1) return;
 
@@ -126,18 +147,18 @@ const NoteDrawingCanvas = ({ isSaving, onCancel, onSave }: NoteDrawingCanvasProp
   };
 
   const handleExport = async () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const renderedCanvas = rendererRef.current?.querySelector("canvas");
+    if (!renderedCanvas) return;
 
     const output = document.createElement("canvas");
-    output.width = canvas.width;
-    output.height = canvas.height;
+    output.width = renderedCanvas.width;
+    output.height = renderedCanvas.height;
     const context = output.getContext("2d");
     if (!context) return;
 
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, output.width, output.height);
-    context.drawImage(canvas, 0, 0);
+    context.drawImage(renderedCanvas, 0, 0);
 
     const blob = await new Promise<Blob | null>((resolve) => output.toBlob(resolve, "image/png"));
     if (!blob) return;
@@ -155,9 +176,31 @@ const NoteDrawingCanvas = ({ isSaving, onCancel, onSave }: NoteDrawingCanvasProp
   ];
 
   return (
-    <div className="flex flex-col gap-3">
+    <div
+      className="flex flex-col gap-3"
+      style={{
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        WebkitTouchCallout: "none",
+      }}
+      onContextMenu={(event) => event.preventDefault()}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-stone-200 bg-stone-50 p-2">
         <div className="flex flex-wrap gap-1">
+          <button
+            type="button"
+            onClick={togglePencilOnlyMode}
+            className={`inline-flex h-10 items-center gap-2 rounded-md px-3 text-sm font-semibold transition-colors ${
+              pencilOnlyMode
+                ? "bg-stone-900 text-white shadow-sm"
+                : "bg-white text-stone-700 hover:bg-stone-200"
+            }`}
+            aria-pressed={pencilOnlyMode}
+            title={pencilOnlyMode ? "애플펜슬 전용 켜짐" : "애플펜슬 전용 꺼짐"}
+          >
+            <PenLine size={18} />
+            애플펜슬 전용
+          </button>
           {toolButtons.map((item) => {
             const selected = tool === item.tool;
             return (
@@ -199,21 +242,27 @@ const NoteDrawingCanvas = ({ isSaving, onCancel, onSave }: NoteDrawingCanvasProp
         </div>
       </div>
 
-      <canvas
-        ref={canvasRef}
-        width={CANVAS_WIDTH}
-        height={CANVAS_HEIGHT}
-        className="h-[58vh] min-h-[320px] w-full touch-none rounded-xl border border-stone-300 bg-white"
-        style={{
-          cursor: tool === "eraser" ? "cell" : "crosshair",
-        }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-        onContextMenu={(event) => event.preventDefault()}
-      />
+      <div className="relative h-[58vh] min-h-[320px] w-full overflow-hidden rounded-xl border border-stone-300 bg-white">
+        <div ref={rendererRef} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" />
+        <canvas
+          ref={canvasRef}
+          width={CANVAS_WIDTH}
+          height={CANVAS_HEIGHT}
+          className="relative z-10 h-full w-full touch-none bg-transparent"
+          style={{
+            cursor: tool === "eraser" ? "cell" : "crosshair",
+            userSelect: "none",
+            WebkitUserSelect: "none",
+            WebkitTouchCallout: "none",
+          }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          onPointerLeave={handlePointerUp}
+          onContextMenu={(event) => event.preventDefault()}
+        />
+      </div>
 
       <div className="flex justify-end gap-2">
         <button

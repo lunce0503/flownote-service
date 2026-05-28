@@ -9,6 +9,8 @@ export type Point = {
 export type LineElement = {
     id: string;
     points: Point[];
+    color?: string;
+    strokeWidth?: number;
     status?: CanvasElementStatus; // 상태 추가
 };
 
@@ -16,10 +18,15 @@ export type ImageElement = {
     id: string;
     image: HTMLImageElement;
     url: string; // 이미지 URL
+    assetId?: string;
+    objectKey?: string;
+    contentType?: string;
+    byteSize?: number;
     x: number;
     y: number;
     width: number;
     height: number;
+    tintColor?: string;
     status?: CanvasElementStatus; // 상태 추가
 };
 
@@ -30,6 +37,7 @@ export type TextBoxElement = {
     y: number;
     width: number;
     height: number;
+    color?: string;
     status?: CanvasElementStatus; // 상태 추가
 };
 
@@ -52,9 +60,33 @@ export type CanvasSavePayload = {
 };
 
 export type CanvasLoadData = {
+  id?: string;
+  title?: string;
   lines: Omit<LineElement, 'status'>[];
   images: Omit<ImageElement, 'status'>[];
   textBoxes: Omit<TextBoxElement, 'status'>[];
 };
 
-export type ToolType = 'pen' | 'eraser' | 'handle' | 'text';
+export type ToolType = 'pen' | 'eraser' | 'handle' | 'text' | 'lasso';
+
+export type CanvasDocumentSummary = {
+  id: string;
+  title: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type CanvasFolder = {
+  id: string;
+  category: string;
+  name: string;
+  canvasIds: string[];
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type CanvasFolderPayload = {
+  category: string;
+  name: string;
+  canvasIds?: string[];
+};

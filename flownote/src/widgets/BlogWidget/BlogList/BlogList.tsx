@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { Link } from "react-router-dom";
 import { Check, Folder, MoreVertical, Pencil, Plus, Trash2, X } from "lucide-react";
-import { v4 as uuidv4 } from "uuid";
 import getNoteData from "../../../entities/blog/getNoteData";
 import postNoteData from "../../../entities/blog/postNoteData";
 import { deleteNote, updateNoteTitle } from "../../../entities/blog/noteDataActions";
@@ -14,60 +13,28 @@ import {
   updateNoteFolder,
   type NoteFolder,
 } from "../../../entities/blog/noteFolderData";
-import type { BlockDataProps } from "../../../entities/blog";
-
-type NoteBlock = {
-  content?: Array<{
-    text?: string;
-  }>;
-};
-
-type BlogNote = {
-  id: string;
-  title: string;
-  content: NoteBlock[];
-  created_at?: string | Date;
-};
-
-type FolderForm = {
-  category: string;
-  name: string;
-};
-
-const EMPTY_FORM: FolderForm = {
-  category: "",
-  name: "",
-};
-
-const getPreview = (note: BlogNote) => note.content?.[0]?.content?.[0]?.text || "No content";
-
-const createBlankNote = (title: string): BlockDataProps => ({
-  title,
-  id: uuidv4(),
-  content: [
-    {
-      id: uuidv4(),
-      type: "paragraph",
-      content: [],
-      props: {
-        textColor: "default",
-        backgroundColor: "default",
-        textAlignment: "left",
-      },
-      children: [],
-    },
-  ] as any,
-  created_at: new Date(),
-});
+import {
+  BLOG_COLLAPSED_FOLDERS_STORAGE_KEY,
+  EMPTY_BLOG_FOLDER_FORM,
+  buildNoteFolderIdByNoteId,
+  createBlankNote,
+  getNotePreview,
+  getUnfiledNotes,
+  groupNoteFoldersByCategory,
+  type BlogNote,
+  type FolderForm,
+} from "../../../features/blog/model/blogListModel";
+import { useLocalStorageStringSet } from "../../../shared/lib/useLocalStorageStringSet";
+import { subscribeSyncEvents } from "../../../shared/sync";
 
 const BlogList = () => {
   const [blogList, setBlogList] = useState<BlogNote[]>([]);
   const [folders, setFolders] = useState<NoteFolder[]>([]);
-  const [folderForm, setFolderForm] = useState<FolderForm>(EMPTY_FORM);
+  const [folderForm, setFolderForm] = useState<FolderForm>(EMPTY_BLOG_FOLDER_FORM);
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
-  const [editingForm, setEditingForm] = useState<FolderForm>(EMPTY_FORM);
+  const [editingForm, setEditingForm] = useState<FolderForm>(EMPTY_BLOG_FOLDER_FORM);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(() => new Set());
+  const [collapsedFolderIds, setCollapsedFolderIds] = useLocalStorageStringSet(BLOG_COLLAPSED_FOLDERS_STORAGE_KEY);
   const [openNoteMenuId, setOpenNoteMenuId] = useState<string | null>(null);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteTitle, setEditingNoteTitle] = useState<string>("");
@@ -78,31 +45,28 @@ const BlogList = () => {
     void handleBlogList();
   }, []);
 
-  const noteFolderIdByNoteId = useMemo(() => {
-    const entries = folders.flatMap((folder) => folder.noteIds.map((noteId) => [noteId, folder.id] as const));
-    return new Map(entries);
-  }, [folders]);
+  useEffect(() => subscribeSyncEvents((event) => {
+    if (event.resource === "notes" || event.resource === "all") {
+      void handleBlogList();
+    }
+  }), []);
+
+  const noteFolderIdByNoteId = useMemo(() => buildNoteFolderIdByNoteId(folders), [folders]);
 
   const unfiledNotes = useMemo(
-    () => blogList.filter((note) => !noteFolderIdByNoteId.has(note.id)),
+    () => getUnfiledNotes(blogList, noteFolderIdByNoteId),
     [blogList, noteFolderIdByNoteId],
   );
 
-  const foldersByCategory = useMemo(() => {
-    return folders.reduce<Record<string, NoteFolder[]>>((acc, folder) => {
-      const category = folder.category.trim() || "카테고리 없음";
-      acc[category] = [...(acc[category] ?? []), folder];
-      return acc;
-    }, {});
-  }, [folders]);
+  const foldersByCategory = useMemo(() => groupNoteFoldersByCategory(folders), [folders]);
 
   const handleBlogList = async () => {
     setLoading(true);
     setError(null);
     try {
       const [notes, noteFolders] = await Promise.all([getNoteData(), getNoteFolders()]);
-      setBlogList(notes);
-      setFolders(noteFolders);
+      setBlogList(Array.isArray(notes) ? notes : []);
+      setFolders(Array.isArray(noteFolders) ? noteFolders : []);
     } catch (err) {
       console.error("Failed to fetch blog data:", err);
       setError("데이터를 불러오는 중 오류가 발생했습니다.");
@@ -136,7 +100,7 @@ const BlogList = () => {
         name: folderForm.name,
       });
       setFolders((prev) => [created, ...prev]);
-      setFolderForm(EMPTY_FORM);
+      setFolderForm(EMPTY_BLOG_FOLDER_FORM);
     } catch (err) {
       console.error("Failed to create note folder:", err);
       setError("폴더를 생성하는 중 오류가 발생했습니다.");
@@ -265,7 +229,7 @@ const BlogList = () => {
     <div
       draggable
       onDragStart={(event) => event.dataTransfer.setData("text/plain", note.id)}
-      className="mb-2 w-full rounded-md border border-stone-200 bg-white text-black transition hover:bg-stone-100"
+      className="mb-2 w-full rounded-md border border-stone-200 bg-white text-black shadow-sm transition hover:border-stone-300 hover:bg-stone-50"
       key={note.id}
     >
       <div className="flex items-start gap-2 p-3">
@@ -290,7 +254,7 @@ const BlogList = () => {
               <h3 className="truncate font-semibold">{note.title}</h3>
             </Link>
           )}
-          <span className="line-clamp-2 text-xs text-stone-500">{getPreview(note)}</span>
+          <span className="line-clamp-2 text-xs text-stone-500">{getNotePreview(note)}</span>
         </div>
 
         {editingNoteId === note.id ? (
@@ -344,9 +308,24 @@ const BlogList = () => {
   );
 
   return (
-    <div className="m-4 bg-white rounded-xl p-4">
-      <div className="mb-4 rounded bg-amber-100 px-4 py-4 font-bold text-stone-800">
-        {loading ? "Loading" : "Blog Notes"}
+    <div className="min-h-[calc(100vh-56px)] bg-stone-950 p-3 text-stone-900 md:p-5">
+      <div className="mx-auto max-w-7xl rounded-2xl border border-stone-200 bg-stone-50 p-4 shadow-xl md:p-5">
+      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase text-amber-700">Knowledge Stream</p>
+          <h1 className="text-2xl font-black text-stone-950 md:text-3xl">게시글 관리</h1>
+          <p className="text-sm text-stone-500">폴더, 최근 노트, 드로잉 필기를 한 화면에서 정리합니다.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-center">
+          <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
+            <div className="text-lg font-black">{blogList.length}</div>
+            <div className="text-xs text-stone-500">노트</div>
+          </div>
+          <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
+            <div className="text-lg font-black">{folders.length}</div>
+            <div className="text-xs text-stone-500">폴더</div>
+          </div>
+        </div>
       </div>
 
       <div className="mb-4 grid gap-2 rounded-lg border border-stone-200 p-3 md:grid-cols-[1fr_1fr_auto]">
@@ -518,6 +497,7 @@ const BlogList = () => {
             !loading && <p className="py-8 text-center text-sm text-stone-500">작성된 글이 없습니다</p>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

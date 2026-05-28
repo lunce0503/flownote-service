@@ -1,4 +1,4 @@
-import { BrainCircuit, MessageSquareText, Sparkles, Trash2 } from "lucide-react";
+import { BrainCircuit, EyeOff, MessageSquareText, Plus, Sparkles, Trash2 } from "lucide-react";
 import { ChatBlock, ChatSendBlock, type ChatMessage } from "../../shared/ui/ChatBlock";
 import { useState, type RefObject } from "react";
 import type { AgentProfile } from "./model";
@@ -14,15 +14,16 @@ type AgentConversationPanelProps = {
     selectedAgent: AgentProfile;
     selectedAgentId: string;
     onSelectAgent: (agentId: string) => void;
-    agentInstruction: string;
-    onAgentInstructionChange: (instruction: string) => void;
+    recommendedCommands: string[];
+    customCommand: string;
+    onCustomCommandChange: (command: string) => void;
+    onAddCustomCommand: () => void;
+    customAgentName: string;
+    customAgentPrompt: string;
+    onCustomAgentNameChange: (name: string) => void;
+    onCustomAgentPromptChange: (prompt: string) => void;
+    onCreateCustomAgent: () => void;
 };
-
-const prompts = [
-    "최근 노트와 작업을 연결해서 오늘 집중할 순서를 정리해줘",
-    "내 지식 베이스에서 비어있는 주제와 다음 작성 후보를 찾아줘",
-    "진행 중인 작업을 기준으로 실행 가능한 체크리스트를 만들어줘",
-];
 
 const AgentConversationPanel = ({
     messages,
@@ -35,15 +36,36 @@ const AgentConversationPanel = ({
     selectedAgent,
     selectedAgentId,
     onSelectAgent,
-    agentInstruction,
-    onAgentInstructionChange,
+    recommendedCommands,
+    customCommand,
+    onCustomCommandChange,
+    onAddCustomCommand,
+    customAgentName,
+    customAgentPrompt,
+    onCustomAgentNameChange,
+    onCustomAgentPromptChange,
+    onCreateCustomAgent,
 }: AgentConversationPanelProps) => {
     const [selectedPrompt, setSelectedPrompt] = useState("");
     const [selectedPromptKey, setSelectedPromptKey] = useState(0);
+    const [isAgentPanelVisible, setIsAgentPanelVisible] = useState(() => localStorage.getItem("flownote.hideAgentPanel") !== "true");
+    const [areCommandsVisible, setAreCommandsVisible] = useState(() => localStorage.getItem("flownote.hideAgentCommands") !== "true");
 
     const handlePromptSelect = (prompt: string) => {
         setSelectedPrompt(prompt);
         setSelectedPromptKey((key) => key + 1);
+    };
+
+    const toggleAgentPanel = () => {
+        const next = !isAgentPanelVisible;
+        localStorage.setItem("flownote.hideAgentPanel", String(!next));
+        setIsAgentPanelVisible(next);
+    };
+
+    const toggleCommands = () => {
+        const next = !areCommandsVisible;
+        localStorage.setItem("flownote.hideAgentCommands", String(!next));
+        setAreCommandsVisible(next);
     };
 
     return (
@@ -72,7 +94,24 @@ const AgentConversationPanel = ({
                     <Trash2 size={15} />
                     대화 지우기
                 </button>
+                <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-md border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50"
+                    onClick={toggleAgentPanel}
+                >
+                    <EyeOff size={15} />
+                    {isAgentPanelVisible ? "에이전트 숨김" : "에이전트 표시"}
+                </button>
+                <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-md border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50"
+                    onClick={toggleCommands}
+                >
+                    <EyeOff size={15} />
+                    {areCommandsVisible ? "명령 숨김" : "명령 표시"}
+                </button>
             </div>
+            {isAgentPanelVisible ? (
             <div className="mt-3 grid gap-3 rounded-lg border border-stone-200 bg-white p-3 md:grid-cols-[minmax(180px,240px)_1fr]">
                 <label className="block">
                     <span className="mb-1 block text-xs font-bold text-stone-600">현재 에이전트</span>
@@ -94,15 +133,34 @@ const AgentConversationPanel = ({
                 </label>
                 <div>
                     <div className="mb-2 text-sm font-semibold text-stone-900">{selectedAgent.description}</div>
-                    <textarea
-                        className="h-20 w-full resize-none rounded-md border border-stone-300 p-2 text-sm text-stone-800 outline-none focus:ring-2 focus:ring-blue-400"
-                        placeholder="에이전트 기능을 조작할 프롬프트를 입력하세요."
-                        value={agentInstruction}
-                        onChange={(event) => onAgentInstructionChange(event.target.value)}
-                        disabled={isLoading}
-                    />
+                    <div className="grid gap-2 md:grid-cols-[160px_1fr_auto]">
+                        <input
+                            className="rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                            placeholder="커스텀 에이전트명"
+                            value={customAgentName}
+                            onChange={(event) => onCustomAgentNameChange(event.target.value)}
+                            disabled={isLoading}
+                        />
+                        <input
+                            className="rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                            placeholder="에이전트 역할 프롬프트"
+                            value={customAgentPrompt}
+                            onChange={(event) => onCustomAgentPromptChange(event.target.value)}
+                            disabled={isLoading}
+                        />
+                        <button
+                            type="button"
+                            className="inline-flex items-center justify-center gap-1 rounded-md bg-stone-900 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-stone-400"
+                            onClick={onCreateCustomAgent}
+                            disabled={isLoading || !customAgentName.trim() || !customAgentPrompt.trim()}
+                        >
+                            <Plus size={15} />
+                            추가
+                        </button>
+                    </div>
                 </div>
             </div>
+            ) : null}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto bg-stone-50 p-3 md:p-4" ref={chatContainerRef}>
@@ -123,8 +181,9 @@ const AgentConversationPanel = ({
             )}
         </div>
 
+        {areCommandsVisible ? (
         <div className="flex flex-wrap gap-2 border-t border-stone-200 bg-stone-100 p-3">
-            {prompts.map((prompt) => (
+            {recommendedCommands.map((prompt) => (
                 <button
                     key={prompt}
                     className="rounded-md border border-stone-200 bg-white px-3 py-2 text-left text-xs font-medium text-stone-700 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-amber-300 hover:bg-amber-50 hover:text-stone-950 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 disabled:cursor-not-allowed disabled:text-stone-400 disabled:hover:translate-y-0 disabled:hover:border-stone-200 disabled:hover:bg-white disabled:hover:shadow-sm"
@@ -135,7 +194,25 @@ const AgentConversationPanel = ({
                     {prompt}
                 </button>
             ))}
+            <div className="flex min-w-[220px] flex-1 gap-2">
+                <input
+                    value={customCommand}
+                    onChange={(event) => onCustomCommandChange(event.target.value)}
+                    className="min-w-0 flex-1 rounded-md border border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-amber-400"
+                    placeholder="추천 명령어 추가"
+                    disabled={isLoading}
+                />
+                <button
+                    type="button"
+                    onClick={onAddCustomCommand}
+                    disabled={isLoading || !customCommand.trim()}
+                    className="inline-flex items-center justify-center rounded-md bg-stone-900 px-3 text-xs font-bold text-white disabled:cursor-not-allowed disabled:bg-stone-400"
+                >
+                    <Plus size={14} />
+                </button>
+            </div>
         </div>
+        ) : null}
 
         <ChatSendBlock
             onSend={onSend}

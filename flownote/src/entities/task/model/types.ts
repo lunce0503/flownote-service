@@ -12,4 +12,13 @@ export interface TaskProps {
   due_date: string;
   memo: string | null;
   tags: string[];
+  links: string[];
+  time_logs: TaskTimeLog[];
+}
+
+export interface TaskTimeLog {
+  id: string;
+  label: string;
+  minutes: number;
+  performed_date: string;
 }

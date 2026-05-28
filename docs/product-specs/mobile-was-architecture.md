@@ -1,4 +1,4 @@
-# Mobile WAS Architecture
+# 모바일 WAS 아키텍처
 
 Flownote 모바일 앱은 Spring Boot WAS를 설정 진입점으로 사용한다. 앱은 시작 시 `EXPO_PUBLIC_WAS_URL`의 `/api/mobile/config`를 호출하고, WAS가 응답한 `web_url`을 iOS/Android 네이티브 WebView로 연다.
 
@@ -63,7 +63,7 @@ Expo QR 로그는 아래 명령으로 본다.
 docker compose logs -f mobile-app
 ```
 
-## EAS Build
+## EAS 빌드
 
 `flownote-mobile/eas.json`은 Expo EAS 문서의 build profile 구조를 따른다.
 

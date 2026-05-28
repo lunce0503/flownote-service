@@ -6,7 +6,7 @@ import {
   ArrowRight
 } from "lucide-react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import loginUserData from "../../entities/users/api/loginUserData";
 import { useAuth } from "../../shared/auth/AuthContext";
 
@@ -138,9 +138,9 @@ export default function LoginPage() {
         <div className="bg-stone-100 p-6 text-center border-t border-stone-200">
           <p className="text-stone-600 text-sm">
             아직 계정이 없으신가요?{" "}
-            <a href="/signup" className="text-stone-800 font-bold hover:text-amber-600 transition-colors underline underline-offset-4">
+            <Link to="/signup" className="text-stone-800 font-bold hover:text-amber-600 transition-colors underline underline-offset-4">
               회원가입
-            </a>
+            </Link>
           </p>
         </div>
       </div>

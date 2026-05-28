@@ -14,7 +14,7 @@ import {
   TrendingUp,
   Settings
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../shared/auth/AuthContext";
 import { ThemeModeControl } from "../features/theme";
 
@@ -22,8 +22,51 @@ export default function Header() {
   // 사이드바 상태 관리
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
+  const [language, setLanguage] = useState<"ko" | "en">(() => (
+    localStorage.getItem("flownote_language") === "en" ? "en" : "ko"
+  ));
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  const labels = {
+    ko: {
+      blog: "게시글",
+      social: "소셜",
+      agent: "에이전트",
+      canvas: "그림판",
+      task: "일정",
+      stocks: "주식",
+      settings: "설정",
+      login: "로그인",
+      logout: "로그아웃",
+      menu: "메뉴",
+      closeMenu: "메뉴 닫기",
+    },
+    en: {
+      blog: "Blog",
+      social: "Social",
+      agent: "Agent",
+      canvas: "Canvas",
+      task: "Task",
+      stocks: "Stocks",
+      settings: "Settings",
+      login: "Login",
+      logout: "Logout",
+      menu: "Menu",
+      closeMenu: "Close menu",
+    },
+  }[language];
+
+  React.useEffect(() => {
+    const handleLanguageChange = () => {
+      setLanguage(localStorage.getItem("flownote_language") === "en" ? "en" : "ko");
+    };
+    window.addEventListener("flownote-language-change", handleLanguageChange);
+    window.addEventListener("storage", handleLanguageChange);
+    return () => {
+      window.removeEventListener("flownote-language-change", handleLanguageChange);
+      window.removeEventListener("storage", handleLanguageChange);
+    };
+  }, []);
 
   const onMenuClick = () => {
     setIsSidebarOpen(true);
@@ -45,64 +88,64 @@ export default function Header() {
   };
 
   const navLinks = [
-    { name: "Blog", href: "/blog", icon: <BookOpen size={22} /> },
-    { name: "Social", href: "/social", icon: <Users size={22} /> },
-    { name: "Agent", href: "/agent", icon: <Bot size={22} /> },
-    { name: "Canvas", href: "/canvas", icon: <Palette size={22} /> },
-    { name: "Task", href: "/task", icon: <CheckSquare size={22} /> },
-    { name: "Stocks", href: "/stocks", icon: <TrendingUp size={22} /> },
-    { name: "Settings", href: "/settings", icon: <Settings size={22} /> },
+    { name: labels.blog, href: "/blog", icon: <BookOpen size={22} /> },
+    { name: labels.social, href: "/social", icon: <Users size={22} /> },
+    { name: labels.agent, href: "/agent", icon: <Bot size={22} /> },
+    { name: labels.canvas, href: "/canvas", icon: <Palette size={22} /> },
+    { name: labels.task, href: "/task", icon: <CheckSquare size={22} /> },
+    { name: labels.stocks, href: "/stocks", icon: <TrendingUp size={22} /> },
+    { name: labels.settings, href: "/settings", icon: <Settings size={22} /> },
   ];
 
   const profileLinks = [
-    { name: "Canvas", href: "/canvas", icon: <Palette size={18} /> },
-    { name: "Social", href: "/social", icon: <Users size={18} /> },
-    { name: "Agent", href: "/agent", icon: <Bot size={18} /> },
-    { name: "Task", href: "/task", icon: <CheckSquare size={18} /> },
-    { name: "Stocks", href: "/stocks", icon: <TrendingUp size={18} /> },
-    { name: "Settings", href: "/settings", icon: <Settings size={18} /> },
+    { name: labels.canvas, href: "/canvas", icon: <Palette size={18} /> },
+    { name: labels.social, href: "/social", icon: <Users size={18} /> },
+    { name: labels.agent, href: "/agent", icon: <Bot size={18} /> },
+    { name: labels.task, href: "/task", icon: <CheckSquare size={18} /> },
+    { name: labels.stocks, href: "/stocks", icon: <TrendingUp size={18} /> },
+    { name: labels.settings, href: "/settings", icon: <Settings size={18} /> },
   ];
 
   return (
     <>
       {/* --- 기존 헤더 유지 --- */}
-      <header className="w-full bg-amber-100 py-2 px-2 relative z-30">
-        <nav className="flex flex-row items-center justify-between text-stone-600">
+      <header className="relative z-[900] w-full border-b border-stone-800 bg-stone-950 px-2 py-2 shadow-lg">
+        <nav className="flex flex-row items-center justify-between text-stone-100">
           {/* Left Section: Menu & Logo */}
           <div className="flex items-center gap-2 md:gap-2">
             {/* Menu button */}
             <button
               onClick={onMenuClick}
-              className="py-2 hover:bg-amber-200 rounded-md transition-colors duration-200"
-              aria-label="Menu"
+              className="rounded-md p-2 transition-colors duration-200 hover:bg-stone-800"
+              aria-label={labels.menu}
             >
               <Menu size={24} />
             </button>
 
             {/* Header title / Logo */}
-            <a className="flex items-center gap-2 group" href="/">
+            <Link className="flex items-center gap-2 group" to="/">
               <div className="py-2 rounded-lg md:bg-transparent">
                 <Notebook
-                  className="md:hidden text-stone-700 group-hover:text-stone-500 transition-colors"
+                  className="text-amber-200 transition-colors group-hover:text-white md:hidden"
                   size={24}
                 />
               </div>
-              <span className="hidden md:inline text-stone-800 text-2xl font-mono group-hover:text-stone-500 transition-colors">
+              <span className="hidden text-2xl font-black text-white transition-colors group-hover:text-amber-200 md:inline">
                 Flownote
               </span>
-            </a>
+            </Link>
 
             {/* Desktop Navigation Links */}
             {navLinks.map((link) => (
-              <a
+              <Link
                 key={link.name}
-                className="flex flex-col items-center hover:text-stone-400 transition-colors group"
-                href={link.href}
+                className="group flex min-w-12 flex-col items-center rounded-lg px-2 py-1 text-xs font-bold text-stone-200 transition-colors hover:bg-stone-800 hover:text-amber-100"
+                to={link.href}
                 title={link.name}
               >
                 <span className="md:hidden">{link.icon}</span>
                 <span className="hidden md:inline">{link.name}</span>
-              </a>
+              </Link>
             ))}
           </div>
 
@@ -115,7 +158,7 @@ export default function Header() {
               <>
                 <button
                   type="button"
-                  className="flex items-center justify-center gap-2 p-2 md:px-4 md:py-2 bg-stone-700 text-amber-50 rounded-full hover:bg-stone-600 transition-all shadow-md"
+                  className="flex items-center justify-center gap-2 rounded-full bg-amber-100 p-2 text-stone-950 shadow-md transition-all hover:bg-amber-200 md:px-4 md:py-2"
                   title={user.nickname}
                   aria-haspopup="menu"
                   aria-expanded={isProfileOpen}
@@ -133,16 +176,16 @@ export default function Header() {
                     role="menu"
                   >
                     {profileLinks.map((link) => (
-                      <a
+                      <Link
                         key={link.name}
-                        href={link.href}
+                        to={link.href}
                         className="flex items-center gap-3 px-4 py-2 text-sm text-stone-700 hover:bg-amber-100 transition-colors"
                         role="menuitem"
                         onClick={closeProfile}
                       >
                         {link.icon}
                         <span>{link.name}</span>
-                      </a>
+                      </Link>
                     ))}
                     <div className="my-2 border-t border-stone-200" />
                     <ThemeModeControl />
@@ -154,22 +197,22 @@ export default function Header() {
                       onClick={handleLogout}
                     >
                       <LogOut size={18} />
-                      <span>Logout</span>
+                      <span>{labels.logout}</span>
                     </button>
                   </div>
                 )}
               </>
             ) : (
-              <a
-                className="flex items-center justify-center p-2 md:px-4 md:py-2 bg-stone-700 text-amber-50 rounded-full hover:bg-stone-600 transition-all shadow-md"
-                href="/login"
-                title="Login"
+              <Link
+                className="flex items-center justify-center rounded-full bg-amber-100 p-2 text-stone-950 shadow-md transition-all hover:bg-amber-200 md:px-4 md:py-2"
+                to="/login"
+                title={labels.login}
               >
                 <LogIn size={20} />
                 <span className="hidden md:inline ml-2 text-sm font-semibold">
-                  Login
+                  {labels.login}
                 </span>
-              </a>
+              </Link>
             )}
           </div>
         </nav>
@@ -180,14 +223,14 @@ export default function Header() {
       {/* Background Overlay */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/40 z-40 transition-opacity duration-300"
+          className="fixed inset-0 z-[999] bg-black/40 transition-opacity duration-300"
           onClick={closeSidebar}
         />
       )}
 
       {/* Sidebar Panel */}
       <aside
-        className={`fixed top-0 left-0 h-full w-64 bg-stone-50 z-50 shadow-2xl transform transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 left-0 z-[1000] h-full w-64 bg-stone-50 shadow-2xl transform transition-transform duration-300 ease-in-out ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         style={{ pointerEvents: isSidebarOpen ? 'auto' : 'none'} }
@@ -202,7 +245,7 @@ export default function Header() {
             <button 
               onClick={closeSidebar}
               className="p-1 hover:bg-stone-200 rounded-full transition-colors"
-              aria-label="Close menu"
+              aria-label={labels.closeMenu}
             >
               <X size={24} className="text-stone-600" />
             </button>
@@ -211,9 +254,9 @@ export default function Header() {
           {/* Sidebar Navigation Links */}
           <nav className="flex flex-col gap-2">
             {navLinks.map((link) => (
-              <a 
+              <Link 
                 key={link.name}
-                href={link.href}
+                to={link.href}
                 className="flex items-center gap-4 p-3 rounded-lg hover:bg-amber-100 text-stone-700 transition-colors group"
                 onClick={closeSidebar}
               >
@@ -221,20 +264,20 @@ export default function Header() {
                   {link.icon}
                 </span>
                 <span className="text-lg font-medium">{link.name}</span>
-              </a>
+              </Link>
             ))}
             
             <div className="my-4 border-t border-stone-200" />
-            
+
             {isAuthenticated && user ? (
               <>
                 <div className="px-3 py-2 text-sm text-stone-500">
                   {user.nickname}
                 </div>
                 {profileLinks.map((link) => (
-                  <a
+                  <Link
                     key={link.name}
-                    href={link.href}
+                    to={link.href}
                     className="flex items-center gap-4 p-3 rounded-lg hover:bg-amber-100 text-stone-700 transition-colors group"
                     onClick={closeSidebar}
                   >
@@ -242,7 +285,7 @@ export default function Header() {
                       {link.icon}
                     </span>
                     <span className="text-lg font-medium">{link.name}</span>
-                  </a>
+                  </Link>
                 ))}
                 <button
                   type="button"
@@ -250,18 +293,18 @@ export default function Header() {
                   onClick={handleLogout}
                 >
                   <LogOut size={22} className="text-stone-500 group-hover:text-amber-50" />
-                  <span className="text-lg font-medium">Logout</span>
+                  <span className="text-lg font-medium">{labels.logout}</span>
                 </button>
               </>
             ) : (
-              <a 
-                href="/login"
+              <Link 
+                to="/login"
                 className="flex items-center gap-4 p-3 rounded-lg hover:bg-stone-800 hover:text-amber-50 text-stone-700 transition-all group"
                 onClick={closeSidebar}
               >
                 <LogIn size={22} className="text-stone-500 group-hover:text-amber-50" />
-                <span className="text-lg font-medium">Login</span>
-              </a>
+                <span className="text-lg font-medium">{labels.login}</span>
+              </Link>
             )}
           </nav>
 

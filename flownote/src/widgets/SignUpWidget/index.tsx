@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from "react";
 import postUserData from "../../entities/users/api/postUserData";
 import type { UserDataProps } from "../../entities/users";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Lock, Mail, Notebook, User } from "lucide-react";
 
 const SignUpWidget= () => {
@@ -147,9 +147,9 @@ const SignUpWidget= () => {
                 <div className="bg-stone-100 p-6 text-center border-t border-stone-200">
                     <p className="text-stone-600 text-sm">
                         이미 계정이 있으신가요?{" "}
-                        <a href="/login" className="text-stone-800 font-bold hover:text-amber-600 transition-colors underline underline-offset-4">
+                        <Link to="/login" className="text-stone-800 font-bold hover:text-amber-600 transition-colors underline underline-offset-4">
                             로그인
-                        </a>
+                        </Link>
                     </p>
                 </div>
             </div>

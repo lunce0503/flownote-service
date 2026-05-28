@@ -8,7 +8,7 @@ import searchUserData, { type UserSearchResult } from "../../entities/users/api/
 import { useAuth } from "../../shared/auth/AuthContext";
 import uploadFileData from "../../shared/api/uploadFileData";
 import { API_CORE_BASE_URL } from "../../shared/api";
-import { FilePlus2, MoreVertical, X } from "lucide-react";
+import { FilePlus2, MessageSquareText, MoreVertical, Users, X } from "lucide-react";
 
 type SocialMessage = {
     id: string;
@@ -310,8 +310,24 @@ const Chat = () => {
     }, [messages]);
 
     return (
-        <div className="m-4 grid min-h-150 grid-cols-1 overflow-hidden rounded-2xl border bg-gray-100 shadow-xl md:grid-cols-[280px_1fr]">
+        <div className="grid min-h-[calc(100vh-128px)] grid-cols-1 overflow-hidden rounded-2xl border border-stone-200 bg-stone-50 shadow-xl md:grid-cols-[300px_1fr]">
             <aside className="border-b bg-white p-3 md:border-b-0 md:border-r">
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                    <div className="rounded-xl bg-stone-50 px-3 py-2">
+                        <div className="flex items-center gap-2 text-xs font-bold uppercase text-amber-700">
+                            <Users size={14} />
+                            Rooms
+                        </div>
+                        <div className="mt-1 text-xl font-black text-stone-950">{rooms.length}</div>
+                    </div>
+                    <div className="rounded-xl bg-stone-50 px-3 py-2">
+                        <div className="flex items-center gap-2 text-xs font-bold uppercase text-blue-700">
+                            <MessageSquareText size={14} />
+                            Chat
+                        </div>
+                        <div className="mt-1 text-xl font-black text-stone-950">{messages.length}</div>
+                    </div>
+                </div>
                 <div className="mb-3 space-y-2 rounded-lg border border-stone-200 p-3">
                     <input
                         className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-800 outline-none focus:ring-2 focus:ring-blue-400"
@@ -371,7 +387,7 @@ const Chat = () => {
                             key={room.id}
                             className={`group relative flex items-start gap-2 rounded-lg border px-3 py-2 transition-colors ${
                                 selectedRoomId === room.id
-                                    ? "border-blue-500 bg-blue-50"
+                                    ? "border-stone-900 bg-stone-900"
                                     : "border-stone-200 bg-stone-50 hover:bg-amber-50"
                             }`}
                         >
@@ -380,8 +396,8 @@ const Chat = () => {
                                 className="min-w-0 flex-1 text-left"
                                 onClick={() => setSelectedRoomId(room.id)}
                             >
-                                <div className="truncate text-sm font-semibold text-stone-800">{roomTitle(room)}</div>
-                                <div className="truncate text-xs text-stone-500">{room.lastMessage || "메시지가 없습니다."}</div>
+                                <div className={`truncate text-sm font-semibold ${selectedRoomId === room.id ? "text-white" : "text-stone-800"}`}>{roomTitle(room)}</div>
+                                <div className={`truncate text-xs ${selectedRoomId === room.id ? "text-stone-300" : "text-stone-500"}`}>{room.lastMessage || "메시지가 없습니다."}</div>
                             </button>
                             <div className="relative shrink-0" ref={openRoomMenuId === room.id ? roomMenuRef : undefined}>
                                 <button
@@ -408,9 +424,9 @@ const Chat = () => {
                     ))}
                 </div>
             </aside>
-            <div className="flex min-h-150 flex-col">
+            <div className="flex min-h-[560px] flex-col bg-stone-100">
                 <div 
-                    className="flex-1 m-1 overflow-y-auto p-4 flex flex-col"
+                    className="m-1 flex flex-1 flex-col overflow-y-auto rounded-xl bg-white p-4"
                     ref={chatContainerRef}
                 >
                     {messages.map((msg) => (

@@ -18,6 +18,18 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: flownote-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   # 2. FastAPI 백엔드
   api-server:
     build: ./flownote-API
@@ -51,10 +63,16 @@ services:
       - MOBILE_MIN_SUPPORTED_VERSION=${MOBILE_MIN_SUPPORTED_VERSION:-1.0.0}
       - MOBILE_ENABLED_FEATURES=${MOBILE_ENABLED_FEATURES:-webview,auth,tasks,notes,canvas,agent}
       - STOCK_MARKET_DATA_URL=http://api-server:8000/api/market
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - FLOWNOTE_CANVAS_CACHE_TARGET_USERNAME=${FLOWNOTE_CANVAS_CACHE_TARGET_USERNAME:-lunce}
+      - FLOWNOTE_CANVAS_CACHE_TTL=${FLOWNOTE_CANVAS_CACHE_TTL:-24h}
     ports:
       - "8080:8080"
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - /mnt/storage/uploads:/public/uploads
@@ -80,7 +98,16 @@ services:
 
   # 4. React (Vite) SPA
   react-app:
-    build: ./flownote
+    build:
+      context: ./flownote
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://${HOST_LAN_IP:-localhost}:8000}
+        VITE_API_BASE_URL2: ${VITE_API_BASE_URL2:-http://${HOST_LAN_IP:-localhost}:3000}
+        VITE_CORE_API_URL: ${VITE_CORE_API_URL:-http://${HOST_LAN_IP:-localhost}:8080}
+        VITE_AI_BASE_URL: ${VITE_AI_BASE_URL:-http://${HOST_LAN_IP:-localhost}:8000}
+        VITE_CANVAS_API_URL: ${VITE_CANVAS_API_URL:-http://${HOST_LAN_IP:-localhost}:8080}
+        VITE_UPLOAD_API_URL: ${VITE_UPLOAD_API_URL:-http://${HOST_LAN_IP:-localhost}:8080}
+        VITE_SYNC_API_URL: ${VITE_SYNC_API_URL:-http://${HOST_LAN_IP:-localhost}:3000}
     container_name: flownote-react
     restart: always
     ports:
@@ -92,6 +119,7 @@ services:
       - VITE_API_BASE_URL2=${VITE_API_BASE_URL2}
       - VITE_CORE_API_URL=${VITE_CORE_API_URL}
       - VITE_AI_BASE_URL=${VITE_AI_BASE_URL}
+      - VITE_SYNC_API_URL=${VITE_SYNC_API_URL:-http://${HOST_LAN_IP:-localhost}:3000}
     depends_on:
       - api-server
 

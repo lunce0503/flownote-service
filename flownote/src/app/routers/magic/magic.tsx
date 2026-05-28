@@ -1,5 +1,4 @@
 import React,{ useRef, useState }from "react";
-import './magic.css'
 import MagicCircle from "./magicCircle";
 import { Atom, Circle, Cross, Hexagon, LifeBuoy, Plus, Triangle, TriangleDashed } from "lucide-react";
 

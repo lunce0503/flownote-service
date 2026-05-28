@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Activity, ArrowLeft, BarChart3, RefreshCw } from "lucide-react";
 import {
   createStockStream,
@@ -256,10 +257,10 @@ const StockChart = () => {
             <p className="text-sm text-stone-500">보유 종목의 Yahoo Finance 시세를 서버 SSE로 받아 캔들 형태로 누적합니다.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <a href="/stocks" className="inline-flex items-center gap-2 rounded-full bg-stone-900 px-3 py-2 text-sm font-bold text-white">
+            <Link to="/stocks" className="inline-flex items-center gap-2 rounded-full bg-stone-900 px-3 py-2 text-sm font-bold text-white">
               <ArrowLeft size={16} />
               자산 관리
-            </a>
+            </Link>
             <button
               type="button"
               onClick={() => void refresh()}

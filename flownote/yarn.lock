@@ -2572,6 +2572,11 @@ katex@^0.16.0, katex@^0.16.27:
   dependencies:
     commander "^8.3.0"
 
+konva@^10.3.0:
+  version "10.3.0"
+  resolved "https://registry.yarnpkg.com/konva/-/konva-10.3.0.tgz#960c39cb3518357284ae35b189c7dc3295570bd5"
+  integrity sha512-gt19K2gzY4lHbnkvsku7eSmB+A9PTS2jG4F9coBMsdjM1UKfJNxJbDbXVpeCW1wjEGRwBD3nBamcHnqJhAeKlg==
+
 lib0@^0.2.109, lib0@^0.2.85, lib0@^0.2.99:
   version "0.2.117"
   resolved "https://registry.yarnpkg.com/lib0/-/lib0-0.2.117.tgz#6c3f926475d28904af05b590703cbbbc29475716"

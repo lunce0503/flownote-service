@@ -10,19 +10,46 @@ import deleteChatMessage, { deleteAllChatMessages } from "../../entities/chat/ap
 import AgentConversationPanel from "./AgentConversationPanel";
 import AgentFocusQueue from "./AgentFocusQueue";
 import AgentInsightsPanel from "./AgentInsightsPanel";
+import AgentWorkflowBoard from "./AgentWorkflowBoard";
 import AgentWorkspaceSummary from "./AgentWorkspaceSummary";
-import { agentProfiles, buildAgentPrompt, sanitizeInternalApiMentions, type WorkspaceSnapshot } from "./model";
+import { agentProfiles, buildAgentPrompt, buildRecommendedCommands, sanitizeInternalApiMentions, type AgentProfile, type WorkspaceSnapshot } from "./model";
+
+const CUSTOM_AGENTS_STORAGE_KEY = "flownote.customAgents";
+const CUSTOM_COMMANDS_STORAGE_KEY = "flownote.customAgentCommands";
 
 const AgentChat = () => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [workspace, setWorkspace] = useState<WorkspaceSnapshot>({ notes: [], tasks: [] });
+    const [customAgents, setCustomAgents] = useState<AgentProfile[]>(() => {
+        try {
+            const saved = localStorage.getItem(CUSTOM_AGENTS_STORAGE_KEY);
+            return saved ? JSON.parse(saved) : [];
+        } catch {
+            return [];
+        }
+    });
+    const [customCommands, setCustomCommands] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem(CUSTOM_COMMANDS_STORAGE_KEY);
+            return saved ? JSON.parse(saved) : [];
+        } catch {
+            return [];
+        }
+    });
     const [selectedAgentId, setSelectedAgentId] = useState(agentProfiles[0].id);
-    const [agentInstruction, setAgentInstruction] = useState("");
+    const [customAgentName, setCustomAgentName] = useState("");
+    const [customAgentPrompt, setCustomAgentPrompt] = useState("");
+    const [customCommand, setCustomCommand] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
-    const selectedAgent = agentProfiles.find((agent) => agent.id === selectedAgentId) ?? agentProfiles[0];
+    const agents = [...agentProfiles, ...customAgents];
+    const selectedAgent = agents.find((agent) => agent.id === selectedAgentId) ?? agents[0];
+    const recommendedCommands = Array.from(new Set([
+        ...buildRecommendedCommands(workspace, messages),
+        ...customCommands,
+    ])).slice(0, 6);
 
     const activeTasks = workspace.tasks.filter((task) => task.status !== "DONE");
     const completedTasks = workspace.tasks.filter((task) => task.status === "DONE");
@@ -84,7 +111,7 @@ const AgentChat = () => {
 
     const askAgent = async (text: string) => {
         try {
-            const prompt = buildAgentPrompt(text, workspace, selectedAgent, agentInstruction);
+            const prompt = buildAgentPrompt(text, workspace, selectedAgent);
             const headers = new Headers({ "Content-Type": "application/json" });
             Object.entries(authHeaders()).forEach(([key, value]) => {
                 headers.set(key, value);
@@ -144,6 +171,7 @@ const AgentChat = () => {
             console.error("fetch error:", err);
             setError("에이전트 응답을 가져오지 못했습니다.");
         } finally {
+            void getWorkspace();
             setIsLoading(false);
         }
     };
@@ -193,6 +221,36 @@ const AgentChat = () => {
         }
     };
 
+    const handleCreateCustomAgent = () => {
+        const name = customAgentName.trim();
+        const prompt = customAgentPrompt.trim();
+        if (!name || !prompt) return;
+
+        const agent: AgentProfile = {
+            id: `custom-${uuidv4()}`,
+            name,
+            role: "커스텀",
+            description: prompt.length > 80 ? `${prompt.slice(0, 80)}...` : prompt,
+            systemPrompt: prompt,
+        };
+        const nextAgents = [...customAgents, agent];
+        setCustomAgents(nextAgents);
+        localStorage.setItem(CUSTOM_AGENTS_STORAGE_KEY, JSON.stringify(nextAgents));
+        setSelectedAgentId(agent.id);
+        setCustomAgentName("");
+        setCustomAgentPrompt("");
+    };
+
+    const handleAddCustomCommand = () => {
+        const command = customCommand.trim();
+        if (!command) return;
+
+        const nextCommands = Array.from(new Set([command, ...customCommands])).slice(0, 8);
+        setCustomCommands(nextCommands);
+        localStorage.setItem(CUSTOM_COMMANDS_STORAGE_KEY, JSON.stringify(nextCommands));
+        setCustomCommand("");
+    };
+
     useEffect(() => {
         void getMessages();
         void getWorkspace();
@@ -213,6 +271,10 @@ const AgentChat = () => {
                         completedTaskCount={completedTasks.length}
                         error={error}
                     />
+                    <AgentWorkflowBoard
+                        isLoading={isLoading}
+                        onRunPrompt={handleSend}
+                    />
                     <AgentFocusQueue
                         tasks={dueSoonTasks}
                         isLoading={isWorkspaceLoading}
@@ -227,12 +289,19 @@ const AgentChat = () => {
                     onSend={handleSend}
                     onDeleteMessage={handleDeleteMessage}
                     onClearMessages={handleClearMessages}
-                    agents={agentProfiles}
+                    agents={agents}
                     selectedAgent={selectedAgent}
                     selectedAgentId={selectedAgentId}
                     onSelectAgent={setSelectedAgentId}
-                    agentInstruction={agentInstruction}
-                    onAgentInstructionChange={setAgentInstruction}
+                    recommendedCommands={recommendedCommands}
+                    customCommand={customCommand}
+                    onCustomCommandChange={setCustomCommand}
+                    onAddCustomCommand={handleAddCustomCommand}
+                    customAgentName={customAgentName}
+                    customAgentPrompt={customAgentPrompt}
+                    onCustomAgentNameChange={setCustomAgentName}
+                    onCustomAgentPromptChange={setCustomAgentPrompt}
+                    onCreateCustomAgent={handleCreateCustomAgent}
                 />
 
                 <AgentInsightsPanel

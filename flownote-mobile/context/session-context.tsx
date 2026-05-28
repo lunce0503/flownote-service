@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useMemo, useState, type PropsWithChildren } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { flownoteApi, type FlownoteUser, type LoginResponse } from '@/lib/flownote-api';
 
@@ -17,11 +18,44 @@ type SessionContextValue = {
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
+const SESSION_TOKEN_STORAGE_KEY = 'flownote.mobile.session.token';
+const SESSION_USER_STORAGE_KEY = 'flownote.mobile.session.user';
 
 export function SessionProvider({ children }: PropsWithChildren) {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<FlownoteUser | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const restoreSession = async () => {
+      try {
+        const [storedToken, storedUser] = await Promise.all([
+          AsyncStorage.getItem(SESSION_TOKEN_STORAGE_KEY),
+          AsyncStorage.getItem(SESSION_USER_STORAGE_KEY),
+        ]);
+
+        if (!mounted) return;
+        if (storedToken && storedUser) {
+          setToken(storedToken);
+          setUser(JSON.parse(storedUser) as FlownoteUser);
+        }
+      } catch {
+        await AsyncStorage.multiRemove([SESSION_TOKEN_STORAGE_KEY, SESSION_USER_STORAGE_KEY]);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void restoreSession();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     setLoading(true);
@@ -29,6 +63,10 @@ export function SessionProvider({ children }: PropsWithChildren) {
       const session = await flownoteApi.login(email.trim(), password);
       setToken(session.token);
       setUser(session.user);
+      await AsyncStorage.multiSet([
+        [SESSION_TOKEN_STORAGE_KEY, session.token],
+        [SESSION_USER_STORAGE_KEY, JSON.stringify(session.user)],
+      ]);
       return session;
     } finally {
       setLoading(false);
@@ -55,6 +93,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
+    void AsyncStorage.multiRemove([SESSION_TOKEN_STORAGE_KEY, SESSION_USER_STORAGE_KEY]);
   }, []);
 
   const value = useMemo(

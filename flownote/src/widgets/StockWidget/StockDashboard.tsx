@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Activity,
   BarChart3,
@@ -309,13 +310,13 @@ const StockDashboard = () => {
             <p className="text-sm text-stone-500">보유 종목을 저장하고 실시간 시세 흐름으로 손익과 구성 비중을 확인합니다.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <a
-              href="/stocks/chart"
+            <Link
+              to="/stocks/chart"
               className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-3 py-2 text-sm font-bold text-white"
             >
               <BarChart3 size={16} />
               차트 보기
-            </a>
+            </Link>
             <span className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-bold ${
               streaming ? "bg-emerald-100 text-emerald-700" : "bg-stone-200 text-stone-600"
             }`}>

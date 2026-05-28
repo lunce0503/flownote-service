@@ -10,6 +10,7 @@ import {
     Search,
     Users,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const workspaceStats = [
     { label: "오늘의 작업", value: "Task", detail: "할 일과 마감일을 한 곳에서 확인" },
@@ -80,13 +81,13 @@ const Home = () => {
                                 type="search"
                             />
                         </label>
-                        <a
+                        <Link
                             className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-stone-800 px-5 text-sm font-semibold text-amber-50 shadow-md transition hover:bg-stone-700"
-                            href="/blog"
+                            to="/blog"
                         >
                             <Plus size={18} />
                             새 문서
-                        </a>
+                        </Link>
                     </div>
                 </section>
 
@@ -110,12 +111,12 @@ const Home = () => {
                                 <p className="text-sm font-semibold text-amber-700">Task Board</p>
                                 <h2 className="mt-1 text-2xl font-bold text-stone-900">진행 중인 작업</h2>
                             </div>
-                            <a
+                            <Link
                                 className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
-                                href="/task"
+                                to="/task"
                             >
                                 전체 작업 보기
-                            </a>
+                            </Link>
                         </div>
                         <div className="-mx-4 sm:mx-0">
           <TaskWidget />
@@ -130,9 +131,9 @@ const Home = () => {
                                     const Icon = action.icon;
 
                                     return (
-                                        <a
+                                        <Link
                                             className="flex min-h-16 items-center gap-3 rounded-md border border-stone-200 px-4 text-left transition hover:border-amber-300 hover:bg-amber-50"
-                                            href={action.href}
+                                            to={action.href}
                                             key={action.label}
                                         >
                                             <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-stone-800 text-amber-50">
@@ -146,7 +147,7 @@ const Home = () => {
                                                     {action.description}
                                                 </span>
                                             </span>
-                                        </a>
+                                        </Link>
                                     );
                                 })}
                             </div>

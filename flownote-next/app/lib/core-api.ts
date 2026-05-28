@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { corsHeaders } from './cors';
+import { corsHeadersFor } from './cors';
 
 const coreApiBaseUrl = () => {
   const url = process.env.CORE_API_URL || process.env.SPRING_API_URL || process.env.NEXT_PUBLIC_API_URL;
@@ -40,7 +40,7 @@ const proxyCoreApi = async (
 
   return NextResponse.json(data, {
     status: response.status,
-    headers: corsHeaders,
+    headers: corsHeadersFor(request),
   });
 };
 

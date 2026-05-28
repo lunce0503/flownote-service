@@ -23,6 +23,7 @@ const API_BASE_URL = resolveBrowserReachableUrl(import.meta.env.VITE_API_BASE_UR
 const API_BASE_URL2 = resolveBrowserReachableUrl(import.meta.env.VITE_API_BASE_URL2);
 const API_CORE_BASE_URL = resolveBrowserReachableUrl(import.meta.env.VITE_CORE_API_URL) ?? API_BASE_URL2;
 const API_AI_BASE_URL = resolveBrowserReachableUrl(import.meta.env.VITE_AI_BASE_URL) ?? API_BASE_URL;
+const API_SYNC_BASE_URL = resolveBrowserReachableUrl(import.meta.env.VITE_SYNC_API_URL) ?? API_BASE_URL2;
 const AUTH_TOKEN_KEY = "flownote_auth_token";
 const AUTH_USER_KEY = "flownote_auth_user";
 
@@ -80,6 +81,7 @@ export {
   API_BASE_URL2,
   API_CORE_BASE_URL,
   API_AI_BASE_URL,
+  API_SYNC_BASE_URL,
   resolveBrowserReachableUrl,
   DEFAULT_HEADERS,
   axios,

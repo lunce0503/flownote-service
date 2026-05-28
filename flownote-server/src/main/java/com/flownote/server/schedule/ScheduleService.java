@@ -61,8 +61,19 @@ public class ScheduleService {
                 continue;
             }
 
-            assignments.add(column + " = ?");
-            values.add(toSqlValue(field.getKey(), field.getValue()));
+            if ("memo".equals(field.getKey())) {
+                var stored = scheduleRepository.storeMemo(userId, id, field.getValue() == null || field.getValue().isNull() ? "" : field.getValue().asText().trim());
+                assignments.add("memo = ''");
+                assignments.add("memo_object_key = ?");
+                assignments.add("memo_byte_size = ?");
+                assignments.add("memo_public_url = ?");
+                values.add(new ScheduleRepository.StringValue(stored.objectKey()));
+                values.add(new ScheduleRepository.LongValue(stored.byteSize()));
+                values.add(new ScheduleRepository.StringValue(stored.publicUrl()));
+            } else {
+                assignments.add(column + " = ?");
+                values.add(toSqlValue(field.getKey(), field.getValue()));
+            }
         }
 
         if (assignments.isEmpty()) {
@@ -78,7 +89,7 @@ public class ScheduleService {
                   AND start_time < end_time
                   AND cardinality(days_of_week) > 0
                 RETURNING id, title, days_of_week, start_time, end_time, category,
-                          color, memo, is_active, created_at, updated_at
+                          color, memo, memo_object_key, is_active, created_at, updated_at
                 """.formatted(String.join(", ", assignments));
 
         return scheduleRepository.update(sql, values);

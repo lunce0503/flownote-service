@@ -126,14 +126,44 @@ export type CanvasLine = {
   strokeWidth?: number;
 };
 
+export type CanvasImage = {
+  id: string;
+  url: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 export type CanvasData = {
   lines: CanvasLine[];
-  images: unknown[];
+  images: CanvasImage[];
   textBoxes: CanvasTextBox[];
 };
 
 type CanvasResponse = CanvasData & {
   text_boxes?: CanvasTextBox[];
+};
+
+export type CanvasDocumentSummary = {
+  id: string;
+  title: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type CanvasFolder = {
+  id: string;
+  category: string;
+  name: string;
+  canvasIds: string[];
+  created_at?: string;
+  updated_at?: string;
+};
+
+type CanvasFolderResponse = Omit<CanvasFolder, 'canvasIds'> & {
+  canvas_ids?: string[];
+  canvasIds?: string[];
 };
 
 class FlownoteApiError extends Error {
@@ -247,13 +277,50 @@ const normalizeChatMessage = (message: ChatMessageResponse): ChatMessage => ({
 
 const normalizeCanvas = (canvas: CanvasResponse): CanvasData => ({
   lines: Array.isArray(canvas.lines) ? (canvas.lines as CanvasLine[]) : [],
-  images: Array.isArray(canvas.images) ? canvas.images : [],
+  images: Array.isArray(canvas.images) ? (canvas.images as CanvasImage[]) : [],
   textBoxes: Array.isArray(canvas.textBoxes)
     ? canvas.textBoxes
     : Array.isArray(canvas.text_boxes)
       ? canvas.text_boxes
       : [],
 });
+
+const normalizeCanvasFolder = (folder: CanvasFolderResponse): CanvasFolder => ({
+  ...folder,
+  canvasIds: folder.canvasIds ?? folder.canvas_ids ?? [],
+});
+
+const canvasQuery = (canvasId?: string | null) =>
+  canvasId ? `?canvasId=${encodeURIComponent(canvasId)}` : '';
+
+const appendUploadFile = async (
+  formData: FormData,
+  input: { uri: string; fileName?: string | null; mimeType?: string | null; file?: File | null }
+) => {
+  const name = input.fileName || `canvas-${Date.now()}.jpg`;
+  const type = input.mimeType || input.file?.type || 'image/jpeg';
+
+  if (input.file) {
+    formData.append('image', input.file, name);
+    return;
+  }
+
+  if (
+    typeof Blob !== 'undefined'
+    && typeof fetch === 'function'
+    && (input.uri.startsWith('blob:') || input.uri.startsWith('data:'))
+  ) {
+    const blob = await fetch(input.uri).then((response) => response.blob());
+    formData.append('image', blob, name);
+    return;
+  }
+
+  formData.append('image', {
+    uri: input.uri,
+    name,
+    type,
+  } as unknown as Blob);
+};
 
 export const flownoteApi = {
   baseUrl: apiBaseUrl,
@@ -366,29 +433,121 @@ export const flownoteApi = {
     });
     return String(response ?? '').trim();
   },
-  loadCanvas: async (token: string) => {
-    const canvas = await request<CanvasResponse>('/api/canvas/load', { token });
+  listCanvasDocuments: async (token: string) => {
+    const documents = await request<CanvasDocumentSummary[]>('/api/canvas/documents', { token });
+    return Array.isArray(documents) ? documents : [];
+  },
+  createCanvasDocument: (token: string, title: string) =>
+    request<CanvasDocumentSummary>('/api/canvas/documents', {
+      method: 'POST',
+      token,
+      body: { title },
+    }),
+  updateCanvasDocument: (token: string, id: string, title: string) =>
+    request<CanvasDocumentSummary>(`/api/canvas/documents/${id}`, {
+      method: 'PATCH',
+      token,
+      body: { title },
+    }),
+  deleteCanvasDocument: (token: string, id: string) =>
+    request<void>(`/api/canvas/documents/${id}`, {
+      method: 'DELETE',
+      token,
+    }),
+  uploadCanvasImage: async (
+    token: string,
+    input: { uri: string; fileName?: string | null; mimeType?: string | null; file?: File | null }
+  ) => {
+    const formData = new FormData();
+    await appendUploadFile(formData, input);
+
+    const baseUrl = apiBaseUrl();
+    const response = await fetch(`${baseUrl}/api/upload`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    const data = await response.json().catch(() => null) as { fileUrl?: string; filename?: string; message?: string; error?: string } | null;
+
+    if (!response.ok) {
+      throw new FlownoteApiError(response.status, data?.message ?? data?.error ?? `업로드에 실패했습니다. (${response.status})`);
+    }
+
+    const fileUrl = data?.fileUrl ?? (data?.filename ? `/uploads/${data.filename}` : null);
+    if (!fileUrl) {
+      throw new Error('업로드 응답에 파일 URL이 없습니다.');
+    }
+
+    return fileUrl.startsWith('http') ? fileUrl : `${baseUrl}${fileUrl}`;
+  },
+  listCanvasFolders: async (token: string) => {
+    const folders = await request<CanvasFolderResponse[]>('/api/canvas/folders', { token });
+    return Array.isArray(folders) ? folders.map(normalizeCanvasFolder) : [];
+  },
+  createCanvasFolder: async (token: string, input: { category: string; name: string }) => {
+    const folder = await request<CanvasFolderResponse>('/api/canvas/folders', {
+      method: 'POST',
+      token,
+      body: input,
+    });
+    return normalizeCanvasFolder(folder);
+  },
+  updateCanvasFolder: async (token: string, folderId: string, input: { category: string; name: string }) => {
+    const folder = await request<CanvasFolderResponse>(`/api/canvas/folders/${folderId}`, {
+      method: 'PATCH',
+      token,
+      body: input,
+    });
+    return normalizeCanvasFolder(folder);
+  },
+  deleteCanvasFolder: (token: string, folderId: string) =>
+    request<void>(`/api/canvas/folders/${folderId}`, {
+      method: 'DELETE',
+      token,
+    }),
+  addCanvasToFolder: async (token: string, folderId: string, canvasId: string) => {
+    const folder = await request<CanvasFolderResponse>(
+      `/api/canvas/folders/${folderId}/documents/${canvasId}`,
+      { method: 'POST', token }
+    );
+    return normalizeCanvasFolder(folder);
+  },
+  removeCanvasFromFolder: async (token: string, folderId: string, canvasId: string) => {
+    const folder = await request<CanvasFolderResponse>(
+      `/api/canvas/folders/${folderId}/documents/${canvasId}`,
+      { method: 'DELETE', token }
+    );
+    return normalizeCanvasFolder(folder);
+  },
+  loadCanvas: async (token: string, canvasId?: string | null) => {
+    const canvas = await request<CanvasResponse>(`/api/canvas/load${canvasQuery(canvasId)}`, { token });
     return normalizeCanvas(canvas);
   },
   saveCanvasElements: async (
     token: string,
     input: {
       lines: CanvasLine[];
+      images?: CanvasImage[];
       textBoxes: CanvasTextBox[];
       deletedLineIds?: string[];
+      deletedImageIds?: string[];
       deletedTextBoxIds?: string[];
+      canvasId?: string | null;
     }
   ) => {
-    const canvas = await request<CanvasResponse>('/api/canvas/save', {
+    const canvas = await request<CanvasResponse>(`/api/canvas/save${canvasQuery(input.canvasId)}`, {
       method: 'POST',
       token,
       body: {
         addedLines: input.lines,
         modifiedLines: [],
         deletedLines: (input.deletedLineIds ?? []).map((id) => ({ id })),
-        addedImages: [],
+        addedImages: input.images ?? [],
         modifiedImages: [],
-        deletedImages: [],
+        deletedImages: (input.deletedImageIds ?? []).map((id) => ({ id })),
         addedTextBoxes: input.textBoxes,
         modifiedTextBoxes: [],
         deletedTextBoxes: (input.deletedTextBoxIds ?? []).map((id) => ({ id })),

@@ -82,11 +82,35 @@ export const sanitizeInternalApiMentions = (value: string) => (
     value.replace(/\b(?:spring|spting)\s*api\b/gi, "서버")
 );
 
+export const buildRecommendedCommands = (snapshot: WorkspaceSnapshot, messages: Array<{ message: string; sender: string }>) => {
+    const recentUserText = messages
+        .filter((message) => message.sender === "user")
+        .slice(-2)
+        .map((message) => message.message)
+        .join(" ");
+    const activeTask = snapshot.tasks.find((task) => task.status !== "DONE");
+    const recentNote = [...snapshot.notes].sort((a, b) => (
+        new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
+    ))[0];
+
+    return [
+        "계획, 작성, 점검, 정리 순서로 오늘 워크스페이스 실행 안건을 만들어줘",
+        activeTask
+            ? `"${activeTask.task_name || "진행 중인 작업"}"을(를) 30분 단위 실행 순서로 나눠줘`
+            : "오늘 바로 시작할 작업 후보를 노트와 일정에서 찾아줘",
+        recentNote
+            ? `"${recentNote.title}" 노트와 연결되는 작업, 태그, 다음 질문을 추천해줘`
+            : "최근 대화 흐름을 기준으로 새 노트 주제를 추천해줘",
+        recentUserText.trim()
+            ? `최근 대화("${clipText(recentUserText, 40)}")를 이어서 다음 행동 3개를 제안해줘`
+            : "완료한 작업과 남은 작업의 시간 분포를 요약해줘",
+    ];
+};
+
 export const buildAgentPrompt = (
     userText: string,
     snapshot: WorkspaceSnapshot,
     agent: AgentProfile = agentProfiles[0],
-    customInstruction = "",
 ) => {
     const noteContext = snapshot.notes.slice(0, 8).map((note, index) => (
         `${index + 1}. ${note.title}: ${clipText(getNotePreview(note), 180)}`
@@ -104,9 +128,10 @@ export const buildAgentPrompt = (
     return [
         "당신은 Flownote의 지식관리 에이전트입니다.",
         `[현재 에이전트] ${agent.name} - ${agent.description}`,
-        `[에이전트 기본 기능] ${agent.systemPrompt}`,
-        customInstruction.trim() ? `[사용자 기능 조작 프롬프트] ${customInstruction.trim()}` : "",
+        `[에이전트 프롬프트] ${agent.systemPrompt}`,
         "사용자 질문에 답하되, 아래 워크스페이스 컨텍스트를 우선 참고해 노트, 작업, 다음 행동을 연결하세요.",
+        "답변은 가능한 한 계획, 작성, 점검, 정리 중 현재 단계가 무엇인지 먼저 밝히고, 실행 안건과 다음 행동을 짧게 제시하세요.",
+        "개선 요청을 받으면 바로 적용 가능한 안건으로 바꾸고, 수정 대상, 확인 방법, 후속 정리 항목을 함께 제시하세요.",
         "컨텍스트에 없는 내용은 추측하지 말고 필요한 확인 질문을 짧게 제시하세요.",
         "내부 서버 구현명, 특정 백엔드 프레임워크명, 내부 API 이름은 답변에 노출하지 마세요.",
         "",

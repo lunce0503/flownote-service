@@ -1,42 +1,44 @@
 import { useState, useCallback } from 'react';
 import type { Point, ImageElement, TextBoxElement, ToolType, CanvasElementStatus } from '../../../entities/canvas/model/types';
-import { v4 as uuidv4 } from 'uuid';
 
 type GetCanvasCoords = (e: React.PointerEvent | MouseEvent) => Point;
+
+export type MovingCanvasObject = {
+  type: 'image' | 'text';
+  id: string;
+  index: number;
+  status: CanvasElementStatus;
+  grabOffset: Point;
+};
 
 export const useElementManipulation = (getCanvasCoords: GetCanvasCoords, tool: ToolType) => {
   const [images, setImages] = useState<ImageElement[]>([]);
   const [textBoxes, setTextBoxes] = useState<TextBoxElement[]>([]);
-  const [movingObject, setMovingObject] = useState<{ type: 'image' | 'text'; id: string; index: number, status: CanvasElementStatus } | null>(null);
+  const [movingObject, setMovingObject] = useState<MovingCanvasObject | null>(null);
 
-
-  // 텍스트 박스 생성
-  const handleTextTool = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    const { x, y } = getCanvasCoords(e);
-    const newText = prompt('Enter text:');
-    if (newText) {
-      setTextBoxes(prev => [...prev, { id: uuidv4(), text: newText, x, y, width: 100, height: 30, status: 'new' }]);
-    }
-  }, [getCanvasCoords]);
 
   // 요소 이동 로직 
   const moveElement = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!movingObject) return;
 
     const { x, y } = getCanvasCoords(e);
+    const nextPosition = {
+      x: x - movingObject.grabOffset.x,
+      y: y - movingObject.grabOffset.y,
+    };
 
     if (movingObject.type === 'image') {
       setImages(prev => {
         const newImgs = [...prev];
           const current = newImgs[movingObject.index];
-          newImgs[movingObject.index] = { ...current, x, y, status: current.status === 'new' ? 'new' : 'modified' };
+          newImgs[movingObject.index] = { ...current, ...nextPosition, status: current.status === 'new' ? 'new' : 'modified' };
           return newImgs;
       });
     } else if (movingObject.type === 'text') {
       setTextBoxes(prev => {
         const newBoxes = [...prev];
         const current = newBoxes[movingObject.index];
-        newBoxes[movingObject.index] = { ...current, x, y, status: current.status === 'new' ? 'new' : 'modified' };
+        newBoxes[movingObject.index] = { ...current, ...nextPosition, status: current.status === 'new' ? 'new' : 'modified' };
         return newBoxes;
       });
     }
@@ -74,7 +76,6 @@ export const useElementManipulation = (getCanvasCoords: GetCanvasCoords, tool: T
     movingObject,
     setMovingObject,
     eraseElementAtPointer,
-    handleTextTool,
     moveElement,
   };
 };

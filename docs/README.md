@@ -1,8 +1,8 @@
-# Flownote Docs Map
+# Flownote 문서 지도
 
 이 디렉터리는 Flownote의 버전 관리되는 지식 베이스다. 루트 `AGENTS.md`와 `.codex/`는 작업 규칙과 하네스 자산을 제공하고, `docs/`는 제품, 아키텍처, 품질 상태, 실행 계획을 에이전트와 사람이 함께 읽을 수 있는 기록 시스템으로 유지한다.
 
-참고 원칙: OpenAI의 "Harness engineering" 글(https://openai.com/ko-KR/index/harness-engineering/)은 `AGENTS.md`를 거대한 매뉴얼이 아니라 목차로 취급하고, 깊은 지식은 구조화된 `docs/`에 둔다고 설명한다. Flownote도 같은 방향으로 짧은 진입점, 명확한 소유 문서, 검증 가능한 체크리스트를 우선한다.
+참고 원칙: OpenAI의 하네스 엔지니어링 글(https://openai.com/ko-KR/index/harness-engineering/)은 `AGENTS.md`를 거대한 매뉴얼이 아니라 목차로 취급하고, 깊은 지식은 구조화된 `docs/`에 둔다고 설명한다. Flownote도 같은 방향으로 짧은 진입점, 명확한 소유 문서, 검증 가능한 체크리스트를 우선한다.
 
 ## 읽는 순서
 
