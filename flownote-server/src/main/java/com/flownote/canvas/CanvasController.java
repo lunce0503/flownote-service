@@ -34,6 +34,7 @@ import com.flownote.canvas.CanvasDtos.CanvasFolderUpdateRequest;
 import com.flownote.canvas.CanvasDtos.CanvasMetadataResponse;
 import com.flownote.canvas.CanvasDtos.CanvasResponse;
 import com.flownote.canvas.CanvasDtos.CanvasSaveRequest;
+import com.flownote.canvas.CanvasDtos.CanvasSaveResponse;
 import com.flownote.canvas.CanvasDtos.CanvasSummaryResponse;
 import com.flownote.canvas.CanvasDtos.CanvasViewportRequest;
 import com.flownote.canvas.CanvasDtos.CanvasViewportResponse;
@@ -44,10 +45,13 @@ import com.flownote.canvas.CanvasService.CanvasAssetContent;
 public class CanvasController {
     private final AuthService authService;
     private final CanvasService canvasService;
+    private final CanvasOperationScheduler operationScheduler;
 
-    public CanvasController(AuthService authService, CanvasService canvasService) {
+    public CanvasController(AuthService authService, CanvasService canvasService,
+            CanvasOperationScheduler operationScheduler) {
         this.authService = authService;
         this.canvasService = canvasService;
+        this.operationScheduler = operationScheduler;
     }
 
     @GetMapping({"/load", ""})
@@ -70,45 +74,61 @@ public class CanvasController {
     @GetMapping("/{canvasId}/metadata")
     public CanvasMetadataResponse metadataById(
             @RequestHeader(value = "Authorization", required = false) String authorization,
-            @PathVariable UUID canvasId) {
-        return canvasService.metadata(authService.requireUserId(authorization), canvasId);
+            @PathVariable UUID canvasId,
+            @RequestParam(value = "trigger", required = false) String trigger) {
+        UUID userId = authService.requireUserId(authorization);
+        return operationScheduler.execute(userId, canvasId, null, "LOAD", trigger, null,
+                () -> canvasService.metadata(userId, canvasId));
     }
 
     @GetMapping("/metadata")
     public CanvasMetadataResponse metadataByQuery(
             @RequestHeader(value = "Authorization", required = false) String authorization,
-            @RequestParam(value = "canvasId", required = false) UUID canvasId) {
-        return canvasService.metadata(authService.requireUserId(authorization), canvasId);
+            @RequestParam(value = "canvasId", required = false) UUID canvasId,
+            @RequestParam(value = "trigger", required = false) String trigger) {
+        UUID userId = authService.requireUserId(authorization);
+        return operationScheduler.execute(userId, canvasId, null, "LOAD", trigger, null,
+                () -> canvasService.metadata(userId, canvasId));
     }
 
     @GetMapping("/{canvasId}/elements")
     public CanvasElementsResponse elementsById(
             @RequestHeader(value = "Authorization", required = false) String authorization,
-            @PathVariable UUID canvasId) {
-        return canvasService.elements(authService.requireUserId(authorization), canvasId);
+            @PathVariable UUID canvasId,
+            @RequestParam(value = "trigger", required = false) String trigger) {
+        UUID userId = authService.requireUserId(authorization);
+        return operationScheduler.execute(userId, canvasId, null, "LOAD", trigger, null,
+                () -> canvasService.elements(userId, canvasId));
     }
 
     @GetMapping("/elements")
     public CanvasElementsResponse elementsByQuery(
             @RequestHeader(value = "Authorization", required = false) String authorization,
-            @RequestParam(value = "canvasId", required = false) UUID canvasId) {
-        return canvasService.elements(authService.requireUserId(authorization), canvasId);
+            @RequestParam(value = "canvasId", required = false) UUID canvasId,
+            @RequestParam(value = "trigger", required = false) String trigger) {
+        UUID userId = authService.requireUserId(authorization);
+        return operationScheduler.execute(userId, canvasId, null, "LOAD", trigger, null,
+                () -> canvasService.elements(userId, canvasId));
     }
 
     @PostMapping("/{canvasId}/elements/save")
-    public CanvasElementsResponse saveElementsById(
+    public CanvasSaveResponse saveElementsById(
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @PathVariable UUID canvasId,
             @Validated @RequestBody CanvasSaveRequest request) {
-        return canvasService.saveElements(authService.requireUserId(authorization), canvasId, request);
+        UUID userId = authService.requireUserId(authorization);
+        return operationScheduler.execute(userId, canvasId, request.mutationId(), "SAVE", request.trigger(), null,
+                () -> canvasService.saveElements(userId, canvasId, request));
     }
 
     @PostMapping("/elements/save")
-    public CanvasElementsResponse saveElementsByQuery(
+    public CanvasSaveResponse saveElementsByQuery(
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestParam(value = "canvasId", required = false) UUID canvasId,
             @Validated @RequestBody CanvasSaveRequest request) {
-        return canvasService.saveElements(authService.requireUserId(authorization), canvasId, request);
+        UUID userId = authService.requireUserId(authorization);
+        return operationScheduler.execute(userId, canvasId, request.mutationId(), "SAVE", request.trigger(), null,
+                () -> canvasService.saveElements(userId, canvasId, request));
     }
 
     @GetMapping("/{canvasId}/viewport")
@@ -146,6 +166,16 @@ public class CanvasController {
     @GetMapping("/assets/{assetId}")
     public ResponseEntity<byte[]> asset(@PathVariable UUID assetId) {
         CanvasAssetContent content = canvasService.readAsset(assetId);
+        return assetResponse(content);
+    }
+
+    @GetMapping("/assets/by-key")
+    public ResponseEntity<byte[]> assetByObjectKey(@RequestParam("objectKey") String objectKey) {
+        CanvasAssetContent content = canvasService.readAssetByObjectKey(objectKey);
+        return assetResponse(content);
+    }
+
+    private ResponseEntity<byte[]> assetResponse(CanvasAssetContent content) {
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(content.contentType()))
                 .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(content.byteSize()))

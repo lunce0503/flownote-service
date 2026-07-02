@@ -7,6 +7,9 @@ const POST = async (request: Request) => {
   const token = typeof body.token === 'string' ? body.token : '';
   const resource = typeof body.resource === 'string' ? body.resource : 'all';
   const action = typeof body.action === 'string' ? body.action : 'changed';
+  const noteId = typeof body.noteId === 'string' ? body.noteId : undefined;
+  const revision = typeof body.revision === 'number' && Number.isFinite(body.revision) ? body.revision : undefined;
+  const clientId = typeof body.clientId === 'string' ? body.clientId : undefined;
   const corsHeaders = corsHeadersFor(request);
 
   if (!token) {
@@ -17,6 +20,9 @@ const POST = async (request: Request) => {
     token,
     resource,
     action,
+    noteId,
+    revision,
+    clientId,
     at: new Date().toISOString(),
   } as SyncPayload);
 

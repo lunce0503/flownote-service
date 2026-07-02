@@ -56,7 +56,7 @@ const NoteDrawingCanvas = ({ isSaving, onCancel, onSave }: NoteDrawingCanvasProp
     setImages,
     setTextBoxes,
   });
-  const { redrawWith } = useCanvasRendering(
+  const { redrawWith, redrawActiveStroke } = useCanvasRendering(
     rendererRef,
     offset,
     scale,
@@ -111,7 +111,7 @@ const NoteDrawingCanvas = ({ isSaving, onCancel, onSave }: NoteDrawingCanvasProp
 
     if (tool === "pen" && isDrawing) {
       appendPointerToCurrentLine(event);
-      redrawWith(drawnLines, images, textBoxes);
+      redrawActiveStroke();
     }
   };
 

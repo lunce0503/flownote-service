@@ -62,6 +62,9 @@ export type CanvasSavePayload = {
 export type CanvasLoadData = {
   id?: string;
   title?: string;
+  revision?: number;
+  loadStatus?: "COMPLETE" | "PARTIAL";
+  loadWarnings?: string[];
   lines: Omit<LineElement, 'status'>[];
   images: Omit<ImageElement, 'status'>[];
   textBoxes: Omit<TextBoxElement, 'status'>[];

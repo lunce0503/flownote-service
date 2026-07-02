@@ -1,5 +1,6 @@
 import type { ImageElement, LineElement, Point, TextBoxElement } from "../../../entities/canvas/model/types";
 import { isPointInPolygon, lassoHitsLine, type Bounds } from "./canvasGeometry";
+import { CanvasSpatialIndex, getPointsBounds } from "./canvasSpatialIndex";
 
 export type LassoSelection = {
     lineIds: Set<string>;
@@ -17,15 +18,21 @@ export const buildLassoSelection = (
     images: ImageElement[],
     textBoxes: TextBoxElement[],
 ): LassoSelection | null => {
+    const polygonBounds = getPointsBounds(polygon);
+    if (!polygonBounds) return null;
+    const spatialIndex = new CanvasSpatialIndex(lines, images, textBoxes);
+    const lineCandidates = spatialIndex.search(polygonBounds, "line");
+    const imageCandidates = spatialIndex.search(polygonBounds, "image");
+    const textCandidates = spatialIndex.search(polygonBounds, "text");
     const selection: LassoSelection = {
-        lineIds: new Set(lines.filter((line) => line.status !== "deleted" && lassoHitsLine(line, polygon)).map((line) => line.id)),
+        lineIds: new Set(lines.filter((line) => lineCandidates.has(line.id) && line.status !== "deleted" && lassoHitsLine(line, polygon)).map((line) => line.id)),
         imageIds: new Set(images.filter((image) => {
             const center = { x: image.x + image.width / 2, y: image.y + image.height / 2 };
-            return image.status !== "deleted" && isPointInPolygon(center, polygon);
+            return imageCandidates.has(image.id) && image.status !== "deleted" && isPointInPolygon(center, polygon);
         }).map((image) => image.id)),
         textBoxIds: new Set(textBoxes.filter((textBox) => {
             const center = { x: textBox.x + textBox.width / 2, y: textBox.y + textBox.height / 2 };
-            return textBox.status !== "deleted" && isPointInPolygon(center, polygon);
+            return textCandidates.has(textBox.id) && textBox.status !== "deleted" && isPointInPolygon(center, polygon);
         }).map((textBox) => textBox.id)),
     };
 

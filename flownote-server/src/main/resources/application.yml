@@ -13,6 +13,11 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:flownote}
     password: ${SPRING_DATASOURCE_PASSWORD:change-me}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      max-lifetime: ${SPRING_DATASOURCE_HIKARI_MAX_LIFETIME:600000}
+      keepalive-time: ${SPRING_DATASOURCE_HIKARI_KEEPALIVE_TIME:120000}
+      connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:3000}
+      validation-timeout: ${SPRING_DATASOURCE_HIKARI_VALIDATION_TIMEOUT:2000}
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
@@ -38,7 +43,7 @@ management:
 
 flownote:
   cors:
-    origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:3000}
+    origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:5174}
   upload:
     dir: ${FLOWNOTE_UPLOAD_DIR:${user.dir}/uploads}
   storage:
@@ -50,6 +55,7 @@ flownote:
     public-base-url: ${FLOWNOTE_STORAGE_PUBLIC_BASE_URL:}
     validate-on-startup: ${FLOWNOTE_STORAGE_VALIDATE_ON_STARTUP:false}
   canvas:
+    storage-worker-delay-ms: ${FLOWNOTE_CANVAS_STORAGE_WORKER_DELAY_MS:1000}
     cache:
       target-username: ${FLOWNOTE_CANVAS_CACHE_TARGET_USERNAME:lunce}
       ttl: ${FLOWNOTE_CANVAS_CACHE_TTL:24h}

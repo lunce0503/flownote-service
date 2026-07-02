@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   axios,
+  API_CORE_BASE_URL,
+  authHeaders,
   clearAuth,
   getAuthToken,
   getAuthUser,
@@ -56,6 +58,23 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
       axios.interceptors.response.eject(interceptorId);
     };
   }, []);
+
+  useEffect(() => {
+    if (!token || !API_CORE_BASE_URL) return;
+    let active = true;
+    void axios.get<AuthUser>(`${API_CORE_BASE_URL}/api/users/me`, { headers: authHeaders() })
+      .then((response) => {
+        if (!active) return;
+        setAuthUser(response.data);
+        setUser(response.data);
+      })
+      .catch(() => {
+        // The response interceptor handles expired sessions.
+      });
+    return () => {
+      active = false;
+    };
+  }, [token]);
 
   const value = useMemo(
     () => ({

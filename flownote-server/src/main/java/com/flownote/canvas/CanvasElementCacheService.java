@@ -2,7 +2,10 @@ package com.flownote.canvas;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -26,6 +29,7 @@ public class CanvasElementCacheService {
     private final StringRedisTemplate redisTemplate;
     private final String targetUsername;
     private final Duration ttl;
+    private final ConcurrentHashMap<UUID, CacheTargetSnapshot> targetSnapshots = new ConcurrentHashMap<>();
 
     public CanvasElementCacheService(
             JdbcTemplate jdbcTemplate,
@@ -55,7 +59,13 @@ public class CanvasElementCacheService {
             return Optional.of(new CanvasElementsResponse(
                     arrayOrEmpty(node.path("lines")),
                     arrayOrEmpty(node.path("images")),
-                    arrayOrEmpty(node.path("textBoxes"))));
+                    arrayOrEmpty(node.path("textBoxes")),
+                    revision,
+                    "COMPLETE",
+                    "REDIS",
+                    List.of(),
+                    List.of(),
+                    Map.of()));
         } catch (Exception exception) {
             return Optional.empty();
         }
@@ -95,43 +105,40 @@ public class CanvasElementCacheService {
     }
 
     private boolean isCacheTarget(UUID userId, UUID canvasId) {
-        if (!isLikelyTargetUser(userId)) {
-            return false;
-        }
-
-        try {
-            UUID largestCanvasId = jdbcTemplate.query("""
-                    SELECT element.canvas_id
-                    FROM canvas_elements element
-                    WHERE element.user_id = ?
-                      AND element.type IN ('line', 'image')
-                    GROUP BY element.canvas_id
-                    ORDER BY SUM(COALESCE(element.byte_size, octet_length(element.payload::text))) DESC
-                    LIMIT 1
-                    """, (rs, rowNum) -> rs.getObject("canvas_id", UUID.class), userId)
-                    .stream()
-                    .findFirst()
-                    .orElse(null);
-            return canvasId.equals(largestCanvasId);
-        } catch (Exception exception) {
-            return false;
-        }
+        CacheTargetSnapshot snapshot = cacheTargetSnapshot(userId);
+        return snapshot.targetUser() && canvasId.equals(snapshot.largestCanvasId());
     }
 
     private boolean isLikelyTargetUser(UUID userId) {
-        if (targetUsername.isBlank()) {
-            return false;
-        }
+        return cacheTargetSnapshot(userId).targetUser();
+    }
 
+    private CacheTargetSnapshot cacheTargetSnapshot(UUID userId) {
+        if (targetUsername.isBlank()) return new CacheTargetSnapshot(false, null, Long.MAX_VALUE);
+        CacheTargetSnapshot cached = targetSnapshots.get(userId);
+        long now = System.currentTimeMillis();
+        if (cached != null && cached.expiresAt() > now) return cached;
         try {
-            String username = jdbcTemplate.queryForObject("""
-                    SELECT username
-                    FROM users
-                    WHERE id = ?
-                    """, String.class, userId);
-            return username != null && username.equalsIgnoreCase(targetUsername);
-        } catch (EmptyResultDataAccessException exception) {
-            return false;
+            CacheTargetSnapshot resolved = jdbcTemplate.query("""
+                    SELECT u.username,
+                           (SELECT element.canvas_id
+                            FROM canvas_elements element
+                            WHERE element.user_id = u.id AND element.type IN ('line', 'image')
+                            GROUP BY element.canvas_id
+                            ORDER BY SUM(COALESCE(element.byte_size, octet_length(element.payload::text))) DESC
+                            LIMIT 1) AS largest_canvas_id
+                    FROM users u
+                    WHERE u.id = ?
+                    """, (rs, rowNum) -> new CacheTargetSnapshot(
+                            rs.getString("username").equalsIgnoreCase(targetUsername),
+                            rs.getObject("largest_canvas_id", UUID.class),
+                            now + Duration.ofMinutes(5).toMillis()), userId)
+                    .stream().findFirst()
+                    .orElse(new CacheTargetSnapshot(false, null, now + Duration.ofMinutes(5).toMillis()));
+            targetSnapshots.put(userId, resolved);
+            return resolved;
+        } catch (Exception exception) {
+            return new CacheTargetSnapshot(false, null, now + Duration.ofSeconds(30).toMillis());
         }
     }
 
@@ -145,5 +152,8 @@ public class CanvasElementCacheService {
 
     private String cacheKeyPattern(UUID userId, UUID canvasId) {
         return "%s:%s:%s:*".formatted(KEY_PREFIX, userId, canvasId);
+    }
+
+    private record CacheTargetSnapshot(boolean targetUser, UUID largestCanvasId, long expiresAt) {
     }
 }

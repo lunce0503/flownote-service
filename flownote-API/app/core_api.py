@@ -20,7 +20,7 @@ def forward_request(method: str, path: str, authorization: str | None = None, bo
 
     request = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=35) as response:
             raw = response.read()
             if not raw:
                 return None

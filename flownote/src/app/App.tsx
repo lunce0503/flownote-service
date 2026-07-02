@@ -16,6 +16,7 @@ import CanvasRoute from './routers/Canvas/route.tsx';
 import StockRoute from './routers/Stock/route.tsx';
 import StockChartRoute from './routers/Stock/chart.tsx';
 import SettingsRoute from './routers/Settings/route.tsx';
+import AdminCanvasRoute from './routers/AdminCanvas/route.tsx';
 import BlogDetail from './routers/BlogDetail/index.tsx';
 import { AuthProvider } from '../shared/auth/AuthContext.tsx';
 import ProtectedRoute from '../shared/auth/ProtectedRoute.tsx';
@@ -94,6 +95,14 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         ></Route>
+        <Route
+          path="/admin/canvas"
+          element={
+            <ProtectedRoute>
+              <AdminCanvasRoute />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </>
   );

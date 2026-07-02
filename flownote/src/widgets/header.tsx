@@ -12,7 +12,8 @@ import {
   Bot,
   Palette,
   TrendingUp,
-  Settings
+  Settings,
+  Activity,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../shared/auth/AuthContext";
@@ -40,6 +41,7 @@ export default function Header() {
       logout: "로그아웃",
       menu: "메뉴",
       closeMenu: "메뉴 닫기",
+      admin: "운영 진단",
     },
     en: {
       blog: "Blog",
@@ -53,6 +55,7 @@ export default function Header() {
       logout: "Logout",
       menu: "Menu",
       closeMenu: "Close menu",
+      admin: "Diagnostics",
     },
   }[language];
 
@@ -104,6 +107,7 @@ export default function Header() {
     { name: labels.task, href: "/task", icon: <CheckSquare size={18} /> },
     { name: labels.stocks, href: "/stocks", icon: <TrendingUp size={18} /> },
     { name: labels.settings, href: "/settings", icon: <Settings size={18} /> },
+    ...(user?.role === "ADMIN" ? [{ name: labels.admin, href: "/admin/canvas", icon: <Activity size={18} /> }] : []),
   ];
 
   return (

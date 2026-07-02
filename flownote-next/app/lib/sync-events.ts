@@ -3,6 +3,9 @@ type SyncPayload = {
   resource: 'notes' | 'canvas' | 'tasks' | 'schedule' | 'all';
   action: string;
   at: string;
+  noteId?: string;
+  revision?: number;
+  clientId?: string;
 };
 
 type SyncClient = {

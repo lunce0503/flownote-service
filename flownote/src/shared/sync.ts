@@ -2,13 +2,33 @@ import { API_SYNC_BASE_URL, getAuthToken } from "./api";
 
 export type SyncResource = "notes" | "canvas" | "tasks" | "schedule" | "all";
 
-type SyncEventPayload = {
+export type SyncEventPayload = {
   resource: SyncResource;
   action: string;
   at: string;
+  noteId?: string;
+  revision?: number;
+  clientId?: string;
 };
 
-const publishSyncEvent = async (resource: SyncResource, action = "changed") => {
+type SyncEventDetails = Pick<SyncEventPayload, "noteId" | "revision" | "clientId">;
+
+const SYNC_CLIENT_ID_KEY = "flownote.sync.clientId";
+
+const getSyncClientId = () => {
+  const existing = sessionStorage.getItem(SYNC_CLIENT_ID_KEY);
+  if (existing) return existing;
+
+  const clientId = crypto.randomUUID();
+  sessionStorage.setItem(SYNC_CLIENT_ID_KEY, clientId);
+  return clientId;
+};
+
+const publishSyncEvent = async (
+  resource: SyncResource,
+  action = "changed",
+  details: SyncEventDetails = {},
+) => {
   const token = getAuthToken();
   if (!API_SYNC_BASE_URL || !token) return;
 
@@ -16,7 +36,7 @@ const publishSyncEvent = async (resource: SyncResource, action = "changed") => {
     await fetch(`${API_SYNC_BASE_URL}/api/sync/publish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, resource, action }),
+      body: JSON.stringify({ token, resource, action, ...details }),
       keepalive: true,
     });
   } catch (error) {
@@ -40,4 +60,4 @@ const subscribeSyncEvents = (onEvent: (event: SyncEventPayload) => void) => {
   return () => source.close();
 };
 
-export { publishSyncEvent, subscribeSyncEvents };
+export { getSyncClientId, publishSyncEvent, subscribeSyncEvents };

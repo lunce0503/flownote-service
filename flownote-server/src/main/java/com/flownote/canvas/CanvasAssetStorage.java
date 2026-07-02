@@ -3,6 +3,7 @@ package com.flownote.canvas;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +15,8 @@ import org.springframework.web.server.ResponseStatusException;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.ResponseBytes;
+import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
+import software.amazon.awssdk.core.retry.RetryPolicy;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -45,6 +48,11 @@ public class CanvasAssetStorage {
                 .endpointOverride(URI.create(endpoint))
                 .region(Region.of(isBlank(region) ? "us-east-1" : region))
                 .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKeyId, secretAccessKey)))
+                .overrideConfiguration(ClientOverrideConfiguration.builder()
+                        .apiCallTimeout(Duration.ofSeconds(10))
+                        .apiCallAttemptTimeout(Duration.ofSeconds(5))
+                        .retryPolicy(RetryPolicy.builder().numRetries(2).build())
+                        .build())
                 .forcePathStyle(true)
                 .build();
     }

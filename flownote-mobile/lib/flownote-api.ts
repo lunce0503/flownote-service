@@ -69,11 +69,14 @@ export type Note = {
   content: unknown;
   createdAt: string;
   updatedAt: string;
+  revision: number;
+  clientId?: string;
 };
 
 type NoteResponse = Note & {
   created_at?: string;
   updated_at?: string;
+  client_id?: string;
 };
 
 export type CreateTaskInput = {
@@ -92,6 +95,7 @@ export type CreateNoteInput = {
   title: string;
   content: unknown;
   createdAt?: string;
+  revision?: number;
 };
 
 export type ChatMessage = {
@@ -246,6 +250,8 @@ const normalizeNote = (note: NoteResponse): Note => ({
   content: note.content,
   createdAt: note.createdAt ?? note.created_at ?? '',
   updatedAt: note.updatedAt ?? note.updated_at ?? '',
+  revision: note.revision ?? 0,
+  clientId: note.clientId ?? note.client_id,
 });
 
 type TaskMutationResponse = {
@@ -398,6 +404,8 @@ export const flownoteApi = {
         title: input.title,
         content: input.content,
         createdAt: input.createdAt ?? new Date().toISOString(),
+        revision: (input.revision ?? 0) + 1,
+        client_id: makeUuid(),
       },
     });
     return normalizeNote(note);

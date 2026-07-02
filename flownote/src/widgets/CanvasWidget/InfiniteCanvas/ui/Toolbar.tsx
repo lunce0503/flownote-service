@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ToolType } from '../../../../entities/canvas/model/types';
-import { ClipboardPaste, Copy, Download, Eraser, Grid3X3, Hand, ImagePlus, Lasso, Palette, PenLine, RotateCcw, Settings, Trash2, Type, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
+import type { CanvasLoadTrigger, CanvasSaveState, CanvasSaveStatus } from '../../../../features/canvas/model/usePersistence';
+import { CheckCircle2, ClipboardPaste, Copy, Download, Eraser, Hand, ImagePlus, Lasso, Loader2, Palette, PenLine, RefreshCw, RotateCcw, Settings, Trash2, TriangleAlert, Type, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
 
 interface ToolbarProps {
   canvasTitle: string;
@@ -8,7 +9,11 @@ interface ToolbarProps {
   setTool: (tool: ToolType) => void;
   handleImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   handleSave: () => Promise<void>;
-  handleLoad: () => Promise<void>;
+  handleLoad: (trigger?: CanvasLoadTrigger) => Promise<void>;
+  cancelCanvasLoad: () => void;
+  retryPendingSaves: () => Promise<void>;
+  cancelPendingSaves: () => void;
+  saveState: CanvasSaveState;
   handleUndo: () => void;
   canUndo: boolean;
   lassoSelectionCount: number;
@@ -19,12 +24,8 @@ interface ToolbarProps {
   onScaleLassoSelection: (factor: number) => void;
   onChangeLassoSelectionColor: (color: string) => void;
   onClearLassoSelection: () => void;
-  pencilOnlyMode: boolean;
-  onTogglePencilOnlyMode: () => void;
   penColor: string;
   onPenColorChange: (color: string) => void;
-  isCanvasLibraryVisible: boolean;
-  onToggleCanvasLibraryVisible: () => void;
   isCanvasSettingsVisible: boolean;
   onToggleCanvasSettingsVisible: () => void;
   zoomPercent: number;
@@ -44,6 +45,16 @@ const floatingPillClass = 'pointer-events-auto flex min-h-12 shrink-0 items-cent
 const iconButtonClass = 'inline-flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full p-3 text-stone-950 transition hover:bg-stone-100 active:scale-95';
 const selectedIconButtonClass = 'bg-stone-950 text-white hover:bg-stone-800';
 
+const saveStatusClassByStatus: Record<CanvasSaveStatus, string> = {
+  idle: 'bg-stone-100 text-stone-600',
+  loading: 'bg-blue-100 text-blue-800',
+  pending: 'bg-amber-100 text-amber-800',
+  saving: 'bg-blue-100 text-blue-800',
+  saved: 'bg-emerald-100 text-emerald-800',
+  failed: 'bg-red-100 text-red-700',
+  retrying: 'bg-blue-100 text-blue-800',
+};
+
 const TOUCH_TAP_MAX_MOVEMENT = 10;
 const TOUCH_CLICK_SUPPRESSION_MS = 700;
 
@@ -54,6 +65,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   handleImageUpload,
   handleSave,
   handleLoad,
+  cancelCanvasLoad,
+  retryPendingSaves,
+  cancelPendingSaves,
+  saveState,
   handleUndo,
   canUndo,
   lassoSelectionCount,
@@ -64,12 +79,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onScaleLassoSelection,
   onChangeLassoSelectionColor,
   onClearLassoSelection,
-  pencilOnlyMode,
-  onTogglePencilOnlyMode,
   penColor,
   onPenColorChange,
-  isCanvasLibraryVisible,
-  onToggleCanvasLibraryVisible,
   isCanvasSettingsVisible,
   onToggleCanvasSettingsVisible,
   zoomPercent,
@@ -118,6 +129,17 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     },
   });
   const shouldShowLassoActions = lassoSelectionCount > 0 || (tool === 'lasso' && hasCopiedLassoSelection);
+  const isSaveBusy = saveState.status === 'loading' || saveState.status === 'saving' || saveState.status === 'retrying';
+  const canCancelRetry = saveState.status === 'retrying' || saveState.pendingRetries > 0;
+  const saveStatusIcon = (() => {
+    if (isSaveBusy) return <Loader2 size={14} className="animate-spin" />;
+    if (saveState.status === 'failed') return <TriangleAlert size={14} />;
+    if (saveState.status === 'saved') return <CheckCircle2 size={14} />;
+    return null;
+  })();
+  const saveStatusLabel = saveState.pendingRetries > 0
+    ? `${saveState.message} ${saveState.pendingRetries}`
+    : saveState.message;
 
   return (
     <div
@@ -126,17 +148,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     >
       <div className="canvas-toolbar-scroll pointer-events-auto flex min-w-0 items-start justify-between gap-2 overflow-x-auto pb-2">
         <div className="flex min-w-max items-start gap-2">
-          <button
-            type="button"
-            className={`${iconButtonClass} pointer-events-auto bg-white/95 shadow-lg ring-1 ring-stone-200/80`}
-            onClick={onToggleCanvasLibraryVisible}
-            {...touchActivation(onToggleCanvasLibraryVisible)}
-            title={isCanvasLibraryVisible ? '캔버스 폴더 숨기기' : '캔버스 폴더 표시'}
-            aria-pressed={isCanvasLibraryVisible}
-          >
-            <Grid3X3 size={20} />
-          </button>
-
           <div className="pointer-events-auto flex min-h-12 max-w-[220px] shrink-0 items-center rounded-full bg-white/95 px-4 text-sm font-black shadow-lg ring-1 ring-stone-200/80 backdrop-blur" title={canvasTitle}>
             <span className="truncate">{canvasTitle}</span>
           </div>
@@ -144,7 +155,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <div className={floatingPillClass} aria-label="도구">
             <button
               type="button"
-              onClick={handleUndo}
               {...touchActivation(handleUndo)}
               disabled={!canUndo}
               className={`${iconButtonClass} ${canUndo ? '' : 'disabled:cursor-not-allowed disabled:opacity-40'}`}
@@ -159,7 +169,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <button
                   key={item.tool}
                   type="button"
-                  onClick={() => setTool(item.tool)}
                   {...touchActivation(() => setTool(item.tool))}
                   className={`${iconButtonClass} ${selected ? selectedIconButtonClass : ''}`}
                   title={item.label}
@@ -183,9 +192,37 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </div>
 
           <div className={floatingPillClass} aria-label="파일과 설정">
+            <div
+              className={`inline-flex min-h-9 min-w-[104px] items-center justify-center gap-1.5 rounded-full px-3 text-xs font-black ${saveStatusClassByStatus[saveState.status]}`}
+              title={saveStatusLabel}
+              aria-live="polite"
+            >
+              {saveStatusIcon}
+              <span className="max-w-[90px] truncate">{saveStatusLabel}</span>
+            </div>
+            {saveState.status === 'failed' && (
+              <button
+                type="button"
+                {...touchActivation(() => { void retryPendingSaves(); })}
+                className={iconButtonClass}
+                title="저장 재시도"
+              >
+                <RefreshCw size={18} />
+              </button>
+            )}
+            {canCancelRetry && (
+              <button
+                type="button"
+                {...touchActivation(cancelPendingSaves)}
+                className={iconButtonClass}
+                title="저장 재시도 취소"
+                aria-label="저장 재시도 취소"
+              >
+                <X size={18} />
+              </button>
+            )}
             <button
               type="button"
-              onClick={handleSave}
               {...touchActivation(() => { void handleSave(); })}
               className={iconButtonClass}
               title="캔버스 저장"
@@ -194,16 +231,27 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             </button>
             <button
               type="button"
-              onClick={handleLoad}
               {...touchActivation(() => { void handleLoad(); })}
               className={iconButtonClass}
               title="캔버스 불러오기"
+              disabled={saveState.status === 'loading'}
+              aria-disabled={saveState.status === 'loading'}
             >
               <Upload size={19} />
             </button>
+            {saveState.status === 'loading' && (
+              <button
+                type="button"
+                {...touchActivation(cancelCanvasLoad)}
+                className={iconButtonClass}
+                title="캔버스 불러오기 취소"
+                aria-label="캔버스 불러오기 취소"
+              >
+                <X size={18} />
+              </button>
+            )}
             <button
               type="button"
-              onClick={onToggleCanvasSettingsVisible}
               {...touchActivation(onToggleCanvasSettingsVisible)}
               className={`${iconButtonClass} ${isCanvasSettingsVisible ? selectedIconButtonClass : ''}`}
               title="그림판 설정"
@@ -222,29 +270,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             style={{ backgroundColor: penColor }}
             title="현재 펜 색상"
           />
-          <button
-            type="button"
-            onClick={onTogglePencilOnlyMode}
-            {...touchActivation(onTogglePencilOnlyMode)}
-            className={`${iconButtonClass} ${pencilOnlyMode ? selectedIconButtonClass : ''}`}
-            title={pencilOnlyMode ? '애플펜슬 전용 켜짐' : '애플펜슬 전용 꺼짐'}
-            aria-pressed={pencilOnlyMode}
-          >
-            <PenLine size={18} />
-          </button>
         </div>
 
         <div className="pointer-events-auto flex min-h-12 shrink-0 overflow-hidden rounded-full bg-white shadow-lg ring-1 ring-stone-200/80" title="펜 색상">
-          <div className="flex min-w-16 items-center justify-center bg-black">
-            <span className="h-1.5 w-1.5 rounded-full bg-white" />
-          </div>
           {PEN_COLORS.map((color) => {
             const selected = penColor.toLowerCase() === color.value.toLowerCase();
             return (
               <button
                 key={color.value}
                 type="button"
-                onClick={() => onPenColorChange(color.value)}
                 {...touchActivation(() => onPenColorChange(color.value))}
                 className="relative flex min-h-12 min-w-12 shrink-0 items-center justify-center transition hover:brightness-95 active:brightness-90"
                 style={{ backgroundColor: color.value }}
@@ -266,7 +300,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             <>
               <button
                 type="button"
-                onClick={onCopyLassoSelection}
                 {...touchActivation(onCopyLassoSelection)}
                 className={iconButtonClass}
                 title="선택 영역 복사하기"
@@ -275,7 +308,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => onScaleLassoSelection(0.88)}
                 {...touchActivation(() => onScaleLassoSelection(0.88))}
                 className={iconButtonClass}
                 title="선택 영역 축소"
@@ -284,7 +316,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => onScaleLassoSelection(1.12)}
                 {...touchActivation(() => onScaleLassoSelection(1.12))}
                 className={iconButtonClass}
                 title="선택 영역 확대"
@@ -297,7 +328,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   <button
                     key={`selection-${color.value}`}
                     type="button"
-                    onClick={() => onChangeLassoSelectionColor(color.value)}
                     {...touchActivation(() => onChangeLassoSelectionColor(color.value))}
                     className="min-h-9 min-w-9 rounded-full border-2 border-white shadow-sm transition hover:scale-105"
                     style={{ backgroundColor: color.value }}
@@ -308,7 +338,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               </div>
               <button
                 type="button"
-                onClick={onDeleteLassoSelection}
                 {...touchActivation(onDeleteLassoSelection)}
                 className={`${iconButtonClass} bg-red-600 text-white hover:bg-red-700`}
                 title="선택 영역 삭제"
@@ -317,7 +346,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               </button>
               <button
                 type="button"
-                onClick={onClearLassoSelection}
                 {...touchActivation(onClearLassoSelection)}
                 className={iconButtonClass}
                 title="선택 해제"
@@ -329,7 +357,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           {hasCopiedLassoSelection && (
             <button
               type="button"
-              onClick={onPasteLassoSelection}
               {...touchActivation(onPasteLassoSelection)}
               className={iconButtonClass}
               title="복사한 선택 영역 붙여넣기"

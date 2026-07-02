@@ -20,6 +20,8 @@ import java.util.concurrent.Executors;
 import org.springframework.http.HttpStatus;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -42,6 +44,7 @@ import com.flownote.canvas.CanvasDtos.CanvasFolderUpdateRequest;
 import com.flownote.canvas.CanvasDtos.CanvasMetadataResponse;
 import com.flownote.canvas.CanvasDtos.CanvasResponse;
 import com.flownote.canvas.CanvasDtos.CanvasSaveRequest;
+import com.flownote.canvas.CanvasDtos.CanvasSaveResponse;
 import com.flownote.canvas.CanvasDtos.CanvasSummaryResponse;
 import com.flownote.canvas.CanvasDtos.CanvasViewportRequest;
 import com.flownote.canvas.CanvasDtos.CanvasViewportResponse;
@@ -51,20 +54,25 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 
 @Service
 public class CanvasService {
+    private static final Logger log = LoggerFactory.getLogger(CanvasService.class);
+
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final CanvasAssetStorage assetStorage;
     private final CanvasElementCacheService elementCacheService;
+    private final CanvasStorageOutboxService storageOutboxService;
 
     public CanvasService(
             JdbcTemplate jdbcTemplate,
             ObjectMapper objectMapper,
             CanvasAssetStorage assetStorage,
-            CanvasElementCacheService elementCacheService) {
+            CanvasElementCacheService elementCacheService,
+            CanvasStorageOutboxService storageOutboxService) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
         this.assetStorage = assetStorage;
         this.elementCacheService = elementCacheService;
+        this.storageOutboxService = storageOutboxService;
     }
 
     public CanvasResponse load(UUID userId, UUID canvasId) {
@@ -74,7 +82,10 @@ public class CanvasService {
 
     @Transactional
     public CanvasResponse save(UUID userId, UUID canvasId, CanvasSaveRequest request) {
-        CanvasResponse current = load(userId, canvasId);
+        UUID targetCanvasId = canvasId == null ? getOrCreateDefaultDocument(userId).id() : canvasId;
+        requireOwnedCanvas(userId, targetCanvasId);
+        lockCanvasSave(userId, targetCanvasId);
+        CanvasResponse current = getCanvas(userId, targetCanvasId);
         JsonNode lines = merge(current.lines(), request.addedLines(), request.modifiedLines(), request.deletedLines());
         JsonNode images = merge(current.images(), request.addedImages(), request.modifiedImages(), request.deletedImages());
         JsonNode textBoxes = merge(current.textBoxes(), request.addedTextBoxes(), request.modifiedTextBoxes(), request.deletedTextBoxes());
@@ -105,42 +116,73 @@ public class CanvasService {
     }
 
     public CanvasElementsResponse elements(UUID userId, UUID canvasId) {
+        long startedAt = System.nanoTime();
         UUID targetCanvasId = canvasId == null ? getOrCreateDefaultDocument(userId).id() : canvasId;
         requireOwnedCanvas(userId, targetCanvasId);
         long revision = getCanvasRevision(userId, targetCanvasId);
         Optional<CanvasElementsResponse> cached = elementCacheService.get(userId, targetCanvasId, revision);
         if (cached.isPresent()) {
-            return cached.get();
+            CanvasElementsResponse response = cached.get();
+            log.info(
+                    "canvas_elements_load_completed canvasId={} revision={} cacheHit=true elapsedMs={} lines={} images={} textBoxes={} bytes={}",
+                    targetCanvasId,
+                    revision,
+                    elapsedMs(startedAt),
+                    arraySize(response.lines()),
+                    arraySize(response.images()),
+                    arraySize(response.textBoxes()),
+                    responseBytes(response));
+            return response;
         }
 
         CanvasElementsResponse response;
         CanvasElementArrays elementArrays = readElementArrays(userId, targetCanvasId);
         if (elementArrays.hasRows()) {
-            response = new CanvasElementsResponse(elementArrays.lines(), elementArrays.images(), elementArrays.textBoxes());
+            response = new CanvasElementsResponse(
+                    elementArrays.lines(), elementArrays.images(), elementArrays.textBoxes(), revision,
+                    elementArrays.complete() ? "COMPLETE" : "PARTIAL", "DATABASE", List.of(),
+                    elementArrays.complete() ? List.of() : List.of("일부 이전 R2 요소를 불러오지 못했습니다."),
+                    Map.of("totalMs", elapsedMs(startedAt)));
         } else {
             CanvasResponse canvas = getStoredCanvasJson(userId, targetCanvasId);
-            response = new CanvasElementsResponse(canvas.lines(), canvas.images(), canvas.textBoxes());
+            response = new CanvasElementsResponse(canvas.lines(), canvas.images(), canvas.textBoxes(), revision,
+                    "COMPLETE", "DATABASE", List.of(), List.of(), Map.of("totalMs", elapsedMs(startedAt)));
         }
         elementCacheService.put(userId, targetCanvasId, revision, response);
+        log.info(
+                "canvas_elements_load_completed canvasId={} revision={} cacheHit=false elapsedMs={} lines={} images={} textBoxes={} bytes={}",
+                targetCanvasId,
+                revision,
+                elapsedMs(startedAt),
+                arraySize(response.lines()),
+                arraySize(response.images()),
+                arraySize(response.textBoxes()),
+                responseBytes(response));
         return response;
     }
 
     private CanvasElementArrays readElementArrays(UUID userId, UUID canvasId) {
-        CanvasElementArrays snapshot = readElementSnapshot(userId, canvasId);
-        if (snapshot.hasRows()) {
-            return snapshot;
-        }
-
+        long startedAt = System.nanoTime();
+        long queryStartedAt = System.nanoTime();
         List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
-                SELECT type, payload::text AS payload, object_key
+                SELECT id, canvas_id, user_id, type, payload::text AS payload, object_key, storage_status
                 FROM canvas_elements
                 WHERE canvas_id = ? AND user_id = ?
                 ORDER BY created_at ASC
                 """, canvasId, userId);
+        long queryElapsedMs = elapsedMs(queryStartedAt);
         CanvasElementArrays arrays = buildElementArrays(rows);
-        if (arrays.hasRows()) {
-            writeElementSnapshot(userId, canvasId, arrays);
-        }
+        log.info(
+                "canvas_elements_rows_loaded canvasId={} rows={} failedRows={} queryMs={} elapsedMs={} lines={} images={} textBoxes={} snapshotWritten={}",
+                canvasId,
+                rows.size(),
+                arrays.failedRows(),
+                queryElapsedMs,
+                elapsedMs(startedAt),
+                arraySize(arrays.lines()),
+                arraySize(arrays.images()),
+                arraySize(arrays.textBoxes()),
+                false);
         return arrays;
     }
 
@@ -149,16 +191,20 @@ public class CanvasService {
         ArrayNode images = emptyArray();
         ArrayNode textBoxes = emptyArray();
         if (rows.isEmpty()) {
-            return new CanvasElementArrays(lines, images, textBoxes, false);
+            return new CanvasElementArrays(lines, images, textBoxes, false, true, 0);
         }
 
         ExecutorService executor = Executors.newFixedThreadPool(Math.min(24, Math.max(1, rows.size())));
+        int failedRows;
         try {
-            List<CanvasElementPayload> payloads = rows.stream()
-                    .map(row -> CompletableFuture.supplyAsync(() -> readElementPayload(row), executor))
+            List<CompletableFuture<Optional<CanvasElementPayload>>> futures = rows.stream()
+                    .map(row -> CompletableFuture.supplyAsync(() -> readElementPayloadSafely(row), executor))
+                    .toList();
+            List<Optional<CanvasElementPayload>> payloads = futures.stream()
                     .map(CompletableFuture::join)
                     .toList();
-            payloads.forEach(element -> {
+            failedRows = (int) payloads.stream().filter(Optional::isEmpty).count();
+            payloads.stream().flatMap(Optional::stream).forEach(element -> {
                 switch (element.type()) {
                     case "line" -> lines.add(element.payload());
                     case "image" -> images.add(element.payload());
@@ -170,31 +216,129 @@ public class CanvasService {
         } finally {
             executor.shutdown();
         }
-        return new CanvasElementArrays(lines, images, textBoxes, !rows.isEmpty());
+        if (failedRows > 0) {
+            log.warn("canvas_elements_partial_load rows={} failedRows={} lines={} images={} textBoxes={}",
+                    rows.size(),
+                    failedRows,
+                    arraySize(lines),
+                    arraySize(images),
+                    arraySize(textBoxes));
+        }
+        return new CanvasElementArrays(lines, images, textBoxes, true, failedRows == 0, failedRows);
+    }
+
+    private Optional<CanvasElementPayload> readElementPayloadSafely(Map<String, Object> row) {
+        try {
+            return Optional.of(readElementPayload(row));
+        } catch (RuntimeException exception) {
+            log.warn(
+                    "canvas_element_payload_read_failed type={} objectKey={} id={}",
+                    row.get("type"),
+                    row.get("object_key"),
+                    row.get("id"),
+                    exception);
+            return Optional.empty();
+        }
     }
 
     private CanvasElementPayload readElementPayload(Map<String, Object> row) {
         String objectKey = row.get("object_key") == null ? "" : String.valueOf(row.get("object_key"));
-        JsonNode payload = objectKey.isBlank()
-                ? readJson(String.valueOf(row.get("payload")))
-                : readJson(assetStorage.readJson(objectKey));
+        JsonNode databasePayload = readJson(String.valueOf(row.get("payload")));
+        boolean legacyMetadataOnly = databasePayload.size() <= 3
+                && databasePayload.has("id")
+                && databasePayload.has("objectKey");
+        JsonNode payload = legacyMetadataOnly && !objectKey.isBlank()
+                ? readJson(assetStorage.readJson(objectKey))
+                : databasePayload;
+        if (legacyMetadataOnly && !objectKey.isBlank()) {
+            backfillLegacyElementPayload(row, payload);
+        }
         return new CanvasElementPayload(String.valueOf(row.get("type")), payload);
     }
 
+    private void backfillLegacyElementPayload(Map<String, Object> row, JsonNode payload) {
+        try {
+            jdbcTemplate.update("""
+                    UPDATE canvas_elements
+                    SET payload = ?::jsonb,
+                        storage_status = CASE WHEN storage_status = 'FAILED' THEN 'READY' ELSE storage_status END,
+                        storage_error_code = NULL,
+                        updated_at = NOW()
+                    WHERE canvas_id = ? AND user_id = ? AND id = ? AND object_key = ?
+                      AND payload ->> 'objectKey' IS NOT NULL
+                    """,
+                    payload.toString(),
+                    row.get("canvas_id"),
+                    row.get("user_id"),
+                    row.get("id"),
+                    row.get("object_key"));
+        } catch (RuntimeException exception) {
+            log.warn("canvas_legacy_payload_backfill_failed canvasId={} elementId={} objectKey={}",
+                    row.get("canvas_id"),
+                    row.get("id"),
+                    row.get("object_key"),
+                    exception);
+        }
+    }
+
     @Transactional
-    public CanvasElementsResponse saveElements(UUID userId, UUID canvasId, CanvasSaveRequest request) {
+    public CanvasSaveResponse saveElements(UUID userId, UUID canvasId, CanvasSaveRequest request) {
+        long startedAt = System.nanoTime();
         UUID targetCanvasId = canvasId == null ? getOrCreateDefaultDocument(userId).id() : canvasId;
         requireOwnedCanvas(userId, targetCanvasId);
+        UUID mutationId = requireMutationId(request);
+        String payloadHash = CanvasMutationHasher.hash(objectMapper, request);
+        lockCanvasSave(userId, targetCanvasId);
+
+        Optional<CanvasMutationRecord> existingMutation = findCanvasMutation(userId, targetCanvasId, mutationId);
+        if (existingMutation.isPresent()) {
+            CanvasMutationRecord mutation = existingMutation.get();
+            if (!mutation.payloadHash().equals(payloadHash)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "동일한 mutationId에 다른 저장 내용이 전달되었습니다.");
+            }
+            if (!"COMPLETED".equals(mutation.status()) || mutation.resultRevision() == null) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "동일한 저장 요청이 아직 처리 중입니다.");
+            }
+            log.info(
+                    "canvas_elements_save_duplicate canvasId={} mutationId={} revision={} elapsedMs={}",
+                    targetCanvasId,
+                    mutationId,
+                    mutation.resultRevision(),
+                    elapsedMs(startedAt));
+            return new CanvasSaveResponse(mutationId, mutation.resultRevision(), true, storageStatus(targetCanvasId));
+        }
+
+        insertCanvasMutation(userId, targetCanvasId, mutationId, payloadHash);
+        if (!hasSaveChanges(request)) {
+            long revision = getCanvasRevision(userId, targetCanvasId);
+            completeCanvasMutation(userId, targetCanvasId, mutationId, revision);
+            log.info("canvas_elements_save_skipped canvasId={} mutationId={} reason=no_changes elapsedMs={}", targetCanvasId, mutationId, elapsedMs(startedAt));
+            return new CanvasSaveResponse(mutationId, revision, false, storageStatus(targetCanvasId));
+        }
+        log.info(
+                "canvas_elements_save_started canvasId={} mutationId={} addedLines={} modifiedLines={} deletedLines={} addedImages={} modifiedImages={} deletedImages={} addedTextBoxes={} modifiedTextBoxes={} deletedTextBoxes={}",
+                targetCanvasId,
+                mutationId,
+                arraySize(request.addedLines()),
+                arraySize(request.modifiedLines()),
+                arraySize(request.deletedLines()),
+                arraySize(request.addedImages()),
+                arraySize(request.modifiedImages()),
+                arraySize(request.deletedImages()),
+                arraySize(request.addedTextBoxes()),
+                arraySize(request.modifiedTextBoxes()),
+                arraySize(request.deletedTextBoxes()));
         invalidateElementSnapshot(userId, targetCanvasId);
-        deleteElements(userId, targetCanvasId, "line", request == null ? null : request.deletedLines());
-        deleteElements(userId, targetCanvasId, "image", request == null ? null : request.deletedImages());
-        deleteElements(userId, targetCanvasId, "textBox", request == null ? null : request.deletedTextBoxes());
-        upsertElements(userId, targetCanvasId, "line", request == null ? null : request.addedLines());
-        upsertElements(userId, targetCanvasId, "line", request == null ? null : request.modifiedLines());
-        upsertElements(userId, targetCanvasId, "image", request == null ? null : request.addedImages());
-        upsertElements(userId, targetCanvasId, "image", request == null ? null : request.modifiedImages());
-        upsertElements(userId, targetCanvasId, "textBox", request == null ? null : request.addedTextBoxes());
-        upsertElements(userId, targetCanvasId, "textBox", request == null ? null : request.modifiedTextBoxes());
+        int storagePriority = CanvasOperationPriority.resolve("SAVE", request.trigger());
+        deleteElements(userId, targetCanvasId, "line", request.deletedLines());
+        deleteElements(userId, targetCanvasId, "image", request.deletedImages());
+        deleteElements(userId, targetCanvasId, "textBox", request.deletedTextBoxes());
+        upsertElements(userId, targetCanvasId, "line", request.addedLines(), storagePriority);
+        upsertElements(userId, targetCanvasId, "line", request.modifiedLines(), storagePriority);
+        upsertElements(userId, targetCanvasId, "image", request.addedImages(), storagePriority);
+        upsertElements(userId, targetCanvasId, "image", request.modifiedImages(), storagePriority);
+        upsertElements(userId, targetCanvasId, "textBox", request.addedTextBoxes(), storagePriority);
+        upsertElements(userId, targetCanvasId, "textBox", request.modifiedTextBoxes(), storagePriority);
         jdbcTemplate.update("""
                 UPDATE canvas_documents
                 SET lines = '[]'::jsonb,
@@ -204,7 +348,56 @@ public class CanvasService {
                     updated_at = NOW()
                 WHERE id = ? AND user_id = ?
                 """, targetCanvasId, userId);
-        return new CanvasElementsResponse(emptyArray(), emptyArray(), emptyArray());
+        scheduleElementWarmupAfterCommit(userId, targetCanvasId);
+        long revision = getCanvasRevision(userId, targetCanvasId);
+        completeCanvasMutation(userId, targetCanvasId, mutationId, revision);
+        log.info("canvas_elements_save_completed canvasId={} mutationId={} revision={} elapsedMs={}", targetCanvasId, mutationId, revision, elapsedMs(startedAt));
+        return new CanvasSaveResponse(mutationId, revision, false, "PENDING");
+    }
+
+    private UUID requireMutationId(CanvasSaveRequest request) {
+        if (request == null || request.mutationId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "mutationId가 필요합니다.");
+        }
+        return request.mutationId();
+    }
+
+    private Optional<CanvasMutationRecord> findCanvasMutation(UUID userId, UUID canvasId, UUID mutationId) {
+        return jdbcTemplate.query("""
+                SELECT payload_hash, status, result_revision
+                FROM canvas_mutations
+                WHERE canvas_id = ? AND mutation_id = ? AND user_id = ?
+                """, (rs, rowNum) -> new CanvasMutationRecord(
+                rs.getString("payload_hash"),
+                rs.getString("status"),
+                rs.getObject("result_revision", Long.class)), canvasId, mutationId, userId)
+                .stream()
+                .findFirst();
+    }
+
+    private void insertCanvasMutation(UUID userId, UUID canvasId, UUID mutationId, String payloadHash) {
+        jdbcTemplate.update("""
+                INSERT INTO canvas_mutations (canvas_id, mutation_id, user_id, payload_hash, status)
+                VALUES (?, ?, ?, ?, 'PROCESSING')
+                """, canvasId, mutationId, userId, payloadHash);
+    }
+
+    private void completeCanvasMutation(UUID userId, UUID canvasId, UUID mutationId, long revision) {
+        jdbcTemplate.update("""
+                UPDATE canvas_mutations
+                SET status = 'COMPLETED', result_revision = ?, completed_at = NOW()
+                WHERE canvas_id = ? AND mutation_id = ? AND user_id = ?
+                """, revision, canvasId, mutationId, userId);
+    }
+
+    private void lockCanvasSave(UUID userId, UUID canvasId) {
+        jdbcTemplate.query("""
+                SELECT pg_advisory_xact_lock(
+                    hashtext(?::text),
+                    hashtext(?::text)
+                )
+                """, rs -> {
+                }, userId.toString(), canvasId.toString());
     }
 
     public CanvasViewportResponse viewport(UUID userId, UUID canvasId) {
@@ -245,9 +438,9 @@ public class CanvasService {
                 INSERT INTO canvas_assets (id, user_id, object_key, content_type, byte_size)
                 VALUES (?, ?, ?, ?, ?)
                 """, assetId, userId, stored.objectKey(), stored.contentType(), stored.byteSize());
-        String url = stored.publicUrl() == null || stored.publicUrl().isBlank()
-                ? stripTrailingSlash(assetUrlBase) + "/" + assetId
-                : stored.publicUrl();
+        String url = assetUrlBase == null || assetUrlBase.isBlank()
+                ? stored.publicUrl()
+                : stripTrailingSlash(assetUrlBase) + "/" + assetId;
         return new CanvasAssetResponse(assetId, stored.objectKey(), url, stored.contentType(), stored.byteSize());
     }
 
@@ -266,6 +459,20 @@ public class CanvasService {
         return new CanvasAssetContent(
                 String.valueOf(asset.get("content_type")),
                 ((Number) asset.get("byte_size")).longValue(),
+                bytes.asByteArray());
+    }
+
+    public CanvasAssetContent readAssetByObjectKey(String objectKey) {
+        String normalizedObjectKey = normalizeImageObjectKey(objectKey);
+        ResponseBytes<GetObjectResponse> bytes = assetStorage.read(normalizedObjectKey);
+        String contentType = bytes.response().contentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 파일만 읽을 수 있습니다.");
+        }
+        long byteSize = bytes.response().contentLength();
+        return new CanvasAssetContent(
+                contentType,
+                byteSize >= 0 ? byteSize : bytes.asByteArray().length,
                 bytes.asByteArray());
     }
 
@@ -451,7 +658,7 @@ public class CanvasService {
                 WHERE id = ? AND user_id = ?
                 """, String.class, canvasId, userId);
         if (objectKey == null || objectKey.isBlank()) {
-            return new CanvasElementArrays(emptyArray(), emptyArray(), emptyArray(), false);
+            return new CanvasElementArrays(emptyArray(), emptyArray(), emptyArray(), false, true, 0);
         }
         try {
             JsonNode snapshot = readJson(assetStorage.readJson(objectKey));
@@ -462,7 +669,9 @@ public class CanvasService {
                     lines.isArray() ? (ArrayNode) lines : emptyArray(),
                     images.isArray() ? (ArrayNode) images : emptyArray(),
                     textBoxes.isArray() ? (ArrayNode) textBoxes : emptyArray(),
-                    true);
+                    true,
+                    true,
+                    0);
         } catch (RuntimeException exception) {
             jdbcTemplate.update("""
                     UPDATE canvas_documents
@@ -471,7 +680,7 @@ public class CanvasService {
                         elements_public_url = NULL
                     WHERE id = ? AND user_id = ?
                     """, canvasId, userId);
-            return new CanvasElementArrays(emptyArray(), emptyArray(), emptyArray(), false);
+            return new CanvasElementArrays(emptyArray(), emptyArray(), emptyArray(), false, true, 0);
         }
     }
 
@@ -534,14 +743,16 @@ public class CanvasService {
     private void invalidateElementSnapshot(UUID userId, UUID canvasId) {
         elementCacheService.invalidate(userId, canvasId);
         List<String> snapshotKeys = jdbcTemplate.queryForList("""
-                UPDATE canvas_documents
-                SET elements_object_key = NULL,
-                    elements_byte_size = NULL,
-                    elements_public_url = NULL
+                SELECT elements_object_key
+                FROM canvas_documents
                 WHERE id = ? AND user_id = ? AND elements_object_key IS NOT NULL
-                RETURNING elements_object_key
                 """, String.class, canvasId, userId);
-        deleteAfterCommit(snapshotKeys);
+        jdbcTemplate.update("""
+                UPDATE canvas_documents
+                SET elements_object_key = NULL, elements_byte_size = NULL, elements_public_url = NULL
+                WHERE id = ? AND user_id = ?
+                """, canvasId, userId);
+        snapshotKeys.forEach(objectKey -> storageOutboxService.enqueueDelete(userId, canvasId, objectKey));
     }
 
     private void deleteElements(UUID userId, UUID canvasId, String type, JsonNode elements) {
@@ -572,50 +783,55 @@ public class CanvasService {
             ps.setArray(4, connection.createArrayOf("text", ids.toArray(String[]::new)));
             return ps;
         });
-        deleteAfterCommit(objectKeys);
+        objectKeys.forEach(objectKey -> storageOutboxService.enqueueDelete(userId, canvasId, objectKey));
     }
 
-    private void upsertElements(UUID userId, UUID canvasId, String type, JsonNode elements) {
-        currentArray(elements).forEach(element -> upsertElement(userId, canvasId, type, element));
+    private void upsertElements(UUID userId, UUID canvasId, String type, JsonNode elements, int priority) {
+        currentArray(elements).forEach(element -> upsertElement(userId, canvasId, type, element, priority));
     }
 
-    private void upsertElement(UUID userId, UUID canvasId, String type, JsonNode element) {
+    private void upsertElement(UUID userId, UUID canvasId, String type, JsonNode element, int priority) {
         JsonNode id = element.get("id");
         if (id == null || !id.isTextual()) {
             return;
         }
-        String objectKey = "canvas-elements/%s/%s/%s.json".formatted(canvasId, type, id.asText());
-        StoredCanvasAsset stored = assetStorage.putJson(objectKey, element.toString());
+        String elementId = id.asText();
+        String previousObjectKey = findElementObjectKey(userId, canvasId, elementId);
+        String objectKey = "canvas-elements/%s/%s/%s-%s.json".formatted(canvasId, type, elementId, UUID.randomUUID());
         Bounds bounds = boundsFor(type, element);
-        ObjectNode metadataPayload = objectMapper.createObjectNode();
-        metadataPayload.put("id", id.asText());
-        metadataPayload.put("objectKey", objectKey);
-        metadataPayload.put("url", stored.publicUrl());
         jdbcTemplate.update("""
                 INSERT INTO canvas_elements (
                     id, canvas_id, user_id, type, payload, object_key, byte_size, public_url,
-                    bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y
+                    bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y, storage_status,
+                    storage_error_code, r2_synced_at
                 )
-                VALUES (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?::jsonb, ?, NULL, NULL, ?, ?, ?, ?, 'PENDING', NULL, NULL)
                 ON CONFLICT (canvas_id, id)
                 DO UPDATE SET type = EXCLUDED.type,
                               payload = EXCLUDED.payload,
                               object_key = EXCLUDED.object_key,
-                              byte_size = EXCLUDED.byte_size,
-                              public_url = EXCLUDED.public_url,
+                              byte_size = NULL,
+                              public_url = NULL,
                               bbox_min_x = EXCLUDED.bbox_min_x,
                               bbox_min_y = EXCLUDED.bbox_min_y,
                               bbox_max_x = EXCLUDED.bbox_max_x,
                               bbox_max_y = EXCLUDED.bbox_max_y,
+                              storage_status = 'PENDING',
+                              storage_error_code = NULL,
+                              r2_synced_at = NULL,
                               revision = canvas_elements.revision + 1,
                               updated_at = NOW()
                 """,
-                id.asText(), canvasId, userId, type, metadataPayload.toString(), objectKey, stored.byteSize(), stored.publicUrl(),
+                elementId, canvasId, userId, type, element.toString(), objectKey,
                 bounds.minX(), bounds.minY(), bounds.maxX(), bounds.maxY());
+        storageOutboxService.enqueueElementUpload(
+                userId, canvasId, elementId, objectKey, element, priority);
+        if (previousObjectKey != null && !previousObjectKey.isBlank() && !previousObjectKey.equals(objectKey)) {
+            storageOutboxService.enqueueDelete(userId, canvasId, previousObjectKey);
+        }
     }
 
     private void replaceElements(UUID userId, UUID canvasId, String type, JsonNode elements) {
-        Set<String> nextIds = elementIds(elements);
         List<Map<String, Object>> removedRows = jdbcTemplate.queryForList("""
                 SELECT id, object_key
                 FROM canvas_elements
@@ -627,42 +843,64 @@ public class CanvasService {
             if (id == null || !id.isTextual()) {
                 return;
             }
-            String objectKey = "canvas-elements/%s/%s/%s.json".formatted(canvasId, type, id.asText());
-            StoredCanvasAsset stored = assetStorage.putJson(objectKey, element.toString());
+            String objectKey = "canvas-elements/%s/%s/%s-%s.json".formatted(canvasId, type, id.asText(), UUID.randomUUID());
             Bounds bounds = boundsFor(type, element);
-            ObjectNode metadataPayload = objectMapper.createObjectNode();
-            metadataPayload.put("id", id.asText());
-            metadataPayload.put("objectKey", objectKey);
-            metadataPayload.put("url", stored.publicUrl());
             jdbcTemplate.update("""
                     INSERT INTO canvas_elements (
                         id, canvas_id, user_id, type, payload, object_key, byte_size, public_url,
-                        bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y
+                        bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y, storage_status,
+                        storage_error_code, r2_synced_at
                     )
-                    VALUES (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?::jsonb, ?, NULL, NULL, ?, ?, ?, ?, 'PENDING', NULL, NULL)
                     ON CONFLICT (canvas_id, id)
                     DO UPDATE SET type = EXCLUDED.type,
                                   payload = EXCLUDED.payload,
                                   object_key = EXCLUDED.object_key,
-                                  byte_size = EXCLUDED.byte_size,
-                                  public_url = EXCLUDED.public_url,
+                                  byte_size = NULL,
+                                  public_url = NULL,
                                   bbox_min_x = EXCLUDED.bbox_min_x,
                                   bbox_min_y = EXCLUDED.bbox_min_y,
                                   bbox_max_x = EXCLUDED.bbox_max_x,
                                   bbox_max_y = EXCLUDED.bbox_max_y,
+                                  storage_status = 'PENDING',
+                                  storage_error_code = NULL,
+                                  r2_synced_at = NULL,
                                   revision = canvas_elements.revision + 1,
                                   updated_at = NOW()
                     """,
-                    id.asText(), canvasId, userId, type, metadataPayload.toString(), objectKey, stored.byteSize(), stored.publicUrl(),
+                    id.asText(), canvasId, userId, type, element.toString(), objectKey,
                     bounds.minX(), bounds.minY(), bounds.maxX(), bounds.maxY());
+            storageOutboxService.enqueueElementUpload(
+                    userId, canvasId, id.asText(), objectKey, element,
+                    CanvasOperationPriority.resolve("SAVE", "AUTOMATIC"));
         });
         List<String> removedObjectKeys = removedRows.stream()
-                .filter(row -> !nextIds.contains(String.valueOf(row.get("id"))))
                 .map(row -> row.get("object_key"))
                 .filter(value -> value != null && !String.valueOf(value).isBlank())
                 .map(String::valueOf)
                 .toList();
-        deleteAfterCommit(removedObjectKeys);
+        removedObjectKeys.forEach(objectKey -> storageOutboxService.enqueueDelete(userId, canvasId, objectKey));
+    }
+
+    private String storageStatus(UUID canvasId) {
+        Integer pending = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM canvas_storage_jobs
+                WHERE canvas_id = ? AND status IN ('PENDING', 'PROCESSING')
+                """, Integer.class, canvasId);
+        return pending != null && pending > 0 ? "PENDING" : "READY";
+    }
+
+    private String findElementObjectKey(UUID userId, UUID canvasId, String elementId) {
+        return jdbcTemplate.query("""
+                SELECT object_key
+                FROM canvas_elements
+                WHERE canvas_id = ? AND user_id = ? AND id = ?
+                """, (rs, rowNum) -> rs.getString("object_key"), canvasId, userId, elementId)
+                .stream()
+                .filter(value -> value != null && !value.isBlank())
+                .findFirst()
+                .orElse(null);
     }
 
     private Set<String> elementIds(JsonNode elements) {
@@ -775,6 +1013,73 @@ public class CanvasService {
         return node != null && node.isArray() ? node : emptyArray();
     }
 
+    private boolean hasSaveChanges(CanvasSaveRequest request) {
+        if (request == null) {
+            return false;
+        }
+        return hasArrayItems(request.addedLines())
+                || hasArrayItems(request.modifiedLines())
+                || hasArrayItems(request.deletedLines())
+                || hasArrayItems(request.addedImages())
+                || hasArrayItems(request.modifiedImages())
+                || hasArrayItems(request.deletedImages())
+                || hasArrayItems(request.addedTextBoxes())
+                || hasArrayItems(request.modifiedTextBoxes())
+                || hasArrayItems(request.deletedTextBoxes());
+    }
+
+    private boolean hasArrayItems(JsonNode node) {
+        return node != null && node.isArray() && !node.isEmpty();
+    }
+
+    private int arraySize(JsonNode node) {
+        return node != null && node.isArray() ? node.size() : 0;
+    }
+
+    private int responseBytes(CanvasElementsResponse response) {
+        return jsonBytes(response.lines()) + jsonBytes(response.images()) + jsonBytes(response.textBoxes());
+    }
+
+    private int jsonBytes(JsonNode node) {
+        return node == null ? 0 : node.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+    }
+
+    private long elapsedMs(long startedAt) {
+        return (System.nanoTime() - startedAt) / 1_000_000;
+    }
+
+    private void scheduleElementWarmupAfterCommit(UUID userId, UUID canvasId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            warmElementCacheAsync(userId, canvasId);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                warmElementCacheAsync(userId, canvasId);
+            }
+        });
+    }
+
+    private void warmElementCacheAsync(UUID userId, UUID canvasId) {
+        CompletableFuture.runAsync(() -> {
+            long startedAt = System.nanoTime();
+            try {
+                CanvasElementsResponse response = elements(userId, canvasId);
+                log.info(
+                        "canvas_elements_warmup_completed canvasId={} elapsedMs={} lines={} images={} textBoxes={} bytes={}",
+                        canvasId,
+                        elapsedMs(startedAt),
+                        arraySize(response.lines()),
+                        arraySize(response.images()),
+                        arraySize(response.textBoxes()),
+                        responseBytes(response));
+            } catch (RuntimeException exception) {
+                log.warn("canvas_elements_warmup_failed canvasId={} elapsedMs={}", canvasId, elapsedMs(startedAt), exception);
+            }
+        });
+    }
+
     private ArrayNode emptyArray() {
         return objectMapper.createArrayNode();
     }
@@ -864,13 +1169,33 @@ public class CanvasService {
         return value == null ? "" : value.replaceAll("/+$", "");
     }
 
+    private String normalizeImageObjectKey(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 objectKey가 필요합니다.");
+        }
+        String normalizedObjectKey = objectKey.strip().replace('\\', '/');
+        if (normalizedObjectKey.startsWith("/") || normalizedObjectKey.contains("..") || !normalizedObjectKey.startsWith("canvas/")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 objectKey 형식이 올바르지 않습니다.");
+        }
+        return normalizedObjectKey;
+    }
+
     public record CanvasAssetContent(String contentType, long byteSize, byte[] bytes) {
     }
 
-    private record CanvasElementArrays(ArrayNode lines, ArrayNode images, ArrayNode textBoxes, boolean hasRows) {
+    private record CanvasElementArrays(
+            ArrayNode lines,
+            ArrayNode images,
+            ArrayNode textBoxes,
+            boolean hasRows,
+            boolean complete,
+            int failedRows) {
     }
 
     private record CanvasElementPayload(String type, JsonNode payload) {
+    }
+
+    private record CanvasMutationRecord(String payloadHash, String status, Long resultRevision) {
     }
 
     private record Bounds(double minX, double minY, double maxX, double maxY) {

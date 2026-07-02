@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class CanvasDtos {
@@ -12,6 +13,8 @@ public final class CanvasDtos {
     }
 
     public record CanvasSaveRequest(
+            @JsonProperty("mutationId")
+            UUID mutationId,
             @JsonProperty("addedLines")
             JsonNode addedLines,
             @JsonProperty("modifiedLines")
@@ -29,8 +32,32 @@ public final class CanvasDtos {
             @JsonProperty("modifiedTextBoxes")
             JsonNode modifiedTextBoxes,
             @JsonProperty("deletedTextBoxes")
-            JsonNode deletedTextBoxes
+            JsonNode deletedTextBoxes,
+            String trigger,
+            @JsonProperty("operationId")
+            UUID operationId,
+            @JsonProperty("clientCreatedAt")
+            OffsetDateTime clientCreatedAt
     ) {
+        public CanvasSaveRequest(UUID mutationId, JsonNode addedLines, JsonNode modifiedLines, JsonNode deletedLines,
+                JsonNode addedImages, JsonNode modifiedImages, JsonNode deletedImages, JsonNode addedTextBoxes,
+                JsonNode modifiedTextBoxes, JsonNode deletedTextBoxes) {
+            this(mutationId, addedLines, modifiedLines, deletedLines, addedImages, modifiedImages, deletedImages,
+                    addedTextBoxes, modifiedTextBoxes, deletedTextBoxes, null, null, null);
+        }
+    }
+
+    public record CanvasSaveResponse(
+            @JsonProperty("mutationId")
+            UUID mutationId,
+            long revision,
+            boolean duplicate,
+            @JsonProperty("storageStatus")
+            String storageStatus
+    ) {
+        public CanvasSaveResponse(UUID mutationId, long revision, boolean duplicate) {
+            this(mutationId, revision, duplicate, "PENDING");
+        }
     }
 
     public record CanvasResponse(
@@ -58,8 +85,18 @@ public final class CanvasDtos {
             JsonNode lines,
             JsonNode images,
             @JsonProperty("textBoxes")
-            JsonNode textBoxes
+            JsonNode textBoxes,
+            Long revision,
+            String status,
+            String source,
+            @JsonProperty("failedElements")
+            List<String> failedElements,
+            List<String> warnings,
+            Map<String, Long> timings
     ) {
+        public CanvasElementsResponse(JsonNode lines, JsonNode images, JsonNode textBoxes) {
+            this(lines, images, textBoxes, null, "COMPLETE", "DATABASE", List.of(), List.of(), Map.of());
+        }
     }
 
     public record CanvasAssetResponse(

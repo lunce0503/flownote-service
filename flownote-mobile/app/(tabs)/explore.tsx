@@ -259,6 +259,7 @@ export default function WorkspaceScreen() {
         title: editingNoteTitle.trim(),
         content: buildNoteContent(editingNoteBody),
         createdAt: selectedNote.createdAt,
+        revision: selectedNote.revision,
       });
       setNotes((current) => current.map((note) => (note.id === updated.id ? updated : note)));
     } catch (error) {

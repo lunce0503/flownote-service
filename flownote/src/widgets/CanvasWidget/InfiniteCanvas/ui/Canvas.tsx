@@ -4,12 +4,19 @@ import { v4 as uuidv4 } from "uuid";
 import { useCanvasState } from "../../../../features/canvas/model/useCanvasState";
 import { useDrawing } from "../../../../features/canvas/model/useDrawing";
 import { useElementManipulation } from "../../../../features/canvas/model/useElementManipulation";
-import { usePersistence } from "../../../../features/canvas/model/usePersistence";
+import {
+    usePersistence,
+    type CanvasLineStreamEndEvent,
+    type CanvasLineStreamPointsEvent,
+    type CanvasLineStreamStartEvent,
+} from "../../../../features/canvas/model/usePersistence";
 import { useCanvasRendering } from "../../../../features/canvas/model/useCanvasRendering";
 import { useCanvasHistory } from "../../../../features/canvas/model/useCanvasHistory";
 import {
-    CANVAS_AUTOSAVE_DELAY_MS,
     CANVAS_COLLAPSED_FOLDER_IDS_STORAGE_KEY,
+    CANVAS_ERASER_IMAGES_STORAGE_KEY,
+    CANVAS_ERASER_LINES_STORAGE_KEY,
+    CANVAS_ERASER_TEXT_BOXES_STORAGE_KEY,
     CANVAS_LIBRARY_VISIBLE_STORAGE_KEY,
     CANVAS_MANAGEMENT_TOOLBAR_STORAGE_KEY,
     CANVAS_PEN_COLOR_STORAGE_KEY,
@@ -78,6 +85,26 @@ const isEditableKeyboardTarget = (target: EventTarget | null) => {
     return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
 };
 
+const isClipboardImageFile = (file: File | null | undefined) => (
+    Boolean(file && (file.type.startsWith("image/") || /\.(avif|bmp|gif|jpe?g|png|webp)$/i.test(file.name)))
+);
+
+const getClipboardImageFile = (clipboardData: DataTransfer | null) => {
+    if (!clipboardData) return null;
+
+    const fileFromFiles = Array.from(clipboardData.files).find(isClipboardImageFile);
+    if (fileFromFiles) return fileFromFiles;
+
+    for (const item of Array.from(clipboardData.items)) {
+        if (item.kind !== "file" && !item.type.startsWith("image/")) continue;
+        const file = item.getAsFile();
+        if (!isClipboardImageFile(file) && !item.type.startsWith("image/")) continue;
+        return file;
+    }
+
+    return null;
+};
+
 const Canvas = () => {
     const canvasRootRef = useRef<HTMLDivElement | null>(null);
     const canvasViewportRef = useRef<HTMLDivElement | null>(null);
@@ -124,7 +151,75 @@ const Canvas = () => {
         eraseElementAtPointer,
         moveElement,
     } = useElementManipulation(getCanvasCoords, tool);
-    const { handleSave, handleLoad, handleImageUpload, addImageFile, handleFlushSave } = usePersistence(
+    const clearHistoryRef = useRef<() => void>(() => undefined);
+    const [remoteStreamingLinesById, setRemoteStreamingLinesById] = useState<Record<string, LineElement>>({});
+    const handleRemoteLineStart = useCallback((event: CanvasLineStreamStartEvent) => {
+        const line = event.line;
+        if (!line?.id || !Array.isArray(line.points)) return;
+        setRemoteStreamingLinesById((prev) => ({
+            ...prev,
+            [line.id]: { ...line, points: line.points.map((point) => ({ ...point })), status: "unchanged" },
+        }));
+    }, []);
+    const handleRemoteLinePoints = useCallback((event: CanvasLineStreamPointsEvent) => {
+        if (!event.lineId || !Array.isArray(event.points) || event.points.length === 0) return;
+        setRemoteStreamingLinesById((prev) => {
+            const current = prev[event.lineId!];
+            if (!current) return prev;
+            return {
+                ...prev,
+                [event.lineId!]: {
+                    ...current,
+                    points: [...current.points, ...event.points!.map((point) => ({ ...point }))],
+                },
+            };
+        });
+    }, []);
+    const handleRemoteLineEnd = useCallback((event: CanvasLineStreamEndEvent) => {
+        if (!event.lineId) return;
+        const lineId = event.lineId;
+        const line = event.line;
+        setRemoteStreamingLinesById((prev) => {
+            if (!line?.id || !Array.isArray(line.points)) return prev;
+            return {
+                ...prev,
+                [lineId]: { ...line, points: line.points.map((point) => ({ ...point })), status: "unchanged" },
+            };
+        });
+        window.setTimeout(() => {
+            setRemoteStreamingLinesById((prev) => {
+                if (!prev[lineId]) return prev;
+                const { [lineId]: _removed, ...rest } = prev;
+                return rest;
+            });
+        }, 10_000);
+    }, []);
+    const clearRemoteStreamingLines = useCallback(() => {
+        setRemoteStreamingLinesById({});
+        clearHistoryRef.current();
+    }, []);
+    const remoteStreamingLines = useMemo(() => Object.values(remoteStreamingLinesById), [remoteStreamingLinesById]);
+    const streamCallbacks = useMemo(() => ({
+        onLineStreamStart: handleRemoteLineStart,
+        onLineStreamPoints: handleRemoteLinePoints,
+        onLineStreamEnd: handleRemoteLineEnd,
+        onRemoteCanvasChanged: clearRemoteStreamingLines,
+    }), [clearRemoteStreamingLines, handleRemoteLineEnd, handleRemoteLinePoints, handleRemoteLineStart]);
+    const {
+        handleSave,
+        requestSave,
+        handleLoad,
+        cancelCanvasLoad,
+        handleImageUpload,
+        addImageFile,
+        handleFlushSave,
+        retryPendingSaves,
+        cancelPendingSaves,
+        saveState,
+        streamLineStart,
+        streamLinePoints,
+        streamLineEnd,
+    } = usePersistence(
         drawnLines,
         images,
         textBoxes,
@@ -132,6 +227,7 @@ const Canvas = () => {
         setImages,
         setTextBoxes,
         selectedCanvasId,
+        streamCallbacks,
     );
     const { canUndo, clearHistory, recordHistory, undo } = useCanvasHistory({
         lines: drawnLines,
@@ -141,6 +237,7 @@ const Canvas = () => {
         setImages,
         setTextBoxes,
     });
+    clearHistoryRef.current = clearHistory;
     const pointers = useRef<Map<number, Point>>(new Map());
     const lastTouchDistance = useRef<number | null>(null);
     const lastTouchCenter = useRef<Point | null>(null);
@@ -148,6 +245,8 @@ const Canvas = () => {
     const middleDragStart = useRef<Point | null>(null);
     const lassoDragStart = useRef<Point | null>(null);
     const lassoPasteCountRef = useRef(0);
+    const activeStreamingLineIdRef = useRef<string | null>(null);
+    const lastStreamedPointIndexRef = useRef(0);
     const handleFlushSaveRef = useRef(handleFlushSave);
     const selectedCanvasIdRef = useRef(selectedCanvasId);
     const [isMiddleDragging, setIsMiddleDragging] = useState(false);
@@ -160,12 +259,20 @@ const Canvas = () => {
     const [editingTextValue, setEditingTextValue] = useState("");
     const [isCanvasSettingsVisible, setIsCanvasSettingsVisible] = useState(false);
     const [isManagementToolbarVisible, setIsManagementToolbarVisible] = useLocalStorageBoolean(CANVAS_MANAGEMENT_TOOLBAR_STORAGE_KEY, true);
+    const [canEraseLines, setCanEraseLines] = useLocalStorageBoolean(CANVAS_ERASER_LINES_STORAGE_KEY, true);
+    const [canEraseImages, setCanEraseImages] = useLocalStorageBoolean(CANVAS_ERASER_IMAGES_STORAGE_KEY, true);
+    const [canEraseTextBoxes, setCanEraseTextBoxes] = useLocalStorageBoolean(CANVAS_ERASER_TEXT_BOXES_STORAGE_KEY, true);
 
     const currentLineStyle = useMemo(() => ({
         color: penColor,
         strokeWidth: DEFAULT_STROKE_WIDTH,
     }), [penColor]);
-    const { redrawWith } = useCanvasRendering(konvaRendererRef, offset, scale, currentLine.current, currentLineStyle, viewport);
+    const eraserTargets = useMemo(() => ({
+        lines: canEraseLines,
+        images: canEraseImages,
+        textBoxes: canEraseTextBoxes,
+    }), [canEraseImages, canEraseLines, canEraseTextBoxes]);
+    const { redrawWith, redrawActiveStroke } = useCanvasRendering(konvaRendererRef, offset, scale, currentLine.current, currentLineStyle, viewport);
     const { offsetRef, scaleRef } = useStoredCanvasViewport({
         selectedCanvasId,
         offset,
@@ -200,8 +307,8 @@ const Canvas = () => {
     }, []);
 
     useEffect(() => {
-        redrawWith(drawnLines, images, textBoxes);
-    }, [offset, scale, drawnLines, images, textBoxes, redrawWith]);
+        redrawWith([...drawnLines, ...remoteStreamingLines], images, textBoxes);
+    }, [offset, scale, drawnLines, images, remoteStreamingLines, textBoxes, redrawWith]);
 
     useEffect(() => {
         selectedCanvasIdRef.current = selectedCanvasId;
@@ -243,7 +350,8 @@ const Canvas = () => {
         if (selectedCanvasId) {
             setEditingTextBoxId(null);
             setEditingTextValue("");
-            void handleLoad().then(clearHistory);
+            setRemoteStreamingLinesById({});
+            void handleLoad("selection").then(clearHistory);
         }
     }, [clearHistory, handleLoad, selectedCanvasId]);
 
@@ -254,12 +362,8 @@ const Canvas = () => {
     }), [loadCanvasLibrary]);
 
     useEffect(() => {
-        const timeout = window.setTimeout(() => {
-            if (selectedCanvasId) void handleSave();
-        }, CANVAS_AUTOSAVE_DELAY_MS);
-
-        return () => window.clearTimeout(timeout);
-    }, [drawnLines, images, textBoxes, handleSave, selectedCanvasId]);
+        if (selectedCanvasId) requestSave();
+    }, [drawnLines, images, textBoxes, requestSave, selectedCanvasId]);
 
     useEffect(() => {
         const flushCanvasSave = () => {
@@ -716,13 +820,6 @@ const Canvas = () => {
                 }
                 return;
             }
-            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v") {
-                if (lassoClipboard) {
-                    event.preventDefault();
-                    handlePasteLassoSelection();
-                }
-                return;
-            }
             if (event.key === "e") setTool("eraser");
             else if (event.key === "p") setTool("pen");
             else if (event.key === "h") setTool("handle");
@@ -732,17 +829,20 @@ const Canvas = () => {
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [handleCopyLassoSelection, handlePasteLassoSelection, lassoClipboard, lassoSelectionCount, setTool, undo]);
+    }, [handleCopyLassoSelection, lassoSelectionCount, setTool, undo]);
 
     useEffect(() => {
         const handlePaste = (event: ClipboardEvent) => {
             if (isEditableKeyboardTarget(event.target)) return;
 
-            const items = Array.from(event.clipboardData?.items ?? []);
-            const imageFile = items
-                .find((item) => item.kind === "file" && item.type.startsWith("image/"))
-                ?.getAsFile();
-            if (!imageFile) return;
+            const imageFile = getClipboardImageFile(event.clipboardData);
+            if (!imageFile) {
+                if (lassoClipboard) {
+                    event.preventDefault();
+                    handlePasteLassoSelection();
+                }
+                return;
+            }
 
             event.preventDefault();
             recordHistory();
@@ -751,7 +851,7 @@ const Canvas = () => {
 
         window.addEventListener("paste", handlePaste);
         return () => window.removeEventListener("paste", handlePaste);
-    }, [addImageFile, recordHistory]);
+    }, [addImageFile, handlePasteLassoSelection, lassoClipboard, recordHistory]);
 
     const handleChangeLassoSelectionColor = (color: string) => {
         if (!lassoSelection) return;
@@ -784,6 +884,8 @@ const Canvas = () => {
 
     const resetActiveCanvasAction = () => {
         currentLine.current = [];
+        activeStreamingLineIdRef.current = null;
+        lastStreamedPointIndexRef.current = 0;
         setIsDrawing(false);
         setIsLassoDragging(false);
         lassoDragStart.current = null;
@@ -873,14 +975,23 @@ const Canvas = () => {
             if (editingTextBoxId) commitTextBoxEdit();
             setLassoSelection(null);
             recordHistory();
-            eraseAtPointer(event);
-            eraseElementAtPointer(event);
+            eraseAtPointer(event, eraserTargets.lines);
+            eraseElementAtPointer(event, { images: eraserTargets.images, textBoxes: eraserTargets.textBoxes });
         } else if (tool === "pen") {
             if (editingTextBoxId) commitTextBoxEdit();
             setLassoSelection(null);
             recordHistory();
+            const lineId = uuidv4();
             currentLine.current = [];
             appendPointerToCurrentLine(event);
+            activeStreamingLineIdRef.current = lineId;
+            lastStreamedPointIndexRef.current = currentLine.current.length;
+            streamLineStart({
+                id: lineId,
+                points: currentLine.current.map((point) => ({ ...point })),
+                color: penColor,
+                strokeWidth: DEFAULT_STROKE_WIDTH,
+            });
             setIsDrawing(true);
         } else if (tool === "lasso") {
             if (editingTextBoxId) commitTextBoxEdit();
@@ -967,11 +1078,19 @@ const Canvas = () => {
         } else if (blocksTouchDrawing(event)) {
             return;
         } else if (tool === "eraser") {
-            eraseAtPointer(event);
-            eraseElementAtPointer(event);
+            eraseAtPointer(event, eraserTargets.lines);
+            eraseElementAtPointer(event, { images: eraserTargets.images, textBoxes: eraserTargets.textBoxes });
         } else if ((tool === "pen" || tool === "lasso") && isDrawing) {
+            const previousPointCount = currentLine.current.length;
             appendPointerToCurrentLine(event);
-            redrawWith(drawnLines, images, textBoxes);
+            if (tool === "pen" && activeStreamingLineIdRef.current) {
+                const newPoints = currentLine.current.slice(Math.max(previousPointCount, lastStreamedPointIndexRef.current));
+                if (newPoints.length > 0) {
+                    lastStreamedPointIndexRef.current = currentLine.current.length;
+                    streamLinePoints(activeStreamingLineIdRef.current, newPoints.map((point) => ({ ...point })));
+                }
+            }
+            redrawActiveStroke();
         } else if (tool === "handle" && movingObject) {
             moveElement(event);
         }
@@ -1001,19 +1120,34 @@ const Canvas = () => {
             setIsLassoDragging(false);
             lassoDragStart.current = null;
         } else if ((tool === "pen" || tool === "lasso") && isDrawing) {
+            const previousPointCount = currentLine.current.length;
             appendPointerToCurrentLine(event);
+            if (tool === "pen" && activeStreamingLineIdRef.current) {
+                const newPoints = currentLine.current.slice(Math.max(previousPointCount, lastStreamedPointIndexRef.current));
+                if (newPoints.length > 0) {
+                    lastStreamedPointIndexRef.current = currentLine.current.length;
+                    streamLinePoints(activeStreamingLineIdRef.current, newPoints.map((point) => ({ ...point })));
+                }
+            }
             const finishedLine = finishCurrentLine();
             if (tool === "lasso") {
                 setLassoSelection(buildLassoSelection(finishedLine, drawnLines, images, textBoxes));
             } else if (finishedLine.length > 0) {
-                setDrawnLines((prev) => [...prev, {
-                    id: uuidv4(),
+                const lineId = activeStreamingLineIdRef.current ?? uuidv4();
+                const line = {
+                    id: lineId,
                     points: finishedLine,
                     color: penColor,
                     strokeWidth: DEFAULT_STROKE_WIDTH,
+                };
+                streamLineEnd(line);
+                setDrawnLines((prev) => [...prev, {
+                    ...line,
                     status: "new",
                 }]);
             }
+            activeStreamingLineIdRef.current = null;
+            lastStreamedPointIndexRef.current = 0;
         }
         setMovingObject(null);
     };
@@ -1106,6 +1240,10 @@ const Canvas = () => {
                 }}
                 handleSave={handleSave}
                 handleLoad={handleLoad}
+                cancelCanvasLoad={cancelCanvasLoad}
+                retryPendingSaves={retryPendingSaves}
+                cancelPendingSaves={cancelPendingSaves}
+                saveState={saveState}
                 handleUndo={undo}
                 canUndo={canUndo}
                 lassoSelectionCount={lassoSelectionCount}
@@ -1116,12 +1254,8 @@ const Canvas = () => {
                 onScaleLassoSelection={handleScaleLassoSelection}
                 onChangeLassoSelectionColor={handleChangeLassoSelectionColor}
                 onClearLassoSelection={() => setLassoSelection(null)}
-                pencilOnlyMode={pencilOnlyMode}
-                onTogglePencilOnlyMode={togglePencilOnlyMode}
                 penColor={penColor}
                 onPenColorChange={handlePenColorChange}
-                isCanvasLibraryVisible={isCanvasLibraryVisible}
-                onToggleCanvasLibraryVisible={toggleCanvasLibraryVisible}
                 isCanvasSettingsVisible={isCanvasSettingsVisible}
                 onToggleCanvasSettingsVisible={() => setIsCanvasSettingsVisible((current) => !current)}
                 zoomPercent={Math.round(scale * 100)}
@@ -1156,6 +1290,23 @@ const Canvas = () => {
                                 <span className="font-semibold">펜슬 전용 그리기</span>
                                 <input type="checkbox" checked={pencilOnlyMode} onChange={togglePencilOnlyMode} />
                             </label>
+                            <div className="rounded-md border border-stone-200 p-3">
+                                <p className="mb-2 text-xs font-bold text-stone-500">지우개 대상</p>
+                                <div className="grid gap-2">
+                                    <label className="flex min-h-9 items-center justify-between gap-3">
+                                        <span className="text-sm font-semibold">선</span>
+                                        <input type="checkbox" checked={canEraseLines} onChange={() => setCanEraseLines((current) => !current)} />
+                                    </label>
+                                    <label className="flex min-h-9 items-center justify-between gap-3">
+                                        <span className="text-sm font-semibold">이미지</span>
+                                        <input type="checkbox" checked={canEraseImages} onChange={() => setCanEraseImages((current) => !current)} />
+                                    </label>
+                                    <label className="flex min-h-9 items-center justify-between gap-3">
+                                        <span className="text-sm font-semibold">텍스트 박스</span>
+                                        <input type="checkbox" checked={canEraseTextBoxes} onChange={() => setCanEraseTextBoxes((current) => !current)} />
+                                    </label>
+                                </div>
+                            </div>
                             <div className="rounded-md border border-stone-200 px-3 py-2">
                                 <p className="text-xs font-bold text-stone-500">펜슬 도구 전환</p>
                                 <p className="mt-1 text-xs text-stone-700">브라우저가 펜슬 보조 버튼 이벤트를 노출할 때 펜과 지우개를 전환합니다.</p>

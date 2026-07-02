@@ -32,6 +32,7 @@ type AuthUser = {
   username: string;
   email: string;
   nickname: string;
+  role?: "USER" | "ADMIN";
 };
 
 const DEFAULT_HEADERS = {

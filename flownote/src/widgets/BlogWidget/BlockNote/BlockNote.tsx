@@ -2,7 +2,7 @@ import "@blocknote/core/fonts/inter.css";
 import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
 import { useCreateBlockNote } from "@blocknote/react";
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
   BlockNoteSchema,
   defaultBlockSpecs,
@@ -17,8 +17,7 @@ import axios from "axios";
 import { LatexInline } from "./LatexInline";
 import { transformLatexInlineContent } from "./latexTransform";
 import NoteDrawingPad from "./NoteDrawingPad";
-import { updateNoteTitle } from "../../../entities/blog/noteDataActions";
-import { subscribeSyncEvents } from "../../../shared/sync";
+import { getSyncClientId, subscribeSyncEvents } from "../../../shared/sync";
 
 const uploadFile = async (file: File) => {
   if (!API_CORE_BASE_URL) {
@@ -38,11 +37,40 @@ const uploadFile = async (file: File) => {
   console.log("최종 전달된 이미지 URL:", finalUrl); // 디버깅용
   return finalUrl;
 }
+
+const areBlocksEqual = (left: BlockDataProps["content"], right: BlockDataProps["content"]) => {
+  try {
+    return JSON.stringify(left) === JSON.stringify(right);
+  } catch {
+    return false;
+  }
+};
+
+const normalizeBlocksForSave = (blocks: BlockDataProps["content"]): BlockDataProps["content"] => (
+  blocks.map((block) => {
+    const nextBlock = { ...block } as typeof block;
+
+    if (Array.isArray(block.content)) {
+      nextBlock.content = transformLatexInlineContent(block.content).content as typeof block.content;
+    }
+    if (block.children.length > 0) {
+      nextBlock.children = normalizeBlocksForSave(block.children) as typeof block.children;
+    }
+
+    return nextBlock;
+  }) as BlockDataProps["content"]
+);
+
+type PendingNoteSave = {
+  revision: number;
+  note: BlockDataProps;
+};
+
 const  BlockNote = () => {
   const { title } = useParams<{title:string}>();
   const navigate = useNavigate();
 
-  const schema = BlockNoteSchema.create({
+  const schema = useMemo(() => BlockNoteSchema.create({
     blockSpecs: {
       ...defaultBlockSpecs,
     },
@@ -50,7 +78,7 @@ const  BlockNote = () => {
       ...defaultInlineContentSpecs,
       latex: LatexInline,
     },
-  });
+  }), []);
 
   const editor = useCreateBlockNote({
     schema,
@@ -61,10 +89,37 @@ const  BlockNote = () => {
   const [isDrawingOpen, setIsDrawingOpen] = useState(false);
   const [isDrawingSaving, setIsDrawingSaving] = useState(false);
   const [editingDrawingBlockId, setEditingDrawingBlockId] = useState<string | null>(null);
+  const clientId = useMemo(() => getSyncClientId(), []);
   const noteDataRef = useRef<BlockDataProps | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isComposingRef = useRef(false);
+  const isApplyingRemoteContentRef = useRef(false);
+  const localRevisionRef = useRef(0);
+  const lastPersistedRevisionRef = useRef(0);
+  const pendingSaveRef = useRef<PendingNoteSave | null>(null);
+  const saveLoopPromiseRef = useRef<Promise<void> | null>(null);
+  const saveQueueRunnerRef = useRef<(() => Promise<void>) | null>(null);
+  const ignoredDocumentHashRef = useRef<string | null>(null);
+
+  const replaceEditorContent = useCallback((content: BlockDataProps["content"]) => {
+    if (content.length === 0 || areBlocksEqual(editor.document, content)) {
+      return false;
+    }
+
+    isApplyingRemoteContentRef.current = true;
+    ignoredDocumentHashRef.current = JSON.stringify(content);
+    try {
+      editor.replaceBlocks(editor.document, content);
+    } finally {
+      window.setTimeout(() => {
+        isApplyingRemoteContentRef.current = false;
+        ignoredDocumentHashRef.current = JSON.stringify(editor.document);
+      }, 0);
+    }
+
+    return true;
+  }, [editor]);
 
   useEffect(() => {
     noteDataRef.current = noteData;
@@ -86,9 +141,13 @@ const  BlockNote = () => {
             noteDataRef.current = targetData;
 
           // 데이터에 내용(Block)이 있다면 에디터에 주입
-            if (targetData.content.length > 0) {
-              editor.replaceBlocks(editor.document, targetData.content);
+            if (replaceEditorContent(targetData.content)) {
+              ignoredDocumentHashRef.current = JSON.stringify(editor.document);
             }
+            const revision = targetData.revision ?? 0;
+            localRevisionRef.current = revision;
+            lastPersistedRevisionRef.current = revision;
+            pendingSaveRef.current = null;
           
           }
         } catch (error) {
@@ -99,7 +158,121 @@ const  BlockNote = () => {
       }
     };
     fetchData();
-  }, [title, editor]);
+  }, [editor, title, replaceEditorContent]);
+
+  const createSaveSnapshot = useCallback((revision: number): PendingNoteSave | null => {
+    const currentNote = noteDataRef.current;
+    if (!currentNote) return null;
+
+    return {
+      revision,
+      note: {
+        ...currentNote,
+        content: normalizeBlocksForSave(structuredClone(editor.document)),
+        revision,
+        client_id: clientId,
+      },
+    };
+  }, [clientId, editor]);
+
+  const applyServerNote = useCallback((targetData: BlockDataProps) => {
+    const revision = targetData.revision ?? 0;
+    noteDataRef.current = targetData;
+    setNoteData(targetData);
+    localRevisionRef.current = revision;
+    lastPersistedRevisionRef.current = revision;
+    pendingSaveRef.current = null;
+    replaceEditorContent(targetData.content);
+  }, [replaceEditorContent]);
+
+  const fetchCurrentNote = useCallback(async () => {
+    const currentNote = noteDataRef.current;
+    if (!currentNote) return null;
+
+    const data = await getNoteData();
+    return data.find((note) => note.id === currentNote.id) ?? null;
+  }, []);
+
+  const processSaveQueue = useCallback(() => {
+    if (saveLoopPromiseRef.current) {
+      return saveLoopPromiseRef.current;
+    }
+
+    let retryScheduled = false;
+    const loopPromise = (async () => {
+      while (pendingSaveRef.current) {
+        const pending = pendingSaveRef.current;
+        pendingSaveRef.current = null;
+        const currentTitle = noteDataRef.current?.title ?? pending.note.title;
+
+        try {
+          const saved = await postNoteData({ ...pending.note, title: currentTitle });
+          const savedRevision = saved.revision ?? pending.revision;
+          lastPersistedRevisionRef.current = Math.max(lastPersistedRevisionRef.current, savedRevision);
+          noteDataRef.current = {
+            ...(noteDataRef.current ?? pending.note),
+            content: pending.note.content,
+            revision: savedRevision,
+            updated_at: saved.updated_at,
+            client_id: saved.client_id,
+          };
+          setNoteData((current) => current ? {
+            ...current,
+            revision: savedRevision,
+            updated_at: saved.updated_at,
+            client_id: saved.client_id,
+          } : current);
+        } catch (error) {
+          if (axios.isAxiosError(error) && error.response?.status === 409) {
+            let serverNote: BlockDataProps | null = null;
+            try {
+              serverNote = await fetchCurrentNote();
+            } catch (refreshError) {
+              console.error("노트 충돌 상태 조회 실패:", refreshError);
+            }
+            if (!serverNote) {
+              pendingSaveRef.current = pending;
+              retryScheduled = true;
+              window.setTimeout(() => void saveQueueRunnerRef.current?.(), 1500);
+              break;
+            }
+
+            const serverRevision = serverNote.revision ?? 0;
+            lastPersistedRevisionRef.current = Math.max(lastPersistedRevisionRef.current, serverRevision);
+            localRevisionRef.current = Math.max(localRevisionRef.current, serverRevision);
+
+            if (!areBlocksEqual(editor.document, serverNote.content) || pendingSaveRef.current) {
+              const rebasedRevision = localRevisionRef.current + 1;
+              localRevisionRef.current = rebasedRevision;
+              pendingSaveRef.current = createSaveSnapshot(rebasedRevision);
+            } else {
+              applyServerNote(serverNote);
+            }
+            continue;
+          }
+
+          if (!pendingSaveRef.current || pendingSaveRef.current.revision < pending.revision) {
+            pendingSaveRef.current = pending;
+          }
+          retryScheduled = true;
+          window.setTimeout(() => void saveQueueRunnerRef.current?.(), 1500);
+          console.error("노트 자동 저장 실패:", error);
+          break;
+        }
+      }
+    })();
+
+    saveLoopPromiseRef.current = loopPromise;
+    void loopPromise.finally(() => {
+      saveLoopPromiseRef.current = null;
+      if (pendingSaveRef.current && !retryScheduled) {
+        void saveQueueRunnerRef.current?.();
+      }
+    });
+    return loopPromise;
+  }, [applyServerNote, createSaveSnapshot, editor, fetchCurrentNote]);
+
+  saveQueueRunnerRef.current = processSaveQueue;
 
   useEffect(() => subscribeSyncEvents((event) => {
     if (event.resource !== "notes" && event.resource !== "all") return;
@@ -111,52 +284,27 @@ const  BlockNote = () => {
       const targetData = data.find((note) => note.title === decodedTitle || note.id === noteDataRef.current?.id);
       if (!targetData) return;
 
-      setNoteData(targetData);
-      noteDataRef.current = targetData;
-      editor.replaceBlocks(editor.document, targetData.content);
+      const currentNote = noteDataRef.current;
+      const remoteRevision = targetData.revision ?? 0;
+      const hasLocalEditInProgress =
+        isComposingRef.current ||
+        pendingSaveRef.current !== null ||
+        saveLoopPromiseRef.current !== null ||
+        localRevisionRef.current > lastPersistedRevisionRef.current;
+
+      if (event.clientId === clientId || (event.noteId && event.noteId !== currentNote?.id)) {
+        return;
+      }
+      if (hasLocalEditInProgress) {
+        return;
+      }
+      if (event.action === "note-saved" && remoteRevision <= lastPersistedRevisionRef.current) return;
+
+      applyServerNote(targetData);
     };
 
     void refreshNote();
-  }), [editor, title]);
-
-  const normalizeLatexInBlocks = useCallback((blocks: BlockDataProps["content"]) => {
-    for (const block of blocks) {
-      if (Array.isArray(block.content)) {
-        const { changed, content } = transformLatexInlineContent(block.content);
-
-        if (changed) {
-          editor.updateBlock(block.id, {
-            content,
-          });
-        }
-      }
-
-      if (block.children.length > 0) {
-        normalizeLatexInBlocks(block.children);
-      }
-    }
-  }, [editor]);
-
-  const buildCurrentNoteData = useCallback(() => {
-    const currentNote = noteDataRef.current;
-    if (!currentNote) return null;
-
-    normalizeLatexInBlocks(editor.document);
-
-    return {
-      ...currentNote,
-      content : editor.document,
-      created_at: new Date()
-    };
-  }, [editor, normalizeLatexInBlocks]);
-
-  const saveNoteData = useCallback(async () => {
-    const blockData = buildCurrentNoteData();
-    if (!blockData || !API_CORE_BASE_URL) return;
-
-    noteDataRef.current = blockData;
-    await postNoteData(blockData);
-  }, [buildCurrentNoteData]);
+  }), [applyServerNote, clientId, title]);
 
   const queueSave = useCallback((delay = 700) => {
     if (saveTimerRef.current) {
@@ -167,9 +315,9 @@ const  BlockNote = () => {
 
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null;
-      void saveNoteData();
+      void processSaveQueue();
     }, delay);
-  }, [saveNoteData]);
+  }, [processSaveQueue]);
 
   const flushSave = useCallback(() => {
     if (saveTimerRef.current) {
@@ -177,33 +325,18 @@ const  BlockNote = () => {
       saveTimerRef.current = null;
     }
 
-    return saveNoteData();
-  }, [saveNoteData]);
-
-  const saveNoteDataWithKeepalive = useCallback(() => {
-    const blockData = buildCurrentNoteData();
-    if (!blockData) return;
-
-    void fetch(`${API_CORE_BASE_URL}/api/notes`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...authHeaders(),
-      },
-      body: JSON.stringify(blockData),
-      keepalive: true,
-    });
-  }, [buildCurrentNoteData]);
+    return processSaveQueue();
+  }, [processSaveQueue]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        saveNoteDataWithKeepalive();
+        void flushSave();
       }
     };
 
     const handlePageLeave = () => {
-      saveNoteDataWithKeepalive();
+      void flushSave();
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -220,9 +353,9 @@ const  BlockNote = () => {
       if (titleTimerRef.current) {
         clearTimeout(titleTimerRef.current);
       }
-      void saveNoteData();
+      void processSaveQueue();
     };
-  }, [saveNoteData, saveNoteDataWithKeepalive]);
+  }, [flushSave, processSaveQueue]);
 
   const saveTitle = useCallback(async (nextTitle: string, shouldReplaceRoute = false) => {
     const currentNote = noteDataRef.current;
@@ -236,13 +369,15 @@ const  BlockNote = () => {
     noteDataRef.current = updatedNote;
     setNoteData(updatedNote);
 
-    await updateNoteTitle(currentNote.id, trimmedTitle);
+    const nextRevision = Math.max(localRevisionRef.current, lastPersistedRevisionRef.current) + 1;
+    localRevisionRef.current = nextRevision;
+    pendingSaveRef.current = createSaveSnapshot(nextRevision);
     await flushSave();
 
     if (shouldReplaceRoute) {
       navigate(`/blog/${encodeURIComponent(trimmedTitle)}`, { replace: true });
     }
-  }, [flushSave, navigate]);
+  }, [createSaveSnapshot, flushSave, navigate]);
 
   const handleTitle = (nextTitle:string) => {
     const currentNote = noteDataRef.current;
@@ -281,21 +416,38 @@ const  BlockNote = () => {
   };
 
   const handleNoteData = () => {
+    const documentHash = JSON.stringify(editor.document);
+    if (isApplyingRemoteContentRef.current || ignoredDocumentHashRef.current === documentHash) {
+      ignoredDocumentHashRef.current = null;
+      return;
+    }
+
+    const nextRevision = Math.max(localRevisionRef.current, lastPersistedRevisionRef.current) + 1;
+    localRevisionRef.current = nextRevision;
+    pendingSaveRef.current = createSaveSnapshot(nextRevision);
     queueSave();
   };
 
   const handleCompositionStart = () => {
     isComposingRef.current = true;
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
   };
 
-  const handleCompositionEnd = () => {
+  const handleTitleCompositionEnd = () => {
     isComposingRef.current = false;
-    queueSave(80);
 
     const currentNote = noteDataRef.current;
     if (currentNote?.title.trim()) {
       void saveTitle(currentNote.title);
     }
+  };
+
+  const handleEditorCompositionEnd = () => {
+    isComposingRef.current = false;
+    queueSave();
   };
 
   const findImageBlockByUrl = useCallback((url: string) => {
@@ -380,7 +532,7 @@ const  BlockNote = () => {
           value={noteData.title}
           onChange={(e) => {handleTitle(e.target.value);}}
           onCompositionStart={handleCompositionStart}
-          onCompositionEnd={handleCompositionEnd}
+          onCompositionEnd={handleTitleCompositionEnd}
           onBlur={handleTitleBlur}
           placeholder="Title"
         />
@@ -396,7 +548,7 @@ const  BlockNote = () => {
         </button>
       </div>
       
-      <div onClick={handleEditorClick} onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd}>
+      <div onClick={handleEditorClick} onCompositionStart={handleCompositionStart} onCompositionEnd={handleEditorCompositionEnd}>
         <BlockNoteView 
           editor={editor} 
           onChange={handleNoteData}

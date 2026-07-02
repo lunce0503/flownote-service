@@ -25,7 +25,7 @@ import {
   type FolderForm,
 } from "../../../features/blog/model/blogListModel";
 import { useLocalStorageStringSet } from "../../../shared/lib/useLocalStorageStringSet";
-import { subscribeSyncEvents } from "../../../shared/sync";
+import { getSyncClientId, subscribeSyncEvents } from "../../../shared/sync";
 
 const BlogList = () => {
   const [blogList, setBlogList] = useState<BlogNote[]>([]);
@@ -137,8 +137,17 @@ const BlogList = () => {
     if (!title) return;
 
     try {
-      const updated = await updateNoteTitle(noteId, title);
-      setBlogList((prev) => prev.map((note) => (note.id === noteId ? { ...note, title: updated.title } : note)));
+      const currentNote = blogList.find((note) => note.id === noteId);
+      const updated = await updateNoteTitle(noteId, title, {
+        revision: (currentNote?.revision ?? 0) + 1,
+        clientId: getSyncClientId(),
+      });
+      setBlogList((prev) => prev.map((note) => (note.id === noteId ? {
+        ...note,
+        title: updated.title,
+        revision: updated.revision,
+        client_id: updated.client_id,
+      } : note)));
       setEditingNoteId(null);
       setOpenNoteMenuId(null);
     } catch (err) {

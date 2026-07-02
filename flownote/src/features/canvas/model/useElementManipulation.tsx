@@ -3,6 +3,11 @@ import type { Point, ImageElement, TextBoxElement, ToolType, CanvasElementStatus
 
 type GetCanvasCoords = (e: React.PointerEvent | MouseEvent) => Point;
 
+export type EraserElementTargets = {
+  images: boolean;
+  textBoxes: boolean;
+};
+
 export type MovingCanvasObject = {
   type: 'image' | 'text';
   id: string;
@@ -44,28 +49,45 @@ export const useElementManipulation = (getCanvasCoords: GetCanvasCoords, tool: T
     }
   }, [movingObject, getCanvasCoords]);
 
-  const eraseElementAtPointer = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+  const eraseElementAtPointer = useCallback((
+    e: React.PointerEvent<HTMLCanvasElement>,
+    targets: EraserElementTargets = { images: true, textBoxes: true },
+  ) => {
     const { x, y } = getCanvasCoords(e);
 
-    setImages(prev => prev.flatMap(image => {
-      const hit = image.status !== 'deleted'
-        && x >= image.x
-        && x <= image.x + image.width
-        && y >= image.y
-        && y <= image.y + image.height;
-      if (!hit) return [image];
-      return image.status === 'new' ? [] : [{ ...image, status: 'deleted' as const }];
-    }));
+    if (targets.images) {
+      setImages(prev => {
+        let changed = false;
+        const next = prev.flatMap(image => {
+          const hit = image.status !== 'deleted'
+            && x >= image.x
+            && x <= image.x + image.width
+            && y >= image.y
+            && y <= image.y + image.height;
+          if (!hit) return [image];
+          changed = true;
+          return image.status === 'new' ? [] : [{ ...image, status: 'deleted' as const }];
+        });
+        return changed ? next : prev;
+      });
+    }
 
-    setTextBoxes(prev => prev.flatMap(textBox => {
-      const hit = textBox.status !== 'deleted'
-        && x >= textBox.x
-        && x <= textBox.x + textBox.width
-        && y >= textBox.y
-        && y <= textBox.y + textBox.height;
-      if (!hit) return [textBox];
-      return textBox.status === 'new' ? [] : [{ ...textBox, status: 'deleted' as const }];
-    }));
+    if (targets.textBoxes) {
+      setTextBoxes(prev => {
+        let changed = false;
+        const next = prev.flatMap(textBox => {
+          const hit = textBox.status !== 'deleted'
+            && x >= textBox.x
+            && x <= textBox.x + textBox.width
+            && y >= textBox.y
+            && y <= textBox.y + textBox.height;
+          if (!hit) return [textBox];
+          changed = true;
+          return textBox.status === 'new' ? [] : [{ ...textBox, status: 'deleted' as const }];
+        });
+        return changed ? next : prev;
+      });
+    }
   }, [getCanvasCoords]);
 
   return {

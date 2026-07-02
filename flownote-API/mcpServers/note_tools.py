@@ -36,6 +36,14 @@ async def add_note(
     authorization: str | None = None,
 ) -> dict[str, Any]:
     """텍스트 기반 노트를 생성합니다."""
+    revision = 1
+    if note_id:
+        notes = forward_request("GET", "/api/notes", authorization)
+        if isinstance(notes, list):
+            current = next((note for note in notes if isinstance(note, dict) and note.get("id") == note_id), None)
+            if current:
+                revision = int(current.get("revision") or 0) + 1
+
     body = {
         "id": note_id or str(uuid.uuid4()),
         "title": title,
@@ -48,6 +56,8 @@ async def add_note(
                 "children": [],
             }
         ],
+        "revision": revision,
+        "client_id": f"mcp-{uuid.uuid4()}",
     }
     return ok("add_note", forward_request("POST", "/api/notes", authorization, body))
 

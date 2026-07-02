@@ -2,6 +2,7 @@ package com.flownote.notes;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +39,8 @@ public class NoteService {
 
     public List<NoteResponse> list(UUID userId) {
         return jdbcTemplate.query("""
-                SELECT id, title, content::text AS content, content_object_key, created_at, updated_at
+                SELECT id, title, content::text AS content, content_object_key, created_at, updated_at,
+                       revision, last_client_id
                 FROM notes
                 WHERE user_id = ?
                 ORDER BY created_at DESC
@@ -47,11 +49,14 @@ public class NoteService {
 
     public NoteResponse upsert(UUID userId, NoteRequest request) {
         OffsetDateTime createdAt = request.createdAt() == null ? OffsetDateTime.now() : request.createdAt();
-        String objectKey = "note-content/%s/%s.json".formatted(userId, request.id());
+        String objectKey = contentObjectKey(userId, request.id(), request.revision(), request.clientId());
         StoredCanvasAsset stored = assetStorage.putJson(objectKey, request.content().toString());
-        return jdbcTemplate.queryForObject("""
-                INSERT INTO notes (id, user_id, title, content, content_object_key, content_byte_size, content_public_url, created_at, updated_at)
-                VALUES (?, ?, ?, '[]'::jsonb, ?, ?, ?, ?, NOW())
+        List<NoteResponse> saved = jdbcTemplate.query("""
+                INSERT INTO notes (
+                    id, user_id, title, content, content_object_key, content_byte_size,
+                    content_public_url, created_at, updated_at, revision, last_client_id
+                )
+                VALUES (?, ?, ?, '[]'::jsonb, ?, ?, ?, ?, NOW(), ?, ?)
                 ON CONFLICT (id)
                 DO UPDATE SET
                     title = EXCLUDED.title,
@@ -59,28 +64,61 @@ public class NoteService {
                     content_object_key = EXCLUDED.content_object_key,
                     content_byte_size = EXCLUDED.content_byte_size,
                     content_public_url = EXCLUDED.content_public_url,
-                    updated_at = NOW()
+                    updated_at = NOW(),
+                    revision = EXCLUDED.revision,
+                    last_client_id = EXCLUDED.last_client_id
                 WHERE notes.user_id = EXCLUDED.user_id
-                RETURNING id, title, content::text AS content, content_object_key, created_at, updated_at
-                """, this::mapNote, request.id(), userId, request.title(), objectKey, stored.byteSize(), stored.publicUrl(), createdAt);
+                  AND EXCLUDED.revision > notes.revision
+                RETURNING id, title, content::text AS content, content_object_key, created_at, updated_at,
+                          revision, last_client_id
+                """, this::mapNote, new Object[] {
+                        request.id(), userId, request.title(), objectKey, stored.byteSize(), stored.publicUrl(),
+                        createdAt, request.revision(), request.clientId()
+                });
+        if (!saved.isEmpty()) {
+            return saved.get(0);
+        }
+
+        List<NoteResponse> current = findById(userId, request.id());
+        if (!current.isEmpty()
+                && current.get(0).revision() == request.revision()
+                && request.clientId().equals(current.get(0).clientId())) {
+            return current.get(0);
+        }
+
+        assetStorage.delete(objectKey);
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "더 최신인 노트가 이미 저장되었습니다.");
     }
 
     public NoteResponse updateTitle(UUID userId, UUID noteId, NoteTitleUpdateRequest request) {
-        return jdbcTemplate.query("""
+        List<NoteResponse> updated = jdbcTemplate.query("""
                 UPDATE notes
-                SET title = ?, updated_at = NOW()
-                WHERE id = ? AND user_id = ?
-                RETURNING id, title, content::text AS content, content_object_key, created_at, updated_at
-                """, this::mapNote, request.title().trim(), noteId, userId)
-                .stream()
-                .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "노트를 찾을 수 없습니다."));
+                SET title = ?, updated_at = NOW(), revision = ?, last_client_id = ?
+                WHERE id = ? AND user_id = ? AND revision < ?
+                RETURNING id, title, content::text AS content, content_object_key, created_at, updated_at,
+                          revision, last_client_id
+                """, this::mapNote, request.title().trim(), request.revision(), request.clientId(),
+                noteId, userId, request.revision());
+        if (!updated.isEmpty()) {
+            return updated.get(0);
+        }
+
+        List<NoteResponse> current = findById(userId, noteId);
+        if (current.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "노트를 찾을 수 없습니다.");
+        }
+        if (current.get(0).revision() == request.revision()
+                && request.clientId().equals(current.get(0).clientId())) {
+            return current.get(0);
+        }
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "더 최신인 노트가 이미 저장되었습니다.");
     }
 
     @Transactional
     public NoteResponse delete(UUID userId, UUID noteId) {
         Map<String, Object> note = jdbcTemplate.query("""
-                SELECT id, title, content::text AS content, content_object_key, created_at, updated_at
+                SELECT id, title, content::text AS content, content_object_key, created_at, updated_at,
+                       revision, last_client_id
                 FROM notes
                 WHERE id = ? AND user_id = ?
                 """, (rs, rowNum) -> Map.<String, Object>of(
@@ -89,7 +127,9 @@ public class NoteService {
                         "content", rs.getString("content"),
                         "content_object_key", rs.getString("content_object_key") == null ? "" : rs.getString("content_object_key"),
                         "created_at", rs.getObject("created_at", OffsetDateTime.class),
-                        "updated_at", rs.getObject("updated_at", OffsetDateTime.class)
+                        "updated_at", rs.getObject("updated_at", OffsetDateTime.class),
+                        "revision", rs.getLong("revision"),
+                        "last_client_id", rs.getString("last_client_id") == null ? "" : rs.getString("last_client_id")
                 ), noteId, userId)
                 .stream()
                 .findFirst()
@@ -116,7 +156,9 @@ public class NoteService {
                 String.valueOf(note.get("title")),
                 content,
                 (OffsetDateTime) note.get("created_at"),
-                (OffsetDateTime) note.get("updated_at"));
+                (OffsetDateTime) note.get("updated_at"),
+                (long) note.get("revision"),
+                String.valueOf(note.get("last_client_id")));
     }
 
     private void deleteAfterCommit(String objectKey) {
@@ -144,7 +186,23 @@ public class NoteService {
                         ? readJson(rs.getString("content"))
                         : readJson(assetStorage.readJson(contentObjectKey)),
                 rs.getObject("created_at", OffsetDateTime.class),
-                rs.getObject("updated_at", OffsetDateTime.class));
+                rs.getObject("updated_at", OffsetDateTime.class),
+                rs.getLong("revision"),
+                rs.getString("last_client_id"));
+    }
+
+    private List<NoteResponse> findById(UUID userId, UUID noteId) {
+        return jdbcTemplate.query("""
+                SELECT id, title, content::text AS content, content_object_key, created_at, updated_at,
+                       revision, last_client_id
+                FROM notes
+                WHERE id = ? AND user_id = ?
+                """, this::mapNote, noteId, userId);
+    }
+
+    static String contentObjectKey(UUID userId, UUID noteId, long revision, String clientId) {
+        UUID clientKey = UUID.nameUUIDFromBytes(clientId.getBytes(StandardCharsets.UTF_8));
+        return "note-content/%s/%s/%d-%s.json".formatted(userId, noteId, revision, clientKey);
     }
 
     private JsonNode readJson(String content) {

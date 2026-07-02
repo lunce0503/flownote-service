@@ -17,18 +17,36 @@ public class AuthService {
     }
 
     public UUID requireUserId(String authorizationHeader) {
+        return requireUser(authorizationHeader).userId();
+    }
+
+    public AuthenticatedUser requireAdmin(String authorizationHeader) {
+        AuthenticatedUser user = requireUser(authorizationHeader);
+        if (!"ADMIN".equals(user.role())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "관리자 권한이 필요합니다.");
+        }
+        return user;
+    }
+
+    public AuthenticatedUser requireUser(String authorizationHeader) {
         UUID token = parseBearerToken(authorizationHeader);
         return jdbcTemplate.query("""
-                SELECT user_id
-                FROM app_sessions
-                WHERE token = ? AND expires_at > ?
+                SELECT s.user_id, u.role
+                FROM app_sessions s
+                JOIN users u ON u.id = s.user_id
+                WHERE s.token = ? AND s.expires_at > ?
                 """,
-                (rs, rowNum) -> rs.getObject("user_id", UUID.class),
+                (rs, rowNum) -> new AuthenticatedUser(
+                        rs.getObject("user_id", UUID.class),
+                        rs.getString("role")),
                 token,
                 OffsetDateTime.now())
                 .stream()
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."));
+    }
+
+    public record AuthenticatedUser(UUID userId, String role) {
     }
 
     private UUID parseBearerToken(String authorizationHeader) {

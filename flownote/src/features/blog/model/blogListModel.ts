@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import type { BlockDataProps } from "../../../entities/blog";
+import { getSyncClientId } from "../../../shared/sync";
 import type { NoteFolder } from "../../../entities/blog/noteFolderData";
 
 export type NoteBlock = {
@@ -13,6 +14,8 @@ export type BlogNote = {
     title: string;
     content: NoteBlock[];
     created_at?: string | Date;
+    revision?: number;
+    client_id?: string;
 };
 
 export type FolderForm = {
@@ -46,6 +49,8 @@ export const createBlankNote = (title: string): BlockDataProps => ({
         },
     ] as BlockDataProps["content"],
     created_at: new Date(),
+    revision: 1,
+    client_id: getSyncClientId(),
 });
 
 export const buildNoteFolderIdByNoteId = (folders: NoteFolder[]) => {

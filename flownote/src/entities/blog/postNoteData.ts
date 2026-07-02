@@ -1,6 +1,6 @@
 import axios from "axios";
 import { API_CORE_BASE_URL, authHeaders } from "../../shared/api";
-import { publishSyncEvent } from "../../shared/sync";
+import { getSyncClientId, publishSyncEvent } from "../../shared/sync";
 import type { BlockDataProps } from "./model/types";
 
 const postNoteData = async (noteData: BlockDataProps) => {
@@ -9,11 +9,21 @@ const postNoteData = async (noteData: BlockDataProps) => {
     }
 
     try {
-        const response = await axios.post(`${API_CORE_BASE_URL}/api/notes`, noteData, {
+        const requestData = {
+            ...noteData,
+            revision: noteData.revision ?? 1,
+            client_id: noteData.client_id ?? getSyncClientId(),
+        };
+        const response = await axios.post<BlockDataProps>(`${API_CORE_BASE_URL}/api/notes`, requestData, {
             headers: authHeaders(),
         });
-        void publishSyncEvent("notes", "note-saved");
-        console.log('Task posted successfully:', response.data);
+        if (response.data.revision === requestData.revision) {
+            void publishSyncEvent("notes", "note-saved", {
+                noteId: response.data.id,
+                revision: response.data.revision,
+                clientId: requestData.client_id,
+            });
+        }
         return response.data;
     } catch (error) {
         console.error('Error posting task:', error);

@@ -1,18 +1,28 @@
 import axios from "axios";
 import { API_CORE_BASE_URL, authHeaders } from "../../shared/api";
-import { publishSyncEvent } from "../../shared/sync";
+import { getSyncClientId, publishSyncEvent } from "../../shared/sync";
+import type { BlockDataProps } from "./model/types";
 
-const updateNoteTitle = async (noteId: string, title: string) => {
+const updateNoteTitle = async (
+  noteId: string,
+  title: string,
+  syncDetails: { revision: number; clientId?: string },
+) => {
   if (!API_CORE_BASE_URL) {
     throw new Error("노트 API 기본 URL이 설정되지 않았습니다.");
   }
 
-  const response = await axios.patch(
+  const clientId = syncDetails.clientId ?? getSyncClientId();
+  const response = await axios.patch<BlockDataProps>(
     `${API_CORE_BASE_URL}/api/notes/${noteId}`,
-    { title },
+    { title, revision: syncDetails.revision, client_id: clientId },
     { headers: authHeaders() },
   );
-  void publishSyncEvent("notes", "note-title-updated");
+  void publishSyncEvent("notes", "note-title-updated", {
+    noteId,
+    revision: syncDetails.revision,
+    clientId,
+  });
   return response.data;
 };
 
