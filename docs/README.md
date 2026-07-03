@@ -6,8 +6,8 @@
 
 ## 읽는 순서
 
-1. `AGENTS.md`: 항상 적용되는 작업 규칙과 검증 의무.
-2. `.codex/README.md`: Codex 하네스 자산의 위치와 역할.
+1. `AGENTS.md`/`CLAUDE.md`: 항상 적용되는 작업 규칙과 검증 의무.
+2. `.codex/README.md`/`.claude/README.md`: Codex/Claude code 하네스 자산의 위치와 역할.
 3. `docs/PRODUCT_SENSE.md`: 제품 목적과 주요 사용자 흐름.
 4. `docs/DESIGN.md`: 하위 프로젝트와 아키텍처 경계.
 5. `docs/PLANS.md`: 실행 계획과 기술 부채 관리 방식.
@@ -21,6 +21,8 @@
 | `design-docs/` | 장기 설계 문서와 아키텍처 결정 색인 |
 | `generated/` | 코드나 스키마에서 재생성 가능한 참조 문서 |
 | `product-specs/` | 제품 기능별 사양과 사용자 흐름 |
+| `exec-plan/` | 실행 계획 설정 문서 |
+| `references/` | 외부 문서/docs 자료 보관 |
 | `DESIGN.md` | 시스템 맵과 서비스 경계 |
 | `FRONTEND.md` | 웹/모바일 UI 작업 기준 |
 | `PLANS.md` | 계획 문서 작성과 완료 기록 기준 |

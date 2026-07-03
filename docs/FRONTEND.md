@@ -32,4 +32,5 @@
 - `cd flownote-next && yarn lint && yarn build`
 - 모바일 정적 검증은 `cd flownote-mobile && yarn verify`
 - 최종 통합은 저장소 루트에서 `docker compose up -d --build`
-- 운영 반영 요청이 있으면 `flownote/`에서 Vercel production 배포를 실행하고, 연동 백엔드 변경이 있으면 Railway 배포와 헬스체크도 함께 확인한다.
+- 파일을 수정한 작업이면 `flownote/`에서 Vercel production 배포를 실행하고, 연동 백엔드 변경이 있으면 Railway 배포와 헬스체크도 함께 확인한다.
+- `report/` 아래 보고서만 작성하거나 수정하는 작업은 프론트 산출물이 바뀌지 않으므로 Vercel 배포를 생략한다.
