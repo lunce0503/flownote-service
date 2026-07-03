@@ -21,3 +21,10 @@ GEMINI.md
 !.env.*.example
 flownote-server/build/
 flownote-server/.gradle/
+
+# 로컬 도구/실험 산출물 (저장소에 포함하지 않음)
+.antigravitycli/
+/package.json
+/package-lock.json
+/architecture-diagram.html
+.claude/settings.local.json
