@@ -4,13 +4,13 @@ from typing import Any
 
 from google.genai import types
 
-from app.core_api import forward_request
+from app.core_api import forward_request_async
 from mcpServers.common import no_parameters_schema, ok, schema, string_array_schema, string_schema
 
 
 async def get_schedule_items(authorization: str | None = None) -> dict[str, Any]:
     """현재 저장된 시간표 항목 목록을 반환합니다."""
-    return ok("get_schedule_items", forward_request("GET", "/api/schedule-items", authorization))
+    return ok("get_schedule_items", await forward_request_async("GET", "/api/schedule-items", authorization))
 
 
 async def add_schedule_item(
@@ -34,7 +34,7 @@ async def add_schedule_item(
         "memo": memo,
         "is_active": True,
     }
-    return ok("add_schedule_item", forward_request("POST", "/api/schedule-items", authorization, body))
+    return ok("add_schedule_item", await forward_request_async("POST", "/api/schedule-items", authorization, body))
 
 
 schedule_function_declarations = [

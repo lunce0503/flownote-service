@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import urllib.error
@@ -30,3 +31,13 @@ def forward_request(method: str, path: str, authorization: str | None = None, bo
         raise HTTPException(status_code=error.code, detail=detail)
     except urllib.error.URLError as error:
         raise HTTPException(status_code=502, detail=f"Core API request failed: {error.reason}")
+
+
+async def forward_request_async(
+    method: str,
+    path: str,
+    authorization: str | None = None,
+    body: Any | None = None,
+) -> Any:
+    """이벤트 루프를 막지 않도록 동기 forward_request를 스레드에서 실행한다."""
+    return await asyncio.to_thread(forward_request, method, path, authorization, body)

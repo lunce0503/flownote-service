@@ -63,6 +63,13 @@ def _canvas_room(canvas_id: str) -> str:
     return f"canvas:{canvas_id}"
 
 
+def _require_room_membership(rooms: Any, canvas_id: str) -> None:
+    """발신자가 canvas:join으로 권한 검증을 거쳐 해당 캔버스 룸에 들어와 있는지 확인한다."""
+    joined = set(rooms) if rooms is not None else set()
+    if _canvas_room(canvas_id) not in joined:
+        raise HTTPException(status_code=403, detail="캔버스 세션에 먼저 참여해야 합니다.")
+
+
 def _normalize_mutation_id(value: Any) -> str:
     if value is None or value == "":
         return str(uuid.uuid4())
@@ -430,6 +437,7 @@ def create_canvas_socket_server(cors_allowed_origins: list[str]) -> socketio.Asy
             canvas_id = data.get("canvasId")
             if not isinstance(canvas_id, str) or not canvas_id:
                 raise HTTPException(status_code=400, detail="canvasId가 필요합니다.")
+            _require_room_membership(sio.rooms(sid), canvas_id)
             await sio.emit(
                 "canvas:line-start",
                 {
@@ -449,6 +457,7 @@ def create_canvas_socket_server(cors_allowed_origins: list[str]) -> socketio.Asy
             canvas_id = data.get("canvasId")
             if not isinstance(canvas_id, str) or not canvas_id:
                 raise HTTPException(status_code=400, detail="canvasId가 필요합니다.")
+            _require_room_membership(sio.rooms(sid), canvas_id)
             await sio.emit(
                 "canvas:line-points",
                 {
@@ -469,6 +478,7 @@ def create_canvas_socket_server(cors_allowed_origins: list[str]) -> socketio.Asy
             canvas_id = data.get("canvasId")
             if not isinstance(canvas_id, str) or not canvas_id:
                 raise HTTPException(status_code=400, detail="canvasId가 필요합니다.")
+            _require_room_membership(sio.rooms(sid), canvas_id)
             await sio.emit(
                 "canvas:line-end",
                 {

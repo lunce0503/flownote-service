@@ -5,7 +5,7 @@ from typing import Any
 
 from google.genai import types
 
-from app.core_api import forward_request
+from app.core_api import forward_request_async
 from mcpServers.common import no_parameters_schema, ok, schema, string_schema
 
 
@@ -17,7 +17,7 @@ def _compact_text(value: Any, limit: int = 8000) -> Any:
 
 async def get_note_list(authorization: str | None = None) -> dict[str, Any]:
     """노트 목록과 내용을 반환합니다."""
-    notes = forward_request("GET", "/api/notes", authorization)
+    notes = await forward_request_async("GET", "/api/notes", authorization)
     if isinstance(notes, list):
         notes = [
             {
@@ -38,7 +38,7 @@ async def add_note(
     """텍스트 기반 노트를 생성합니다."""
     revision = 1
     if note_id:
-        notes = forward_request("GET", "/api/notes", authorization)
+        notes = await forward_request_async("GET", "/api/notes", authorization)
         if isinstance(notes, list):
             current = next((note for note in notes if isinstance(note, dict) and note.get("id") == note_id), None)
             if current:
@@ -59,7 +59,7 @@ async def add_note(
         "revision": revision,
         "client_id": f"mcp-{uuid.uuid4()}",
     }
-    return ok("add_note", forward_request("POST", "/api/notes", authorization, body))
+    return ok("add_note", await forward_request_async("POST", "/api/notes", authorization, body))
 
 
 note_function_declarations = [

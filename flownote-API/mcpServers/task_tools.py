@@ -5,7 +5,7 @@ from typing import Any
 
 from google.genai import types
 
-from app.core_api import forward_request
+from app.core_api import forward_request_async
 from mcpServers.common import (
     integer_schema,
     no_parameters_schema,
@@ -18,7 +18,7 @@ from mcpServers.common import (
 
 async def get_task_list(authorization: str | None = None) -> dict[str, Any]:
     """현재 저장된 모든 작업 목록을 반환합니다."""
-    return ok("get_task_list", forward_request("GET", "/api/tasks", authorization))
+    return ok("get_task_list", await forward_request_async("GET", "/api/tasks", authorization))
 
 
 async def add_task_item(
@@ -45,7 +45,7 @@ async def add_task_item(
         "memo": memo,
         "tags": tags or [],
     }
-    return ok("add_task_item", forward_request("POST", "/api/tasks", authorization, body))
+    return ok("add_task_item", await forward_request_async("POST", "/api/tasks", authorization, body))
 
 
 async def update_task_item(
@@ -77,12 +77,12 @@ async def update_task_item(
         }.items()
         if value is not None
     }
-    return ok("update_task_item", forward_request("PATCH", f"/api/tasks/{task_id}", authorization, body))
+    return ok("update_task_item", await forward_request_async("PATCH", f"/api/tasks/{task_id}", authorization, body))
 
 
 async def delete_task_item(task_id: str, authorization: str | None = None) -> dict[str, Any]:
     """작업을 삭제합니다."""
-    return ok("delete_task_item", forward_request("DELETE", f"/api/tasks/{task_id}", authorization))
+    return ok("delete_task_item", await forward_request_async("DELETE", f"/api/tasks/{task_id}", authorization))
 
 
 task_function_declarations = [

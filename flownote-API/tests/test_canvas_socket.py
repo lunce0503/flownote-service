@@ -4,7 +4,12 @@ import uuid
 
 from fastapi import HTTPException
 
-from app.canvas_socket import CanvasLoadTaskRegistry, _combine_canvas_load_results, _normalize_mutation_id
+from app.canvas_socket import (
+    CanvasLoadTaskRegistry,
+    _combine_canvas_load_results,
+    _normalize_mutation_id,
+    _require_room_membership,
+)
 
 
 class CanvasMutationIdTest(unittest.TestCase):
@@ -23,6 +28,23 @@ class CanvasMutationIdTest(unittest.TestCase):
             _normalize_mutation_id("not-a-uuid")
 
         self.assertEqual(400, raised.exception.status_code)
+
+
+class CanvasRoomMembershipTest(unittest.TestCase):
+    def test_member_of_canvas_room_is_allowed(self) -> None:
+        _require_room_membership(["some-sid", "canvas:abc"], "abc")
+
+    def test_non_member_is_rejected_with_403(self) -> None:
+        with self.assertRaises(HTTPException) as raised:
+            _require_room_membership(["some-sid", "canvas:other"], "abc")
+
+        self.assertEqual(403, raised.exception.status_code)
+
+    def test_no_rooms_is_rejected(self) -> None:
+        with self.assertRaises(HTTPException) as raised:
+            _require_room_membership(None, "abc")
+
+        self.assertEqual(403, raised.exception.status_code)
 
 
 class CanvasLoadTaskRegistryTest(unittest.IsolatedAsyncioTestCase):
