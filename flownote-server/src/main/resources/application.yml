@@ -1,5 +1,9 @@
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${PORT:${SERVER_PORT:8080}}
+  compression:
+    enabled: true
+    min-response-size: 1024
+    mime-types: application/json,application/javascript,text/html,text/xml,text/plain,text/css,text/event-stream
 
 spring:
   application:
@@ -9,6 +13,18 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:flownote}
     password: ${SPRING_DATASOURCE_PASSWORD:change-me}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      max-lifetime: ${SPRING_DATASOURCE_HIKARI_MAX_LIFETIME:600000}
+      keepalive-time: ${SPRING_DATASOURCE_HIKARI_KEEPALIVE_TIME:120000}
+      connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:3000}
+      validation-timeout: ${SPRING_DATASOURCE_HIKARI_VALIDATION_TIMEOUT:2000}
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      username: ${SPRING_DATA_REDIS_USERNAME:}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
+      timeout: ${SPRING_DATA_REDIS_TIMEOUT:500ms}
   servlet:
     multipart:
       max-file-size: ${FLOWNOTE_MAX_UPLOAD_FILE_SIZE:50MB}
@@ -27,9 +43,22 @@ management:
 
 flownote:
   cors:
-    origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:3000}
+    origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:5174}
   upload:
     dir: ${FLOWNOTE_UPLOAD_DIR:${user.dir}/uploads}
+  storage:
+    endpoint: ${FLOWNOTE_STORAGE_ENDPOINT:}
+    bucket: ${FLOWNOTE_STORAGE_BUCKET:}
+    region: ${FLOWNOTE_STORAGE_REGION:us-east-1}
+    access-key-id: ${FLOWNOTE_STORAGE_ACCESS_KEY_ID:}
+    secret-access-key: ${FLOWNOTE_STORAGE_SECRET_ACCESS_KEY:}
+    public-base-url: ${FLOWNOTE_STORAGE_PUBLIC_BASE_URL:}
+    validate-on-startup: ${FLOWNOTE_STORAGE_VALIDATE_ON_STARTUP:false}
+  canvas:
+    storage-worker-delay-ms: ${FLOWNOTE_CANVAS_STORAGE_WORKER_DELAY_MS:1000}
+    cache:
+      target-username: ${FLOWNOTE_CANVAS_CACHE_TARGET_USERNAME:lunce}
+      ttl: ${FLOWNOTE_CANVAS_CACHE_TTL:24h}
   mobile:
     core-api-url: ${MOBILE_CORE_API_URL:http://localhost:8080}
     ai-api-url: ${MOBILE_AI_API_URL:http://localhost:8000}

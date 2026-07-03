@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
 public final class NoteDtos {
     private NoteDtos() {
@@ -16,7 +17,9 @@ public final class NoteDtos {
             @NotNull UUID id,
             @NotBlank String title,
             @NotNull JsonNode content,
-            OffsetDateTime createdAt
+            OffsetDateTime createdAt,
+            @Positive long revision,
+            @NotBlank String clientId
     ) {
     }
 
@@ -25,12 +28,16 @@ public final class NoteDtos {
             String title,
             JsonNode content,
             OffsetDateTime createdAt,
-            OffsetDateTime updatedAt
+            OffsetDateTime updatedAt,
+            long revision,
+            String clientId
     ) {
     }
 
     public record NoteTitleUpdateRequest(
-            @NotBlank String title
+            @NotBlank String title,
+            @Positive long revision,
+            @NotBlank String clientId
     ) {
     }
 }

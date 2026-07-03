@@ -1,5 +1,10 @@
 package com.flownote.server.task;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flownote.canvas.CanvasAssetStorage;
+import com.flownote.canvas.CanvasAssetStorage.StoredCanvasAsset;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -18,12 +23,16 @@ import java.util.UUID;
 @Repository
 public class TaskRepository {
     private final JdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper;
+    private final CanvasAssetStorage assetStorage;
 
     private final RowMapper<Task> taskRowMapper = (rs, rowNum) -> {
         Array tagsArray = rs.getArray("tags");
         List<String> tags = tagsArray == null
                 ? List.of()
                 : Arrays.asList((String[]) tagsArray.getArray());
+        List<String> links = readLinks(rs.getArray("links"), rs.getString("links_object_key"));
+        List<Task.TaskTimeLog> timeLogs = readTimeLogs(rs.getString("time_logs"), rs.getString("time_logs_object_key"));
 
         return new Task(
                 rs.getString("id"),
@@ -34,21 +43,26 @@ public class TaskRepository {
                 getInteger(rs, "estimated_minutes"),
                 getInteger(rs, "actual_minutes"),
                 getLocalDate(rs, "due_date"),
-                rs.getString("memo"),
+                readText(rs.getString("memo"), rs.getString("memo_object_key")),
                 tags,
+                links,
+                timeLogs,
                 rs.getTimestamp("created_at").toInstant(),
                 rs.getTimestamp("updated_at").toInstant()
         );
     };
 
-    public TaskRepository(JdbcTemplate jdbcTemplate) {
+    public TaskRepository(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper, CanvasAssetStorage assetStorage) {
         this.jdbcTemplate = jdbcTemplate;
+        this.objectMapper = objectMapper;
+        this.assetStorage = assetStorage;
     }
 
     public List<Task> findAll(UUID userId) {
         return jdbcTemplate.query("""
                 SELECT id, task_name, category, difficulty_level, status,
                        estimated_minutes, actual_minutes, due_date, memo, tags,
+                       memo_object_key, links, links_object_key, time_logs, time_logs_object_key,
                        created_at, updated_at
                 FROM tasks
                 WHERE user_id = ?
@@ -57,15 +71,21 @@ public class TaskRepository {
     }
 
     public Task create(UUID userId, CreateTaskRequest request) {
+        StoredCanvasAsset storedMemo = storeMemo(userId, request.id(), request.memo());
+        StoredCanvasAsset storedLinks = storeLinks(userId, request.id(), request.links());
+        StoredCanvasAsset storedTimeLogs = storeTimeLogs(userId, request.id(), request.timeLogs());
         List<Task> tasks = jdbcTemplate.query(connection -> {
             PreparedStatement ps = connection.prepareStatement("""
                     INSERT INTO tasks (
                         id, user_id, task_name, category, difficulty_level, status,
-                        estimated_minutes, due_date, memo, tags
+                        estimated_minutes, actual_minutes, due_date, memo, memo_object_key, memo_byte_size, memo_public_url,
+                        tags, links, links_object_key, links_byte_size, links_public_url,
+                        time_logs, time_logs_object_key, time_logs_byte_size, time_logs_public_url
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ARRAY[]::TEXT[], ?, ?, ?, '[]'::jsonb, ?, ?, ?)
                     RETURNING id, task_name, category, difficulty_level, status,
                               estimated_minutes, actual_minutes, due_date, memo, tags,
+                              memo_object_key, links, links_object_key, time_logs, time_logs_object_key,
                               created_at, updated_at
                     """);
             ps.setObject(1, UUID.fromString(request.id()));
@@ -75,9 +95,18 @@ public class TaskRepository {
             setNullableInteger(ps, 5, request.difficultyLevel());
             setNullableString(ps, 6, request.status());
             setNullableInteger(ps, 7, request.estimatedMinutes());
-            setNullableDate(ps, 8, request.dueDate());
-            setNullableString(ps, 9, request.memo());
-            ps.setArray(10, connection.createArrayOf("text", normalizeTags(request.tags())));
+            setNullableInteger(ps, 8, request.actualMinutes());
+            setNullableDate(ps, 9, request.dueDate());
+            ps.setString(10, storedMemo.objectKey());
+            ps.setLong(11, storedMemo.byteSize());
+            ps.setString(12, storedMemo.publicUrl());
+            ps.setArray(13, connection.createArrayOf("text", normalizeTextArray(request.tags())));
+            ps.setString(14, storedLinks.objectKey());
+            ps.setLong(15, storedLinks.byteSize());
+            ps.setString(16, storedLinks.publicUrl());
+            ps.setString(17, storedTimeLogs.objectKey());
+            ps.setLong(18, storedTimeLogs.byteSize());
+            ps.setString(19, storedTimeLogs.publicUrl());
             return ps;
         }, taskRowMapper);
 
@@ -102,6 +131,7 @@ public class TaskRepository {
                 WHERE id = ? AND user_id = ?
                 RETURNING id, task_name, category, difficulty_level, status,
                           estimated_minutes, actual_minutes, due_date, memo, tags,
+                          memo_object_key, links, links_object_key, time_logs, time_logs_object_key,
                           created_at, updated_at
                 """, taskRowMapper, UUID.fromString(id), userId);
         return tasks.stream().findFirst();
@@ -141,14 +171,77 @@ public class TaskRepository {
         }
     }
 
-    private static String[] normalizeTags(List<String> tags) {
-        if (tags == null) {
+    private static String[] normalizeTextArray(List<String> values) {
+        if (values == null) {
             return new String[0];
         }
-        return tags.toArray(String[]::new);
+        return values.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toArray(String[]::new);
     }
 
-    public sealed interface SqlValue permits StringValue, IntegerValue, DateValue, TagsValue, UuidValue {
+    public StoredCanvasAsset storeMemo(UUID userId, String taskId, String memo) {
+        return assetStorage.putText("task-payloads/%s/%s/memo.txt".formatted(userId, taskId), memo);
+    }
+
+    public StoredCanvasAsset storeLinks(UUID userId, String taskId, List<String> links) {
+        return assetStorage.putJson("task-payloads/%s/%s/links.json".formatted(userId, taskId), writeJson(normalizeTextArray(links)));
+    }
+
+    public StoredCanvasAsset storeTimeLogs(UUID userId, String taskId, List<Task.TaskTimeLog> timeLogs) {
+        return assetStorage.putJson("task-payloads/%s/%s/time-logs.json".formatted(userId, taskId), writeJson(timeLogs == null ? List.of() : timeLogs));
+    }
+
+    private String readText(String fallback, String objectKey) {
+        return objectKey == null || objectKey.isBlank() ? fallback : assetStorage.readText(objectKey);
+    }
+
+    private List<String> readLinks(Array linksArray, String objectKey) throws java.sql.SQLException {
+        if (objectKey != null && !objectKey.isBlank()) {
+            try {
+                return objectMapper.readValue(assetStorage.readText(objectKey), new TypeReference<>() {});
+            } catch (JsonProcessingException ignored) {
+                return List.of();
+            }
+        }
+        return linksArray == null ? List.of() : Arrays.asList((String[]) linksArray.getArray());
+    }
+
+    private List<Task.TaskTimeLog> readTimeLogs(String value, String objectKey) {
+        return parseTimeLogs(objectKey == null || objectKey.isBlank() ? value : assetStorage.readText(objectKey));
+    }
+
+    private List<Task.TaskTimeLog> parseTimeLogs(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+
+        try {
+            return objectMapper.readValue(value, new TypeReference<>() {});
+        } catch (JsonProcessingException ignored) {
+            return List.of();
+        }
+    }
+
+    private String serializeTimeLogs(List<Task.TaskTimeLog> value) {
+        return writeJson(value == null ? List.of() : value);
+    }
+
+    private String writeJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException ignored) {
+            return "[]";
+        }
+    }
+
+    private static void setJsonb(PreparedStatement ps, int index, String value) throws java.sql.SQLException {
+        ps.setObject(index, value == null || value.isBlank() ? "[]" : value, Types.OTHER);
+    }
+
+    public sealed interface SqlValue permits StringValue, IntegerValue, LongValue, DateValue, TextArrayValue, TimeLogsValue, UuidValue {
         void bind(PreparedStatement ps, int index) throws java.sql.SQLException;
     }
 
@@ -166,6 +259,17 @@ public class TaskRepository {
         }
     }
 
+    public record LongValue(Long value) implements SqlValue {
+        @Override
+        public void bind(PreparedStatement ps, int index) throws java.sql.SQLException {
+            if (value == null) {
+                ps.setNull(index, Types.BIGINT);
+            } else {
+                ps.setLong(index, value);
+            }
+        }
+    }
+
     public record DateValue(LocalDate value) implements SqlValue {
         @Override
         public void bind(PreparedStatement ps, int index) throws java.sql.SQLException {
@@ -173,10 +277,21 @@ public class TaskRepository {
         }
     }
 
-    public record TagsValue(List<String> value) implements SqlValue {
+    public record TextArrayValue(List<String> value) implements SqlValue {
         @Override
         public void bind(PreparedStatement ps, int index) throws java.sql.SQLException {
-            ps.setArray(index, ps.getConnection().createArrayOf("text", normalizeTags(value)));
+            ps.setArray(index, ps.getConnection().createArrayOf("text", normalizeTextArray(value)));
+        }
+    }
+
+    public record TimeLogsValue(List<Task.TaskTimeLog> value) implements SqlValue {
+        @Override
+        public void bind(PreparedStatement ps, int index) throws java.sql.SQLException {
+            try {
+                setJsonb(ps, index, new ObjectMapper().writeValueAsString(value == null ? List.of() : value));
+            } catch (JsonProcessingException ignored) {
+                setJsonb(ps, index, "[]");
+            }
         }
     }
 

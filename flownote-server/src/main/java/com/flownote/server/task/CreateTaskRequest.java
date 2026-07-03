@@ -10,8 +10,11 @@ public record CreateTaskRequest(
         Integer difficultyLevel,
         String status,
         Integer estimatedMinutes,
+        Integer actualMinutes,
         LocalDate dueDate,
         String memo,
-        List<String> tags
+        List<String> tags,
+        List<String> links,
+        List<Task.TaskTimeLog> timeLogs
 ) {
 }

@@ -15,8 +15,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.flownote.canvas.CanvasAssetStorage;
+import com.flownote.canvas.CanvasAssetStorage.StoredCanvasAsset;
 import com.flownote.social.SocialDtos.SocialMessageRequest;
 import com.flownote.social.SocialDtos.SocialMessageResponse;
 import com.flownote.social.SocialDtos.SocialRoomMemberResponse;
@@ -26,30 +30,34 @@ import com.flownote.social.SocialDtos.SocialRoomResponse;
 @Service
 public class SocialService {
     private final JdbcTemplate jdbcTemplate;
+    private final CanvasAssetStorage assetStorage;
 
-    public SocialService(JdbcTemplate jdbcTemplate) {
+    public SocialService(JdbcTemplate jdbcTemplate, CanvasAssetStorage assetStorage) {
         this.jdbcTemplate = jdbcTemplate;
+        this.assetStorage = assetStorage;
     }
 
     public List<SocialRoomResponse> listRooms(UUID userId) {
         List<SocialRoomRow> rooms = jdbcTemplate.query("""
                 SELECT r.id, r.name, r.updated_at,
-                       (
-                           SELECT s.message
-                           FROM social s
-                           WHERE s.room_id = r.id
-                           ORDER BY s.timestamp DESC
-                           LIMIT 1
-                       ) AS last_message
+                       latest.message AS last_message,
+                       latest.message_object_key AS last_message_object_key
                 FROM social_rooms r
                 JOIN social_room_members m ON m.room_id = r.id
+                LEFT JOIN LATERAL (
+                    SELECT s.message, s.message_object_key
+                    FROM social s
+                    WHERE s.room_id = r.id
+                    ORDER BY s.timestamp DESC
+                    LIMIT 1
+                ) latest ON true
                 WHERE m.user_id = ?
                 ORDER BY r.updated_at DESC
                 """,
                 (rs, rowNum) -> new SocialRoomRow(
                         rs.getObject("id", UUID.class),
                         rs.getString("name"),
-                        rs.getString("last_message"),
+                        readMessage(rs.getString("last_message"), rs.getString("last_message_object_key")),
                         rs.getObject("updated_at", OffsetDateTime.class)),
                 userId);
 
@@ -103,7 +111,7 @@ public class SocialService {
     public List<SocialMessageResponse> listMessages(UUID userId, UUID roomId) {
         requireRoomMember(userId, roomId);
         return jdbcTemplate.query("""
-                SELECT s.id, s.room_id, s.user_id, u.nickname, s.message, s.timestamp, s.user_id = ? AS mine
+                SELECT s.id, s.room_id, s.user_id, u.nickname, s.message, s.message_object_key, s.timestamp, s.user_id = ? AS mine
                 FROM social s
                 JOIN users u ON u.id = s.user_id
                 WHERE s.room_id = ?
@@ -117,11 +125,13 @@ public class SocialService {
         requireRoomMember(userId, roomId);
         UUID id = UUID.randomUUID();
         OffsetDateTime timestamp = request.timestamp() == null ? OffsetDateTime.now() : request.timestamp();
+        String objectKey = "social-messages/%s/%s/%s.txt".formatted(roomId, userId, id);
+        StoredCanvasAsset stored = assetStorage.putText(objectKey, request.message());
         SocialMessageResponse created = jdbcTemplate.queryForObject("""
-                INSERT INTO social (id, room_id, user_id, message, timestamp)
-                VALUES (?, ?, ?, ?, ?)
-                RETURNING id, room_id, user_id, (SELECT nickname FROM users WHERE id = ?) AS nickname, message, timestamp, true AS mine
-                """, this::mapMessage, id, roomId, userId, request.message(), timestamp, userId);
+                INSERT INTO social (id, room_id, user_id, message, message_object_key, message_byte_size, message_public_url, timestamp)
+                VALUES (?, ?, ?, '', ?, ?, ?, ?)
+                RETURNING id, room_id, user_id, (SELECT nickname FROM users WHERE id = ?) AS nickname, message, message_object_key, timestamp, true AS mine
+                """, this::mapMessage, id, roomId, userId, objectKey, stored.byteSize(), stored.publicUrl(), timestamp, userId);
         jdbcTemplate.update("UPDATE social_rooms SET updated_at = ? WHERE id = ?", timestamp, roomId);
         return created;
     }
@@ -129,49 +139,67 @@ public class SocialService {
     @Transactional
     public SocialMessageResponse deleteMessage(UUID userId, UUID roomId, UUID id) {
         requireRoomMember(userId, roomId);
-        return jdbcTemplate.query("""
+        String objectKey = jdbcTemplate.query("""
+                SELECT message_object_key
+                FROM social
+                WHERE id = ? AND room_id = ? AND user_id = ?
+                """, (rs, rowNum) -> rs.getString("message_object_key"), id, roomId, userId)
+                .stream()
+                .findFirst()
+                .orElse("");
+        SocialMessageResponse deleted = jdbcTemplate.query("""
                 WITH deleted AS (
                     DELETE FROM social
                     WHERE id = ? AND room_id = ? AND user_id = ?
-                    RETURNING id, room_id, user_id, message, timestamp
+                    RETURNING id, room_id, user_id, message, message_object_key, timestamp
                 )
-                SELECT deleted.id, deleted.room_id, deleted.user_id, u.nickname, deleted.message, deleted.timestamp, true AS mine
+                SELECT deleted.id, deleted.room_id, deleted.user_id, u.nickname, deleted.message, deleted.message_object_key, deleted.timestamp, true AS mine
                 FROM deleted
                 JOIN users u ON u.id = deleted.user_id
                 """, this::mapMessage, id, roomId, userId)
                 .stream()
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "소셜 메시지를 찾을 수 없습니다."));
+        deleteAfterCommit(objectKey);
+        return deleted;
     }
 
     @Transactional
     public void deleteRoom(UUID userId, UUID roomId) {
         requireRoomMember(userId, roomId);
+        List<String> objectKeys = jdbcTemplate.queryForList("""
+                SELECT message_object_key
+                FROM social
+                WHERE room_id = ? AND message_object_key IS NOT NULL
+                """, String.class, roomId);
         int deleted = jdbcTemplate.update("DELETE FROM social_rooms WHERE id = ?", roomId);
         if (deleted == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "톡방을 찾을 수 없습니다.");
         }
+        deleteAfterCommit(objectKeys);
     }
 
     private SocialRoomResponse getRoom(UUID userId, UUID roomId) {
         requireRoomMember(userId, roomId);
         return jdbcTemplate.query("""
                 SELECT r.id, r.name, r.updated_at,
-                       (
-                           SELECT s.message
-                           FROM social s
-                           WHERE s.room_id = r.id
-                           ORDER BY s.timestamp DESC
-                           LIMIT 1
-                       ) AS last_message
+                       latest.message AS last_message,
+                       latest.message_object_key AS last_message_object_key
                 FROM social_rooms r
+                LEFT JOIN LATERAL (
+                    SELECT s.message, s.message_object_key
+                    FROM social s
+                    WHERE s.room_id = r.id
+                    ORDER BY s.timestamp DESC
+                    LIMIT 1
+                ) latest ON true
                 WHERE r.id = ?
                 """,
                 (rs, rowNum) -> new SocialRoomResponse(
                         rs.getObject("id", UUID.class),
                         rs.getString("name"),
                         listMembers(rs.getObject("id", UUID.class)),
-                        rs.getString("last_message"),
+                        readMessage(rs.getString("last_message"), rs.getString("last_message_object_key")),
                         rs.getObject("updated_at", OffsetDateTime.class)),
                 roomId)
                 .stream()
@@ -294,9 +322,40 @@ public class SocialService {
                 rs.getObject("room_id", UUID.class),
                 rs.getObject("user_id", UUID.class),
                 rs.getString("nickname"),
-                rs.getString("message"),
+                readMessage(rs.getString("message"), rs.getString("message_object_key")),
                 rs.getObject("timestamp", OffsetDateTime.class),
                 rs.getBoolean("mine"));
+    }
+
+    private String readMessage(String fallback, String objectKey) {
+        return objectKey == null || objectKey.isBlank() ? fallback : assetStorage.readText(objectKey);
+    }
+
+    private void deleteAfterCommit(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) {
+            return;
+        }
+        deleteAfterCommit(List.of(objectKey));
+    }
+
+    private void deleteAfterCommit(List<String> objectKeys) {
+        List<String> keys = objectKeys.stream()
+                .filter(key -> key != null && !key.isBlank())
+                .distinct()
+                .toList();
+        if (keys.isEmpty()) {
+            return;
+        }
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            keys.forEach(assetStorage::delete);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                keys.forEach(assetStorage::delete);
+            }
+        });
     }
 
     private record SocialRoomRow(UUID id, String name, String lastMessage, OffsetDateTime updatedAt) {

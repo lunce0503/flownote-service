@@ -46,6 +46,12 @@ public class UserController {
         return userService.search(authService.requireUserId(authorization), q);
     }
 
+    @GetMapping("/me")
+    public UserResponse current(
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        return userService.current(authService.requireUserId(authorization));
+    }
+
     @GetMapping
     public void listUsersBlocked() {
         throw new org.springframework.web.server.ResponseStatusException(

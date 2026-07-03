@@ -16,9 +16,11 @@ java {
 dependencies {
     implementation "org.springframework.boot:spring-boot-starter-actuator"
     implementation "org.springframework.boot:spring-boot-starter-jdbc"
+    implementation "org.springframework.boot:spring-boot-starter-data-redis"
     implementation "org.springframework.boot:spring-boot-starter-validation"
     implementation "org.springframework.boot:spring-boot-starter-web"
     implementation "org.springframework.security:spring-security-crypto"
+    implementation "software.amazon.awssdk:s3:2.29.6"
     implementation "org.flywaydb:flyway-core"
     implementation "org.flywaydb:flyway-database-postgresql"
     runtimeOnly "org.postgresql:postgresql"

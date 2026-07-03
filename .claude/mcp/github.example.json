@@ -1,0 +1,6 @@
+{
+  "name": "github",
+  "purpose": "저장소, pull request, issue, CI 점검.",
+  "required_env": [],
+  "risk": "저장소 메타데이터와 댓글이 노출될 수 있다. 필요한 최소 권한만 사용한다."
+}

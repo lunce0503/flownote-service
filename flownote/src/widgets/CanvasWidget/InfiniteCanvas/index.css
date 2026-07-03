@@ -1,0 +1,61 @@
+.canvas-touch-root,
+.canvas-touch-root canvas,
+.canvas-touch-root svg {
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.canvas-touch-root {
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+.canvas-touch-root canvas {
+  touch-action: none;
+}
+
+.canvas-touch-root button,
+.canvas-touch-root label,
+.canvas-touch-root input,
+.canvas-touch-root textarea,
+.canvas-touch-root select,
+.canvas-touch-root [contenteditable="true"],
+.canvas-touch-root [data-canvas-touch-allow="true"] {
+  -webkit-touch-callout: default;
+  touch-action: manipulation;
+}
+
+.canvas-touch-root button,
+.canvas-touch-root label {
+  min-width: 48px;
+  min-height: 48px;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.canvas-touch-root button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.canvas-touch-root button:disabled {
+  cursor: not-allowed;
+}
+
+.canvas-touch-root .canvas-toolbar-scroll {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.canvas-touch-root .canvas-toolbar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.canvas-touch-root input,
+.canvas-touch-root textarea,
+.canvas-touch-root [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}

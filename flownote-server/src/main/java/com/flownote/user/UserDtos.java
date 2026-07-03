@@ -24,7 +24,7 @@ public final class UserDtos {
     ) {
     }
 
-    public record UserResponse(UUID id, String username, String email, String nickname) {
+    public record UserResponse(UUID id, String username, String email, String nickname, String role) {
     }
 
     public record UserSearchResponse(UUID id, String username, String nickname) {

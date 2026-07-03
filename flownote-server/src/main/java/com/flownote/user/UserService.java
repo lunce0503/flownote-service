@@ -31,13 +31,14 @@ public class UserService {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO users (id, username, email, password_hash, nickname)
                 VALUES (?, ?, ?, ?, ?)
-                RETURNING id, username, email, nickname
+                RETURNING id, username, email, nickname, role
                 """,
                 (rs, rowNum) -> new UserResponse(
                         rs.getObject("id", UUID.class),
                         rs.getString("username"),
                         rs.getString("email"),
-                        rs.getString("nickname")),
+                        rs.getString("nickname"),
+                        rs.getString("role")),
                 id,
                 request.username(),
                 request.email(),
@@ -47,7 +48,7 @@ public class UserService {
 
     public LoginResponse login(LoginRequest request) {
         UserWithPassword user = jdbcTemplate.query("""
-                SELECT id, username, email, nickname, password_hash
+                SELECT id, username, email, nickname, password_hash, role
                 FROM users
                 WHERE email = ?
                 LIMIT 1
@@ -57,7 +58,8 @@ public class UserService {
                         rs.getString("username"),
                         rs.getString("email"),
                         rs.getString("nickname"),
-                        rs.getString("password_hash")),
+                        rs.getString("password_hash"),
+                        rs.getString("role")),
                 request.email())
                 .stream()
                 .findFirst()
@@ -73,7 +75,7 @@ public class UserService {
                 VALUES (?, ?, ?)
                 """, token, user.id(), OffsetDateTime.now().plusDays(30));
 
-        return new LoginResponse(token, new UserResponse(user.id(), user.username(), user.email(), user.nickname()));
+        return new LoginResponse(token, new UserResponse(user.id(), user.username(), user.email(), user.nickname(), user.role()));
     }
 
     public List<UserSearchResponse> search(UUID currentUserId, String query) {
@@ -105,6 +107,22 @@ public class UserService {
                 likeQuery);
     }
 
-    private record UserWithPassword(UUID id, String username, String email, String nickname, String passwordHash) {
+    public UserResponse current(UUID userId) {
+        return jdbcTemplate.query("""
+                SELECT id, username, email, nickname, role
+                FROM users
+                WHERE id = ?
+                """, (rs, rowNum) -> new UserResponse(
+                        rs.getObject("id", UUID.class),
+                        rs.getString("username"),
+                        rs.getString("email"),
+                        rs.getString("nickname"),
+                        rs.getString("role")), userId)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+    }
+
+    private record UserWithPassword(UUID id, String username, String email, String nickname, String passwordHash, String role) {
     }
 }
