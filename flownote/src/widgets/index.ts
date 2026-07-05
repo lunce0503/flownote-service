@@ -5,4 +5,5 @@ export { default as CanvasWidget } from "./CanvasWidget/InfiniteCanvas";
 export { default as Header } from "./Header";
 export { default as SignUpWidget } from "./SignUpWidget";
 export { default as SocialWidget } from "./SocialWidget";
+export { default as ScrewPuzzleWidget } from "./ScrewPuzzleWidget";
 export { default as TaskWidget } from "./TaskWidget";
