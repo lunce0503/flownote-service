@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.agent_router import router as agent_router
+from app.api.agent_note_router import router as agent_note_router
 from app.api.chat_router import router as chat_router
 from app.api.market_router import router as market_router
 from app.api.social_router import router as social_router
@@ -32,6 +33,7 @@ async def root():
     return {"message": "Hello, World!"}
 
 fastapi_app.include_router(agent_router)
+fastapi_app.include_router(agent_note_router)
 fastapi_app.include_router(chat_router)
 fastapi_app.include_router(market_router)
 fastapi_app.include_router(social_router)
