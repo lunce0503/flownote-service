@@ -1155,9 +1155,23 @@ const Canvas = () => {
     const handleWheel = (event: React.WheelEvent<HTMLCanvasElement>) => {
         event.preventDefault();
         const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
-        const nextScale = Math.min(5, Math.max(0.2, scaleRef.current * factor));
+        const previousScale = scaleRef.current;
+        const nextScale = Math.min(5, Math.max(0.2, previousScale * factor));
+        const zoomRatio = nextScale / previousScale;
+        if (zoomRatio === 1) return; // 스케일 한계 도달 시 위치 이동 없이 종료
+
+        // 0,0 이 아니라 마우스 포인터 좌표를 기준으로 확대/축소 (캔버스 픽셀 공간, 터치 핀치줌과 동일 공식)
+        const focus = getCanvasViewportPoint(event.currentTarget, event.nativeEvent);
+        const previousOffset = offsetRef.current;
+        const nextOffset = {
+            x: focus.x - (focus.x - previousOffset.x) * zoomRatio,
+            y: focus.y - (focus.y - previousOffset.y) * zoomRatio,
+        };
+
         scaleRef.current = nextScale;
+        offsetRef.current = nextOffset;
         setScale(nextScale);
+        setOffset(nextOffset);
     };
 
     const handleContextMenu = (event: React.MouseEvent) => event.preventDefault();
