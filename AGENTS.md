@@ -57,6 +57,23 @@
 - 장기 프로젝트 메모리 후보: `.codex/memories/`
 - 하네스 워크플로우와 라우팅: `.codex/harness/`
 
+## 지식 저장소 (System of Record)
+
+Flownote의 컨텍스트는 채팅이나 개인의 기억이 아니라 저장소 안의 평문·구조화 마크다운으로 인코딩한다. 에이전트 우선 환경에서 "볼 수 없는 것은 존재하지 않는 것"이므로 결정·계획·상태·품질을 버전 관리되는 문서로 남긴다. 배경 원칙은 `docs/references/harness-engineering.md`(OpenAI 하네스 엔지니어링 요약)를 따르고, 문서 지도는 `docs/README.md`이다.
+
+- 진입점은 맵이다: `AGENTS.md`/`CLAUDE.md`는 백과사전이 아니라 목차다. 짧게 유지하고, 깊은 지식은 `docs/`의 소유 문서로 위임한다.
+- 점진적 노출(Incremental Disclosure): 처음부터 전부 읽지 않는다. 맵에서 시작해 작업에 필요한 문서만 따라 들어간다. 각 문서는 자족적이고 단일 소유자를 가진다.
+- 소유 문서 갱신: 코드가 제품 행동·아키텍처·런타임·검증 기준을 바꾸면, 그 기준을 소유한 문서를 같은 변경 범위에서 갱신한다.
+  - 제품 행동·사용자 흐름 → `docs/product-specs/`, `docs/PRODUCT_SENSE.md`
+  - 아키텍처 경계·서비스 맵 → `ARCHITECTURE.md`, `docs/DESIGN.md`
+  - DB 스키마 등 재생성 가능한 참조 → `docs/generated/`
+  - 실행 계획·의사결정 로그·기술 부채 → `docs/exec-plan/`, `docs/PLANS.md`
+  - 품질 등급·아키텍처 격차 → `docs/QUALITY_SCORE.md`
+  - 프론트/보안/안정성 기준 → `docs/FRONTEND.md`, `docs/SECURITY.md`, `docs/RELIABILITY.md`
+  - 외부/LLM 참조 자료 → `docs/references/`
+- 정정 우선: 오래된 문서는 삭제보다 정정한다. 더 이상 사실이 아니면 근거와 대체 위치를 남기고, 교차 링크와 상대 경로가 깨지지 않게 유지한다.
+- 비밀값 금지: `docs/`에는 비밀값·토큰·로컬 인증 정보·업로드 원본·DB 덤프를 기록하지 않는다.
+
 ## 기본 워크플로우
 
 1. 파악: 요청을 관련 하위 프로젝트와 파일에 매핑한다.
@@ -64,7 +81,7 @@
 3. 구현: 기존 컨벤션을 사용해 집중된 변경만 수행한다.
 4. 검증: 변경에 맞는 lint, build, test, targeted check를 실행한다.
 5. 리뷰: 회귀, 보안, API 계약, UI 동작을 확인한다.
-6. 기록: 버그와 실행 로그는 `logs/`, 분석 산출물과 작업 결과는 `report/`, 재사용 가능한 프로젝트 컨벤션은 `.codex/memories/`에 남긴다.
+6. 기록: 버그와 실행 로그는 `logs/`, 분석 산출물과 작업 결과는 `report/`, 재사용 가능한 프로젝트 컨벤션은 `.codex/memories/`에 남긴다. 제품 행동·아키텍처·검증 기준이 바뀌면 `docs/`의 소유 문서(System of Record)를 같은 변경에서 갱신하고 교차 링크를 확인한다.
 7. Docker 빌드 및 실행: 작업 종료 전 저장소 루트에서 `docker compose up -d --build`를 실행해 통합 빌드와 백그라운드 실행을 확인한다.
 8. 클라우드 배포: 파일을 수정한 작업은 Docker 검증 뒤 Vercel production 및 영향받는 Railway 서비스를 배포하고 URL, deployment id, 헬스체크 결과를 확인한다. `report/` 전용 보고서 작성/수정은 Docker와 클라우드 배포를 생략한다.
 9. 보고: 최종 응답에는 하위 프로젝트 검증 결과, `docker compose up -d --build` 결과, 클라우드 배포 결과를 함께 포함한다.
