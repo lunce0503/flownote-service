@@ -2,7 +2,7 @@
 
 이 문서는 저장소 전체 구조와 작업 기록 위치를 한눈에 확인하기 위한 루트 아키텍처 문서다. 세부 운영 규칙은 `AGENTS.md`, 장기 문서는 `docs/`, 에이전트 실행 자산은 `.codex/` 혹은 `.claude/`를 기준으로 한다.
 
-# 조감도
+# 개요
 
 Flownote는 기획한 내용을 바탕으로 관련 필기를 텍스트와 그림으로 표현하여 새로운 아이디어를 만들거나 기존의 내용을 정리하며 지식을 정리하게 돕는 노트이다. 
 주된 기능은 그림판(Canvas)과 작성 영역(Text Pad)이며 부가적인 기능을 이용하여 그림판과 작성영역과의 유기적인 조합을 이루는 방식으로 개발되었다. 
@@ -57,6 +57,16 @@ graph TB
 - FastAPI → Ollama: 에이전트 노트가 그림을 캡션→임베딩→유사 검색(내부망 전용).
 - FastAPI → Gemini: 메인 플래너 에이전트의 MCP 도구 호출(외부 API).
 - Spring → FastAPI: 주식 시세(`/api/market`). Spring → PostgreSQL/Redis: 저장·캔버스 캐시.
+
+## 코드맵
+
+### `flownote/` : flownote의 프론트엔드를 다루는 곳
+
+#### `flownote/`: 
+### `flownote-mobile/` : flownote의 IOS/Android 앱을 다루는 곳
+### `flownote-next/` : `flownote/`에서 클라이언트가 요청한 데이터를 가공해 전송하는 서버
+### `flownote-server/` : flownote 서버스의 메인 서버로 주로 캔버스/텍스트 패드 데이터 저장, 로그인 인증, 이외의 다양한 기능의 데이터를 다루는 서버이다.
+### `flownote-API/` : flownote API 라우터로 flownote의 여러 마이크로서비스를 연결하는 api를 관리하는 서버
 
 ## 하위 서버 아키텍쳐
 
