@@ -1,5 +1,5 @@
 import axios from "axios";
-import { API_CORE_BASE_URL, authHeaders } from "../../../shared/api";
+import { API_CORE_BASE_URL, authHeaders } from "@/shared/api";
 import type { TaskProps } from "../model/types";
 
 // 1. 수정할 데이터를 인자(updateData)로 받도록 수정

@@ -1,4 +1,4 @@
-import { API_CORE_BASE_URL, authHeaders } from "../../../shared/api";
+import { API_CORE_BASE_URL, authHeaders } from "@/shared/api";
 import axios from "axios";
 
 export type SocialMessagePayload = {

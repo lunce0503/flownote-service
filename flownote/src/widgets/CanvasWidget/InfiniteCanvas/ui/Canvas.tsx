@@ -1,19 +1,18 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
-import { Check, ChevronDown, ChevronRight, Folder, MoreVertical, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Trash2, X } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
-import { useCanvasState } from "../../../../features/canvas/model/useCanvasState";
-import { useDrawing } from "../../../../features/canvas/model/useDrawing";
-import { useElementManipulation } from "../../../../features/canvas/model/useElementManipulation";
+import { useCanvasState } from "@/features/canvas";
+import { useDrawing } from "@/features/canvas";
+import { useElementManipulation } from "@/features/canvas";
 import {
     usePersistence,
     type CanvasLineStreamEndEvent,
     type CanvasLineStreamPointsEvent,
     type CanvasLineStreamStartEvent,
-} from "../../../../features/canvas/model/usePersistence";
-import { useCanvasRendering } from "../../../../features/canvas/model/useCanvasRendering";
-import { useCanvasHistory } from "../../../../features/canvas/model/useCanvasHistory";
+} from "@/features/canvas";
+import { useCanvasRendering } from "@/features/canvas";
+import { useCanvasHistory } from "@/features/canvas";
 import {
-    CANVAS_COLLAPSED_FOLDER_IDS_STORAGE_KEY,
     CANVAS_ERASER_IMAGES_STORAGE_KEY,
     CANVAS_ERASER_LINES_STORAGE_KEY,
     CANVAS_ERASER_TEXT_BOXES_STORAGE_KEY,
@@ -25,59 +24,26 @@ import {
     DEFAULT_STROKE_WIDTH,
     DEFAULT_TEXT_BOX_HEIGHT,
     DEFAULT_TEXT_BOX_WIDTH,
-} from "../../../../features/canvas/model/canvasConstants";
-import { useStoredCanvasViewport } from "../../../../features/canvas/model/useStoredCanvasViewport";
-import { isCanvasInteractiveTarget } from "../../../../features/canvas/model/canvasDom";
-import { isPointInsideBounds, markModified } from "../../../../features/canvas/model/canvasGeometry";
-import {
-    buildCanvasFolderIdByCanvasId,
-    getCanvasTitle,
-    getUnfiledCanvases,
-    groupCanvasFoldersByCategory,
-} from "../../../../features/canvas/model/canvasLibraryModel";
+} from "@/features/canvas";
+import { useStoredCanvasViewport } from "@/features/canvas";
+import { isCanvasInteractiveTarget } from "@/features/canvas";
+import { isPointInsideBounds } from "@/features/canvas";
+import { getCanvasTitle } from "@/features/canvas";
 import {
     buildLassoSelection,
     getLassoSelectionBounds,
     getLassoSelectionCount,
     type LassoSelection,
-} from "../../../../features/canvas/model/canvasSelectionModel";
-import { getAutoTextBoxSize } from "../../../../features/canvas/model/canvasTextBoxModel";
-import type { CanvasDocumentSummary, CanvasFolder, ImageElement, LineElement, Point, TextBoxElement } from "../../../../entities/canvas/model/types";
-import {
-    addCanvasToFolder,
-    createCanvasDocument,
-    createCanvasFolder,
-    deleteCanvasDocument,
-    deleteCanvasFolder,
-    getCanvasDocuments,
-    getCanvasFolders,
-    removeCanvasFromFolder,
-    updateCanvasDocument,
-    updateCanvasFolder,
-} from "../../../../entities/canvas/api/canvasLibraryData";
-import { useLocalStorageBoolean } from "../../../../shared/lib/useLocalStorageBoolean";
-import { useLocalStorageStringSet } from "../../../../shared/lib/useLocalStorageStringSet";
-import { subscribeSyncEvents } from "../../../../shared/sync";
+} from "@/features/canvas";
+import { getAutoTextBoxSize } from "@/features/canvas";
+import type { CanvasDocumentSummary, CanvasFolder, LineElement, Point, TextBoxElement } from "@/entities/canvas";
+import { getCanvasDocuments, getCanvasFolders, createCanvasDocument } from "@/entities/canvas";
+import { useLocalStorageBoolean } from "@/shared/lib/useLocalStorageBoolean";
+import { subscribeSyncEvents } from "@/shared/lib/sync";
+import { useLassoActions } from "../model/useLassoActions";
+import { CanvasLibraryPanel } from "./CanvasLibraryPanel";
 import { Toolbar } from "./Toolbar";
 import "../index.css";
-
-type FolderForm = {
-    category: string;
-    name: string;
-};
-
-type LassoClipboard = {
-    lines: LineElement[];
-    images: ImageElement[];
-    textBoxes: TextBoxElement[];
-};
-
-const EMPTY_FOLDER_FORM: FolderForm = {
-    category: "",
-    name: "",
-};
-
-const LASSO_PASTE_OFFSET = 32;
 
 const isEditableKeyboardTarget = (target: EventTarget | null) => {
     if (!(target instanceof HTMLElement)) return false;
@@ -118,14 +84,6 @@ const Canvas = () => {
     const [canvasDocuments, setCanvasDocuments] = useState<CanvasDocumentSummary[]>([]);
     const [canvasFolders, setCanvasFolders] = useState<CanvasFolder[]>([]);
     const [selectedCanvasId, setSelectedCanvasId] = useState<string | null>(null);
-    const [folderForm, setFolderForm] = useState<FolderForm>(EMPTY_FOLDER_FORM);
-    const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
-    const [editingFolderForm, setEditingFolderForm] = useState<FolderForm>(EMPTY_FOLDER_FORM);
-    const [editingCanvasId, setEditingCanvasId] = useState<string | null>(null);
-    const [editingCanvasTitle, setEditingCanvasTitle] = useState("");
-    const [openCanvasMenuId, setOpenCanvasMenuId] = useState<string | null>(null);
-    const [openFolderMenuId, setOpenFolderMenuId] = useState<string | null>(null);
-    const [collapsedFolderIds, setCollapsedFolderIds] = useLocalStorageStringSet(CANVAS_COLLAPSED_FOLDER_IDS_STORAGE_KEY);
     const [isCanvasLibraryVisible, setIsCanvasLibraryVisible] = useLocalStorageBoolean(CANVAS_LIBRARY_VISIBLE_STORAGE_KEY, true);
     const [libraryError, setLibraryError] = useState<string | null>(null);
 
@@ -244,14 +202,12 @@ const Canvas = () => {
     const isTouchGestureActive = useRef(false);
     const middleDragStart = useRef<Point | null>(null);
     const lassoDragStart = useRef<Point | null>(null);
-    const lassoPasteCountRef = useRef(0);
     const activeStreamingLineIdRef = useRef<string | null>(null);
     const lastStreamedPointIndexRef = useRef(0);
     const handleFlushSaveRef = useRef(handleFlushSave);
     const selectedCanvasIdRef = useRef(selectedCanvasId);
     const [isMiddleDragging, setIsMiddleDragging] = useState(false);
     const [lassoSelection, setLassoSelection] = useState<LassoSelection | null>(null);
-    const [lassoClipboard, setLassoClipboard] = useState<LassoClipboard | null>(null);
     const [isLassoDragging, setIsLassoDragging] = useState(false);
     const [pencilOnlyMode, setPencilOnlyMode] = useLocalStorageBoolean(CANVAS_PENCIL_ONLY_MODE_STORAGE_KEY, true);
     const [penColor, setPenColor] = useState(() => localStorage.getItem(CANVAS_PEN_COLOR_STORAGE_KEY) || DEFAULT_PEN_COLOR);
@@ -412,16 +368,6 @@ const Canvas = () => {
         };
     }, []);
 
-    const canvasFolderIdByCanvasId = useMemo(() => buildCanvasFolderIdByCanvasId(canvasFolders), [canvasFolders]);
-
-    const unfiledCanvases = useMemo(() => (
-        getUnfiledCanvases(canvasDocuments, canvasFolderIdByCanvasId)
-    ), [canvasDocuments, canvasFolderIdByCanvasId]);
-
-    const canvasFoldersByCategory = useMemo(() => (
-        groupCanvasFoldersByCategory(canvasFolders)
-    ), [canvasFolders]);
-
     const lassoSelectionCount = getLassoSelectionCount(lassoSelection);
 
     const viewportCenter = useMemo(() => ({
@@ -452,10 +398,6 @@ const Canvas = () => {
         getLassoSelectionBounds(lassoSelection, drawnLines, images, textBoxes)
     ), [drawnLines, images, lassoSelection, textBoxes]);
 
-    const replaceFolder = (updated: CanvasFolder) => {
-        setCanvasFolders((prev) => prev.map((folder) => (folder.id === updated.id ? updated : folder)));
-    };
-
     const flushCurrentCanvasSave = () => {
         if (selectedCanvasIdRef.current) handleFlushSaveRef.current();
     };
@@ -465,145 +407,6 @@ const Canvas = () => {
             flushCurrentCanvasSave();
         }
         setSelectedCanvasId(canvasId);
-    };
-
-    const handleCreateCanvas = async (folderId?: string) => {
-        try {
-            flushCurrentCanvasSave();
-            const created = await createCanvasDocument(`새 캔버스_${Date.now()}`);
-            setCanvasDocuments((prev) => [created, ...prev]);
-            if (folderId) {
-                const updatedFolder = await addCanvasToFolder(folderId, created.id);
-                setCanvasFolders((prev) => prev.map((folder) => (folder.id === updatedFolder.id ? updatedFolder : {
-                    ...folder,
-                    canvasIds: folder.canvasIds.filter((canvasId) => canvasId !== created.id),
-                })));
-            }
-            handleSelectCanvas(created.id);
-        } catch (error) {
-            console.error("Failed to create canvas:", error);
-            setLibraryError("캔버스를 생성하는 중 오류가 발생했습니다.");
-        }
-    };
-
-    const handleCreateFolder = async () => {
-        if (!folderForm.name.trim()) return;
-        try {
-            const created = await createCanvasFolder(folderForm);
-            setCanvasFolders((prev) => [created, ...prev]);
-            setFolderForm(EMPTY_FOLDER_FORM);
-        } catch (error) {
-            console.error("Failed to create canvas folder:", error);
-            setLibraryError("캔버스 폴더를 생성하는 중 오류가 발생했습니다.");
-        }
-    };
-
-    const handleUpdateFolder = async (folderId: string) => {
-        if (!editingFolderForm.name.trim()) return;
-        try {
-            const updated = await updateCanvasFolder(folderId, editingFolderForm);
-            replaceFolder(updated);
-            setEditingFolderId(null);
-            setOpenFolderMenuId(null);
-        } catch (error) {
-            console.error("Failed to update canvas folder:", error);
-            setLibraryError("캔버스 폴더를 수정하는 중 오류가 발생했습니다.");
-        }
-    };
-
-    const handleDeleteFolder = async (folderId: string) => {
-        try {
-            await deleteCanvasFolder(folderId);
-            setCanvasFolders((prev) => prev.filter((folder) => folder.id !== folderId));
-            setOpenFolderMenuId(null);
-        } catch (error) {
-            console.error("Failed to delete canvas folder:", error);
-            setLibraryError("캔버스 폴더를 삭제하는 중 오류가 발생했습니다.");
-        }
-    };
-
-    const handleUpdateCanvasTitle = async (canvasId: string) => {
-        const title = editingCanvasTitle.trim();
-        if (!title) return;
-        try {
-            const updated = await updateCanvasDocument(canvasId, title);
-            setCanvasDocuments((prev) => prev.map((document) => (document.id === canvasId ? updated : document)));
-            setEditingCanvasId(null);
-            setOpenCanvasMenuId(null);
-        } catch (error) {
-            console.error("Failed to update canvas title:", error);
-            setLibraryError("캔버스 이름을 수정하는 중 오류가 발생했습니다.");
-        }
-    };
-
-    const handleDeleteCanvas = async (canvasId: string) => {
-        try {
-            await deleteCanvasDocument(canvasId);
-            setCanvasDocuments((prev) => {
-                const next = prev.filter((document) => document.id !== canvasId);
-                setSelectedCanvasId((current) => (current === canvasId ? next[0]?.id ?? null : current));
-                return next;
-            });
-            setCanvasFolders((prev) => prev.map((folder) => ({
-                ...folder,
-                canvasIds: folder.canvasIds.filter((id) => id !== canvasId),
-            })));
-            setOpenCanvasMenuId(null);
-        } catch (error) {
-            console.error("Failed to delete canvas:", error);
-            setLibraryError("캔버스를 삭제하는 중 오류가 발생했습니다.");
-        }
-    };
-
-    const handleDropOnFolder = async (event: DragEvent<HTMLDivElement>, folderId: string) => {
-        event.preventDefault();
-        const canvasId = event.dataTransfer.getData("text/plain");
-        if (!canvasId) return;
-        try {
-            const updated = await addCanvasToFolder(folderId, canvasId);
-            setCanvasFolders((prev) => prev.map((folder) => (folder.id === updated.id ? updated : {
-                ...folder,
-                canvasIds: folder.canvasIds.filter((id) => id !== canvasId),
-            })));
-        } catch (error) {
-            console.error("Failed to move canvas into folder:", error);
-            setLibraryError("캔버스를 폴더로 이동하는 중 오류가 발생했습니다.");
-        }
-    };
-
-    const handleDropOnUnfiled = async (event: DragEvent<HTMLDivElement>) => {
-        event.preventDefault();
-        const canvasId = event.dataTransfer.getData("text/plain");
-        const folderId = canvasFolderIdByCanvasId.get(canvasId);
-        if (!canvasId || !folderId) return;
-        try {
-            const updated = await removeCanvasFromFolder(folderId, canvasId);
-            replaceFolder(updated);
-        } catch (error) {
-            console.error("Failed to remove canvas from folder:", error);
-            setLibraryError("캔버스를 폴더에서 빼는 중 오류가 발생했습니다.");
-        }
-    };
-
-    const beginEditFolder = (folder: CanvasFolder) => {
-        setEditingFolderId(folder.id);
-        setEditingFolderForm({ category: folder.category, name: folder.name });
-        setOpenFolderMenuId(null);
-    };
-
-    const beginEditCanvas = (document: CanvasDocumentSummary) => {
-        setEditingCanvasId(document.id);
-        setEditingCanvasTitle(document.title);
-        setOpenCanvasMenuId(null);
-    };
-
-    const toggleFolderCollapsed = (folderId: string) => {
-        setCollapsedFolderIds((current) => {
-            const next = new Set(current);
-            if (next.has(folderId)) next.delete(folderId);
-            else next.add(folderId);
-            return next;
-        });
     };
 
     const toggleCanvasLibraryVisible = () => setIsCanvasLibraryVisible((current) => !current);
@@ -683,126 +486,27 @@ const Canvas = () => {
         pencilOnlyMode && event.pointerType === "touch" && (tool === "pen" || tool === "eraser" || tool === "lasso")
     );
 
-    const moveLassoSelection = (dx: number, dy: number) => {
-        if (!lassoSelection) return;
-
-        setDrawnLines((prev) => prev.map((line) => (
-            lassoSelection.lineIds.has(line.id)
-                ? markModified({ ...line, points: line.points.map((point) => ({ x: point.x + dx, y: point.y + dy })) })
-                : line
-        )));
-        setImages((prev) => prev.map((image) => (
-            lassoSelection.imageIds.has(image.id)
-                ? markModified({ ...image, x: image.x + dx, y: image.y + dy })
-                : image
-        )));
-        setTextBoxes((prev) => prev.map((textBox) => (
-            lassoSelection.textBoxIds.has(textBox.id)
-                ? markModified({ ...textBox, x: textBox.x + dx, y: textBox.y + dy })
-                : textBox
-        )));
-    };
-
-    const handleScaleLassoSelection = (factor: number) => {
-        if (!lassoSelection || !lassoBounds) return;
-        recordHistory();
-
-        const center = {
-            x: (lassoBounds.minX + lassoBounds.maxX) / 2,
-            y: (lassoBounds.minY + lassoBounds.maxY) / 2,
-        };
-        const scalePoint = (point: Point): Point => ({
-            x: center.x + (point.x - center.x) * factor,
-            y: center.y + (point.y - center.y) * factor,
-        });
-
-        setDrawnLines((prev) => prev.map((line) => (
-            lassoSelection.lineIds.has(line.id)
-                ? markModified({ ...line, points: line.points.map(scalePoint) })
-                : line
-        )));
-        setImages((prev) => prev.map((image) => {
-            if (!lassoSelection.imageIds.has(image.id)) return image;
-            const topLeft = scalePoint({ x: image.x, y: image.y });
-            return markModified({ ...image, x: topLeft.x, y: topLeft.y, width: image.width * factor, height: image.height * factor });
-        }));
-        setTextBoxes((prev) => prev.map((textBox) => {
-            if (!lassoSelection.textBoxIds.has(textBox.id)) return textBox;
-            const topLeft = scalePoint({ x: textBox.x, y: textBox.y });
-            return markModified({ ...textBox, x: topLeft.x, y: topLeft.y, width: textBox.width * factor, height: textBox.height * factor });
-        }));
-    };
-
-    const handleCopyLassoSelection = () => {
-        if (!lassoSelection) return;
-
-        setLassoClipboard({
-            lines: drawnLines
-                .filter((line) => line.status !== "deleted" && lassoSelection.lineIds.has(line.id))
-                .map((line) => ({ ...line, points: line.points.map((point) => ({ ...point })) })),
-            images: images
-                .filter((image) => image.status !== "deleted" && lassoSelection.imageIds.has(image.id))
-                .map((image) => ({ ...image })),
-            textBoxes: textBoxes
-                .filter((textBox) => textBox.status !== "deleted" && lassoSelection.textBoxIds.has(textBox.id))
-                .map((textBox) => ({ ...textBox })),
-        });
-        lassoPasteCountRef.current = 0;
-    };
-
-    const handlePasteLassoSelection = () => {
-        if (!lassoClipboard) return;
-        recordHistory();
-
-        lassoPasteCountRef.current += 1;
-        const pasteOffset = LASSO_PASTE_OFFSET * lassoPasteCountRef.current;
-        const nextLineIds = new Set<string>();
-        const nextImageIds = new Set<string>();
-        const nextTextBoxIds = new Set<string>();
-
-        const pastedLines = lassoClipboard.lines.map((line) => {
-            const id = uuidv4();
-            nextLineIds.add(id);
-            return {
-                ...line,
-                id,
-                points: line.points.map((point) => ({ x: point.x + pasteOffset, y: point.y + pasteOffset })),
-                status: "new" as const,
-            };
-        });
-        const pastedImages = lassoClipboard.images.map((image) => {
-            const id = uuidv4();
-            nextImageIds.add(id);
-            return {
-                ...image,
-                id,
-                x: image.x + pasteOffset,
-                y: image.y + pasteOffset,
-                status: "new" as const,
-            };
-        });
-        const pastedTextBoxes = lassoClipboard.textBoxes.map((textBox) => {
-            const id = uuidv4();
-            nextTextBoxIds.add(id);
-            return {
-                ...textBox,
-                id,
-                x: textBox.x + pasteOffset,
-                y: textBox.y + pasteOffset,
-                status: "new" as const,
-            };
-        });
-
-        setDrawnLines((prev) => [...prev, ...pastedLines]);
-        setImages((prev) => [...prev, ...pastedImages]);
-        setTextBoxes((prev) => [...prev, ...pastedTextBoxes]);
-        setLassoSelection({
-            lineIds: nextLineIds,
-            imageIds: nextImageIds,
-            textBoxIds: nextTextBoxIds,
-        });
-        setTool("lasso");
-    };
+    const {
+        lassoClipboard,
+        moveLassoSelection,
+        handleScaleLassoSelection,
+        handleCopyLassoSelection,
+        handlePasteLassoSelection,
+        handleChangeLassoSelectionColor,
+        handleDeleteLassoSelection,
+    } = useLassoActions({
+        lassoSelection,
+        setLassoSelection,
+        lassoBounds,
+        drawnLines,
+        images,
+        textBoxes,
+        setDrawnLines,
+        setImages,
+        setTextBoxes,
+        setTool,
+        recordHistory,
+    });
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -852,35 +556,6 @@ const Canvas = () => {
         window.addEventListener("paste", handlePaste);
         return () => window.removeEventListener("paste", handlePaste);
     }, [addImageFile, handlePasteLassoSelection, lassoClipboard, recordHistory]);
-
-    const handleChangeLassoSelectionColor = (color: string) => {
-        if (!lassoSelection) return;
-        recordHistory();
-        setDrawnLines((prev) => prev.map((line) => (
-            lassoSelection.lineIds.has(line.id)
-                ? markModified({ ...line, color })
-                : line
-        )));
-        setTextBoxes((prev) => prev.map((textBox) => (
-            lassoSelection.textBoxIds.has(textBox.id)
-                ? markModified({ ...textBox, color })
-                : textBox
-        )));
-        setImages((prev) => prev.map((image) => (
-            lassoSelection.imageIds.has(image.id)
-                ? markModified({ ...image, tintColor: color })
-                : image
-        )));
-    };
-
-    const handleDeleteLassoSelection = () => {
-        if (!lassoSelection) return;
-        recordHistory();
-        setDrawnLines((prev) => prev.map((line) => (lassoSelection.lineIds.has(line.id) ? markModified({ ...line, status: "deleted" }) : line)));
-        setImages((prev) => prev.map((image) => (lassoSelection.imageIds.has(image.id) ? markModified({ ...image, status: "deleted" }) : image)));
-        setTextBoxes((prev) => prev.map((textBox) => (lassoSelection.textBoxIds.has(textBox.id) ? markModified({ ...textBox, status: "deleted" }) : textBox)));
-        setLassoSelection(null);
-    };
 
     const resetActiveCanvasAction = () => {
         currentLine.current = [];
@@ -1155,73 +830,26 @@ const Canvas = () => {
     const handleWheel = (event: React.WheelEvent<HTMLCanvasElement>) => {
         event.preventDefault();
         const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
-        const nextScale = Math.min(5, Math.max(0.2, scaleRef.current * factor));
+        const previousScale = scaleRef.current;
+        const nextScale = Math.min(5, Math.max(0.2, previousScale * factor));
+        const zoomRatio = nextScale / previousScale;
+        if (zoomRatio === 1) return; // 스케일 한계 도달 시 위치 이동 없이 종료
+
+        // 0,0 이 아니라 마우스 포인터 좌표를 기준으로 확대/축소 (캔버스 픽셀 공간, 터치 핀치줌과 동일 공식)
+        const focus = getCanvasViewportPoint(event.currentTarget, event.nativeEvent);
+        const previousOffset = offsetRef.current;
+        const nextOffset = {
+            x: focus.x - (focus.x - previousOffset.x) * zoomRatio,
+            y: focus.y - (focus.y - previousOffset.y) * zoomRatio,
+        };
+
         scaleRef.current = nextScale;
+        offsetRef.current = nextOffset;
         setScale(nextScale);
+        setOffset(nextOffset);
     };
 
     const handleContextMenu = (event: React.MouseEvent) => event.preventDefault();
-    const canvasCard = (document: CanvasDocumentSummary) => (
-        <div
-            key={document.id}
-            draggable
-            onDragStart={(event) => event.dataTransfer.setData("text/plain", document.id)}
-            className={`mb-2 rounded-md border bg-white text-stone-900 shadow-sm transition ${
-                selectedCanvasId === document.id ? "border-amber-500 ring-2 ring-amber-200" : "border-stone-200 hover:border-stone-300"
-            }`}
-        >
-            <div className="flex items-start gap-2 p-2">
-                {editingCanvasId === document.id ? (
-                    <input
-                        className="min-w-0 flex-1 rounded-md border border-stone-300 px-2 py-1 text-xs"
-                        value={editingCanvasTitle}
-                        onChange={(event) => setEditingCanvasTitle(event.target.value)}
-                        onKeyDown={(event) => {
-                            if (event.key === "Enter") void handleUpdateCanvasTitle(document.id);
-                            if (event.key === "Escape") setEditingCanvasId(null);
-                        }}
-                        autoFocus
-                    />
-                ) : (
-                    <button
-                        type="button"
-                        className="min-w-0 flex-1 truncate text-left text-sm font-semibold"
-                        onClick={() => handleSelectCanvas(document.id)}
-                    >
-                        {document.title}
-                    </button>
-                )}
-                {editingCanvasId === document.id ? (
-                    <div className="flex shrink-0 gap-1">
-                        <button type="button" className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => void handleUpdateCanvasTitle(document.id)}>
-                            <Check size={14} />
-                        </button>
-                        <button type="button" className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => setEditingCanvasId(null)}>
-                            <X size={14} />
-                        </button>
-                    </div>
-                ) : (
-                    <div className="relative shrink-0">
-                        <button type="button" className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => setOpenCanvasMenuId((current) => (current === document.id ? null : document.id))}>
-                            <MoreVertical size={14} />
-                        </button>
-                        {openCanvasMenuId === document.id && (
-                            <div className="absolute right-0 z-30 mt-1 w-28 overflow-hidden rounded-md border border-stone-200 bg-white text-xs shadow-lg">
-                                <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-stone-100" onClick={() => beginEditCanvas(document)}>
-                                    <Pencil size={13} />
-                                    수정
-                                </button>
-                                <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-red-600 hover:bg-red-50" onClick={() => void handleDeleteCanvas(document.id)}>
-                                    <Trash2 size={13} />
-                                    삭제
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
 
     return (
         <div
@@ -1314,137 +942,20 @@ const Canvas = () => {
                         </div>
                     </div>
                 )}
-                {!isCanvasLibraryVisible && (
-                    <button
-                        type="button"
-                        data-canvas-touch-allow="true"
-                        className="absolute left-0 top-4 z-40 inline-flex h-11 items-center gap-2 rounded-r-md border border-l-0 border-stone-300 bg-white px-3 text-sm font-bold text-stone-800 shadow-lg hover:bg-stone-900 hover:text-amber-50"
-                        onClick={toggleCanvasLibraryVisible}
-                        title="캔버스 폴더 펼치기"
-                        aria-label="캔버스 폴더 펼치기"
-                    >
-                        <PanelLeftOpen size={18} />
-                        <span className="hidden sm:inline">폴더</span>
-                    </button>
-                )}
-                {isCanvasLibraryVisible && (
-                    <aside
-                        data-canvas-touch-allow="true"
-                        className="absolute left-4 top-4 z-40 max-h-[calc(100%-2rem)] w-72 overflow-y-auto rounded-lg border border-stone-300 bg-stone-50 p-3 text-stone-900 shadow-xl"
-                        onDragStart={(event) => event.stopPropagation()}
-                    >
-                    <div className="mb-3 flex items-center justify-between">
-                        <div>
-                            <p className="text-[11px] font-bold uppercase text-amber-700">Canvas Library</p>
-                            <h2 className="text-base font-black">캔버스 폴더</h2>
-                        </div>
-                        <div className="flex shrink-0 gap-1">
-                            <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-stone-200 bg-white text-stone-800 hover:bg-stone-100" onClick={toggleCanvasLibraryVisible} title="캔버스 폴더 숨기기" aria-label="캔버스 폴더 숨기기">
-                                <PanelLeftClose size={16} />
-                            </button>
-                            <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-stone-900 text-white" onClick={() => void handleCreateCanvas()} title="캔버스 추가">
-                                <Plus size={16} />
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="mb-3 grid gap-2">
-                        <input className="rounded-md border border-stone-300 px-2 py-2 text-xs text-stone-900" value={folderForm.category} onChange={(event) => setFolderForm((prev) => ({ ...prev, category: event.target.value }))} placeholder="카테고리" />
-                        <div className="flex gap-2">
-                            <input className="min-w-0 flex-1 rounded-md border border-stone-300 px-2 py-2 text-xs text-stone-900" value={folderForm.name} onChange={(event) => setFolderForm((prev) => ({ ...prev, name: event.target.value }))} placeholder="폴더 이름" />
-                            <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-stone-900 text-white disabled:bg-stone-300" onClick={() => void handleCreateFolder()} disabled={!folderForm.name.trim()} title="폴더 추가">
-                                <Plus size={16} />
-                            </button>
-                        </div>
-                    </div>
-
-                    {libraryError && <p className="mb-3 rounded-md bg-red-50 p-2 text-xs text-red-700">{libraryError}</p>}
-
-                    <div className="space-y-3">
-                        {Object.entries(canvasFoldersByCategory).map(([category, folders]) => (
-                            <section key={category}>
-                                <h3 className="mb-2 border-b border-stone-200 pb-1 text-[11px] font-bold uppercase text-stone-500">{category}</h3>
-                                <div className="space-y-2">
-                                    {folders.map((folder) => {
-                                        const folderCanvasIds = new Set(folder.canvasIds);
-                                        const folderCanvases = canvasDocuments.filter((document) => folderCanvasIds.has(document.id));
-                                        const isEditing = editingFolderId === folder.id;
-                                        const isCollapsed = collapsedFolderIds.has(folder.id);
-
-                                        return (
-                                            <div key={folder.id} className="rounded-lg border border-stone-200 bg-white p-2" onDragOver={(event) => event.preventDefault()} onDrop={(event) => void handleDropOnFolder(event, folder.id)}>
-                                                <div className="mb-2 flex items-start justify-between gap-2">
-                                                    {isEditing ? (
-                                                        <div className="grid min-w-0 flex-1 gap-1">
-                                                            <input className="rounded-md border border-stone-300 px-2 py-1 text-xs" value={editingFolderForm.category} onChange={(event) => setEditingFolderForm((prev) => ({ ...prev, category: event.target.value }))} placeholder="카테고리" />
-                                                            <input className="rounded-md border border-stone-300 px-2 py-1 text-xs" value={editingFolderForm.name} onChange={(event) => setEditingFolderForm((prev) => ({ ...prev, name: event.target.value }))} placeholder="폴더 이름" />
-                                                        </div>
-                                                    ) : (
-                                                        <button type="button" className="flex min-w-0 items-center gap-2 text-left" onClick={() => toggleFolderCollapsed(folder.id)} title={isCollapsed ? "폴더 열기" : "폴더 접기"}>
-                                                            {isCollapsed ? <ChevronRight size={15} className="shrink-0 text-stone-500" /> : <ChevronDown size={15} className="shrink-0 text-stone-500" />}
-                                                            <Folder size={16} className="shrink-0 text-amber-600" />
-                                                            <span className="truncate text-sm font-bold">{folder.name}</span>
-                                                            <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-bold text-stone-500">{folderCanvases.length}</span>
-                                                        </button>
-                                                    )}
-
-                                                    {isEditing ? (
-                                                        <div className="flex shrink-0 gap-1">
-                                                            <button type="button" className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => void handleUpdateFolder(folder.id)}>
-                                                                <Check size={14} />
-                                                            </button>
-                                                            <button type="button" className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => setEditingFolderId(null)}>
-                                                                <X size={14} />
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="relative shrink-0">
-                                                            <button type="button" className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => setOpenFolderMenuId((current) => (current === folder.id ? null : folder.id))}>
-                                                                <MoreVertical size={14} />
-                                                            </button>
-                                                            {openFolderMenuId === folder.id && (
-                                                                <div className="absolute right-0 z-30 mt-1 w-32 overflow-hidden rounded-md border border-stone-200 bg-white text-xs shadow-lg">
-                                                                    <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-stone-100" onClick={() => beginEditFolder(folder)}>
-                                                                        <Pencil size={13} />
-                                                                        수정
-                                                                    </button>
-                                                                    <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-stone-100" onClick={() => void handleCreateCanvas(folder.id)}>
-                                                                        <Plus size={13} />
-                                                                        캔버스 추가
-                                                                    </button>
-                                                                    <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-red-600 hover:bg-red-50" onClick={() => void handleDeleteFolder(folder.id)}>
-                                                                        <Trash2 size={13} />
-                                                                        삭제
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                {!isCollapsed && (
-                                                    <div className="min-h-14 rounded-md border border-dashed border-stone-200 bg-stone-50 p-2">
-                                                        {folderCanvases.length > 0 ? folderCanvases.map(canvasCard) : <p className="py-3 text-center text-xs text-stone-500">캔버스를 드래그해서 넣으세요</p>}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </section>
-                        ))}
-
-                        <section className="rounded-lg border border-dashed border-stone-300 bg-white p-2" onDragOver={(event) => event.preventDefault()} onDrop={handleDropOnUnfiled}>
-                            <div className="mb-2 flex items-center justify-between">
-                                <h3 className="text-xs font-bold text-stone-700">최근 캔버스</h3>
-                                <button type="button" className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-stone-200 hover:bg-stone-100" onClick={() => void handleCreateCanvas()} title="캔버스 추가">
-                                    <Plus size={14} />
-                                </button>
-                            </div>
-                            {unfiledCanvases.length > 0 ? unfiledCanvases.map(canvasCard) : <p className="py-4 text-center text-xs text-stone-500">폴더 밖 캔버스가 없습니다</p>}
-                        </section>
-                    </div>
-                    </aside>
-                )}
+                <CanvasLibraryPanel
+                    documents={canvasDocuments}
+                    folders={canvasFolders}
+                    selectedCanvasId={selectedCanvasId}
+                    libraryError={libraryError}
+                    isVisible={isCanvasLibraryVisible}
+                    onToggleVisible={toggleCanvasLibraryVisible}
+                    onSelectCanvas={handleSelectCanvas}
+                    onFlushCurrentCanvasSave={flushCurrentCanvasSave}
+                    setCanvasDocuments={setCanvasDocuments}
+                    setCanvasFolders={setCanvasFolders}
+                    setSelectedCanvasId={setSelectedCanvasId}
+                    setLibraryError={setLibraryError}
+                />
 
                 <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full" width={viewport.width} height={viewport.height} viewBox={`0 0 ${viewport.width} ${viewport.height}`} aria-hidden="true">
                 <rect width="100%" height="100%" fill="#fafaf9" />

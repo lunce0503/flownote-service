@@ -1,4 +1,4 @@
-import { TaskWidget } from "../../widgets";
+import { TaskWidget } from "@/widgets";
 import {
     BookOpen,
     Bot,

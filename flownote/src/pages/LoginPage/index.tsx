@@ -7,8 +7,8 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
-import loginUserData from "../../entities/users/api/loginUserData";
-import { useAuth } from "../../shared/auth/AuthContext";
+import { loginUserData } from "@/entities/users";
+import { useAuth } from "@/features/auth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState<string>("");

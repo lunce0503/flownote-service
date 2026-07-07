@@ -1,6 +1,6 @@
 import React from 'react';
-import type { ToolType } from '../../../../entities/canvas/model/types';
-import type { CanvasLoadTrigger, CanvasSaveState, CanvasSaveStatus } from '../../../../features/canvas/model/usePersistence';
+import type { ToolType } from '@/entities/canvas';
+import type { CanvasLoadTrigger, CanvasSaveState, CanvasSaveStatus } from '@/features/canvas';
 import { CheckCircle2, ClipboardPaste, Copy, Download, Eraser, Hand, ImagePlus, Lasso, Loader2, Palette, PenLine, RefreshCw, RotateCcw, Settings, Trash2, TriangleAlert, Type, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
 
 interface ToolbarProps {

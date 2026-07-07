@@ -1,4 +1,4 @@
-import { SocialPage } from "../../../pages";
+import { SocialPage } from "@/pages";
 
 const Social = () => {
     return(

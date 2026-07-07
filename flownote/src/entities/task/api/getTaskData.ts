@@ -1,5 +1,5 @@
 import axios from "axios";
-import { API_CORE_BASE_URL, authHeaders } from "../../../shared/api";
+import { API_CORE_BASE_URL, authHeaders } from "@/shared/api";
 import type { TaskProps } from "../model/types";
 
 const normalizeTasksResponse = (data: unknown): TaskProps[] => {

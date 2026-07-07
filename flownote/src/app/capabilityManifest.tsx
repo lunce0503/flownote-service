@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 
-import Home from './routers/Home';
+import Home from './routers/Home/route.tsx';
 import Blog from './routers/Blog/index.tsx';
 import BlogDetail from './routers/BlogDetail/index.tsx';
 import Social from './routers/Social/index.tsx';
@@ -8,13 +8,13 @@ import Agent from './routers/Agent/index.tsx';
 import TaskRoute from './routers/Task/route.tsx';
 import LoginRoute from './routers/Login/route.tsx';
 import SignUpRoute from './routers/SignUp/routes.tsx';
-import LolBanPickRoute from './routers/LolBanPick/route.tsx';
+import LolBanPickRoute from './routers/LolBanpick/route.tsx';
 import CanvasRoute from './routers/Canvas/route.tsx';
 import StockRoute from './routers/Stock/route.tsx';
 import StockChartRoute from './routers/Stock/chart.tsx';
 import SettingsRoute from './routers/Settings/route.tsx';
 import AdminCanvasRoute from './routers/AdminCanvas/route.tsx';
-import Magic from './routers/magic/magic.tsx';
+import Magic from './routers/Magic/magic.tsx';
 
 // 하나의 라우트 노드. index 라우트, 또는 children을 가진 부모 라우트를 표현한다.
 export type CapabilityRoute = {

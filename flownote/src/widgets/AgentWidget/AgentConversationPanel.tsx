@@ -1,5 +1,5 @@
 import { BrainCircuit, EyeOff, MessageSquareText, Plus, Sparkles, Trash2 } from "lucide-react";
-import { ChatBlock, ChatSendBlock, type ChatMessage } from "../../shared/ui/ChatBlock";
+import { ChatBlock, ChatSendBlock, type ChatMessage } from "@/shared/ui/ChatBlock";
 import { useState, type RefObject } from "react";
 import type { AgentProfile } from "./model";
 

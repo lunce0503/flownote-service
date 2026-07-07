@@ -9,8 +9,8 @@ import {
   getAuthUser,
   setAuthToken,
   setAuthUser,
-} from "../api";
-import type { AuthUser } from "../api";
+} from "@/shared/api";
+import type { AuthUser } from "@/shared/api";
 
 type AuthContextValue = {
   token: string | null;

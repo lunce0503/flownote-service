@@ -1,4 +1,4 @@
-import type { DayOfWeek, ScheduleItem, ScheduleItemInput } from "../../../entities/schedule";
+import type { DayOfWeek, ScheduleItem, ScheduleItemInput } from "@/entities/schedule";
 
 export const DAY_OPTIONS: Array<{ value: DayOfWeek; label: string }> = [
     { value: "MON", label: "월" },

@@ -1,4 +1,4 @@
-import { API_CORE_BASE_URL, authHeaders, getAuthToken } from "../../shared/api";
+import { API_CORE_BASE_URL, authHeaders, getAuthToken } from "@/shared/api";
 
 export type StockHolding = {
   id: string;

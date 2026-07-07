@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { ChatMessage } from "../../shared/ui/ChatBlock";
-import { API_AI_BASE_URL, authHeaders } from "../../shared/api";
-import getNoteData from "../../entities/blog/getNoteData";
-import getTasksData from "../../entities/task/api/getTaskData";
-import getChatData from "../../entities/chat/api/getChatData";
-import postChatData from "../../entities/chat/api/postChatData";
-import deleteChatMessage, { deleteAllChatMessages } from "../../entities/chat/api/deleteChatData";
+import type { ChatMessage } from "@/shared/ui/ChatBlock";
+import { API_AI_BASE_URL, authHeaders } from "@/shared/api";
+import { getNoteData } from "@/entities/blog";
+import { getTasksData } from "@/features/task";
+import { getChatData, postChatData, deleteChatMessage, deleteAllChatMessages } from "@/features/chat";
 import AgentConversationPanel from "./AgentConversationPanel";
 import AgentFocusQueue from "./AgentFocusQueue";
 import AgentInsightsPanel from "./AgentInsightsPanel";

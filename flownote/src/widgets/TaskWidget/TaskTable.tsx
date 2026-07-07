@@ -1,11 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
 
-import getTaskData from "../../entities/task/api/getTaskData";
-import postTaskData from "../../entities/task/api/postTaskData";
-import deleteTasksData from "../../entities/task/api/deleteTaskData";
-import updateTasksData from "../../entities/task/api/updateTaskData";
-import type { TaskProps } from "../../entities/task";
+import { getTasksData as getTaskData, postTaskData, deleteTasksData, updateTaskData as updateTasksData } from "@/features/task";
+import type { TaskProps } from "@/entities/task";
 
 import { TaskHeader, TaskItem } from "./TaskEliment";
 import DailySchedulePanel from "./DailySchedulePanel";

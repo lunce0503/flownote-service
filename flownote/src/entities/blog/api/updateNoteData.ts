@@ -1,6 +1,6 @@
 import axios from "axios";
-import { API_CORE_BASE_URL, authHeaders } from "../../shared/api";
-import type { BlockDataProps } from "./model/types";
+import { API_CORE_BASE_URL, authHeaders } from "@/shared/api";
+import type { BlockDataProps } from "../model/types";
 
 const updateNoteData = async (title: string, updatenoteData: BlockDataProps) => {
     if (!API_CORE_BASE_URL) {

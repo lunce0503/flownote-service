@@ -1,5 +1,5 @@
 import { Clock3, FolderKanban, RefreshCw } from "lucide-react";
-import type { TaskProps } from "../../entities/task";
+import type { TaskProps } from "@/entities/task";
 import { formatDueDate, statusLabel } from "./model";
 
 type AgentFocusQueueProps = {

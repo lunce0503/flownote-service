@@ -1,4 +1,4 @@
-import { CanvasWidget } from "../../../widgets";
+import { CanvasWidget } from "@/widgets";
 
 export default function CanvasRoute() {
     return <CanvasWidget />

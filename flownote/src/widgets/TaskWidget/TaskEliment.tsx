@@ -16,7 +16,7 @@ import {
     TimerReset,
     X,
 } from "lucide-react";
-import type { TaskProps } from "../../entities/task";
+import type { TaskProps } from "@/entities/task";
 
 // --- Constants & Styles ---
 const STATUS_CONFIG = {

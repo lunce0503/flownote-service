@@ -1,7 +1,7 @@
 import axios from "axios";
-import { API_CORE_BASE_URL, authHeaders } from "../../../shared/api";
+import { API_CORE_BASE_URL, authHeaders } from "@/shared/api";
 
-const updateTasksData = async (id : string) => {
+const deleteTasksData = async (id : string) => {
     try {
             const response = await axios.delete(`${API_CORE_BASE_URL}/api/tasks/${id}`, {
                 headers: authHeaders(),
@@ -12,4 +12,4 @@ const updateTasksData = async (id : string) => {
         }
 };
 
-export default updateTasksData;
+export default deleteTasksData;

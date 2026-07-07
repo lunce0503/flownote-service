@@ -29,7 +29,7 @@ import {
   type StockHoldingInput,
   type StockQuote,
   type StockSearchResult,
-} from "../../entities/stocks/api";
+} from "@/entities/stocks";
 import { formatMoney, formatNumber, normalizeCurrencyCode } from "./format";
 
 const EMPTY_FORM: StockHoldingInput = {

@@ -6,3 +6,4 @@ export { default as Header } from "./Header";
 export { default as SignUpWidget } from "./SignUpWidget";
 export { default as SocialWidget } from "./SocialWidget";
 export { default as TaskWidget } from "./TaskWidget";
+export { StockDashboard, StockChart } from "./StockWidget";

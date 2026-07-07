@@ -1,4 +1,4 @@
-import { StockDashboard } from "../../widgets/StockWidget";
+import { StockDashboard } from "@/widgets/StockWidget";
 
 const StockPage = () => {
   return <StockDashboard />;

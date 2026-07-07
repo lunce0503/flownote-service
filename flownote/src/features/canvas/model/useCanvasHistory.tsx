@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import type { ImageElement, LineElement, TextBoxElement } from "../../../entities/canvas/model/types";
+import type { ImageElement, LineElement, TextBoxElement } from "@/entities/canvas";
 import { markModified } from "./canvasGeometry";
 
 type CanvasSnapshot = {

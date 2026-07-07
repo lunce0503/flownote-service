@@ -16,8 +16,8 @@ import {
   Activity,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../shared/auth/AuthContext";
-import { ThemeModeControl } from "../features/theme";
+import { useAuth } from "@/features/auth";
+import { ThemeModeControl } from "@/features/theme";
 
 export default function Header() {
   // 사이드바 상태 관리

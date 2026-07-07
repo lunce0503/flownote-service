@@ -1,5 +1,5 @@
 import RBush from "rbush";
-import type { ImageElement, LineElement, Point, TextBoxElement } from "../../../entities/canvas/model/types";
+import type { ImageElement, LineElement, Point, TextBoxElement } from "@/entities/canvas";
 import type { Bounds } from "./canvasGeometry";
 
 type ElementKind = "line" | "image" | "text";

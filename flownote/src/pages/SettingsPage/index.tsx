@@ -14,8 +14,8 @@ import {
   Sun,
   Type,
 } from "lucide-react";
-import { useTheme, type ThemeMode } from "../../features/theme";
-import { useAuth } from "../../shared/auth/AuthContext";
+import { useTheme, type ThemeMode } from "@/features/theme";
+import { useAuth } from "@/features/auth";
 
 type FontScale = "normal" | "large";
 type Density = "comfortable" | "compact";

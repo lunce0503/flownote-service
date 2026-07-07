@@ -5,8 +5,8 @@ import {
   deleteScheduleItem,
   listScheduleItems,
   updateScheduleItem,
-} from "../../entities/schedule/api";
-import type { DayOfWeek, ScheduleItem, ScheduleItemInput } from "../../entities/schedule";
+} from "@/entities/schedule";
+import type { DayOfWeek, ScheduleItem, ScheduleItemInput } from "@/entities/schedule";
 import {
   DAY_OPTIONS,
   EMPTY_SCHEDULE_FORM,
@@ -24,7 +24,7 @@ import {
   toScheduleInput,
   toScheduleItem,
   validateScheduleInput,
-} from "../../features/schedule/model/scheduleModel";
+} from "@/features/schedule";
 
 const DailySchedulePanel = () => {
   const [items, setItems] = useState<ScheduleItem[]>([]);

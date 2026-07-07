@@ -1,4 +1,4 @@
-import { LolBanpickPage } from "../../../pages";
+import { LolBanpickPage } from "@/pages";
 
 export default function LolBanPickRoute() {
     return (

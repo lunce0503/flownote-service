@@ -1,4 +1,4 @@
-import type { Point } from "../../../entities/canvas/model/types";
+import type { Point } from "@/entities/canvas";
 
 export const CANVAS_AUTOSAVE_DELAY_MS = 5000;
 export const CANVAS_VIEWPORT_STORAGE_KEY = "flownote.canvas.viewport";

@@ -1,4 +1,4 @@
-import { API_SYNC_BASE_URL, getAuthToken } from "./api";
+import { API_SYNC_BASE_URL, getAuthToken } from "../api";
 
 export type SyncResource = "notes" | "canvas" | "tasks" | "schedule" | "all";
 

@@ -1,6 +1,6 @@
 import axios from "axios";
-import { API_CORE_BASE_URL, authHeaders } from "../../shared/api";
-import { publishSyncEvent } from "../../shared/sync";
+import { API_CORE_BASE_URL, authHeaders } from "@/shared/api";
+import { publishSyncEvent } from "@/shared/lib/sync";
 
 type NoteFolder = {
   id: string;

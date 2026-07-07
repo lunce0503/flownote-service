@@ -1,5 +1,5 @@
 import axios from "axios";
-import { API_CORE_BASE_URL } from "../../../shared/api";
+import { API_CORE_BASE_URL } from "@/shared/api";
 
 const getUserData = async () => {
     try {

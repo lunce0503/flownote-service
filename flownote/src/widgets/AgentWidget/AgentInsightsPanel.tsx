@@ -2,7 +2,7 @@ import { FileText, Lightbulb, Link2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { KnowledgeNote } from "./model";
 import { getNotePreview } from "./model";
-import type { TaskProps } from "../../entities/task";
+import type { TaskProps } from "@/entities/task";
 
 type AgentInsightsPanelProps = {
     activeTasks: TaskProps[];
