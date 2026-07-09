@@ -86,7 +86,7 @@ public class ScheduleService {
                 UPDATE daily_schedule_items
                 SET %s, updated_at = NOW()
                 WHERE id = ? AND user_id = ?
-                  AND start_time < end_time
+                  AND start_time <> end_time
                   AND cardinality(days_of_week) > 0
                 RETURNING id, title, days_of_week, start_time, end_time, category,
                           color, memo, memo_object_key, is_active, created_at, updated_at
@@ -123,8 +123,9 @@ public class ScheduleService {
         if (request.daysOfWeek().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "반복 요일을 하나 이상 선택해야 합니다.");
         }
-        if (request.startTime() == null || request.endTime() == null || !request.startTime().isBefore(request.endTime())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "시작 시간은 종료 시간보다 빨라야 합니다.");
+        if (request.startTime() == null || request.endTime() == null || request.startTime().equals(request.endTime())) {
+            // 종료 < 시작은 자정을 넘겨 다음 날로 이어지는 일정으로 허용한다.
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "시작 시간과 종료 시간은 같을 수 없습니다.");
         }
     }
 

@@ -41,6 +41,9 @@ const PEN_COLORS = [
   { label: '보라', value: '#7C3AED' },
 ];
 
+// 원형 아이콘 버튼 공통 크기. 예외: 저장 상태 필 아이콘(14)은 text-xs 라벨과, 장식용 Palette(16)는 스와치와 정렬을 맞추기 위해 작게 유지한다.
+const TOOLBAR_ICON_SIZE = 18;
+
 const floatingPillClass = 'pointer-events-auto flex min-h-12 shrink-0 items-center gap-1 rounded-full bg-white/95 px-2 shadow-lg ring-1 ring-stone-200/80 backdrop-blur';
 const iconButtonClass = 'inline-flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full p-3 text-stone-950 transition hover:bg-stone-100 active:scale-95';
 const selectedIconButtonClass = 'bg-stone-950 text-white hover:bg-stone-800';
@@ -57,6 +60,67 @@ const saveStatusClassByStatus: Record<CanvasSaveStatus, string> = {
 
 const TOUCH_TAP_MAX_MOVEMENT = 10;
 const TOUCH_CLICK_SUPPRESSION_MS = 700;
+
+type TouchActivation = (action: () => void) => {
+  onPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
+  onPointerUp: (event: React.PointerEvent<HTMLElement>) => void;
+  onPointerCancel: (event: React.PointerEvent<HTMLElement>) => void;
+  onClick: (event: React.MouseEvent<HTMLElement>) => void;
+};
+
+interface ColorSwatchButtonProps {
+  color: { label: string; value: string };
+  selected?: boolean;
+  onSelect: () => void;
+  touchActivation: TouchActivation;
+  titlePrefix: string;
+}
+
+const ColorSwatchButton: React.FC<ColorSwatchButtonProps> = ({ color, selected, onSelect, touchActivation, titlePrefix }) => (
+  <button
+    type="button"
+    {...touchActivation(onSelect)}
+    className="group inline-flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full transition active:scale-95"
+    title={`${titlePrefix}: ${color.label}`}
+    aria-label={`${titlePrefix} ${color.label}`}
+    aria-pressed={selected}
+  >
+    <span
+      className={`rounded-full shadow-sm ring-offset-2 transition-all ${selected ? 'h-8 w-8 ring-2 ring-stone-950' : 'h-6 w-6 ring-1 ring-black/10 group-hover:h-7 group-hover:w-7'}`}
+      style={{ backgroundColor: color.value }}
+    />
+  </button>
+);
+
+interface PenColorPillProps {
+  penColor: string;
+  onPenColorChange: (color: string) => void;
+  touchActivation: TouchActivation;
+}
+
+const PenColorPill: React.FC<PenColorPillProps> = ({ penColor, onPenColorChange, touchActivation }) => {
+  const isPenColorInPalette = PEN_COLORS.some((color) => color.value.toLowerCase() === penColor.toLowerCase());
+  return (
+    <div className={floatingPillClass} role="group" aria-label="펜 색상" title="펜 색상">
+      <Palette size={16} className="ml-2 mr-1 shrink-0 text-stone-500" aria-hidden="true" />
+      {!isPenColorInPalette && (
+        <span className="inline-flex min-h-12 min-w-12 shrink-0 items-center justify-center" title="현재 펜 색상">
+          <span className="h-8 w-8 rounded-full shadow-sm ring-2 ring-stone-950 ring-offset-2" style={{ backgroundColor: penColor }} />
+        </span>
+      )}
+      {PEN_COLORS.map((color) => (
+        <ColorSwatchButton
+          key={color.value}
+          color={color}
+          selected={penColor.toLowerCase() === color.value.toLowerCase()}
+          onSelect={() => onPenColorChange(color.value)}
+          touchActivation={touchActivation}
+          titlePrefix="펜 색상"
+        />
+      ))}
+    </div>
+  );
+};
 
 export const Toolbar: React.FC<ToolbarProps> = ({
   canvasTitle,
@@ -89,13 +153,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const touchStarts = React.useRef(new Map<number, { x: number; y: number }>());
   const lastTouchActivationAt = React.useRef(0);
   const toolButtons: Array<{ tool: ToolType; label: string; icon: React.ReactNode }> = [
-    { tool: 'pen', label: '펜', icon: <PenLine size={18} /> },
-    { tool: 'eraser', label: '지우개', icon: <Eraser size={18} /> },
-    { tool: 'lasso', label: '올가미', icon: <Lasso size={18} /> },
-    { tool: 'handle', label: '이동', icon: <Hand size={18} /> },
-    { tool: 'text', label: '텍스트', icon: <Type size={18} /> },
+    { tool: 'pen', label: '펜', icon: <PenLine size={TOOLBAR_ICON_SIZE} /> },
+    { tool: 'eraser', label: '지우개', icon: <Eraser size={TOOLBAR_ICON_SIZE} /> },
+    { tool: 'lasso', label: '올가미', icon: <Lasso size={TOOLBAR_ICON_SIZE} /> },
+    { tool: 'handle', label: '이동', icon: <Hand size={TOOLBAR_ICON_SIZE} /> },
+    { tool: 'text', label: '텍스트', icon: <Type size={TOOLBAR_ICON_SIZE} /> },
   ];
-  const touchActivation = (action: () => void) => ({
+  const touchActivation: TouchActivation = (action: () => void) => ({
     onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
       if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
       event.stopPropagation();
@@ -148,7 +212,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     >
       <div className="canvas-toolbar-scroll pointer-events-auto flex min-w-0 items-start justify-between gap-2 overflow-x-auto pb-2">
         <div className="flex min-w-max items-start gap-2">
-          <div className="pointer-events-auto flex min-h-12 max-w-[220px] shrink-0 items-center rounded-full bg-white/95 px-4 text-sm font-black shadow-lg ring-1 ring-stone-200/80 backdrop-blur" title={canvasTitle}>
+          <div className="pointer-events-auto flex min-h-12 max-w-[128px] shrink-0 items-center rounded-full bg-white/95 px-4 text-sm font-black shadow-lg ring-1 ring-stone-200/80 backdrop-blur sm:max-w-[220px] xl:max-w-xs" title={canvasTitle}>
             <span className="truncate">{canvasTitle}</span>
           </div>
 
@@ -161,7 +225,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               title="되돌리기"
               aria-disabled={!canUndo}
             >
-              <RotateCcw size={18} />
+              <RotateCcw size={TOOLBAR_ICON_SIZE} />
             </button>
             {toolButtons.map((item) => {
               const selected = tool === item.tool;
@@ -179,14 +243,19 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               );
             })}
             <label className={`${iconButtonClass} cursor-pointer`} title="이미지 추가">
-              <ImagePlus size={19} />
+              <ImagePlus size={TOOLBAR_ICON_SIZE} />
               <input className="sr-only" type="file" accept="image/*" onChange={handleImageUpload} />
             </label>
           </div>
+
+          {/* lg 이상에서는 펜 색상이 첫 줄에 합류해 툴바가 한 줄이 된다. 그 미만에서는 아래 두 번째 줄로 표시. */}
+          <div className="hidden lg:flex">
+            <PenColorPill penColor={penColor} onPenColorChange={onPenColorChange} touchActivation={touchActivation} />
+          </div>
         </div>
 
-        <div className="flex shrink-0 justify-end gap-2">
-          <div className={floatingPillClass} title="현재 확대율과 화면 중앙 좌표">
+        <div className="sticky right-0 z-10 flex shrink-0 justify-end gap-2 bg-stone-50 pl-2">
+          <div className="pointer-events-auto hidden min-h-12 shrink-0 items-center gap-1 rounded-full bg-white/95 px-2 shadow-lg ring-1 ring-stone-200/80 backdrop-blur sm:flex" title="현재 확대율과 화면 중앙 좌표">
             <span className="px-3 text-sm font-black">{zoomPercent}%</span>
             <span className="rounded-full bg-stone-100 px-3 py-2 text-xs font-black">⌂ {Math.round(viewportCenter.x)}, {Math.round(viewportCenter.y)}</span>
           </div>
@@ -207,7 +276,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 className={iconButtonClass}
                 title="저장 재시도"
               >
-                <RefreshCw size={18} />
+                <RefreshCw size={TOOLBAR_ICON_SIZE} />
               </button>
             )}
             {canCancelRetry && (
@@ -218,7 +287,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 title="저장 재시도 취소"
                 aria-label="저장 재시도 취소"
               >
-                <X size={18} />
+                <X size={TOOLBAR_ICON_SIZE} />
               </button>
             )}
             <button
@@ -227,7 +296,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               className={iconButtonClass}
               title="캔버스 저장"
             >
-              <Download size={19} />
+              <Download size={TOOLBAR_ICON_SIZE} />
             </button>
             <button
               type="button"
@@ -237,7 +306,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               disabled={saveState.status === 'loading'}
               aria-disabled={saveState.status === 'loading'}
             >
-              <Upload size={19} />
+              <Upload size={TOOLBAR_ICON_SIZE} />
             </button>
             {saveState.status === 'loading' && (
               <button
@@ -247,7 +316,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 title="캔버스 불러오기 취소"
                 aria-label="캔버스 불러오기 취소"
               >
-                <X size={18} />
+                <X size={TOOLBAR_ICON_SIZE} />
               </button>
             )}
             <button
@@ -257,44 +326,23 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               title="그림판 설정"
               aria-pressed={isCanvasSettingsVisible}
             >
-              <Settings size={19} />
+              <Settings size={TOOLBAR_ICON_SIZE} />
             </button>
           </div>
         </div>
       </div>
 
-      <div className="canvas-toolbar-scroll pointer-events-auto mt-2 flex items-start gap-3 overflow-x-auto pb-2">
-        <div className="pointer-events-auto flex shrink-0 items-center gap-2 rounded-full bg-white/95 p-2 shadow-lg ring-1 ring-stone-200/80 backdrop-blur">
-          <div
-            className="min-h-12 min-w-12 rounded-full border-2 border-white shadow"
-            style={{ backgroundColor: penColor }}
-            title="현재 펜 색상"
-          />
-        </div>
-
-        <div className="pointer-events-auto flex min-h-12 shrink-0 overflow-hidden rounded-full bg-white shadow-lg ring-1 ring-stone-200/80" title="펜 색상">
-          {PEN_COLORS.map((color) => {
-            const selected = penColor.toLowerCase() === color.value.toLowerCase();
-            return (
-              <button
-                key={color.value}
-                type="button"
-                {...touchActivation(() => onPenColorChange(color.value))}
-                className="relative flex min-h-12 min-w-12 shrink-0 items-center justify-center transition hover:brightness-95 active:brightness-90"
-                style={{ backgroundColor: color.value }}
-                title={`펜 색상: ${color.label}`}
-                aria-label={`펜 색상 ${color.label}`}
-                aria-pressed={selected}
-              >
-                {selected && <span className="h-2.5 w-2.5 rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.25)]" />}
-              </button>
-            );
-          })}
-        </div>
+      <div className="canvas-toolbar-scroll pointer-events-auto mt-2 flex items-start gap-3 overflow-x-auto pb-2 lg:hidden">
+        <PenColorPill penColor={penColor} onPenColorChange={onPenColorChange} touchActivation={touchActivation} />
       </div>
 
+      {/* 라쏘 액션 바는 툴바 행을 추가하는 대신 캔버스 위에 떠 있는 오버레이로 표시한다(라이브러리·설정 패널과 같은 z-40 층). */}
       {shouldShowLassoActions && (
-        <div className="pointer-events-auto mt-3 flex w-fit items-center gap-1 rounded-full bg-white/95 px-2 py-1 shadow-lg ring-1 ring-stone-200/80 backdrop-blur" aria-label="선택 영역">
+        <div
+          data-canvas-touch-allow="true"
+          className="canvas-toolbar-scroll pointer-events-auto absolute left-1/2 top-full z-40 mt-2 flex w-max max-w-[calc(100vw-16px)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-full bg-white/95 px-2 py-1 shadow-lg ring-1 ring-stone-200/80 backdrop-blur"
+          aria-label="선택 영역"
+        >
           {lassoSelectionCount > 0 && <span className="px-2 text-xs font-black text-stone-700">선택 {lassoSelectionCount}</span>}
           {lassoSelectionCount > 0 && (
             <>
@@ -304,7 +352,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 className={iconButtonClass}
                 title="선택 영역 복사하기"
               >
-                <Copy size={18} />
+                <Copy size={TOOLBAR_ICON_SIZE} />
               </button>
               <button
                 type="button"
@@ -312,7 +360,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 className={iconButtonClass}
                 title="선택 영역 축소"
               >
-                <ZoomOut size={18} />
+                <ZoomOut size={TOOLBAR_ICON_SIZE} />
               </button>
               <button
                 type="button"
@@ -320,19 +368,17 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 className={iconButtonClass}
                 title="선택 영역 확대"
               >
-                <ZoomIn size={18} />
+                <ZoomIn size={TOOLBAR_ICON_SIZE} />
               </button>
               <div className="flex min-h-12 items-center gap-1 rounded-full bg-stone-100 px-2" title="선택한 선, 이미지, 텍스트 색상 변경">
                 <Palette size={16} className="text-stone-600" />
                 {PEN_COLORS.map((color) => (
-                  <button
+                  <ColorSwatchButton
                     key={`selection-${color.value}`}
-                    type="button"
-                    {...touchActivation(() => onChangeLassoSelectionColor(color.value))}
-                    className="min-h-9 min-w-9 rounded-full border-2 border-white shadow-sm transition hover:scale-105"
-                    style={{ backgroundColor: color.value }}
-                    title={`선택 색상: ${color.label}`}
-                    aria-label={`선택 색상 ${color.label}`}
+                    color={color}
+                    onSelect={() => onChangeLassoSelectionColor(color.value)}
+                    touchActivation={touchActivation}
+                    titlePrefix="선택 색상"
                   />
                 ))}
               </div>
@@ -342,7 +388,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 className={`${iconButtonClass} bg-red-600 text-white hover:bg-red-700`}
                 title="선택 영역 삭제"
               >
-                <Trash2 size={18} />
+                <Trash2 size={TOOLBAR_ICON_SIZE} />
               </button>
               <button
                 type="button"
@@ -350,7 +396,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 className={iconButtonClass}
                 title="선택 해제"
               >
-                <X size={18} />
+                <X size={TOOLBAR_ICON_SIZE} />
               </button>
             </>
           )}
@@ -361,7 +407,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               className={iconButtonClass}
               title="복사한 선택 영역 붙여넣기"
             >
-              <ClipboardPaste size={18} />
+              <ClipboardPaste size={TOOLBAR_ICON_SIZE} />
             </button>
           )}
         </div>

@@ -17,7 +17,6 @@ import {
     CANVAS_ERASER_LINES_STORAGE_KEY,
     CANVAS_ERASER_TEXT_BOXES_STORAGE_KEY,
     CANVAS_LIBRARY_VISIBLE_STORAGE_KEY,
-    CANVAS_MANAGEMENT_TOOLBAR_STORAGE_KEY,
     CANVAS_PEN_COLOR_STORAGE_KEY,
     CANVAS_PENCIL_ONLY_MODE_STORAGE_KEY,
     DEFAULT_PEN_COLOR,
@@ -214,7 +213,6 @@ const Canvas = () => {
     const [editingTextBoxId, setEditingTextBoxId] = useState<string | null>(null);
     const [editingTextValue, setEditingTextValue] = useState("");
     const [isCanvasSettingsVisible, setIsCanvasSettingsVisible] = useState(false);
-    const [isManagementToolbarVisible, setIsManagementToolbarVisible] = useLocalStorageBoolean(CANVAS_MANAGEMENT_TOOLBAR_STORAGE_KEY, true);
     const [canEraseLines, setCanEraseLines] = useLocalStorageBoolean(CANVAS_ERASER_LINES_STORAGE_KEY, true);
     const [canEraseImages, setCanEraseImages] = useLocalStorageBoolean(CANVAS_ERASER_IMAGES_STORAGE_KEY, true);
     const [canEraseTextBoxes, setCanEraseTextBoxes] = useLocalStorageBoolean(CANVAS_ERASER_TEXT_BOXES_STORAGE_KEY, true);
@@ -413,7 +411,6 @@ const Canvas = () => {
 
     const togglePencilOnlyMode = () => setPencilOnlyMode((current) => !current);
 
-    const toggleManagementToolbarVisible = () => setIsManagementToolbarVisible((current) => !current);
 
     const handlePenColorChange = (color: string) => {
         setPenColor(color);
@@ -906,10 +903,6 @@ const Canvas = () => {
                         </div>
 
                         <div className="grid gap-2 text-sm">
-                            <label className="flex items-center justify-between gap-3 rounded-md border border-stone-200 px-3 py-2">
-                                <span className="font-semibold">관리 툴바</span>
-                                <input type="checkbox" checked={isManagementToolbarVisible} onChange={toggleManagementToolbarVisible} />
-                            </label>
                             <label className="flex items-center justify-between gap-3 rounded-md border border-stone-200 px-3 py-2">
                                 <span className="font-semibold">캔버스 폴더</span>
                                 <input type="checkbox" checked={isCanvasLibraryVisible} onChange={toggleCanvasLibraryVisible} />

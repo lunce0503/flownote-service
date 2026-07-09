@@ -85,9 +85,18 @@ export const getDayLabel = (day: DayOfWeek) => (
     DAY_OPTIONS.find((option) => option.value === day)?.label ?? ""
 );
 
-export const getItemDuration = (item: Pick<ScheduleItem, "start_time" | "end_time">) => (
-    Math.max(0, timeToMinutes(item.end_time) - timeToMinutes(item.start_time))
+// 자정 넘김 의미론: 종료 < 시작이면 다음 날로 이어지는 일정이며, 시작한 요일에 전체 시간이 귀속된다.
+export const isOvernightItem = (item: Pick<ScheduleItem, "start_time" | "end_time">) => (
+    timeToMinutes(item.end_time) < timeToMinutes(item.start_time)
 );
+
+export const getItemDuration = (item: Pick<ScheduleItem, "start_time" | "end_time">) => {
+    const start = timeToMinutes(item.start_time);
+    const end = timeToMinutes(item.end_time);
+    if (end > start) return end - start;
+    if (end < start) return 1440 - start + end;
+    return 0;
+};
 
 export const sortScheduleItems = (items: ScheduleItem[]) => (
     [...items].sort((a, b) => a.start_time.localeCompare(b.start_time) || a.title.localeCompare(b.title))
@@ -112,47 +121,171 @@ export const getDayTotals = (items: ScheduleItem[]) => DAY_OPTIONS.map((day) => 
     return { ...day, minutes };
 });
 
+interface ScheduleSegmentBase {
+    key: string;
+    itemId: string;
+    title: string;
+    label: string;
+    color: string;
+    startMin: number;
+    endMin: number;
+    durationMinutes: number;
+    range: string;
+    isSpill: boolean;
+}
+
+export interface RoutineSegment extends ScheduleSegmentBase {
+    lane: number;
+    left: number;
+    width: number;
+    showLabel: boolean;
+}
+
+export interface WeeklySegment extends ScheduleSegmentBase {
+    lane: number;
+    top: number;
+    height: number;
+}
+
+// 시작순으로 정렬된 구간에 greedy first-fit으로 레인을 배정한다(겹치는 구간은 다른 레인).
+const assignLanes = (parts: Array<{ startMin: number; endMin: number }>) => {
+    const laneEnds: number[] = [];
+    return parts.map((part) => {
+        const lane = laneEnds.findIndex((end) => end <= part.startMin);
+        if (lane >= 0) {
+            laneEnds[lane] = part.endMin;
+            return lane;
+        }
+        laneEnds.push(part.endMin);
+        return laneEnds.length - 1;
+    });
+};
+
+// 아이템을 1~2개 구간으로 분할한다. 자정 넘김은 [start,1440] + 다음 날 [0,end] 두 조각이 된다.
+const splitItemParts = (item: ScheduleItem) => {
+    const start = timeToMinutes(item.start_time);
+    const end = timeToMinutes(item.end_time);
+    if (end > start) return [{ startMin: start, endMin: end, isSpill: false }];
+    if (end < start) {
+        return [
+            { startMin: start, endMin: 1440, isSpill: false },
+            { startMin: 0, endMin: end, isSpill: true },
+        ];
+    }
+    return [];
+};
+
+const toSegmentBase = (item: ScheduleItem) => ({
+    itemId: item.id,
+    title: item.title,
+    label: item.category?.trim() || item.title,
+    color: item.color || "#0f766e",
+    durationMinutes: getItemDuration(item),
+    range: `${item.start_time.slice(0, 5)} - ${item.end_time.slice(0, 5)}${isOvernightItem(item) ? " (다음 날)" : ""}`,
+});
+
+const buildTotals = (items: ScheduleItem[]) => {
+    const totals = new Map<string, { label: string; minutes: number; color: string }>();
+    items.forEach((item) => {
+        const label = item.category?.trim() || item.title;
+        const current = totals.get(label);
+        totals.set(label, {
+            label,
+            minutes: (current?.minutes ?? 0) + getItemDuration(item),
+            color: current?.color ?? (item.color || "#0f766e"),
+        });
+    });
+    return Array.from(totals.values()).sort((a, b) => b.minutes - a.minutes);
+};
+
 export const buildRoutineChart = (items: ScheduleItem[]) => {
-    const segments = items.map((item) => {
-        const start = timeToMinutes(item.start_time);
-        const end = timeToMinutes(item.end_time);
-        const duration = Math.max(0, end - start);
+    const parts = items
+        .flatMap((item) => {
+            const base = toSegmentBase(item);
+            return splitItemParts(item).map((part, index) => ({
+                ...base,
+                ...part,
+                key: index === 0 ? item.id : `${item.id}-b`,
+            }));
+        })
+        .sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+
+    const lanes = assignLanes(parts);
+    const segments: RoutineSegment[] = parts.map((part, index) => {
+        const width = Math.max(1.25, ((part.endMin - part.startMin) / 1440) * 100);
         return {
-            id: item.id,
-            title: item.title,
-            label: item.category?.trim() || item.title,
-            color: item.color || "#0f766e",
-            start,
-            end,
-            duration,
-            left: (start / 1440) * 100,
-            width: Math.max(0.5, (duration / 1440) * 100),
-            range: `${item.start_time.slice(0, 5)} - ${item.end_time.slice(0, 5)}`,
+            ...part,
+            lane: lanes[index],
+            left: (part.startMin / 1440) * 100,
+            width,
+            showLabel: width >= 3.5,
         };
     });
 
-    const totals = new Map<string, { label: string; minutes: number; color: string }>();
-    segments.forEach((segment) => {
-        const current = totals.get(segment.label);
-        totals.set(segment.label, {
-            label: segment.label,
-            minutes: (current?.minutes ?? 0) + segment.duration,
-            color: current?.color ?? segment.color,
+    // totals/totalMinutes는 구간이 아닌 아이템 기준으로 계산해 자정 넘김 분할의 이중 계산을 막는다.
+    const totalMinutes = items.reduce((sum, item) => sum + getItemDuration(item), 0);
+    return {
+        segments,
+        laneCount: segments.reduce((max, segment) => Math.max(max, segment.lane + 1), 1),
+        totalMinutes,
+        freeMinutes: Math.max(0, 1440 - totalMinutes),
+        totals: buildTotals(items),
+    };
+};
+
+const nextDay = (day: DayOfWeek): DayOfWeek => {
+    const index = DAY_OPTIONS.findIndex((option) => option.value === day);
+    return DAY_OPTIONS[(index + 1) % DAY_OPTIONS.length].value;
+};
+
+export const buildWeeklyChart = (items: ScheduleItem[]) => {
+    const partsByDay = new Map<DayOfWeek, Array<Omit<WeeklySegment, "lane" | "top" | "height">>>(
+        DAY_OPTIONS.map((option) => [option.value, []]),
+    );
+
+    items.filter((item) => item.is_active).forEach((item) => {
+        const base = toSegmentBase(item);
+        const start = timeToMinutes(item.start_time);
+        const end = timeToMinutes(item.end_time);
+        if (start === end) return;
+        item.days_of_week.forEach((day) => {
+            if (end > start) {
+                partsByDay.get(day)?.push({ ...base, key: `${item.id}-${day}`, startMin: start, endMin: end, isSpill: false });
+                return;
+            }
+            // 자정 넘김: 시작 요일 컬럼에 [start,1440], 다음 요일 컬럼에 [0,end] 조각을 둔다(일요일→월요일 순환).
+            partsByDay.get(day)?.push({ ...base, key: `${item.id}-${day}`, startMin: start, endMin: 1440, isSpill: false });
+            partsByDay.get(nextDay(day))?.push({ ...base, key: `${item.id}-${day}-spill`, startMin: 0, endMin: end, isSpill: true });
         });
     });
 
-    const totalMinutes = segments.reduce((sum, segment) => sum + segment.duration, 0);
     return {
-        segments,
-        totalMinutes,
-        freeMinutes: Math.max(0, 1440 - totalMinutes),
-        totals: Array.from(totals.values()).sort((a, b) => b.minutes - a.minutes),
+        days: DAY_OPTIONS.map((option) => {
+            const parts = (partsByDay.get(option.value) ?? [])
+                .sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+            const lanes = assignLanes(parts);
+            const segments: WeeklySegment[] = parts.map((part, index) => ({
+                ...part,
+                lane: lanes[index],
+                top: (part.startMin / 1440) * 100,
+                height: Math.max(0.8, ((part.endMin - part.startMin) / 1440) * 100),
+            }));
+            return {
+                day: option.value,
+                label: option.label,
+                laneCount: segments.reduce((max, segment) => Math.max(max, segment.lane + 1), 1),
+                segments,
+            };
+        }),
     };
 };
+
+export const SCHEDULE_WEEKLY_VIEW_STORAGE_KEY = "flownote.schedule.weeklyView";
 
 export const validateScheduleInput = (form: ScheduleItemInput) => {
     if (!form.title.trim()) return "시간표 제목을 입력하세요.";
     if (form.daysOfWeek.length === 0) return "반복 요일을 하나 이상 선택하세요.";
-    if (!form.startTime || !form.endTime || form.startTime >= form.endTime) return "시작 시간은 종료 시간보다 빨라야 합니다.";
+    if (!form.startTime || !form.endTime) return "시작 시간과 종료 시간을 입력하세요.";
+    if (form.startTime === form.endTime) return "시작 시간과 종료 시간은 같을 수 없습니다. 자정을 넘기는 일정은 종료 시간을 더 이른 시각으로 입력하세요.";
     return null;
 };
