@@ -22,7 +22,7 @@
 
 ## 진행 중인 작업
 
-현재 장기 실행 계획은 별도 파일이 없으면 대화 컨텍스트와 최종 응답에 남긴다. 반복될 계획은 `docs/design-docs/` 또는 `docs/product-specs/`로 승격한다.
+장기 실행 계획은 `docs/exec-plan/active/`에 일급 아티팩트로 저장한다(작성 요령: `docs/exec-plan/README.md`). 완료되면 의사결정 로그를 채워 `docs/exec-plan/completed/`로 옮기고, 남은 부채는 `docs/exec-plan/tech-debt-tracker.md`에 등재한다. 반복될 계획은 `docs/design-docs/` 또는 `docs/product-specs/`로 승격한다.
 
 ## 완료된 작업
 

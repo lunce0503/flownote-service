@@ -100,7 +100,7 @@ services:
     depends_on:
       - spring-server
     volumes:
-      - ./report:/app/report:ro
+      - ./logs/report:/app/report:ro
 
   # 4. React (Vite) SPA
   react-app:

@@ -21,7 +21,7 @@
 | `design-docs/` | 장기 설계 문서와 아키텍처 결정 색인 |
 | `generated/` | 코드나 스키마에서 재생성 가능한 참조 문서 |
 | `product-specs/` | 제품 기능별 사양과 사용자 흐름 |
-| `exec-plan/` | 실행 계획 설정 문서 |
+| `exec-plan/` | 실행 계획 아티팩트: `active/`(진행 중), `completed/`(완료+의사결정 로그), `tech-debt-tracker.md`. 작성 요령은 `exec-plan/README.md` |
 | `references/` | 외부 문서/docs 자료 보관 |
 | `DESIGN.md` | 시스템 맵과 서비스 경계 |
 | `FRONTEND.md` | 웹/모바일 UI 작업 기준 |

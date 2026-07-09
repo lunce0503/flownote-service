@@ -11,6 +11,6 @@
 - 구현 후 가장 좁고 의미 있는 명령으로 검증한다.
 - 작업 종료 전 저장소 루트에서 `docker compose up -d --build`를 실행해 통합 Docker 빌드와 백그라운드 실행을 검증한다.
 - 파일을 수정한 작업은 Docker 검증 뒤 항상 클라우드 배포까지 진행한다. 프론트 변경은 Vercel production, FastAPI 변경은 Railway `flownote-api`, Spring 변경은 Railway `flownote-main`에 배포한다.
-- `report/` 아래 보고서만 작성하거나 수정하는 작업은 Docker 빌드와 클라우드 배포를 생략하고 파일 확인만 수행한다.
-- `report/` 외 문서 전용 변경은 Vercel production 배포를 기본으로 수행하고, 백엔드 실행 산출물이 바뀌지 않았으면 Railway 배포 생략 사유를 기록한다.
+- `logs/report/` 아래 보고서만 작성하거나 수정하는 작업은 Docker 빌드와 클라우드 배포를 생략하고 파일 확인만 수행한다.
+- `logs/report/` 외 문서 전용 변경은 Vercel production 배포를 기본으로 수행하고, 백엔드 실행 산출물이 바뀌지 않았으면 Railway 배포 생략 사유를 기록한다.
 - 실행하지 못한 명령은 이유와 함께 기록한다.

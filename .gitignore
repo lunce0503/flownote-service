@@ -2,7 +2,6 @@
 .env.*
 !.env.example
 DB/
-report/
 node_modules/
 .DS_Store
 logs/
