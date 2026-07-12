@@ -77,6 +77,18 @@ export const formatDuration = (minutes: number) => {
     return `${remainingMinutes}분`;
 };
 
+// 일정 블록 배경색의 밝기(YIQ)에 따라 읽을 수 있는 글자색을 고른다. 밝은 배경(노랑·주황 등)은 진한 글자, 어두운 배경은 흰 글자.
+export const getReadableTextColor = (backgroundColor: string) => {
+    const hex = backgroundColor.replace("#", "").trim();
+    const expanded = hex.length === 3 ? hex.split("").map((ch) => ch + ch).join("") : hex;
+    if (!/^[0-9a-fA-F]{6}$/.test(expanded)) return "#ffffff";
+    const red = parseInt(expanded.slice(0, 2), 16);
+    const green = parseInt(expanded.slice(2, 4), 16);
+    const blue = parseInt(expanded.slice(4, 6), 16);
+    const yiq = (red * 299 + green * 587 + blue * 114) / 1000;
+    return yiq >= 150 ? "#1c1917" : "#ffffff";
+};
+
 export const formatDays = (days: DayOfWeek[]) => (
     DAY_OPTIONS.filter((day) => days.includes(day.value)).map((day) => day.label).join(", ") || "요일 없음"
 );
