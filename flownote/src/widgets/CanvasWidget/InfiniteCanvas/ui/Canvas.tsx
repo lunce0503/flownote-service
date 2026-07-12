@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { X } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { useCanvasState } from "@/features/canvas";
@@ -82,7 +83,11 @@ const Canvas = () => {
 
     const [canvasDocuments, setCanvasDocuments] = useState<CanvasDocumentSummary[]>([]);
     const [canvasFolders, setCanvasFolders] = useState<CanvasFolder[]>([]);
-    const [selectedCanvasId, setSelectedCanvasId] = useState<string | null>(null);
+    // 캔버스 id는 URL(/canvas/:canvasId)로 구분한다. 라우터가 canvasId로 위젯을 키잉해
+    // 리마운트하므로 URL→상태는 lazy 초기값으로 반영하고, 편집기 내 전환은 URL을 갱신한다.
+    const { canvasId: routeCanvasId } = useParams<{ canvasId: string }>();
+    const navigate = useNavigate();
+    const [selectedCanvasId, setSelectedCanvasId] = useState<string | null>(routeCanvasId ?? null);
     const [isCanvasLibraryVisible, setIsCanvasLibraryVisible] = useLocalStorageBoolean(CANVAS_LIBRARY_VISIBLE_STORAGE_KEY, true);
     const [libraryError, setLibraryError] = useState<string | null>(null);
 
@@ -267,6 +272,14 @@ const Canvas = () => {
     useEffect(() => {
         selectedCanvasIdRef.current = selectedCanvasId;
     }, [selectedCanvasId]);
+
+    // 선택 상태 → URL. 편집기 안에서 다른 캔버스를 고르면 주소를 /canvas/:id로 맞춘다.
+    // (URL→상태는 route.tsx의 key={canvasId} 리마운트 + 위 lazy 초기값으로 처리)
+    useEffect(() => {
+        if (selectedCanvasId && selectedCanvasId !== routeCanvasId) {
+            navigate(`/canvas/${selectedCanvasId}`);
+        }
+    }, [selectedCanvasId, routeCanvasId, navigate]);
 
     useEffect(() => {
         handleFlushSaveRef.current = handleFlushSave;

@@ -11,6 +11,7 @@ import SignUpRoute from './routers/SignUp/routes.tsx';
 import LolBanPickRoute from './routers/LolBanpick/route.tsx';
 import ScrewPuzzleRoute from './routers/ScrewPuzzle/route.tsx';
 import CanvasRoute from './routers/Canvas/route.tsx';
+import CanvasListRoute from './routers/Canvas/list.tsx';
 import StockRoute from './routers/Stock/route.tsx';
 import StockChartRoute from './routers/Stock/chart.tsx';
 import SettingsRoute from './routers/Settings/route.tsx';
@@ -70,7 +71,11 @@ export const capabilityManifest: Capability[] = [
     nav: true,
     enabled: true,
     protected: true,
-    routes: [{ path: '/canvas', element: <CanvasRoute /> }],
+    // /canvas = 그림판 목록, /canvas/:canvasId = 해당 캔버스 편집기(멀티 캔버스 URL 구분).
+    routes: [
+      { path: '/canvas', element: <CanvasListRoute /> },
+      { path: '/canvas/:canvasId', element: <CanvasRoute /> },
+    ],
   },
   {
     id: 'stocks',
