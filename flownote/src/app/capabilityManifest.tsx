@@ -9,6 +9,7 @@ import TaskRoute from './routers/Task/route.tsx';
 import LoginRoute from './routers/Login/route.tsx';
 import SignUpRoute from './routers/SignUp/routes.tsx';
 import LolBanPickRoute from './routers/LolBanpick/route.tsx';
+import ScrewPuzzleRoute from './routers/ScrewPuzzle/route.tsx';
 import CanvasRoute from './routers/Canvas/route.tsx';
 import StockRoute from './routers/Stock/route.tsx';
 import StockChartRoute from './routers/Stock/chart.tsx';
@@ -112,6 +113,13 @@ export const capabilityManifest: Capability[] = [
     nav: false,
     enabled: true,
     routes: [{ path: '/banpick', element: <LolBanPickRoute /> }],
+  },
+  {
+    id: 'screw-puzzle',
+    label: '나사 퍼즐',
+    nav: true,
+    enabled: true,
+    routes: [{ path: '/screw-puzzle', element: <ScrewPuzzleRoute /> }],
   },
   {
     id: 'magic',

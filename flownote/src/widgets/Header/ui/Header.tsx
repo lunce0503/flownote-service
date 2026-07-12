@@ -14,6 +14,10 @@ import {
   TrendingUp,
   Settings,
   Activity,
+  Puzzle,
+  Ellipsis,
+  Sparkles,
+  Trophy,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth";
@@ -23,6 +27,7 @@ export default function Header() {
   // 사이드바 상태 관리
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
+  const [isMoreOpen, setIsMoreOpen] = useState<boolean>(false);
   const [language, setLanguage] = useState<"ko" | "en">(() => (
     localStorage.getItem("flownote_language") === "en" ? "en" : "ko"
   ));
@@ -36,7 +41,12 @@ export default function Header() {
       canvas: "그림판",
       task: "일정",
       stocks: "주식",
+      puzzle: "퍼즐",
+      stockChart: "주식 차트",
+      banpick: "밴픽",
+      magic: "Magic",
       settings: "설정",
+      more: "기타",
       login: "로그인",
       logout: "로그아웃",
       menu: "메뉴",
@@ -50,7 +60,12 @@ export default function Header() {
       canvas: "Canvas",
       task: "Task",
       stocks: "Stocks",
+      puzzle: "Puzzle",
+      stockChart: "Stock Chart",
+      banpick: "Banpick",
+      magic: "Magic",
       settings: "Settings",
+      more: "Etc",
       login: "Login",
       logout: "Logout",
       menu: "Menu",
@@ -72,6 +87,7 @@ export default function Header() {
   }, []);
 
   const onMenuClick = () => {
+    setIsMoreOpen(false);
     setIsSidebarOpen(true);
   };
 
@@ -83,22 +99,37 @@ export default function Header() {
     setIsProfileOpen(false);
   };
 
+  const closeMore = () => {
+    setIsMoreOpen(false);
+  };
+
   const handleLogout = () => {
     logout();
     closeProfile();
+    closeMore();
     closeSidebar();
     navigate("/");
   };
 
-  const navLinks = [
+  const primaryNavLinks = [
+    { name: labels.canvas, href: "/canvas", icon: <Palette size={22} /> },
     { name: labels.blog, href: "/blog", icon: <BookOpen size={22} /> },
+  ];
+
+  const extraNavLinks = [
     { name: labels.social, href: "/social", icon: <Users size={22} /> },
     { name: labels.agent, href: "/agent", icon: <Bot size={22} /> },
-    { name: labels.canvas, href: "/canvas", icon: <Palette size={22} /> },
     { name: labels.task, href: "/task", icon: <CheckSquare size={22} /> },
     { name: labels.stocks, href: "/stocks", icon: <TrendingUp size={22} /> },
+    { name: labels.stockChart, href: "/stocks/chart", icon: <TrendingUp size={22} /> },
+    { name: labels.puzzle, href: "/screw-puzzle", icon: <Puzzle size={22} /> },
+    { name: labels.banpick, href: "/banpick", icon: <Trophy size={22} /> },
+    { name: labels.magic, href: "/magic", icon: <Sparkles size={22} /> },
     { name: labels.settings, href: "/settings", icon: <Settings size={22} /> },
+    ...(user?.role === "ADMIN" ? [{ name: labels.admin, href: "/admin/canvas", icon: <Activity size={22} /> }] : []),
   ];
+
+  const sidebarLinks = [...primaryNavLinks, ...extraNavLinks];
 
   const profileLinks = [
     { name: labels.canvas, href: "/canvas", icon: <Palette size={18} /> },
@@ -140,17 +171,58 @@ export default function Header() {
             </Link>
 
             {/* Desktop Navigation Links */}
-            {navLinks.map((link) => (
+            {primaryNavLinks.map((link) => (
               <Link
                 key={link.name}
                 className="group flex min-w-12 flex-col items-center rounded-lg px-2 py-1 text-xs font-bold text-stone-200 transition-colors hover:bg-stone-800 hover:text-amber-100"
                 to={link.href}
                 title={link.name}
+                onClick={closeMore}
               >
                 <span className="md:hidden">{link.icon}</span>
                 <span className="hidden md:inline">{link.name}</span>
               </Link>
             ))}
+
+            <div className="relative">
+              <button
+                type="button"
+                className="group flex min-w-12 flex-col items-center rounded-lg px-2 py-1 text-xs font-bold text-stone-200 transition-colors hover:bg-stone-800 hover:text-amber-100"
+                title={labels.more}
+                aria-haspopup="menu"
+                aria-expanded={isMoreOpen}
+                onClick={() => {
+                  setIsProfileOpen(false);
+                  setIsMoreOpen((open) => !open);
+                }}
+              >
+                <span className="md:hidden"><Ellipsis size={22} /></span>
+                <span className="hidden md:inline-flex items-center gap-1">
+                  <Ellipsis size={18} />
+                  {labels.more}
+                </span>
+              </button>
+
+              {isMoreOpen && (
+                <div
+                  className="absolute left-0 top-full z-[950] mt-2 w-56 rounded-lg border border-stone-700 bg-stone-950 py-2 shadow-xl"
+                  role="menu"
+                >
+                  {extraNavLinks.map((link) => (
+                    <Link
+                      key={link.name}
+                      to={link.href}
+                      className="flex items-center gap-3 px-4 py-2 text-sm font-semibold text-stone-200 transition-colors hover:bg-stone-800 hover:text-amber-100"
+                      role="menuitem"
+                      onClick={closeMore}
+                    >
+                      {link.icon}
+                      <span>{link.name}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Center Section: Placeholder */}
@@ -166,7 +238,10 @@ export default function Header() {
                   title={user.nickname}
                   aria-haspopup="menu"
                   aria-expanded={isProfileOpen}
-                  onClick={() => setIsProfileOpen((open) => !open)}
+                  onClick={() => {
+                    setIsMoreOpen(false);
+                    setIsProfileOpen((open) => !open);
+                  }}
                 >
                   <User size={20} />
                   <span className="hidden md:inline max-w-32 truncate text-sm font-semibold">
@@ -257,7 +332,7 @@ export default function Header() {
 
           {/* Sidebar Navigation Links */}
           <nav className="flex flex-col gap-2">
-            {navLinks.map((link) => (
+            {sidebarLinks.map((link) => (
               <Link 
                 key={link.name}
                 to={link.href}
