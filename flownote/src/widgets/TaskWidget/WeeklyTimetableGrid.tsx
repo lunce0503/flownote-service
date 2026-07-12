@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { DayOfWeek, ScheduleItem } from "@/entities/schedule";
-import { buildWeeklyChart, formatDuration } from "@/features/schedule";
+import { buildWeeklyChart, formatDuration, getReadableTextColor } from "@/features/schedule";
 
 interface WeeklyTimetableGridProps {
   items: ScheduleItem[];
@@ -42,7 +42,10 @@ const WeeklyTimetableGrid = ({ items, today, onSelectItem }: WeeklyTimetableGrid
               <span
                 key={hour}
                 className="absolute pl-1 text-[10px] font-bold text-stone-400"
-                style={{ top: `${(hour / 24) * 100}%` }}
+                style={{
+                  top: `${(hour / 24) * 100}%`,
+                  transform: hour === 0 ? "none" : "translateY(-50%)",
+                }}
               >
                 {hour}시
               </span>
@@ -69,7 +72,7 @@ const WeeklyTimetableGrid = ({ items, today, onSelectItem }: WeeklyTimetableGrid
                     key={segment.key}
                     type="button"
                     onClick={() => onSelectItem(segment.itemId)}
-                    className={`absolute overflow-hidden rounded-md px-1 py-0.5 text-left text-[10px] font-bold text-white shadow-sm transition hover:brightness-110 ${
+                    className={`absolute overflow-hidden rounded-md px-1 py-0.5 text-left text-[10px] font-bold shadow-sm transition hover:brightness-110 ${
                       segment.isSpill ? "opacity-70" : ""
                     }`}
                     style={{
@@ -78,6 +81,7 @@ const WeeklyTimetableGrid = ({ items, today, onSelectItem }: WeeklyTimetableGrid
                       left: `${segment.lane * laneWidth}%`,
                       width: `${laneWidth}%`,
                       backgroundColor: segment.color,
+                      color: getReadableTextColor(segment.color),
                     }}
                     title={`${segment.title} ${segment.range} (${formatDuration(segment.durationMinutes)})${segment.isSpill ? " · 전날에서 이어짐" : ""}`}
                     aria-label={`${segment.title} ${segment.range}`}

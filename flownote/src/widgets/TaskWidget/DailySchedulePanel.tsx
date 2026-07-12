@@ -19,6 +19,7 @@ import {
   getDayLabel,
   getDayTotals,
   getItemDuration,
+  getReadableTextColor,
   getScheduleItemsByDay,
   getToday,
   isOvernightItem,
@@ -318,7 +319,7 @@ const DailySchedulePanel = () => {
                   {routineChart.segments.map((segment) => (
                     <div
                       key={segment.key}
-                      className={`absolute flex h-10 min-w-1 items-center overflow-hidden rounded-md px-2 text-[11px] font-black text-white shadow-sm ${
+                      className={`absolute flex h-10 min-w-1 items-center overflow-hidden rounded-md px-2 text-[11px] font-black shadow-sm ${
                         segment.isSpill ? "opacity-70" : ""
                       }`}
                       style={{
@@ -326,6 +327,7 @@ const DailySchedulePanel = () => {
                         left: `${segment.left}%`,
                         width: `${segment.width}%`,
                         backgroundColor: segment.color,
+                        color: getReadableTextColor(segment.color),
                       }}
                       title={`${segment.title} ${segment.range} (${formatDuration(segment.durationMinutes)})${segment.isSpill ? " · 다음 날 이어지는 구간" : ""}`}
                     >
@@ -333,12 +335,19 @@ const DailySchedulePanel = () => {
                     </div>
                   ))}
                 </div>
-                <div className="grid grid-cols-5 text-center text-[11px] font-bold text-stone-500">
-                  <span className="py-1">0h</span>
-                  <span className="py-1">6h</span>
-                  <span className="py-1">12h</span>
-                  <span className="py-1">18h</span>
-                  <span className="py-1">24h</span>
+                <div className="relative h-6 text-[11px] font-bold text-stone-500">
+                  {[0, 6, 12, 18, 24].map((hour) => (
+                    <span
+                      key={hour}
+                      className="absolute py-1"
+                      style={{
+                        left: `${(hour / 24) * 100}%`,
+                        transform: hour === 0 ? "none" : hour === 24 ? "translateX(-100%)" : "translateX(-50%)",
+                      }}
+                    >
+                      {hour}h
+                    </span>
+                  ))}
                 </div>
               </div>
 
