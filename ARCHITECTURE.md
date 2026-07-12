@@ -90,6 +90,7 @@ graph TB
 - 모바일 앱은 `EXPO_PUBLIC_WAS_URL`의 `/api/mobile/config`를 시작점으로 사용한다.
 - DB 스키마 기준은 Spring Flyway 마이그레이션이며, 문서가 실제 마이그레이션과 다르면 마이그레이션을 우선한다.
 - 실시간 캔버스는 React ↔ FastAPI Socket.IO로 연결되고, FastAPI가 스트로크/이미지/텍스트를 Spring 캔버스 API에 중계·저장한다. Spring은 Redis로 캔버스 상태를 캐시한다.
+- 프로덕션에서는 캔버스 부하 분리를 위해 같은 Spring 이미지를 `flownote-canvas` 인스턴스로 하나 더 배포하고, 캔버스 트래픽만 그쪽으로 보낸다. 라우팅 지점은 두 곳이다: FastAPI `CANVAS_API_BASE_URL`(캔버스 소켓 중계 전용, 미설정 시 `CORE_API_BASE_URL` 폴백)과 프론트 `VITE_CANVAS_API_URL`(캔버스 HTTP 전용). DB·Redis·스토리지는 flownote-main과 공유하며, 스토리지 워커는 `FOR UPDATE SKIP LOCKED` 선점이라 다중 인스턴스에서 안전하다.
 - 에이전트 노트는 FastAPI가 내부망 Ollama(`OLLAMA_BASE_URL`)로 이미지를 캡션→임베딩→유사 검색한다. Ollama와 이 기능은 내부망 전용이며 클라우드에 배포하지 않는다.
 - 메인 플래너 에이전트는 FastAPI가 외부 Google Gemini API로 MCP 도구를 호출하되, 최종 저장은 항상 Spring Core API를 거친다.
 - 주식 시세는 Spring이 FastAPI `/api/market`(`STOCK_MARKET_DATA_URL`)을 호출해 받는다.
@@ -104,6 +105,7 @@ graph TB
 | `flownote-next/` | Vercel `flownote-next` | Next.js |
 | `flownote-API/` | Railway `flownote-api` | Socket.IO(wss), health `/` |
 | `flownote-server/` | Railway `flownote-main` | health `/actuator/health` |
+| `flownote-server/` (캔버스 전담) | Railway `flownote-canvas` | 같은 이미지 2호기, `/api/canvas/**` 트래픽 전담, 변수는 flownote-main 참조 |
 | PostgreSQL · Redis | Railway 관리형 | 사설 네트워크 |
 | Ollama · 에이전트 노트 | 배포 안 함 | 내부망 전용 |
 
