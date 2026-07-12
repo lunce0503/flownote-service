@@ -1,68 +1,27 @@
-# 아키텍처
-
-이 문서는 저장소 전체 구조와 작업 기록 위치를 한눈에 확인하기 위한 루트 아키텍처 문서다. 세부 운영 규칙은 `AGENTS.md`, 장기 문서는 `docs/`, 에이전트 실행 자산은 `.codex/` 혹은 `.claude/`를 기준으로 한다.
-
 # 개요
+
+
+
+# 시스템 구성 (조감도)
 
 Flownote는 기획한 내용을 바탕으로 관련 필기를 텍스트와 그림으로 표현하여 새로운 아이디어를 만들거나 기존의 내용을 정리하며 지식을 정리하게 돕는 노트이다. 
 주된 기능은 그림판(Canvas)과 작성 영역(Text Pad)이며 부가적인 기능을 이용하여 그림판과 작성영역과의 유기적인 조합을 이루는 방식으로 개발되었다. 
 그림판은 연필이나 펜을 통해 작성하는 방식을 말하며 이는 고전적인 필기를 중심으로 작성되는 기능이다. 이 기능을 주요 작성 방법으로 정하면 대상의 연결성과 높은 직관력을 가지는 시각적 표현의 장점을 이용하는 곳으로 주로 구상이나 이해를 중시할 때 작성되는 방식이다. 
 작성 영역은 키보드와 같은 타이핑 기기를 통해 작성되는 기능을 말하며, 이를 주된 작성법으로 정하면 엄밀하게 정의되어야 하거나 정보의 오류가 없어야 하는 내용을 담는 것이 주된 내용이 된다. 그리고 그림판 기능과 달리 단방향으로 작성하기 때문에 시간을 기반으로 하는 정보를 작성하는데 용이하다. 
 위의 주된 기능을 바탕으로 작성하는 내용을 기록하는데 불편함을 겪는 경우에 이용하는 것이 부가적인 기능이다. 텍스트나 선 데이터를 가지고 표현하기 어려운 경우, 사용자가 해당되는 지식을 나타내는 것이 어려운 경우나 실시간으로 변하는 값을 이용하는 경우와 같이 어려움을 갖는 경우에 사용하는 기능이다. 
-## 시스템 구성 (조감도)
 
-아래는 로컬 통합 실행(`docker-compose.yml`) 기준의 서비스 토폴로지다. 실선은 요청, 점선은 실시간 소켓, 노란 마름모는 외부 API, 회색 묶음은 내부망 전용(클라우드 미배포)이다.
+# 코드맵
 
-```mermaid
-graph TB
-    subgraph client["클라이언트"]
-        web["flownote<br/>Vite React · :5173"]
-        next["flownote-next<br/>Next.js · :3000"]
-        mobile["flownote-mobile<br/>Expo WebView · :8081"]
-    end
+## `flownote/` : flownote의 프론트엔드를 다루는 곳
+## `flownote/src` : flownote의 프론트와 직접관련된 소스 코드를 작성하는 곳으로 FSD 방식으로 코드를 작성하는 것을 주로 둔다.
+### `flownote/src/app`: flownote 프론트엔드의 가장 최상위 폴더로 실제 렌더링을 할때 마지막으로 거쳐야하는 곳이다.
 
-    subgraph backend["백엔드"]
-        spring["flownote-server<br/>Spring Boot · :8080<br/>인증 · 소유 데이터 · 캔버스 저장"]
-        api["flownote-API<br/>FastAPI · :8000<br/>AI · 실시간 소켓 · 에이전트 노트"]
-    end
+### `flownote/src/entities`: flownote 기능 중 비지니스 모델과 관련된 내용을 다루는 곳으로  
+### `flownote/src/features`: 
+### `flownote/src/pages`: 
+### `flownote/src/shared`: 
+### `flownote/src/widgets`: 
 
-    subgraph infra["데이터 · 인프라"]
-        pg[("PostgreSQL<br/>:5432")]
-        redis[("Redis<br/>:6379 · 캔버스 캐시")]
-    end
-
-    subgraph localonly["내부망 전용 · 클라우드 미배포"]
-        ollama["Ollama · :11434<br/>gemma4:e2b + embeddinggemma"]
-    end
-
-    gemini{{"Google Gemini API<br/>외부"}}
-
-    web -->|"VITE_CORE_API_URL"| spring
-    web -->|"VITE_AI_BASE_URL"| api
-    web -.->|"Canvas Socket.IO"| api
-    next -->|"CORE_API_URL"| spring
-    mobile -->|"/api/mobile/config"| spring
-
-    api -->|"CORE_API_BASE_URL · 캔버스/노트/작업"| spring
-    api -->|"OLLAMA_BASE_URL · 에이전트 노트"| ollama
-    api -->|"google-genai · 메인 에이전트"| gemini
-    spring -->|"STOCK_MARKET_DATA_URL"| api
-    spring --> pg
-    spring --> redis
-    next --> pg
-```
-
-- 웹/모바일 → Spring: 인증과 사용자 소유 데이터.
-- 웹 → FastAPI: AI 기능과 캔버스 실시간 소켓(Socket.IO). FastAPI가 스트로크/이미지/텍스트를 Spring 캔버스 API에 중계·저장한다.
-- FastAPI → Ollama: 에이전트 노트가 그림을 캡션→임베딩→유사 검색(내부망 전용).
-- FastAPI → Gemini: 메인 플래너 에이전트의 MCP 도구 호출(외부 API).
-- Spring → FastAPI: 주식 시세(`/api/market`). Spring → PostgreSQL/Redis: 저장·캔버스 캐시.
-
-## 코드맵
-
-### `flownote/` : flownote의 프론트엔드를 다루는 곳
-
-#### `flownote/`: 
 ### `flownote-mobile/` : flownote의 IOS/Android 앱을 다루는 곳
 ### `flownote-next/` : `flownote/`에서 클라이언트가 요청한 데이터를 가공해 전송하는 서버
 ### `flownote-server/` : flownote 서버스의 메인 서버로 주로 캔버스/텍스트 패드 데이터 저장, 로그인 인증, 이외의 다양한 기능의 데이터를 다루는 서버이다.
