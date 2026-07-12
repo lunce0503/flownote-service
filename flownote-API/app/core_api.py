@@ -10,8 +10,14 @@ from fastapi import HTTPException
 CORE_API_BASE_URL = os.getenv("CORE_API_BASE_URL") or os.getenv("SPRING_API_URL") or "http://spring-server:8080"
 
 
-def forward_request(method: str, path: str, authorization: str | None = None, body: Any | None = None) -> Any:
-    url = f"{CORE_API_BASE_URL.rstrip('/')}{path}"
+def forward_request(
+    method: str,
+    path: str,
+    authorization: str | None = None,
+    body: Any | None = None,
+    base_url: str | None = None,
+) -> Any:
+    url = f"{(base_url or CORE_API_BASE_URL).rstrip('/')}{path}"
     data = None if body is None else json.dumps(body, default=str).encode("utf-8")
     headers = {"Accept": "application/json"}
     if data is not None:

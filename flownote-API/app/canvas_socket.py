@@ -17,6 +17,11 @@ from fastapi import HTTPException
 
 from app.core_api import CORE_API_BASE_URL, forward_request
 
+# 캔버스 부하 분리: 설정 시 캔버스 중계만 전용 Spring 인스턴스로 보낸다. 미설정이면 기존 Core API 그대로.
+import os
+
+CANVAS_API_BASE_URL = (os.getenv("CANVAS_API_BASE_URL") or CORE_API_BASE_URL).rstrip("/")
+
 
 DATA_URL_PATTERN = re.compile(r"^data:(?P<content_type>[^;,]+)?(?:;charset=[^;,]+)?;base64,(?P<data>.+)$", re.DOTALL)
 logger = logging.getLogger("flownote.canvas_socket")
@@ -117,7 +122,7 @@ def _error_response(error: Exception) -> dict[str, Any]:
 
 
 async def _forward_json(method: str, path: str, authorization: str | None = None, body: Any | None = None) -> Any:
-    return await asyncio.to_thread(forward_request, method, path, authorization, body)
+    return await asyncio.to_thread(forward_request, method, path, authorization, body, CANVAS_API_BASE_URL)
 
 
 async def _forward_json_cancellable(
@@ -130,7 +135,7 @@ async def _forward_json_cancellable(
     if authorization:
         headers["Authorization"] = authorization
     timeout = httpx.Timeout(connect=5, read=180, write=35, pool=5)
-    async with httpx.AsyncClient(base_url=CORE_API_BASE_URL.rstrip("/"), timeout=timeout) as client:
+    async with httpx.AsyncClient(base_url=CANVAS_API_BASE_URL, timeout=timeout) as client:
         response = await client.request(method, path, headers=headers, json=body)
         if response.is_error:
             raise HTTPException(status_code=response.status_code, detail=response.text)
@@ -247,7 +252,7 @@ def _upload_canvas_asset_sync(authorization: str | None, file_data_url: str, fil
         headers["Authorization"] = authorization
 
     request = urllib.request.Request(
-        f"{CORE_API_BASE_URL.rstrip('/')}/api/canvas/assets",
+        f"{CANVAS_API_BASE_URL}/api/canvas/assets",
         data=body,
         headers=headers,
         method="POST",
