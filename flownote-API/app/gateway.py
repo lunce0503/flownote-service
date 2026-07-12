@@ -18,6 +18,11 @@ from fastapi import APIRouter, Request, Response
 
 CORE_API_BASE_URL = (os.getenv("CORE_API_BASE_URL") or os.getenv("SPRING_API_URL") or "http://spring-server:8080").rstrip("/")
 CANVAS_API_BASE_URL = (os.getenv("CANVAS_API_BASE_URL") or CORE_API_BASE_URL).rstrip("/")
+# AI/데이터 백엔드(aiclient·agent-note·market·chat·social)는 flownote-ai로 분리됨.
+AI_API_BASE_URL = (os.getenv("AI_API_BASE_URL") or "http://ai-server:8000").rstrip("/")
+
+# flownote-ai(AI/데이터 백엔드)가 소유하는 경로 접두어.
+_AI_PREFIXES = ("aiclient", "agent-note", "market", "chat", "social")
 
 # 홉 단위 헤더는 프록시가 다시 계산해야 하므로 그대로 전달하지 않는다.
 _HOP_BY_HOP = {
@@ -33,6 +38,9 @@ def _target_base(path: str) -> str:
     """요청 경로로 백엔드를 결정한다."""
     if path == "canvas" or path.startswith("canvas/"):
         return CANVAS_API_BASE_URL
+    head = path.split("/", 1)[0]
+    if head in _AI_PREFIXES:
+        return AI_API_BASE_URL
     return CORE_API_BASE_URL
 
 
