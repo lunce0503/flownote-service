@@ -22,6 +22,11 @@ import os
 
 CANVAS_API_BASE_URL = (os.getenv("CANVAS_API_BASE_URL") or CORE_API_BASE_URL).rstrip("/")
 
+# 대형 필기 백로그(수천 요소)가 한 mutation으로 들어오면 백엔드 저장이 기본 35초를
+# 넘길 수 있다. 저장 요청만 별도 타임아웃을 준다. 프론트 소켓 타임아웃(30s)보다 길어도
+# 저장이 원장에 기록되면 다음 재시도가 duplicate로 즉시 성공하므로 루프가 끊긴다.
+CANVAS_SAVE_FORWARD_TIMEOUT_SECONDS = float(os.getenv("CANVAS_SAVE_FORWARD_TIMEOUT_SECONDS", "90"))
+
 
 DATA_URL_PATTERN = re.compile(r"^data:(?P<content_type>[^;,]+)?(?:;charset=[^;,]+)?;base64,(?P<data>.+)$", re.DOTALL)
 logger = logging.getLogger("flownote.canvas_socket")
@@ -121,8 +126,14 @@ def _error_response(error: Exception) -> dict[str, Any]:
     }
 
 
-async def _forward_json(method: str, path: str, authorization: str | None = None, body: Any | None = None) -> Any:
-    return await asyncio.to_thread(forward_request, method, path, authorization, body, CANVAS_API_BASE_URL)
+async def _forward_json(
+    method: str,
+    path: str,
+    authorization: str | None = None,
+    body: Any | None = None,
+    timeout_seconds: float = 35,
+) -> Any:
+    return await asyncio.to_thread(forward_request, method, path, authorization, body, CANVAS_API_BASE_URL, timeout_seconds)
 
 
 async def _forward_json_cancellable(
@@ -188,10 +199,11 @@ async def _forward_json_timed(
     path: str,
     authorization: str | None = None,
     body: Any | None = None,
+    timeout_seconds: float = 35,
 ) -> tuple[Any, int]:
     started_at = time.perf_counter()
     try:
-        result = await _forward_json(method, path, authorization, body)
+        result = await _forward_json(method, path, authorization, body, timeout_seconds)
         elapsed_ms = int((time.perf_counter() - started_at) * 1000)
         logger.info("canvas_core_request_completed label=%s method=%s path=%s elapsed_ms=%s", label, method, path, elapsed_ms)
         return result, elapsed_ms
@@ -416,6 +428,7 @@ def create_canvas_socket_server(cors_allowed_origins: list[str]) -> socketio.Asy
                 f"/api/canvas/elements/save{canvas_query}",
                 _authorization(data),
                 request_payload,
+                timeout_seconds=CANVAS_SAVE_FORWARD_TIMEOUT_SECONDS,
             )
             if isinstance(canvas_id, str) and canvas_id:
                 await sio.emit(

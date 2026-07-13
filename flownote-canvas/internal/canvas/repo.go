@@ -367,12 +367,33 @@ func deleteElements(ctx context.Context, tx pgx.Tx, userID, canvasID, etype stri
 
 func upsertElements(ctx context.Context, tx pgx.Tx, userID, canvasID, etype string, arr json.RawMessage) error {
 	elements := decodeArray(arr)
+	// 대형 필기 백로그(수천 요소)는 요소당 왕복 Exec으로 수십 초가 걸려 게이트웨이
+	// 타임아웃과 트랜잭션 롤백을 유발한다. 같은 SQL을 pgx.Batch로 묶어 왕복을 청크당 1회로 줄인다.
+	const upsertBatchSize = 500
+	batch := &pgx.Batch{}
+	flush := func() error {
+		if batch.Len() == 0 {
+			return nil
+		}
+		results := tx.SendBatch(ctx, batch)
+		for i := 0; i < batch.Len(); i++ {
+			if _, err := results.Exec(); err != nil {
+				_ = results.Close()
+				return err
+			}
+		}
+		if err := results.Close(); err != nil {
+			return err
+		}
+		batch = &pgx.Batch{}
+		return nil
+	}
 	for _, el := range elements {
 		id := elementID(el)
 		if id == "" {
 			continue
 		}
-		if _, err := tx.Exec(ctx, `
+		batch.Queue(`
 			INSERT INTO canvas_elements (id, canvas_id, user_id, type, payload, object_key, storage_status)
 			VALUES ($1, $2, $3, $4, $5::jsonb, NULL, 'READY')
 			ON CONFLICT (canvas_id, id) DO UPDATE SET
@@ -382,11 +403,14 @@ func upsertElements(ctx context.Context, tx pgx.Tx, userID, canvasID, etype stri
 				storage_status = 'READY',
 				storage_error_code = NULL,
 				updated_at = NOW()
-		`, id, canvasID, userID, etype, string(el)); err != nil {
-			return err
+		`, id, canvasID, userID, etype, string(el))
+		if batch.Len() >= upsertBatchSize {
+			if err := flush(); err != nil {
+				return err
+			}
 		}
 	}
-	return nil
+	return flush()
 }
 
 // Viewport는 사용자별 뷰포트를 반환한다(없으면 기본값).
