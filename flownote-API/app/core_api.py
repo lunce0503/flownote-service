@@ -16,6 +16,7 @@ def forward_request(
     authorization: str | None = None,
     body: Any | None = None,
     base_url: str | None = None,
+    timeout_seconds: float = 35,
 ) -> Any:
     url = f"{(base_url or CORE_API_BASE_URL).rstrip('/')}{path}"
     data = None if body is None else json.dumps(body, default=str).encode("utf-8")
@@ -27,7 +28,7 @@ def forward_request(
 
     request = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(request, timeout=35) as response:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             raw = response.read()
             if not raw:
                 return None

@@ -60,7 +60,7 @@ func main() {
 	})
 	handler.Register(mux)
 
-	root := withCORS(cfg.CORSOrigins, mux)
+	root := withCORS(cfg.CORSOrigins, withRequestLog(mux))
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
@@ -82,6 +82,36 @@ func main() {
 	defer shutdownCancel()
 	_ = srv.Shutdown(shutdownCtx)
 	log.Printf("flownote-canvas stopped")
+}
+
+// withRequestLog는 헬스체크를 제외한 모든 요청을 상태 코드·지연 시간과 함께 기록한다.
+// 2초 초과 요청에는 SLOW 표시를 붙여 저장 지연 같은 문제를 로그에서 바로 찾을 수 있게 한다.
+func withRequestLog(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" || r.URL.Path == "/health" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		started := time.Now()
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		elapsed := time.Since(started)
+		slow := ""
+		if elapsed > 2*time.Second {
+			slow = " SLOW"
+		}
+		log.Printf("%s %s -> %d %dms%s", r.Method, r.URL.Path, rec.status, elapsed.Milliseconds(), slow)
+	})
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusRecorder) WriteHeader(code int) {
+	s.status = code
+	s.ResponseWriter.WriteHeader(code)
 }
 
 // withCORS는 필요 시 CORS 헤더를 붙인다. 게이트웨이 뒤에서는 보통 CORS_ORIGINS를 비워둔다.
