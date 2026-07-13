@@ -1,4 +1,4 @@
-package com.flownote.canvas;
+package com.flownote.storage;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;

@@ -18,8 +18,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.flownote.canvas.CanvasAssetStorage;
-import com.flownote.canvas.CanvasAssetStorage.StoredCanvasAsset;
+import com.flownote.storage.CanvasAssetStorage;
+import com.flownote.storage.CanvasAssetStorage.StoredCanvasAsset;
 import com.flownote.notes.NoteDtos.NoteRequest;
 
 class NoteRevisionConflictTest {

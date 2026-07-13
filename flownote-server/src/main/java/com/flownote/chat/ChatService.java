@@ -14,8 +14,8 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.flownote.canvas.CanvasAssetStorage;
-import com.flownote.canvas.CanvasAssetStorage.StoredCanvasAsset;
+import com.flownote.storage.CanvasAssetStorage;
+import com.flownote.storage.CanvasAssetStorage.StoredCanvasAsset;
 import com.flownote.chat.ChatDtos.ChatMessageRequest;
 import com.flownote.chat.ChatDtos.ChatMessageResponse;
 

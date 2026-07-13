@@ -1,4 +1,4 @@
-package com.flownote.canvas;
+package com.flownote.storage;
 
 import java.io.IOException;
 import java.net.URI;

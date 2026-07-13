@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Activity, Database, HardDrive, RefreshCw, Server } from "lucide-react";
 import { Navigate } from "react-router-dom";
-import { API_CORE_BASE_URL, authHeaders } from "@/shared/api";
+import { API_CORE_BASE_URL, authHeaders, resolveBrowserReachableUrl } from "@/shared/api";
+
+// 캔버스 진단 API는 Go 캔버스 백엔드(flownote-canvas)가 소유한다(Spring에서 이관).
+const CANVAS_ADMIN_BASE_URL = resolveBrowserReachableUrl(import.meta.env.VITE_CANVAS_API_URL) || API_CORE_BASE_URL || "";
 import { useAuth } from "@/features/auth";
 import { readCanvasDeviceDiagnostics, type CanvasDeviceDiagnostic } from "@/features/canvas";
 
@@ -39,15 +42,15 @@ const AdminCanvasRoute = () => {
     setLoading(true);
     setError("");
     void readCanvasDeviceDiagnostics().then(setDeviceEvents);
-    if (!API_CORE_BASE_URL) {
+    if (!CANVAS_ADMIN_BASE_URL) {
       setError("Core API URL이 설정되지 않았습니다.");
       setLoading(false);
       return;
     }
     try {
       const [summaryResponse, eventsResponse] = await Promise.all([
-        fetch(`${API_CORE_BASE_URL}/api/admin/canvas/summary`, { headers: authHeaders() }),
-        fetch(`${API_CORE_BASE_URL}/api/admin/canvas/events?limit=100`, { headers: authHeaders() }),
+        fetch(`${CANVAS_ADMIN_BASE_URL}/api/admin/canvas/summary`, { headers: authHeaders() }),
+        fetch(`${CANVAS_ADMIN_BASE_URL}/api/admin/canvas/events?limit=100`, { headers: authHeaders() }),
       ]);
       if (!summaryResponse.ok || !eventsResponse.ok) {
         throw new Error("관리자 진단 정보를 불러오지 못했습니다.");

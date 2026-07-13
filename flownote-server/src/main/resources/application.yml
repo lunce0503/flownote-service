@@ -54,11 +54,6 @@ flownote:
     secret-access-key: ${FLOWNOTE_STORAGE_SECRET_ACCESS_KEY:}
     public-base-url: ${FLOWNOTE_STORAGE_PUBLIC_BASE_URL:}
     validate-on-startup: ${FLOWNOTE_STORAGE_VALIDATE_ON_STARTUP:false}
-  canvas:
-    storage-worker-delay-ms: ${FLOWNOTE_CANVAS_STORAGE_WORKER_DELAY_MS:1000}
-    cache:
-      target-username: ${FLOWNOTE_CANVAS_CACHE_TARGET_USERNAME:lunce}
-      ttl: ${FLOWNOTE_CANVAS_CACHE_TTL:24h}
   mobile:
     core-api-url: ${MOBILE_CORE_API_URL:http://localhost:8080}
     ai-api-url: ${MOBILE_AI_API_URL:http://localhost:8000}

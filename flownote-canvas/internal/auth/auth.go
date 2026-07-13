@@ -47,6 +47,44 @@ func (a *Authenticator) RequireUser(ctx context.Context, authorization string) (
 	return userID, nil
 }
 
+// RequireAdmin은 사용자를 해석하고 ADMIN 역할까지 확인한다(Spring requireAdmin과 동일 규칙).
+func (a *Authenticator) RequireAdmin(ctx context.Context, authorization string) (string, error) {
+	token, err := parseBearer(authorization)
+	if err != nil {
+		return "", err
+	}
+	var userID, role string
+	err = a.pool.QueryRow(ctx, `
+		SELECT s.user_id::text, COALESCE(u.role, 'USER')
+		FROM app_sessions s
+		JOIN users u ON u.id = s.user_id
+		WHERE s.token = $1 AND s.expires_at > NOW()
+	`, token).Scan(&userID, &role)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", httpjson.Errorf(http.StatusUnauthorized, "로그인이 필요합니다.")
+	}
+	if err != nil {
+		return "", err
+	}
+	if role != "ADMIN" {
+		return "", httpjson.Errorf(http.StatusForbidden, "관리자 권한이 필요합니다.")
+	}
+	return userID, nil
+}
+
+// AdminMiddleware는 관리자 전용 라우트를 인증한다.
+func (a *Authenticator) AdminMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, err := a.RequireAdmin(r.Context(), r.Header.Get("Authorization"))
+		if err != nil {
+			httpjson.WriteError(w, err)
+			return
+		}
+		ctx := context.WithValue(r.Context(), userIDKey, userID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 // Middleware는 요청을 인증하고 사용자 UUID를 컨텍스트에 담는다.
 func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
