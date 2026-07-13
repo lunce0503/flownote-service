@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
-import type { BlockDataProps } from "../../../entities/blog";
-import { getSyncClientId } from "../../../shared/sync";
-import type { NoteFolder } from "../../../entities/blog/noteFolderData";
+import type { BlockDataProps } from "@/entities/blog";
+import { getSyncClientId } from "@/shared/lib/sync";
+import type { NoteFolder } from "@/entities/blog";
 
 export type NoteBlock = {
     content?: Array<{

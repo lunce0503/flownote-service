@@ -1,10 +1,9 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import './App.css';
 
-import { Header } from '../widgets';
-import { AuthProvider } from '../shared/auth/AuthContext.tsx';
-import ProtectedRoute from '../shared/auth/ProtectedRoute.tsx';
-import { ThemeProvider } from '../features/theme';
+import { Header } from '@/widgets';
+import { AuthProvider, ProtectedRoute } from '@/features/auth';
+import { ThemeProvider } from '@/features/theme';
 import { capabilityManifest, type CapabilityRoute } from './capabilityManifest.tsx';
 
 const renderRoute = (route: CapabilityRoute, key: string, isProtected?: boolean) => {

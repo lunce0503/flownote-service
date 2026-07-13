@@ -7,9 +7,9 @@
 3. 구현: 집중된 파일만 편집한다.
 4. 검증: 가장 좁고 의미 있는 검사를 실행한다.
 5. 리뷰: 회귀, 보안, 계약, UX를 점검한다.
-6. 기록: 버그 재현과 실행 로그 요약은 `logs/`, 리뷰와 감사 산출물은 `report/`, 안정적인 학습 내용은 `.codex/memories/` 후보로 남긴다.
+6. 기록: 버그 재현과 실행 로그 요약은 `logs/`, 리뷰와 감사 산출물은 `logs/report/`, 안정적인 학습 내용은 `.codex/memories/` 후보로 남긴다.
 7. Docker 빌드 및 실행: 작업 종료 전 저장소 루트에서 `docker compose up -d --build`를 실행한다.
-8. 클라우드 배포: 파일을 수정한 작업은 항상 클라우드 배포를 진행한다. `flownote/`는 Vercel production, `flownote-API/`는 Railway `flownote-api`, `flownote-server/`는 Railway `flownote-main`을 배포한다. `report/` 전용 보고서 작업은 Docker와 클라우드 배포를 생략한다. `report/` 외 문서 전용 변경은 Vercel production 배포를 기본으로 하고 백엔드 배포 생략 사유를 기록한다.
+8. 클라우드 배포: 파일을 수정한 작업은 항상 클라우드 배포를 진행한다. `flownote/`는 Vercel production, `flownote-API/`는 Railway `flownote-api`, `flownote-server/`는 Railway `flownote-main`을 배포한다. `logs/report/` 전용 보고서 작업은 Docker와 클라우드 배포를 생략한다. `logs/report/` 외 문서 전용 변경은 Vercel production 배포를 기본으로 하고 백엔드 배포 생략 사유를 기록한다.
 9. 보고: 최종 응답에 개별 검증, Docker 빌드 및 백그라운드 실행 결과, 클라우드 배포 결과를 함께 남긴다.
 
 ## 중단 조건
@@ -25,5 +25,5 @@
 
 - `logs/bugs/`: 사용자가 본 오류, 재현 경로, 원인, 수정 방향을 기록한다.
 - `logs/`: 일회성 실행 로그 요약과 운영 증상을 기록한다. 비밀값과 대용량 원본 파일은 제외한다.
-- `report/`: 코드 리뷰, 배포 감사, 품질 점검, 큰 작업 결과처럼 다시 읽을 산출물을 기록한다.
+- `logs/report/`: 코드 리뷰, 배포 감사, 품질 점검, 큰 작업 결과처럼 다시 읽을 산출물을 기록한다.
 - `.codex/memories/`: 반복 적용할 안정적인 프로젝트 컨벤션만 후보로 남긴다.

@@ -3,7 +3,7 @@ import {
   ResizableFileBlockWrapper,
 } from "@blocknote/react";
 import type { ReactCustomBlockRenderProps } from "@blocknote/react";
-import ReactMarkdownRender from "../../../shared/ui/ReactMarkdownRender";
+import ReactMarkdownRender from "@/shared/ui/ReactMarkdownRender";
 
 export const LaTexViewer = (props: Omit<ReactCustomBlockRenderProps<string>, "content">) => {
     return(

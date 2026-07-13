@@ -22,7 +22,7 @@ Flownote의 하네스는 `.codex/`의 규칙, 프롬프트, 체크리스트, 메
 | 장기 제품/설계 지식 | `docs/` | 기능 이해, 의사결정, 온보딩 |
 | 안정화된 프로젝트 기억 | `.codex/memories/` | 반복되는 컨벤션 후보 |
 | 버그와 실행 증상 | `logs/` | 재현, 원인, 수정 방향 추적 |
-| 리뷰와 감사 산출물 | `report/` | 품질 점검, 배포 결과, 큰 작업 요약 |
+| 리뷰와 감사 산출물 | `logs/report/` | 품질 점검, 배포 결과, 큰 작업 요약 |
 
 ## 표준 작업 루프
 
@@ -32,10 +32,10 @@ Flownote의 하네스는 `.codex/`의 규칙, 프롬프트, 체크리스트, 메
 4. 구현 후 가장 좁은 검증을 먼저 실행한다.
 5. 저장소 루트에서 `docker compose up -d --build`로 통합 실행을 확인한다.
 6. 파일을 수정한 작업은 항상 클라우드 배포를 진행한다. `flownote/`는 Vercel production, `flownote-API/`는 Railway `flownote-api`, `flownote-server/`는 Railway `flownote-main`을 배포한다.
-7. `report/` 아래 보고서만 작성하거나 수정하는 작업은 Docker와 클라우드 배포를 생략하고, 파일 확인으로 검증을 끝낸다.
-8. `report/` 외 문서 전용 변경은 Vercel production 배포를 기본으로 수행하고, 백엔드 실행 산출물이 바뀌지 않았으면 Railway 배포 생략 사유를 기록한다.
-9. 배포 URL, deployment id, 헬스체크 결과를 확인하고 필요한 경우 `report/`에 남긴다.
-10. 버그는 `logs/`, 결과 산출물은 `report/`, 장기 지식은 `docs/` 또는 `.codex/memories/` 갱신을 검토한다.
+7. `logs/report/` 아래 보고서만 작성하거나 수정하는 작업은 Docker와 클라우드 배포를 생략하고, 파일 확인으로 검증을 끝낸다.
+8. `logs/report/` 외 문서 전용 변경은 Vercel production 배포를 기본으로 수행하고, 백엔드 실행 산출물이 바뀌지 않았으면 Railway 배포 생략 사유를 기록한다.
+9. 배포 URL, deployment id, 헬스체크 결과를 확인하고 필요한 경우 `logs/report/`에 남긴다.
+10. 버그는 `logs/`, 결과 산출물은 `logs/report/`, 장기 지식은 `docs/` 또는 `.codex/memories/` 갱신을 검토한다.
 
 ## 문서 정리 루프
 

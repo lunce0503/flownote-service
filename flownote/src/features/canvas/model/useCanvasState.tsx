@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import type { ToolType } from '../../../entities/canvas/model/types';
+import type { ToolType } from '@/entities/canvas';
 
 export const useCanvasState = (canvasRef: RefObject<HTMLCanvasElement|null>) => {
   const [offset, setOffset] = useState({ x: 0, y: 0 });

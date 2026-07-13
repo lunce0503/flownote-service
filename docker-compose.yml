@@ -30,7 +30,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # 2. FastAPI 백엔드
+  # 2. FastAPI API 게이트웨이 (라우팅 + 캔버스 소켓 중계)
   api-server:
     build: ./flownote-API
     container_name: flownote-api
@@ -40,11 +40,57 @@ services:
     environment:
       - CORS_ORIGINS=${CORS_ORIGINS:-http://${HOST_LAN_IP:-localhost}:3000,http://${HOST_LAN_IP:-localhost}:5173,http://${HOST_LAN_IP:-localhost}:8081,http://localhost:3000,http://localhost:5173,http://localhost:8081}
       - JWT_SECRET=${JWT_SECRET}
+      # 게이트웨이 라우팅 대상: 코어=Spring, 캔버스=Go, AI/데이터=flownote-ai
       - CORE_API_BASE_URL=http://spring-server:8080
+      - CANVAS_API_BASE_URL=http://canvas-server:8090
+      - AI_API_BASE_URL=http://ai-server:8000
     ports:
       - "8000:8000"
     depends_on:
       - spring-server
+      - canvas-server
+      - ai-server
+
+  # 2-A. Go 캔버스 백엔드 (/api/canvas/** 전담)
+  canvas-server:
+    build: ./flownote-canvas
+    container_name: flownote-canvas
+    restart: always
+    environment:
+      - PORT=8090
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - FLOWNOTE_STORAGE_ENDPOINT=${FLOWNOTE_STORAGE_ENDPOINT}
+      - FLOWNOTE_STORAGE_BUCKET=${FLOWNOTE_STORAGE_BUCKET}
+      - FLOWNOTE_STORAGE_REGION=${FLOWNOTE_STORAGE_REGION}
+      - FLOWNOTE_STORAGE_ACCESS_KEY_ID=${FLOWNOTE_STORAGE_ACCESS_KEY_ID}
+      - FLOWNOTE_STORAGE_SECRET_ACCESS_KEY=${FLOWNOTE_STORAGE_SECRET_ACCESS_KEY}
+      - FLOWNOTE_STORAGE_PUBLIC_BASE_URL=${FLOWNOTE_STORAGE_PUBLIC_BASE_URL}
+    ports:
+      - "8090:8090"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # 2-B. flownote-ai: AI/데이터 백엔드 (aiclient·agent-note·market·chat·social)
+  ai-server:
+    build: ./flownote-ai
+    container_name: flownote-ai
+    restart: always
+    env_file:
+      - ./flownote-API/.env
+    environment:
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://${HOST_LAN_IP:-localhost}:3000,http://${HOST_LAN_IP:-localhost}:5173,http://${HOST_LAN_IP:-localhost}:8081,http://localhost:3000,http://localhost:5173,http://localhost:8081}
+      - CORE_API_BASE_URL=http://spring-server:8080
+      # 에이전트 노트: 내부망 Ollama(gemma4+embeddinggemma) 및 sqlite 인덱스 경로
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - AGENT_NOTE_DB_PATH=${AGENT_NOTE_DB_PATH:-/app/data/agent_note.db}
+    ports:
+      - "8010:8000"
+    volumes:
+      - agent-note-data:/app/data # 에이전트 노트 캡션 인덱스(sqlite) 영속화
+    depends_on:
+      - spring-server
+      - ollama
 
   # 2-1. Spring Boot 메인 백엔드
   spring-server:
@@ -100,7 +146,7 @@ services:
     depends_on:
       - spring-server
     volumes:
-      - ./report:/app/report:ro
+      - ./logs/report:/app/report:ro
 
   # 4. React (Vite) SPA
   react-app:
@@ -155,3 +201,29 @@ services:
     depends_on:
       - spring-server
       - react-app
+
+  # 6. Ollama 로컬 LLM (내부망 전용 · GPU 없음/CPU) — 클라우드 미배포
+  ollama:
+    image: ollama/ollama:latest
+    container_name: flownote-ollama
+    restart: always
+    environment:
+      # 다른 컨테이너가 ollama:11434 로 접근하려면 0.0.0.0 바인딩 필수(기본 127.0.0.1이면 내부 통신 불가)
+      - OLLAMA_HOST=0.0.0.0:11434
+      # CPU 단일/소수 사용 전제: 동시 처리 1, 모델 로드 유지로 재로딩 지연 방지
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_KEEP_ALIVE=1h
+    volumes:
+      - ollama-models:/root/.ollama # 모델 가중치 캐시(재다운로드 방지)
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    # 내부 서비스: 호스트 포트 publish/공개 도메인 없음. 접근은 compose 네트워크의 ollama:11434
+    # 최초 1회 모델 받기: docker compose exec ollama ollama pull gemma4:e2b-it-qat
+
+volumes:
+  ollama-models:
+  agent-note-data:

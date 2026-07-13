@@ -1,4 +1,4 @@
-import type { CanvasElementStatus, LineElement, Point } from "../../../entities/canvas/model/types";
+import type { CanvasElementStatus, LineElement, Point } from "@/entities/canvas";
 
 export type Bounds = {
     minX: number;

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { Point, ImageElement, TextBoxElement, ToolType, CanvasElementStatus } from '../../../entities/canvas/model/types';
+import type { Point, ImageElement, TextBoxElement, ToolType, CanvasElementStatus } from '@/entities/canvas';
 
 type GetCanvasCoords = (e: React.PointerEvent | MouseEvent) => Point;
 

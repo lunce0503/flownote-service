@@ -1,4 +1,4 @@
-import { BlockNoteWidget } from "../../widgets";
+import { BlockNoteWidget } from "@/widgets";
 
 const BlogDetailPage = () => {
     return (

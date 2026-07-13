@@ -2,14 +2,14 @@ import { useEffect, useRef } from "react";
 import type { PointerEvent, ReactNode } from "react";
 import { Eraser, PenLine, RotateCcw, Trash2 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
-import { useCanvasState } from "../../../../features/canvas/model/useCanvasState";
-import { useDrawing } from "../../../../features/canvas/model/useDrawing";
-import { useElementManipulation } from "../../../../features/canvas/model/useElementManipulation";
-import { useCanvasRendering } from "../../../../features/canvas/model/useCanvasRendering";
-import { useCanvasHistory } from "../../../../features/canvas/model/useCanvasHistory";
-import { CANVAS_PENCIL_ONLY_MODE_STORAGE_KEY } from "../../../../features/canvas/model/canvasConstants";
-import type { LineElement, Point, ToolType } from "../../../../entities/canvas/model/types";
-import { useLocalStorageBoolean } from "../../../../shared/lib/useLocalStorageBoolean";
+import { useCanvasState } from "@/features/canvas";
+import { useDrawing } from "@/features/canvas";
+import { useElementManipulation } from "@/features/canvas";
+import { useCanvasRendering } from "@/features/canvas";
+import { useCanvasHistory } from "@/features/canvas";
+import { CANVAS_PENCIL_ONLY_MODE_STORAGE_KEY } from "@/features/canvas";
+import type { LineElement, Point, ToolType } from "@/entities/canvas";
+import { useLocalStorageBoolean } from "@/shared/lib/useLocalStorageBoolean";
 
 type NoteDrawingCanvasProps = {
   isSaving: boolean;

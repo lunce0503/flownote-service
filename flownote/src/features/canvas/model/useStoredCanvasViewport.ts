@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { Point } from "../../../entities/canvas/model/types";
+import type { Point } from "@/entities/canvas";
 import { DEFAULT_CANVAS_VIEWPORT } from "./canvasConstants";
 import { readStoredViewport, writeStoredViewport } from "./canvasViewportStorage";
 

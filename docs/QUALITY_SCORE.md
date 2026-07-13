@@ -11,8 +11,8 @@
 | FastAPI | `cd flownote-API && uv run pytest` | `[dependency-groups] dev`에 pytest 구성됨(`uv sync --group dev` 후 실행). 변경한 모듈에 맞는 compile/test 실행 |
 | Next.js | `cd flownote-next && yarn lint && yarn build` | Next 변경 시 실행 |
 | Docker | `docker compose up -d --build` | 작업 종료 전 통합 빌드와 백그라운드 실행 확인 |
-| Cloud deploy | Vercel production deploy, Railway deploy/healthcheck | 파일 수정 작업마다 배포 URL, deployment id, 헬스체크 결과를 최종 응답과 필요한 경우 `report/`에 기록 |
-| Report-only | 파일 존재 및 핵심 내용 확인 | `report/` 아래 보고서만 작성/수정한 경우 Docker와 클라우드 배포를 생략 |
+| Cloud deploy | Vercel production deploy, Railway deploy/healthcheck | 파일 수정 작업마다 배포 URL, deployment id, 헬스체크 결과를 최종 응답과 필요한 경우 `logs/report/`에 기록 |
+| Report-only | 파일 존재 및 핵심 내용 확인 | `logs/report/` 아래 보고서만 작성/수정한 경우 Docker와 클라우드 배포를 생략 |
 
 ## 품질 관점
 

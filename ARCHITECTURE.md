@@ -1,17 +1,47 @@
-# Flownote 아키텍처
+# 개요
 
-이 문서는 저장소 전체 구조와 작업 기록 위치를 한눈에 확인하기 위한 루트 아키텍처 문서다. 세부 운영 규칙은 `AGENTS.md`, 장기 문서는 `docs/`, 에이전트 실행 자산은 `.codex/`를 기준으로 한다.
 
-## 하위 프로젝트
+
+# 시스템 구성 (조감도)
+
+Flownote는 기획한 내용을 바탕으로 관련 필기를 텍스트와 그림으로 표현하여 새로운 아이디어를 만들거나 기존의 내용을 정리하며 지식을 정리하게 돕는 노트이다. 
+주된 기능은 그림판(Canvas)과 작성 영역(Text Pad)이며 부가적인 기능을 이용하여 그림판과 작성영역과의 유기적인 조합을 이루는 방식으로 개발되었다. 
+그림판은 연필이나 펜을 통해 작성하는 방식을 말하며 이는 고전적인 필기를 중심으로 작성되는 기능이다. 이 기능을 주요 작성 방법으로 정하면 대상의 연결성과 높은 직관력을 가지는 시각적 표현의 장점을 이용하는 곳으로 주로 구상이나 이해를 중시할 때 작성되는 방식이다. 
+작성 영역은 키보드와 같은 타이핑 기기를 통해 작성되는 기능을 말하며, 이를 주된 작성법으로 정하면 엄밀하게 정의되어야 하거나 정보의 오류가 없어야 하는 내용을 담는 것이 주된 내용이 된다. 그리고 그림판 기능과 달리 단방향으로 작성하기 때문에 시간을 기반으로 하는 정보를 작성하는데 용이하다. 
+위의 주된 기능을 바탕으로 작성하는 내용을 기록하는데 불편함을 겪는 경우에 이용하는 것이 부가적인 기능이다. 텍스트나 선 데이터를 가지고 표현하기 어려운 경우, 사용자가 해당되는 지식을 나타내는 것이 어려운 경우나 실시간으로 변하는 값을 이용하는 경우와 같이 어려움을 갖는 경우에 사용하는 기능이다. 
+
+# 코드맵
+
+## `flownote/` : flownote의 프론트엔드를 다루는 곳
+## `flownote/src` : flownote의 프론트와 직접관련된 소스 코드를 작성하는 곳으로 FSD 방식으로 코드를 작성하는 것을 주로 둔다.
+### `flownote/src/app`: flownote 프론트엔드의 가장 최상위 폴더로 실제 렌더링을 할때 마지막으로 거쳐야하는 곳이다.
+
+### `flownote/src/entities`: flownote 기능 중 비지니스 모델과 관련된 내용을 다루는 곳으로  
+### `flownote/src/features`: 
+### `flownote/src/pages`: 
+### `flownote/src/shared`: 
+### `flownote/src/widgets`: 
+
+### `flownote-mobile/` : flownote의 IOS/Android 앱을 다루는 곳
+### `flownote-next/` : `flownote/`에서 클라이언트가 요청한 데이터를 가공해 전송하는 서버
+### `flownote-server/` : flownote 서버스의 메인 서버로 주로 캔버스/텍스트 패드 데이터 저장, 로그인 인증, 이외의 다양한 기능의 데이터를 다루는 서버이다.
+### `flownote-API/` : flownote API 라우터로 flownote의 여러 마이크로서비스를 연결하는 api를 관리하는 서버
+
+## 하위 서버 아키텍쳐
 
 | 경로 | 역할 | 주요 책임 |
 | --- | --- | --- |
 | `flownote/` | Vite React 웹 앱 | 작업, 노트, 캔버스, 소셜, 주식 등 주요 사용자 화면 |
 | `flownote-next/` | Next.js 앱 | Next app-router 기반 화면, API, Prisma/PostgreSQL 기능 |
-| `flownote-API/` | FastAPI 서비스 | AI/에이전트 보조 API, 외부 Python 생태계 연동 |
-| `flownote-server/` | Spring Boot WAS | 인증, 사용자 소유 데이터, 작업/노트/모바일 설정 API |
+| `flownote-API/` | **API 게이트웨이**(FastAPI) | 클라이언트 `/api/**`를 받아 백엔드로 라우팅(canvas→Go, AI/데이터→flownote-ai, 코어→Spring) + 실시간 캔버스 Socket.IO 중계. 자체 백엔드 로직 없음 |
+| `flownote-canvas/` | **Go 캔버스 백엔드** | `/api/canvas/**` 전담(문서·폴더·요소·뷰포트·자산). flownote-server와 Postgres/S3 공유, 호환 포맷 read/write |
+| `flownote-ai/` | **AI/데이터 백엔드**(FastAPI) | `/api/aiclient`(Gemini), `/api/agent-note`(내부망 Ollama), `/api/market`(주식), `/api/chat`, `/api/social`. flownote-API에서 분리 |
+| `flownote-server/` | Spring Boot WAS | 인증, 사용자 소유 데이터, 작업/노트/모바일 설정 API. 캔버스는 Go로 이관(Spring 캔버스 코드는 호환/폴백용으로 유지) |
 | `flownote-mobile/` | Expo 모바일 앱 | Spring WAS 설정을 읽어 WebView로 웹 앱을 여는 모바일 진입점 |
-| `docker-compose.yml` | 로컬 통합 실행 | PostgreSQL과 모든 앱/서버를 함께 실행 |
+| `db` (PostgreSQL) | 관계형 DB · :5432 | Spring 소유 데이터 · Next Prisma 데이터 |
+| `redis` (Redis) | 캐시 · :6379 | Spring 캔버스 상태 캐시(TTL) |
+| `ollama` (Ollama) | 내부망 LLM · :11434 | gemma4:e2b(멀티모달) + embeddinggemma, 에이전트 노트 추론(클라우드 미배포) |
+| `docker-compose.yml` | 로컬 통합 실행 | 위 앱·서버·인프라를 함께 실행 |
 
 ## 서비스 경계
 
@@ -20,6 +50,31 @@
 - Next.js 앱은 Prisma/PostgreSQL을 사용하는 독립 흐름을 담당하되, 공통 DB 계약이 바뀌면 Spring과 함께 확인한다.
 - 모바일 앱은 `EXPO_PUBLIC_WAS_URL`의 `/api/mobile/config`를 시작점으로 사용한다.
 - DB 스키마 기준은 Spring Flyway 마이그레이션이며, 문서가 실제 마이그레이션과 다르면 마이그레이션을 우선한다.
+- 캔버스 백엔드는 `flownote-canvas`(Go)가 전담한다. flownote-server(Spring)와 같은 Postgres/S3를 공유하고 `canvas_*` 테이블에 호환 포맷으로 read/write 한다(Go가 쓴 요소를 Spring이 동일하게 읽음을 검증). Go는 요소 payload를 인라인 저장(`object_key=NULL`, `storage_status='READY'`)하되, Spring이 S3로 오프로드한 기존 데이터는 `object_key`로 읽어 호환한다.
+- API 게이트웨이: `flownote-API`가 클라이언트 `/api/**`를 받아 경로로 백엔드를 정한다. `/api/canvas/**`→`CANVAS_API_BASE_URL`(Go), `/api/{aiclient,agent-note,market,chat,social}`→`AI_API_BASE_URL`(flownote-ai), 그 외 코어→`CORE_API_BASE_URL`(Spring). 게이트웨이 자신은 백엔드 로직이 없고 라우팅과 캔버스 소켓 중계만 한다.
+  - 완전 게이트웨이 특성(`app/gateway.py`): **스트리밍 프록시**(SSE `ask_stream`·대용량을 버퍼링 없이 청크 전달), **콜드스타트 재시도**(연결 수립 실패는 백오프 재시도 — 상류 미처리라 POST 안전), **`X-Request-ID`** 생성·전파, 구조화 액세스 로그, hop-by-hop 헤더 정리·`X-Forwarded-*`.
+  - 남은 일(프론트): 현재 프론트는 Spring·Go·flownote-ai를 각 `VITE_*`로 직결한다. 게이트웨이를 단일 진입점으로 쓰려면 `VITE_CORE_API_URL`/`VITE_AI_BASE_URL`을 게이트웨이로 모아야 한다.
+- AI/데이터 백엔드는 `flownote-ai`가 담당한다: 메인 플래너 에이전트(외부 Gemini, MCP 도구의 최종 저장은 Spring Core API 경유), 에이전트 노트(내부망 Ollama — 클라우드 미배포라 클라우드 flownote-ai에서는 미동작), 주식 시세(Spring이 `STOCK_MARKET_DATA_URL`=게이트웨이 경유로 소비), 채팅, 소셜.
+- 운영 주의: Railway 서비스가 유휴로 잠들면 게이트웨이의 첫 프록시 요청이 백엔드를 깨우는 동안 502가 날 수 있다(웜업 후 정상). 상시 가동이 필요하면 min instance 설정.
+- 실시간 캔버스는 React ↔ FastAPI Socket.IO로 연결되고, FastAPI가 스트로크/이미지/텍스트를 `CANVAS_API_BASE_URL`(Go)의 캔버스 API에 중계·저장한다.
+- 라우팅 지점: 프론트 `VITE_CANVAS_API_URL`(캔버스 HTTP), 게이트웨이 `CANVAS_API_BASE_URL`(소켓 중계 + HTTP 프록시). 둘 다 flownote-canvas(Go)를 가리킨다.
+- 에이전트 노트의 Ollama와 그 기능은 내부망 전용이며 클라우드에 배포하지 않는다(클라우드 flownote-ai에서는 Ollama 부재로 미동작).
+
+## 배포 토폴로지
+
+로컬은 `docker-compose.yml`로 통합 실행하고, 프로덕션은 프론트=Vercel, 백엔드=Railway로 나뉜다. Ollama·에이전트 노트는 내부망 전용으로 클라우드에 올리지 않는다.
+
+| 하위 프로젝트 | 프로덕션 대상 | 비고 |
+| --- | --- | --- |
+| `flownote/` (Vite) | Vercel `flownote-react` | 빌드타임 `VITE_*` 주입 |
+| `flownote-next/` | Vercel `flownote-next` | Next.js |
+| `flownote-API/` | Railway `flownote-api` | Socket.IO(wss), health `/` |
+| `flownote-server/` | Railway `flownote-main` | health `/actuator/health` |
+| `flownote-server/` (캔버스 전담) | Railway `flownote-canvas` | 같은 이미지 2호기, `/api/canvas/**` 트래픽 전담, 변수는 flownote-main 참조 |
+| PostgreSQL · Redis | Railway 관리형 | 사설 네트워크 |
+| Ollama · 에이전트 노트 | 배포 안 함 | 내부망 전용 |
+
+내부망은 3계층으로 배선한다: 컨테이너 간 docker DNS(`spring-server:8080`, `api-server:8000`, `ollama:11434`), 실기기 접근용 `HOST_LAN_IP`(LAN), 프로덕션 public HTTPS.
 
 ## 코드 처리 단계
 
@@ -36,11 +91,11 @@
 | --- | --- | --- |
 | `logs/bugs/` | 재현 가능한 런타임 오류와 사용자 제보 버그 | 증상, 재현 경로, 원인, 수정 방향 |
 | `logs/` | 실행 로그 요약과 운영 증상 | 비밀값을 제거한 핵심 로그와 관찰 결과 |
-| `report/` | 리뷰, 감사, 배포 결과, 큰 작업 요약 | 다시 읽을 가치가 있는 분석 산출물 |
+| `logs/report/` | 리뷰, 감사, 배포 결과, 큰 작업 요약 | 다시 읽을 가치가 있는 분석 산출물 |
 | `.codex/memories/` | 안정적인 프로젝트 컨벤션 후보 | 반복 적용할 수 있는 장기 지식 |
 | `docs/` | 제품, 설계, 품질, 보안, 신뢰성 문서 | 코드와 운영 기준을 설명하는 장기 문서 |
 
-`logs/`와 `report/`는 소스 코드의 근거를 대체하지 않는다. 코드와 문서가 충돌하면 소스 코드, 마이그레이션, 실행 가능한 검증 결과를 우선한다.
+`logs/`와 `logs/report/`는 소스 코드의 근거를 대체하지 않는다. 코드와 문서가 충돌하면 소스 코드, 마이그레이션, 실행 가능한 검증 결과를 우선한다.
 
 ## 검증 기준
 

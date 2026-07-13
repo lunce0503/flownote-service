@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import Konva from "konva";
 import RBush from "rbush";
-import type { Point, LineElement, ImageElement, TextBoxElement } from "../../../entities/canvas/model/types";
+import type { Point, LineElement, ImageElement, TextBoxElement } from "@/entities/canvas";
 
 type CurrentLineStyle = {
   color: string;

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Activity, Database, HardDrive, RefreshCw, Server } from "lucide-react";
 import { Navigate } from "react-router-dom";
-import { API_CORE_BASE_URL, authHeaders } from "../../../shared/api";
-import { useAuth } from "../../../shared/auth/AuthContext";
-import { readCanvasDeviceDiagnostics, type CanvasDeviceDiagnostic } from "../../../features/canvas/model/canvasIndexedDb";
+import { API_CORE_BASE_URL, authHeaders } from "@/shared/api";
+import { useAuth } from "@/features/auth";
+import { readCanvasDeviceDiagnostics, type CanvasDeviceDiagnostic } from "@/features/canvas";
 
 type Summary = {
   database?: string;

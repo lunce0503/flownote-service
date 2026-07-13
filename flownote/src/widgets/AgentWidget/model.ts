@@ -1,4 +1,4 @@
-import type { TaskProps } from "../../entities/task";
+import type { TaskProps } from "@/entities/task";
 
 export type NoteBlock = {
     content?: Array<{

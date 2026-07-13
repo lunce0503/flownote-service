@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect } from "react";
-import { ChatBlock, ChatSendBlock, type ChatMessage } from "../../shared/ui/ChatBlock";
+import { ChatBlock, ChatSendBlock, type ChatMessage } from "@/shared/ui/ChatBlock";
 import { v4 as uuidv4 } from 'uuid';
-import postSocialData, { postSocialRoom } from "../../entities/social/api/postSocialData";
-import { getSocialMessages, getSocialRooms } from "../../entities/social/api/getSocialData";
-import deleteSocialMessage, { deleteSocialRoom } from "../../entities/social/api/deleteSocialData";
-import searchUserData, { type UserSearchResult } from "../../entities/users/api/searchUserData";
-import { useAuth } from "../../shared/auth/AuthContext";
-import uploadFileData from "../../shared/api/uploadFileData";
-import { API_CORE_BASE_URL } from "../../shared/api";
+import { postSocialData, postSocialRoom } from "@/entities/social";
+import { getSocialMessages, getSocialRooms } from "@/entities/social";
+import { deleteSocialMessage, deleteSocialRoom } from "@/entities/social";
+import { searchUserData, type UserSearchResult } from "@/entities/users";
+import { useAuth } from "@/features/auth";
+import uploadFileData from "@/shared/api/uploadFileData";
+import { API_CORE_BASE_URL } from "@/shared/api";
 import { FilePlus2, MessageSquareText, MoreVertical, Users, X } from "lucide-react";
 
 type SocialMessage = {

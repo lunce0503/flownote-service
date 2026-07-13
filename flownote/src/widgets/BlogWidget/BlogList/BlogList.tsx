@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { Link } from "react-router-dom";
 import { Check, Folder, MoreVertical, Pencil, Plus, Trash2, X } from "lucide-react";
-import getNoteData from "../../../entities/blog/getNoteData";
-import postNoteData from "../../../entities/blog/postNoteData";
-import { deleteNote, updateNoteTitle } from "../../../entities/blog/noteDataActions";
+import { getNoteData } from "@/entities/blog";
+import { postNoteData } from "@/entities/blog";
+import { deleteNote, updateNoteTitle } from "@/entities/blog";
 import {
   addNoteToFolder,
   createNoteFolder,
@@ -12,7 +12,7 @@ import {
   removeNoteFromFolder,
   updateNoteFolder,
   type NoteFolder,
-} from "../../../entities/blog/noteFolderData";
+} from "@/entities/blog";
 import {
   BLOG_COLLAPSED_FOLDERS_STORAGE_KEY,
   EMPTY_BLOG_FOLDER_FORM,
@@ -23,9 +23,9 @@ import {
   groupNoteFoldersByCategory,
   type BlogNote,
   type FolderForm,
-} from "../../../features/blog/model/blogListModel";
-import { useLocalStorageStringSet } from "../../../shared/lib/useLocalStorageStringSet";
-import { getSyncClientId, subscribeSyncEvents } from "../../../shared/sync";
+} from "@/features/blog";
+import { useLocalStorageStringSet } from "@/shared/lib/useLocalStorageStringSet";
+import { getSyncClientId, subscribeSyncEvents } from "@/shared/lib/sync";
 
 const BlogList = () => {
   const [blogList, setBlogList] = useState<BlogNote[]>([]);

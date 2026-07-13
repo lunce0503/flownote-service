@@ -9,7 +9,7 @@ import {
   type StockHistoryPoint,
   type StockHolding,
   type StockQuote,
-} from "../../entities/stocks/api";
+} from "@/entities/stocks";
 import { formatMoney, formatNumber } from "./format";
 
 type CandlePoint = {

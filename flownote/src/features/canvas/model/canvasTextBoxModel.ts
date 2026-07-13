@@ -1,4 +1,4 @@
-import type { TextBoxElement } from "../../../entities/canvas/model/types";
+import type { TextBoxElement } from "@/entities/canvas";
 import { DEFAULT_TEXT_BOX_HEIGHT, DEFAULT_TEXT_BOX_WIDTH } from "./canvasConstants";
 
 const TEXT_BOX_HORIZONTAL_PADDING = 24;

@@ -1,4 +1,4 @@
-import type { CanvasDocumentSummary, CanvasFolder } from "../../../entities/canvas/model/types";
+import type { CanvasDocumentSummary, CanvasFolder } from "@/entities/canvas";
 
 export const buildCanvasFolderIdByCanvasId = (folders: CanvasFolder[]) => {
     const entries = folders.flatMap((folder) => folder.canvasIds.map((canvasId) => [canvasId, folder.id] as const));

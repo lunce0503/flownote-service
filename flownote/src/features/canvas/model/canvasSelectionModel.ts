@@ -1,4 +1,4 @@
-import type { ImageElement, LineElement, Point, TextBoxElement } from "../../../entities/canvas/model/types";
+import type { ImageElement, LineElement, Point, TextBoxElement } from "@/entities/canvas";
 import { isPointInPolygon, lassoHitsLine, type Bounds } from "./canvasGeometry";
 import { CanvasSpatialIndex, getPointsBounds } from "./canvasSpatialIndex";
 

@@ -8,16 +8,16 @@ import {
   defaultBlockSpecs,
   defaultInlineContentSpecs,
 } from "@blocknote/core";
-import postNoteData from "../../../entities/blog/postNoteData";
-import type { BlockDataProps } from "../../../entities/blog";
+import { postNoteData } from "@/entities/blog";
+import type { BlockDataProps } from "@/entities/blog";
 import { useNavigate, useParams } from "react-router-dom";
-import getNoteData from "../../../entities/blog/getNoteData";
-import { API_CORE_BASE_URL, authHeaders } from "../../../shared/api";
+import { getNoteData } from "@/entities/blog";
+import { API_CORE_BASE_URL, authHeaders } from "@/shared/api";
 import axios from "axios";
 import { LatexInline } from "./LatexInline";
 import { transformLatexInlineContent } from "./latexTransform";
 import NoteDrawingPad from "./NoteDrawingPad";
-import { getSyncClientId, subscribeSyncEvents } from "../../../shared/sync";
+import { getSyncClientId, subscribeSyncEvents } from "@/shared/lib/sync";
 
 const uploadFile = async (file: File) => {
   if (!API_CORE_BASE_URL) {

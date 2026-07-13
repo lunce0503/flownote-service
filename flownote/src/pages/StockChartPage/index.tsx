@@ -1,4 +1,4 @@
-import { StockChart } from "../../widgets/StockWidget";
+import { StockChart } from "@/widgets/StockWidget";
 
 const StockChartPage = () => {
   return <StockChart />;

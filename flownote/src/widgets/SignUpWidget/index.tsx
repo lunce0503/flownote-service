@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from "react";
-import postUserData from "../../entities/users/api/postUserData";
-import type { UserDataProps } from "../../entities/users";
+import { postUserData } from "@/entities/users";
+import type { UserDataProps } from "@/entities/users";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Lock, Mail, Notebook, User } from "lucide-react";
 

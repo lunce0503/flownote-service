@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /home/kwon/Flownote/service log --oneline -10)",
+      "Bash(git -C /home/kwon/Flownote/service status --short)",
+      "Bash(uv run *)"
+    ],
+    "deny": []
+  }
+}

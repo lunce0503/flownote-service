@@ -1,4 +1,4 @@
-import SettingsPage from "../../../pages/SettingsPage";
+import SettingsPage from "@/pages/SettingsPage";
 
 const SettingsRoute = () => {
   return <SettingsPage />;

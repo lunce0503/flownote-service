@@ -1,4 +1,4 @@
-import StockPage from "../../../pages/StockPage";
+import StockPage from "@/pages/StockPage";
 
 const StockRoute = () => {
   return <StockPage />;
