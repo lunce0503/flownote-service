@@ -26,9 +26,18 @@ const canvasDraftTimers = new Map<string, number>();
 const CANVAS_DRAFT_WRITE_DELAY_MS = 1_500;
 const canvasDraftKey = (canvasId?: string | null) => canvasId ?? "default";
 
-// IndexedDB에서 복원한 큐를 메모리에만 반영한다(재기록 없음)
-export const hydrateCanvasRetryQueue = (queue: CanvasRetryQueueItem[]) => {
-  canvasRetryQueueMemory = queue;
+// IndexedDB에서 복원한 큐를 메모리 큐와 병합한다. 복원이 끝나기 전에 이번 세션에서
+// 이미 실패 항목이 쌓였을 수 있으므로(느린 기기에서 실제 발생) 덮어쓰지 않고,
+// 캔버스별 1항목 불변식에 따라 같은 캔버스는 더 최신인 메모리 항목을 우선한다.
+export const hydrateCanvasRetryQueue = (persistedQueue: CanvasRetryQueueItem[]) => {
+  const memoryQueue = canvasRetryQueueMemory;
+  if (memoryQueue.length === 0) {
+    canvasRetryQueueMemory = persistedQueue;
+    return;
+  }
+  const memoryCanvasKeys = new Set(memoryQueue.map((item) => item.canvasId));
+  const restored = persistedQueue.filter((item) => !memoryCanvasKeys.has(item.canvasId));
+  writeCanvasRetryQueue([...restored, ...memoryQueue]);
 };
 
 export const readCanvasRetryQueue = (): CanvasRetryQueueItem[] => {
@@ -64,6 +73,9 @@ export const addCanvasRetryQueueItem = (
       payload,
       lastError,
       createdAt: Date.now(),
+      // 새 payload는 이전 실패의 백오프를 상속하지 않는다(최대 5분 지연 방지).
+      attempts: payloadChanged ? 0 : existingItem.attempts,
+      nextAttemptAt: payloadChanged ? Date.now() : existingItem.nextAttemptAt,
       priority: Math.max(existingItem.priority ?? 40, priority),
     };
     writeCanvasRetryQueue(queue.map((item) => item.id === existingItem.id ? updatedItem : item));

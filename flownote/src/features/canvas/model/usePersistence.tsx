@@ -456,14 +456,18 @@ export const usePersistence = (
     }));
 
     let activeMutation: { mutationId: string; payload: CanvasSavePayload } | null = null;
+    // 저장이 진행되는 동안 캔버스가 전환될 수 있으므로(느린 네트워크에서 실제 발생)
+    // 시도 시점의 canvasId를 캡처해 실패 큐 귀속과 성공 후 정리를 그 캔버스에만 적용한다.
+    let attemptCanvasId: string | null = canvasIdRef.current ?? null;
     try {
       do {
         saveAgainRequestedRef.current = false;
         const currentTrigger = pendingSaveTriggersRef.current.shift() ?? trigger;
+        attemptCanvasId = canvasIdRef.current ?? null;
 
-        if (getCanvasRetryCount(canvasIdRef.current) > 0) {
+        if (getCanvasRetryCount(attemptCanvasId) > 0) {
           await retryPendingSaves({ skipInFlightGuard: true });
-          if (getCanvasRetryCount(canvasIdRef.current) > 0) return;
+          if (getCanvasRetryCount(attemptCanvasId) > 0) return;
           if (saveAgainRequestedRef.current) continue;
         }
 
@@ -475,9 +479,14 @@ export const usePersistence = (
         const revisionAtSaveStart = localRevisionRef.current;
         const mutationId = uuidv4();
         activeMutation = { mutationId, payload };
-        const response = await saveCanvasPayload(CANVAS_SOCKET_URL, canvasIdRef.current, payload, mutationId, currentTrigger);
-        serverRevisionRef.current = response.revision;
+        const response = await saveCanvasPayload(CANVAS_SOCKET_URL, attemptCanvasId, payload, mutationId, currentTrigger);
         activeMutation = null;
+
+        if (canvasIdRef.current !== attemptCanvasId) {
+          saveAgainRequestedRef.current = true;
+          continue;
+        }
+        serverRevisionRef.current = response.revision;
 
         if (localRevisionRef.current !== revisionAtSaveStart) {
           saveAgainRequestedRef.current = true;
@@ -486,7 +495,7 @@ export const usePersistence = (
 
         void publishSyncEvent("canvas", "canvas-saved");
         commitSavedCanvasState();
-        clearCanvasRetryQueue(canvasIdRef.current);
+        clearCanvasRetryQueue(attemptCanvasId);
         setSaveState((current) => ({
           ...current,
           status: "saved",
@@ -500,15 +509,15 @@ export const usePersistence = (
       void appendCanvasDeviceDiagnostic({
         id: uuidv4(),
         operation: "SAVE",
-        canvasId: canvasIdRef.current ?? null,
+        canvasId: attemptCanvasId,
         message: err instanceof Error ? err.message : String(err),
         createdAt: Date.now(),
       });
       const payload = activeMutation?.payload
-        ?? buildCurrentSavePayload();
-      if (hasCanvasSavePayloadChanges(payload)) {
+        ?? (canvasIdRef.current === attemptCanvasId ? buildCurrentSavePayload() : null);
+      if (payload && hasCanvasSavePayloadChanges(payload)) {
         addCanvasRetryQueueItem(
-          canvasIdRef.current,
+          attemptCanvasId,
           payload,
           err instanceof Error ? err.message : String(err),
           activeMutation?.mutationId,
@@ -819,16 +828,33 @@ export const usePersistence = (
       streamCallbacksRef.current.onLineStreamEnd?.(event);
     };
 
+    const joinRoom = () => {
+      void emitCanvasSocket(CANVAS_SOCKET_URL, "canvas:join", {
+        authorization: authHeaders().Authorization,
+        canvasId,
+      }).catch((error) => {
+        console.warn("캔버스 실시간 동기화 참여 실패:", error);
+      });
+    };
+
+    // iPad 등에서 탭 절전으로 소켓이 끊기면 서버 방(room) 멤버십이 사라진다.
+    // 재연결마다 다시 참여하고, 끊긴 동안 놓친 원격 변경을 한 번 동기화한다.
+    let hasJoinedOnce = false;
+    const handleSocketConnect = () => {
+      if (!isActive) return;
+      joinRoom();
+      if (hasJoinedOnce && !saveInFlightRef.current && !hasPendingLocalChanges()) {
+        void handleLoadRef.current?.("remote");
+      }
+      hasJoinedOnce = true;
+    };
+
     socket.on("canvas:changed", handleRemoteCanvasChanged);
     socket.on("canvas:line-start", handleRemoteLineStart);
     socket.on("canvas:line-points", handleRemoteLinePoints);
     socket.on("canvas:line-end", handleRemoteLineEnd);
-    void emitCanvasSocket(CANVAS_SOCKET_URL, "canvas:join", {
-      authorization: authHeaders().Authorization,
-      canvasId,
-    }).catch((error) => {
-      console.warn("캔버스 실시간 동기화 참여 실패:", error);
-    });
+    socket.on("connect", handleSocketConnect);
+    if (socket.connected) handleSocketConnect();
 
     return () => {
       isActive = false;
@@ -836,6 +862,7 @@ export const usePersistence = (
       socket.off("canvas:line-start", handleRemoteLineStart);
       socket.off("canvas:line-points", handleRemoteLinePoints);
       socket.off("canvas:line-end", handleRemoteLineEnd);
+      socket.off("connect", handleSocketConnect);
       socket.emit("canvas:leave", {
         authorization: authHeaders().Authorization,
         canvasId,
