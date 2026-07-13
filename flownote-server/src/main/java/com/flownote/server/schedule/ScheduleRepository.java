@@ -4,8 +4,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
-import com.flownote.canvas.CanvasAssetStorage;
-import com.flownote.canvas.CanvasAssetStorage.StoredCanvasAsset;
+import com.flownote.storage.CanvasAssetStorage;
+import com.flownote.storage.CanvasAssetStorage.StoredCanvasAsset;
 
 import java.sql.Array;
 import java.sql.PreparedStatement;

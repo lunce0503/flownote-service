@@ -59,6 +59,21 @@ func main() {
 		_, _ = w.Write([]byte("ok"))
 	})
 	handler.Register(mux)
+	handler.RegisterAdmin(mux)
+
+	// Spring의 진단 이벤트 보존 잡(매일, 30일 초과 삭제)을 이관했다.
+	go func() {
+		for {
+			purgeCtx, purgeCancel := context.WithTimeout(ctx, time.Minute)
+			if deleted, err := repo.PurgeExpiredOperationEvents(purgeCtx); err != nil {
+				log.Printf("retention: canvas_operation_events 정리 실패: %v", err)
+			} else if deleted > 0 {
+				log.Printf("retention: canvas_operation_events %d건 정리", deleted)
+			}
+			purgeCancel()
+			time.Sleep(24 * time.Hour)
+		}
+	}()
 
 	root := withCORS(cfg.CORSOrigins, withRequestLog(mux))
 
@@ -100,7 +115,11 @@ func withRequestLog(next http.Handler) http.Handler {
 		if elapsed > 2*time.Second {
 			slow = " SLOW"
 		}
-		log.Printf("%s %s -> %d %dms%s", r.Method, r.URL.Path, rec.status, elapsed.Milliseconds(), slow)
+		pathWithQuery := r.URL.Path
+		if r.URL.RawQuery != "" {
+			pathWithQuery += "?" + r.URL.RawQuery
+		}
+		log.Printf("%s %s -> %d %dms%s", r.Method, pathWithQuery, rec.status, elapsed.Milliseconds(), slow)
 	})
 }
 

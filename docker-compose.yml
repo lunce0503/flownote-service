@@ -58,6 +58,8 @@ services:
     restart: always
     environment:
       - PORT=8090
+      # 브라우저가 캔버스 HTTP/관리자 진단을 직접 호출하므로 CORS 허용 필요
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://${HOST_LAN_IP:-localhost}:3000,http://${HOST_LAN_IP:-localhost}:5173,http://${HOST_LAN_IP:-localhost}:8081,http://localhost:3000,http://localhost:5173,http://localhost:8081}
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - FLOWNOTE_STORAGE_ENDPOINT=${FLOWNOTE_STORAGE_ENDPOINT}
       - FLOWNOTE_STORAGE_BUCKET=${FLOWNOTE_STORAGE_BUCKET}
@@ -111,8 +113,6 @@ services:
       - STOCK_MARKET_DATA_URL=http://api-server:8000/api/market
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_DATA_REDIS_PORT=6379
-      - FLOWNOTE_CANVAS_CACHE_TARGET_USERNAME=${FLOWNOTE_CANVAS_CACHE_TARGET_USERNAME:-lunce}
-      - FLOWNOTE_CANVAS_CACHE_TTL=${FLOWNOTE_CANVAS_CACHE_TTL:-24h}
       - FLOWNOTE_STORAGE_ENDPOINT=${FLOWNOTE_STORAGE_ENDPOINT}
       - FLOWNOTE_STORAGE_BUCKET=${FLOWNOTE_STORAGE_BUCKET}
       - FLOWNOTE_STORAGE_REGION=${FLOWNOTE_STORAGE_REGION}
@@ -157,7 +157,7 @@ services:
         VITE_API_BASE_URL2: ${VITE_API_BASE_URL2:-http://${HOST_LAN_IP:-localhost}:3000}
         VITE_CORE_API_URL: ${VITE_CORE_API_URL:-http://${HOST_LAN_IP:-localhost}:8080}
         VITE_AI_BASE_URL: ${VITE_AI_BASE_URL:-http://${HOST_LAN_IP:-localhost}:8000}
-        VITE_CANVAS_API_URL: ${VITE_CANVAS_API_URL:-http://${HOST_LAN_IP:-localhost}:8080}
+        VITE_CANVAS_API_URL: ${VITE_CANVAS_API_URL:-http://${HOST_LAN_IP:-localhost}:8090}
         VITE_CANVAS_SOCKET_URL: ${VITE_CANVAS_SOCKET_URL:-http://${HOST_LAN_IP:-localhost}:8000}
         VITE_UPLOAD_API_URL: ${VITE_UPLOAD_API_URL:-http://${HOST_LAN_IP:-localhost}:8080}
         VITE_SYNC_API_URL: ${VITE_SYNC_API_URL:-http://${HOST_LAN_IP:-localhost}:3000}
