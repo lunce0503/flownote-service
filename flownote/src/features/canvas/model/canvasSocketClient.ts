@@ -33,6 +33,8 @@ export type CanvasChangedEvent = {
   canvasId?: string | null;
   mutationId?: string;
   revision?: number;
+  // 증분 동기화: 게이트웨이가 저장 변경분을 실어 보낸다(대형 mutation은 null → 전체 리로드 폴백).
+  changes?: CanvasSavePayload | null;
 };
 
 export type CanvasLineStreamStartEvent = {
