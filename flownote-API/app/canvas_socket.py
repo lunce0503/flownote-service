@@ -27,6 +27,11 @@ CANVAS_API_BASE_URL = (os.getenv("CANVAS_API_BASE_URL") or CORE_API_BASE_URL).rs
 # 저장이 원장에 기록되면 다음 재시도가 duplicate로 즉시 성공하므로 루프가 끊긴다.
 CANVAS_SAVE_FORWARD_TIMEOUT_SECONDS = float(os.getenv("CANVAS_SAVE_FORWARD_TIMEOUT_SECONDS", "90"))
 
+# 증분 동기화: canvas:changed 브로드캐스트에 변경분(payload)을 실어 수신 기기가 전체
+# 리로드 없이 델타만 적용하게 한다. 임계 초과 대형 mutation은 생략 → 클라이언트가
+# 기존 전체 리로드로 폴백한다(하위 호환: 구 클라이언트는 changes를 무시).
+CANVAS_CHANGED_MAX_INLINE_BYTES = int(os.getenv("CANVAS_CHANGED_MAX_INLINE_BYTES", str(256 * 1024)))
+
 
 DATA_URL_PATTERN = re.compile(r"^data:(?P<content_type>[^;,]+)?(?:;charset=[^;,]+)?;base64,(?P<data>.+)$", re.DOTALL)
 logger = logging.getLogger("flownote.canvas_socket")
@@ -431,6 +436,7 @@ def create_canvas_socket_server(cors_allowed_origins: list[str]) -> socketio.Asy
                 timeout_seconds=CANVAS_SAVE_FORWARD_TIMEOUT_SECONDS,
             )
             if isinstance(canvas_id, str) and canvas_id:
+                inline_changes = payload if _json_size_bytes(payload) <= CANVAS_CHANGED_MAX_INLINE_BYTES else None
                 await sio.emit(
                     "canvas:changed",
                     {
@@ -438,6 +444,7 @@ def create_canvas_socket_server(cors_allowed_origins: list[str]) -> socketio.Asy
                         "sourceSid": sid,
                         "mutationId": mutation_id,
                         "revision": (response or {}).get("revision") if isinstance(response, dict) else None,
+                        "changes": inline_changes,
                     },
                     room=_canvas_room(canvas_id),
                     skip_sid=sid,

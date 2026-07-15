@@ -47,6 +47,7 @@ import {
   removeCanvasRetryQueueItem,
   clearCanvasRetryQueue,
   updateCanvasRetryQueueItem,
+  resetCanvasRetryBackoff,
   serializeCanvasDraft,
   readCanvasLocalDraftPersisted,
   writeCanvasLocalDraft,
@@ -98,6 +99,8 @@ export const usePersistence = (
   const streamedPointsByLineRef = useRef(new Map<string, LineElement["points"]>());
   const streamPointsFrameRef = useRef<number | null>(null);
   const remoteChangeQueueRef = useRef<CanvasChangedEvent[]>([]);
+  const remoteApplyInFlightRef = useRef(false);
+  const drainRemoteChangeQueueRef = useRef<() => boolean>(() => false);
   const streamCallbacksRef = useRef(streamCallbacks);
   const [saveState, setSaveState] = useState<CanvasSaveState>(() => ({
     status: "loading",
@@ -264,8 +267,54 @@ export const usePersistence = (
     return hasCanvasSavePayloadChanges(payload) || getCanvasRetryCount(canvasIdRef.current) > 0;
   }, [buildCurrentSavePayload]);
 
+  // 증분 동기화: canvas:changed에 실려 온 변경분을 전체 리로드 없이 반영한다.
+  // 요소는 id 기준 upsert(원격 상태 = unchanged), 삭제는 id로 제거한다.
+  const applyRemoteChanges = useCallback(async (changes: CanvasSavePayload, revision?: number) => {
+    const upsertById = <T extends { id: string }>(current: T[], upserts: T[], deletedIds: Set<string>): T[] => {
+      const upsertIds = new Set(upserts.map((item) => item.id));
+      return [...current.filter((item) => !deletedIds.has(item.id) && !upsertIds.has(item.id)), ...upserts];
+    };
+
+    const lineUpserts: LineElement[] = [...(changes.addedLines ?? []), ...(changes.modifiedLines ?? [])]
+      .map((line) => ({ ...line, status: "unchanged" as const }));
+    const deletedLineIds = new Set((changes.deletedLines ?? []).map((line) => line.id));
+    if (lineUpserts.length > 0 || deletedLineIds.size > 0) {
+      setDrawnLines((current) => upsertById(current, lineUpserts, deletedLineIds));
+    }
+
+    const textBoxUpserts: TextBoxElement[] = [...(changes.addedTextBoxes ?? []), ...(changes.modifiedTextBoxes ?? [])]
+      .map((textBox) => ({ ...textBox, status: "unchanged" as const }));
+    const deletedTextBoxIds = new Set((changes.deletedTextBoxes ?? []).map((textBox) => textBox.id));
+    if (textBoxUpserts.length > 0 || deletedTextBoxIds.size > 0) {
+      setTextBoxes((current) => upsertById(current, textBoxUpserts, deletedTextBoxIds));
+    }
+
+    const imageUpserts = [...(changes.addedImages ?? []), ...(changes.modifiedImages ?? [])];
+    const deletedImageIds = new Set((changes.deletedImages ?? []).map((image) => image.id));
+    if (imageUpserts.length > 0 || deletedImageIds.size > 0) {
+      const placeholders: ImageElement[] = imageUpserts.map((imageData) => ({
+        ...imageData,
+        image: new Image(),
+        status: "unchanged" as const,
+      }));
+      setImages((current) => upsertById(current, placeholders, deletedImageIds));
+      await Promise.all(imageUpserts.map(async (imageData) => {
+        try {
+          const hydrated = await hydrateImageElement(imageData, CANVAS_API_URL);
+          setImages((current) => current.map((image) => (
+            image.id === hydrated.id ? { ...hydrated, status: "unchanged" as const } : image
+          )));
+        } catch {
+          // 이미지 로드 실패 시 플레이스홀더 유지 — 다음 전체 로드에서 복구된다.
+        }
+      }));
+    }
+
+    if (typeof revision === "number") serverRevisionRef.current = revision;
+  }, [CANVAS_API_URL, setDrawnLines, setImages, setTextBoxes]);
+
   const drainRemoteChangeQueue = useCallback(() => {
-    if (saveInFlightRef.current || hasPendingLocalChanges()) return false;
+    if (saveInFlightRef.current || remoteApplyInFlightRef.current || hasPendingLocalChanges()) return false;
     let nextEvent = remoteChangeQueueRef.current.shift();
     while (nextEvent && typeof nextEvent.revision === "number" && nextEvent.revision <= serverRevisionRef.current) {
       nextEvent = remoteChangeQueueRef.current.shift();
@@ -273,9 +322,25 @@ export const usePersistence = (
     if (!nextEvent) return false;
 
     streamCallbacksRef.current.onRemoteCanvasChanged?.(nextEvent);
+
+    // 델타가 있고 revision이 직전과 연속이면 증분 적용, 아니면(갭·대형 mutation) 전체 리로드 폴백.
+    const inlineChanges = nextEvent.changes;
+    if (inlineChanges && typeof nextEvent.revision === "number" && nextEvent.revision === serverRevisionRef.current + 1) {
+      remoteApplyInFlightRef.current = true;
+      void applyRemoteChanges(inlineChanges, nextEvent.revision).finally(() => {
+        remoteApplyInFlightRef.current = false;
+        window.setTimeout(() => drainRemoteChangeQueueRef.current(), 0);
+      });
+      return true;
+    }
+
     void handleLoadRef.current?.("remote");
     return true;
-  }, [hasPendingLocalChanges]);
+  }, [applyRemoteChanges, hasPendingLocalChanges]);
+
+  useEffect(() => {
+    drainRemoteChangeQueueRef.current = drainRemoteChangeQueue;
+  }, [drainRemoteChangeQueue]);
 
   const retryPendingSaves = useCallback(async (options?: { skipInFlightGuard?: boolean }) => {
     if (!CANVAS_SOCKET_URL) return;
@@ -843,8 +908,19 @@ export const usePersistence = (
     const handleSocketConnect = () => {
       if (!isActive) return;
       joinRoom();
-      if (hasJoinedOnce && !saveInFlightRef.current && !hasPendingLocalChanges()) {
-        void handleLoadRef.current?.("remote");
+      if (hasJoinedOnce) {
+        if (getCanvasRetryCount(canvasIdRef.current) > 0) {
+          // 재연결 직후: 소켓 단절로 실패한 저장은 원인이 사라졌으므로 백오프를 리셋하고
+          // 즉시 재시도한다(5초 폴링·최대 5분 백오프 대기 제거). 큐가 비면 원격 변경을 캐치업한다.
+          resetCanvasRetryBackoff(canvasIdRef.current);
+          void retryPendingSaves().then(() => {
+            if (!saveInFlightRef.current && !hasPendingLocalChanges()) {
+              void handleLoadRef.current?.("remote");
+            }
+          });
+        } else if (!saveInFlightRef.current && !hasPendingLocalChanges()) {
+          void handleLoadRef.current?.("remote");
+        }
       }
       hasJoinedOnce = true;
     };
@@ -868,7 +944,7 @@ export const usePersistence = (
         canvasId,
       });
     };
-  }, [CANVAS_SOCKET_URL, canvasId, drainRemoteChangeQueue, hasPendingLocalChanges]);
+  }, [CANVAS_SOCKET_URL, canvasId, drainRemoteChangeQueue, hasPendingLocalChanges, retryPendingSaves]);
 
   const streamLineStart = useCallback((line: Omit<LineElement, "status">) => {
     if (!CANVAS_SOCKET_URL || !canvasIdRef.current) return;

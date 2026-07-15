@@ -96,6 +96,14 @@ export const addCanvasRetryQueueItem = (
   return item;
 };
 
+// 소켓 재연결 직후처럼 실패 원인이 사라졌을 때 백오프를 무시하고 즉시 재시도 대상으로 만든다.
+export const resetCanvasRetryBackoff = (canvasId?: string | null) => {
+  const target = canvasId ?? null;
+  writeCanvasRetryQueue(readCanvasRetryQueue().map((item) => (
+    item.canvasId === target ? { ...item, nextAttemptAt: Date.now() } : item
+  )));
+};
+
 export const removeCanvasRetryQueueItem = (id: string) => {
   writeCanvasRetryQueue(readCanvasRetryQueue().filter((item) => item.id !== id));
 };
