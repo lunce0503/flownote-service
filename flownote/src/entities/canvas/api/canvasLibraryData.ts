@@ -1,5 +1,5 @@
 import axios from "axios";
-import { API_CORE_BASE_URL, authHeaders } from "@/shared/api";
+import { API_CORE_BASE_URL, authHeaders, resolveBrowserReachableUrl } from "@/shared/api";
 import { publishSyncEvent } from "@/shared/lib/sync";
 import type { CanvasDocumentSummary, CanvasFolder, CanvasFolderPayload } from "../model/types";
 
@@ -13,11 +13,14 @@ const normalizeFolder = (folder: CanvasFolderResponse): CanvasFolder => ({
   canvasIds: folder.canvasIds ?? folder.canvas_ids ?? [],
 });
 
-const requireCoreApiUrl = () => {
-  if (!API_CORE_BASE_URL) {
+// 캔버스 문서·폴더 API는 Go 캔버스 백엔드(flownote-canvas)가 소유한다(Spring에서 이관).
+const CANVAS_LIBRARY_BASE_URL = resolveBrowserReachableUrl(import.meta.env.VITE_CANVAS_API_URL) || API_CORE_BASE_URL || "";
+
+const requireCanvasApiUrl = () => {
+  if (!CANVAS_LIBRARY_BASE_URL) {
     throw new Error("캔버스 API 기본 URL이 설정되지 않았습니다.");
   }
-  return API_CORE_BASE_URL;
+  return CANVAS_LIBRARY_BASE_URL;
 };
 
 const toFolderRequestBody = (payload: Partial<CanvasFolderPayload>) => ({
@@ -27,14 +30,14 @@ const toFolderRequestBody = (payload: Partial<CanvasFolderPayload>) => ({
 });
 
 const getCanvasDocuments = async (): Promise<CanvasDocumentSummary[]> => {
-  const response = await axios.get<CanvasDocumentSummary[]>(`${requireCoreApiUrl()}/api/canvas/documents`, {
+  const response = await axios.get<CanvasDocumentSummary[]>(`${requireCanvasApiUrl()}/api/canvas/documents`, {
     headers: authHeaders(),
   });
   return Array.isArray(response.data) ? response.data : [];
 };
 
 const createCanvasDocument = async (title: string): Promise<CanvasDocumentSummary> => {
-  const response = await axios.post<CanvasDocumentSummary>(`${requireCoreApiUrl()}/api/canvas/documents`, { title }, {
+  const response = await axios.post<CanvasDocumentSummary>(`${requireCanvasApiUrl()}/api/canvas/documents`, { title }, {
     headers: authHeaders(),
   });
   void publishSyncEvent("canvas", "canvas-document-created");
@@ -42,7 +45,7 @@ const createCanvasDocument = async (title: string): Promise<CanvasDocumentSummar
 };
 
 const updateCanvasDocument = async (canvasId: string, title: string): Promise<CanvasDocumentSummary> => {
-  const response = await axios.patch<CanvasDocumentSummary>(`${requireCoreApiUrl()}/api/canvas/documents/${canvasId}`, { title }, {
+  const response = await axios.patch<CanvasDocumentSummary>(`${requireCanvasApiUrl()}/api/canvas/documents/${canvasId}`, { title }, {
     headers: authHeaders(),
   });
   void publishSyncEvent("canvas", "canvas-document-updated");
@@ -50,21 +53,21 @@ const updateCanvasDocument = async (canvasId: string, title: string): Promise<Ca
 };
 
 const deleteCanvasDocument = async (canvasId: string) => {
-  await axios.delete(`${requireCoreApiUrl()}/api/canvas/documents/${canvasId}`, {
+  await axios.delete(`${requireCanvasApiUrl()}/api/canvas/documents/${canvasId}`, {
     headers: authHeaders(),
   });
   void publishSyncEvent("canvas", "canvas-document-deleted");
 };
 
 const getCanvasFolders = async (): Promise<CanvasFolder[]> => {
-  const response = await axios.get<CanvasFolderResponse[]>(`${requireCoreApiUrl()}/api/canvas/folders`, {
+  const response = await axios.get<CanvasFolderResponse[]>(`${requireCanvasApiUrl()}/api/canvas/folders`, {
     headers: authHeaders(),
   });
   return Array.isArray(response.data) ? response.data.map(normalizeFolder) : [];
 };
 
 const createCanvasFolder = async (payload: CanvasFolderPayload): Promise<CanvasFolder> => {
-  const response = await axios.post<CanvasFolderResponse>(`${requireCoreApiUrl()}/api/canvas/folders`, toFolderRequestBody(payload), {
+  const response = await axios.post<CanvasFolderResponse>(`${requireCanvasApiUrl()}/api/canvas/folders`, toFolderRequestBody(payload), {
     headers: authHeaders(),
   });
   void publishSyncEvent("canvas", "canvas-folder-created");
@@ -72,7 +75,7 @@ const createCanvasFolder = async (payload: CanvasFolderPayload): Promise<CanvasF
 };
 
 const updateCanvasFolder = async (folderId: string, payload: Partial<CanvasFolderPayload>): Promise<CanvasFolder> => {
-  const response = await axios.patch<CanvasFolderResponse>(`${requireCoreApiUrl()}/api/canvas/folders/${folderId}`, toFolderRequestBody(payload), {
+  const response = await axios.patch<CanvasFolderResponse>(`${requireCanvasApiUrl()}/api/canvas/folders/${folderId}`, toFolderRequestBody(payload), {
     headers: authHeaders(),
   });
   void publishSyncEvent("canvas", "canvas-folder-updated");
@@ -80,14 +83,14 @@ const updateCanvasFolder = async (folderId: string, payload: Partial<CanvasFolde
 };
 
 const deleteCanvasFolder = async (folderId: string) => {
-  await axios.delete(`${requireCoreApiUrl()}/api/canvas/folders/${folderId}`, {
+  await axios.delete(`${requireCanvasApiUrl()}/api/canvas/folders/${folderId}`, {
     headers: authHeaders(),
   });
   void publishSyncEvent("canvas", "canvas-folder-deleted");
 };
 
 const addCanvasToFolder = async (folderId: string, canvasId: string): Promise<CanvasFolder> => {
-  const response = await axios.post<CanvasFolderResponse>(`${requireCoreApiUrl()}/api/canvas/folders/${folderId}/documents/${canvasId}`, null, {
+  const response = await axios.post<CanvasFolderResponse>(`${requireCanvasApiUrl()}/api/canvas/folders/${folderId}/documents/${canvasId}`, null, {
     headers: authHeaders(),
   });
   void publishSyncEvent("canvas", "canvas-folder-document-added");
@@ -95,7 +98,7 @@ const addCanvasToFolder = async (folderId: string, canvasId: string): Promise<Ca
 };
 
 const removeCanvasFromFolder = async (folderId: string, canvasId: string): Promise<CanvasFolder> => {
-  const response = await axios.delete<CanvasFolderResponse>(`${requireCoreApiUrl()}/api/canvas/folders/${folderId}/documents/${canvasId}`, {
+  const response = await axios.delete<CanvasFolderResponse>(`${requireCanvasApiUrl()}/api/canvas/folders/${folderId}/documents/${canvasId}`, {
     headers: authHeaders(),
   });
   void publishSyncEvent("canvas", "canvas-folder-document-removed");
