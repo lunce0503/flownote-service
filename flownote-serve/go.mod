@@ -1,4 +1,4 @@
-module github.com/flownote/flownote-canvas
+module github.com/flownote/flownote-serve
 
 go 1.23
 

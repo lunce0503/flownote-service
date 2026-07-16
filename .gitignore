@@ -27,3 +27,4 @@ flownote-server/.gradle/
 /package-lock.json
 /architecture-diagram.html
 .claude/settings.local.json
+__pycache__/

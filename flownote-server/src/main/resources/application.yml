@@ -44,21 +44,9 @@ management:
 flownote:
   cors:
     origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:5174}
-  upload:
-    dir: ${FLOWNOTE_UPLOAD_DIR:${user.dir}/uploads}
-  storage:
-    endpoint: ${FLOWNOTE_STORAGE_ENDPOINT:}
-    bucket: ${FLOWNOTE_STORAGE_BUCKET:}
-    region: ${FLOWNOTE_STORAGE_REGION:us-east-1}
-    access-key-id: ${FLOWNOTE_STORAGE_ACCESS_KEY_ID:}
-    secret-access-key: ${FLOWNOTE_STORAGE_SECRET_ACCESS_KEY:}
-    public-base-url: ${FLOWNOTE_STORAGE_PUBLIC_BASE_URL:}
-    validate-on-startup: ${FLOWNOTE_STORAGE_VALIDATE_ON_STARTUP:false}
   mobile:
     core-api-url: ${MOBILE_CORE_API_URL:http://localhost:8080}
     ai-api-url: ${MOBILE_AI_API_URL:http://localhost:8000}
     web-url: ${MOBILE_WEB_URL:http://localhost:5173}
     minimum-supported-version: ${MOBILE_MIN_SUPPORTED_VERSION:1.0.0}
     enabled-features: ${MOBILE_ENABLED_FEATURES:webview,auth,tasks,notes,canvas,agent}
-  stocks:
-    market-data-url: ${STOCK_MARKET_DATA_URL:http://localhost:8000/api/market}
