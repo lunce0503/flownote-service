@@ -40,10 +40,13 @@ services:
     environment:
       - CORS_ORIGINS=${CORS_ORIGINS:-http://${HOST_LAN_IP:-localhost}:3000,http://${HOST_LAN_IP:-localhost}:5173,http://${HOST_LAN_IP:-localhost}:8081,http://localhost:3000,http://localhost:5173,http://localhost:8081}
       - JWT_SECRET=${JWT_SECRET}
-      # 게이트웨이 라우팅 대상: 코어=Spring, 캔버스=Go, AI/데이터=flownote-ai
+      # 게이트웨이 라우팅 대상: 코어(인증)=Spring, 캔버스·노트=Go, 부가기능=serve, AI=flownote-ai
       - CORE_API_BASE_URL=http://spring-server:8080
       - CANVAS_API_BASE_URL=http://canvas-server:8090
       - AI_API_BASE_URL=http://ai-server:8000
+      - SERVE_API_BASE_URL=http://serve-server:8095
+      # socket.io Redis 매니저(replica 확장 대비 — 단일 인스턴스에서도 무해)
+      - REDIS_URL=redis://redis:6379
     ports:
       - "8000:8000"
     depends_on:
@@ -61,14 +64,45 @@ services:
       # 브라우저가 캔버스 HTTP/관리자 진단을 직접 호출하므로 CORS 허용 필요
       - CORS_ORIGINS=${CORS_ORIGINS:-http://${HOST_LAN_IP:-localhost}:3000,http://${HOST_LAN_IP:-localhost}:5173,http://${HOST_LAN_IP:-localhost}:8081,http://localhost:3000,http://localhost:5173,http://localhost:8081}
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # 세션 캐시(토큰→사용자, TTL 5분) — 캔버스 캐시 제거로 유휴였던 Redis 재활용
+      - REDIS_URL=redis://redis:6379
       - FLOWNOTE_STORAGE_ENDPOINT=${FLOWNOTE_STORAGE_ENDPOINT}
       - FLOWNOTE_STORAGE_BUCKET=${FLOWNOTE_STORAGE_BUCKET}
       - FLOWNOTE_STORAGE_REGION=${FLOWNOTE_STORAGE_REGION}
       - FLOWNOTE_STORAGE_ACCESS_KEY_ID=${FLOWNOTE_STORAGE_ACCESS_KEY_ID}
       - FLOWNOTE_STORAGE_SECRET_ACCESS_KEY=${FLOWNOTE_STORAGE_SECRET_ACCESS_KEY}
       - FLOWNOTE_STORAGE_PUBLIC_BASE_URL=${FLOWNOTE_STORAGE_PUBLIC_BASE_URL}
+      # 노트 에디터 업로드(정적 /uploads 서빙) — Spring에서 이관
+      - FLOWNOTE_UPLOAD_DIR=/public/uploads
+    volumes:
+      - /mnt/storage/uploads:/public/uploads
     ports:
       - "8090:8090"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # 2-C. flownote-serve: 부가기능 백엔드 (일정·작업·주식·소셜·채팅) — Spring에서 이관
+  serve-server:
+    build: ./flownote-serve
+    container_name: flownote-serve
+    restart: always
+    environment:
+      - PORT=8095
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://${HOST_LAN_IP:-localhost}:3000,http://${HOST_LAN_IP:-localhost}:5173,http://${HOST_LAN_IP:-localhost}:8081,http://localhost:3000,http://localhost:5173,http://localhost:8081}
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # 세션 캐시(토큰→사용자, TTL 5분) — 캔버스 캐시 제거로 유휴였던 Redis 재활용
+      - REDIS_URL=redis://redis:6379
+      - FLOWNOTE_STORAGE_ENDPOINT=${FLOWNOTE_STORAGE_ENDPOINT}
+      - FLOWNOTE_STORAGE_BUCKET=${FLOWNOTE_STORAGE_BUCKET}
+      - FLOWNOTE_STORAGE_REGION=${FLOWNOTE_STORAGE_REGION}
+      - FLOWNOTE_STORAGE_ACCESS_KEY_ID=${FLOWNOTE_STORAGE_ACCESS_KEY_ID}
+      - FLOWNOTE_STORAGE_SECRET_ACCESS_KEY=${FLOWNOTE_STORAGE_SECRET_ACCESS_KEY}
+      - FLOWNOTE_STORAGE_PUBLIC_BASE_URL=${FLOWNOTE_STORAGE_PUBLIC_BASE_URL}
+      # 시세 원천: 게이트웨이 경유 flownote-ai /api/market
+      - STOCK_MARKET_DATA_URL=http://api-server:8000/api/market
+    ports:
+      - "8095:8095"
     depends_on:
       db:
         condition: service_healthy
@@ -82,7 +116,10 @@ services:
       - ./flownote-API/.env
     environment:
       - CORS_ORIGINS=${CORS_ORIGINS:-http://${HOST_LAN_IP:-localhost}:3000,http://${HOST_LAN_IP:-localhost}:5173,http://${HOST_LAN_IP:-localhost}:8081,http://localhost:3000,http://localhost:5173,http://localhost:8081}
-      - CORE_API_BASE_URL=http://spring-server:8080
+      # 코어 호출은 게이트웨이 경유(경로 기반으로 canvas/serve/spring에 분배 — MCP 도구 포함)
+      - CORE_API_BASE_URL=http://api-server:8000
+      # 외부 시세 응답 캐시(quotes 5s·search 1h·history 10m)
+      - REDIS_URL=redis://redis:6379
       # 에이전트 노트: 내부망 Ollama(gemma4+embeddinggemma) 및 sqlite 인덱스 경로
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
       - AGENT_NOTE_DB_PATH=${AGENT_NOTE_DB_PATH:-/app/data/agent_note.db}
@@ -104,21 +141,13 @@ services:
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://${HOST_LAN_IP:-localhost}:3000,http://${HOST_LAN_IP:-localhost}:5173,http://${HOST_LAN_IP:-localhost}:8081,http://localhost:3000,http://localhost:5173,http://localhost:8081}
-      - FLOWNOTE_UPLOAD_DIR=/public/uploads
       - MOBILE_CORE_API_URL=${MOBILE_CORE_API_URL:-http://${HOST_LAN_IP:-localhost}:8080}
       - MOBILE_AI_API_URL=${MOBILE_AI_API_URL:-http://${HOST_LAN_IP:-localhost}:8000}
       - MOBILE_WEB_URL=${MOBILE_WEB_URL:-http://${HOST_LAN_IP:-localhost}:5173}
       - MOBILE_MIN_SUPPORTED_VERSION=${MOBILE_MIN_SUPPORTED_VERSION:-1.0.0}
       - MOBILE_ENABLED_FEATURES=${MOBILE_ENABLED_FEATURES:-webview,auth,tasks,notes,canvas,agent}
-      - STOCK_MARKET_DATA_URL=http://api-server:8000/api/market
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_DATA_REDIS_PORT=6379
-      - FLOWNOTE_STORAGE_ENDPOINT=${FLOWNOTE_STORAGE_ENDPOINT}
-      - FLOWNOTE_STORAGE_BUCKET=${FLOWNOTE_STORAGE_BUCKET}
-      - FLOWNOTE_STORAGE_REGION=${FLOWNOTE_STORAGE_REGION}
-      - FLOWNOTE_STORAGE_ACCESS_KEY_ID=${FLOWNOTE_STORAGE_ACCESS_KEY_ID}
-      - FLOWNOTE_STORAGE_SECRET_ACCESS_KEY=${FLOWNOTE_STORAGE_SECRET_ACCESS_KEY}
-      - FLOWNOTE_STORAGE_PUBLIC_BASE_URL=${FLOWNOTE_STORAGE_PUBLIC_BASE_URL}
     ports:
       - "8080:8080"
     depends_on:
@@ -126,8 +155,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - /mnt/storage/uploads:/public/uploads
 
   # 3. Next.js 프론트엔드
   next-app:
@@ -155,11 +182,11 @@ services:
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://${HOST_LAN_IP:-localhost}:8000}
         VITE_API_BASE_URL2: ${VITE_API_BASE_URL2:-http://${HOST_LAN_IP:-localhost}:3000}
-        VITE_CORE_API_URL: ${VITE_CORE_API_URL:-http://${HOST_LAN_IP:-localhost}:8080}
+        VITE_CORE_API_URL: ${VITE_CORE_API_URL:-http://${HOST_LAN_IP:-localhost}:8000}
         VITE_AI_BASE_URL: ${VITE_AI_BASE_URL:-http://${HOST_LAN_IP:-localhost}:8000}
         VITE_CANVAS_API_URL: ${VITE_CANVAS_API_URL:-http://${HOST_LAN_IP:-localhost}:8090}
         VITE_CANVAS_SOCKET_URL: ${VITE_CANVAS_SOCKET_URL:-http://${HOST_LAN_IP:-localhost}:8000}
-        VITE_UPLOAD_API_URL: ${VITE_UPLOAD_API_URL:-http://${HOST_LAN_IP:-localhost}:8080}
+        VITE_UPLOAD_API_URL: ${VITE_UPLOAD_API_URL:-http://${HOST_LAN_IP:-localhost}:8000}
         VITE_SYNC_API_URL: ${VITE_SYNC_API_URL:-http://${HOST_LAN_IP:-localhost}:3000}
     container_name: flownote-react
     restart: always

@@ -301,9 +301,21 @@ async def _upload_canvas_asset(authorization: str | None, file_data: dict[str, A
 
 
 def create_canvas_socket_server(cors_allowed_origins: list[str]) -> socketio.AsyncServer:
+    # REDIS_URL이 있으면 Redis 매니저로 방 브로드캐스트를 공유한다(게이트웨이 replica 확장 대비).
+    # 미설정이면 단일 인스턴스 인메모리 매니저 그대로.
+    client_manager = None
+    redis_url = os.getenv("REDIS_URL", "").strip()
+    if redis_url:
+        try:
+            client_manager = socketio.AsyncRedisManager(redis_url)
+        except Exception:  # noqa: BLE001 - Redis 미가용 시 인메모리로 폴백
+            logger.warning("socketio_redis_manager_unavailable url_set=True — 인메모리 매니저로 동작")
+            client_manager = None
+
     sio = socketio.AsyncServer(
         async_mode="asgi",
         cors_allowed_origins=cors_allowed_origins,
+        client_manager=client_manager,
         logger=False,
         engineio_logger=False,
     )

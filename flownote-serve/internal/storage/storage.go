@@ -13,8 +13,8 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/flownote/flownote-canvas/internal/config"
-	"github.com/flownote/flownote-canvas/internal/httpjson"
+	"github.com/flownote/flownote-serve/internal/config"
+	"github.com/flownote/flownote-serve/internal/httpjson"
 )
 
 // Store는 S3 호환 오브젝트 스토리지에 캔버스 자산(이미지)을 저장/조회한다.

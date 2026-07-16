@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// Config는 flownote-canvas 서버의 런타임 설정이다. 모든 값은 환경 변수에서 읽으며,
-// flownote-server(Spring)와 같은 Postgres/S3 자원을 공유하도록 같은 이름 규칙을 따른다.
+// Config는 flownote-serve(부가기능 백엔드: 일정·작업·주식·소셜·채팅)의 런타임 설정이다.
+// flownote-server(Spring)·flownote-canvas(Go)와 같은 Postgres/S3 자원을 공유한다.
 type Config struct {
 	Port string
 
@@ -22,17 +22,17 @@ type Config struct {
 	StorageSecretKey     string
 	StoragePublicBaseURL string
 
+	// 주식 시세 원천(flownote-ai /api/market, 보통 게이트웨이 경유).
+	MarketDataURL string
+
 	// CORS 허용 오리진(쉼표 구분). 게이트웨이 뒤에 있으면 보통 비워둔다.
 	CORSOrigins []string
-
-	// 노트 이미지 업로드 디렉터리(Spring FLOWNOTE_UPLOAD_DIR와 동일 규칙, /uploads/** 정적 서빙).
-	UploadDir string
 }
 
 // Load는 환경 변수에서 설정을 읽는다. Postgres 연결 문자열이 없으면 오류를 반환한다.
 func Load() (Config, error) {
 	cfg := Config{
-		Port:                 firstNonEmpty(os.Getenv("PORT"), "8090"),
+		Port:                 firstNonEmpty(os.Getenv("PORT"), "8095"),
 		DatabaseURL:          strings.TrimSpace(os.Getenv("DATABASE_URL")),
 		StorageEndpoint:      strings.TrimSpace(os.Getenv("FLOWNOTE_STORAGE_ENDPOINT")),
 		StorageBucket:        strings.TrimSpace(os.Getenv("FLOWNOTE_STORAGE_BUCKET")),
@@ -40,7 +40,7 @@ func Load() (Config, error) {
 		StorageAccessKey:     strings.TrimSpace(os.Getenv("FLOWNOTE_STORAGE_ACCESS_KEY_ID")),
 		StorageSecretKey:     strings.TrimSpace(os.Getenv("FLOWNOTE_STORAGE_SECRET_ACCESS_KEY")),
 		StoragePublicBaseURL: strings.TrimSpace(os.Getenv("FLOWNOTE_STORAGE_PUBLIC_BASE_URL")),
-		UploadDir:            firstNonEmpty(os.Getenv("FLOWNOTE_UPLOAD_DIR"), "./uploads"),
+		MarketDataURL:        strings.TrimRight(strings.TrimSpace(os.Getenv("STOCK_MARKET_DATA_URL")), "/"),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -61,13 +61,11 @@ func Load() (Config, error) {
 }
 
 // StorageConfigured는 오브젝트 스토리지 자격 증명이 모두 설정되었는지 알려준다.
-// Spring과 동일하게, 미설정 시 자산 업로드/조회는 503으로 응답한다.
 func (c Config) StorageConfigured() bool {
 	return c.StorageEndpoint != "" && c.StorageBucket != "" && c.StorageAccessKey != "" && c.StorageSecretKey != ""
 }
 
 // deriveDatabaseURL는 Spring 스타일 JDBC 변수에서 pgx 연결 문자열을 조립한다.
-// 예: SPRING_DATASOURCE_URL=jdbc:postgresql://host:5432/db
 func deriveDatabaseURL() string {
 	jdbc := strings.TrimSpace(os.Getenv("SPRING_DATASOURCE_URL"))
 	user := strings.TrimSpace(os.Getenv("SPRING_DATASOURCE_USERNAME"))

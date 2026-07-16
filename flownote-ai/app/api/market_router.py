@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import os
 from datetime import datetime, timezone
 from typing import Any
 
@@ -282,18 +284,53 @@ def _history_sync(symbol: str, period: str) -> list[MarketHistoryPoint]:
     return points
 
 
+# 외부 시세 API 응답 캐시: REDIS_URL이 있으면 Redis TTL 캐시, 없으면 매 요청 원천 조회.
+_market_cache = None
+if os.getenv("REDIS_URL", "").strip():
+    try:
+        import redis.asyncio as _redis_asyncio
+
+        _market_cache = _redis_asyncio.from_url(os.getenv("REDIS_URL"), socket_timeout=0.5, socket_connect_timeout=2)
+    except Exception:  # noqa: BLE001 - Redis 미가용 시 캐시 없이 동작
+        _market_cache = None
+
+
+async def _cached_market(key: str, ttl_seconds: int, producer):
+    if _market_cache is not None:
+        try:
+            hit = await _market_cache.get(key)
+            if hit is not None:
+                return json.loads(hit)
+        except Exception:  # noqa: BLE001
+            pass
+    value = await producer()
+    if _market_cache is not None:
+        try:
+            payload = json.dumps([item.model_dump() for item in value])
+            await _market_cache.set(key, payload, ex=ttl_seconds)
+        except Exception:  # noqa: BLE001
+            pass
+    return value
+
+
 @router.get("/search", response_model=list[MarketSearchResult])
 async def search_market(
     q: str = Query(..., min_length=1),
     limit: int = Query(8, ge=1, le=20),
 ) -> list[MarketSearchResult]:
-    return await run_in_threadpool(_search_sync, q, limit)
+    return await _cached_market(
+        f"market:search:{q.strip().lower()}:{limit}", 3600,
+        lambda: run_in_threadpool(_search_sync, q, limit),
+    )
 
 
 @router.get("/quotes", response_model=list[MarketQuote])
 async def market_quotes(symbols: str = Query(..., min_length=1)) -> list[MarketQuote]:
     parsed = [symbol.strip() for symbol in symbols.split(",") if symbol.strip()]
-    return await run_in_threadpool(_quotes_sync, parsed[:30])
+    return await _cached_market(
+        "market:quotes:" + ",".join(sorted(s.upper() for s in parsed[:30])), 5,
+        lambda: run_in_threadpool(_quotes_sync, parsed[:30]),
+    )
 
 
 @router.get("/history", response_model=list[MarketHistoryPoint])
@@ -301,4 +338,7 @@ async def market_history(
     symbol: str = Query(..., min_length=1),
     period: str = Query("1mo", pattern="^(1d|1wk|1mo|1y|5y)$"),
 ) -> list[MarketHistoryPoint]:
-    return await run_in_threadpool(_history_sync, symbol, period)
+    return await _cached_market(
+        f"market:history:{symbol.strip().upper()}:{period}", 600,
+        lambda: run_in_threadpool(_history_sync, symbol, period),
+    )
