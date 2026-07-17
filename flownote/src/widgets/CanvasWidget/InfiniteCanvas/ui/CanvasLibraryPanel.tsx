@@ -289,7 +289,7 @@ export const CanvasLibraryPanel = ({
             <button
                 type="button"
                 data-canvas-touch-allow="true"
-                className="absolute left-0 top-4 z-40 inline-flex h-11 items-center gap-2 rounded-r-md border border-l-0 border-stone-300 bg-white px-3 text-sm font-bold text-stone-800 shadow-lg hover:bg-stone-900 hover:text-amber-50"
+                className="absolute left-0 top-20 z-40 inline-flex h-11 items-center gap-2 rounded-r-md border border-l-0 border-stone-300 bg-white px-3 text-sm font-bold text-stone-800 shadow-lg hover:bg-stone-900 hover:text-amber-50"
                 onClick={onToggleVisible}
                 title="캔버스 폴더 펼치기"
                 aria-label="캔버스 폴더 펼치기"
@@ -303,7 +303,7 @@ export const CanvasLibraryPanel = ({
     return (
         <aside
             data-canvas-touch-allow="true"
-            className="absolute left-4 top-4 z-40 max-h-[calc(100%-2rem)] w-72 overflow-y-auto rounded-lg border border-stone-300 bg-stone-50 p-3 text-stone-900 shadow-xl"
+            className="absolute left-4 top-20 z-40 max-h-[calc(100%-6rem)] w-72 overflow-y-auto rounded-lg border border-stone-300 bg-stone-50 p-3 text-stone-900 shadow-xl"
             onDragStart={(event) => event.stopPropagation()}
         >
             <div className="mb-3 flex items-center justify-between">

@@ -868,42 +868,43 @@ const Canvas = () => {
             onContextMenu={handleContextMenu}
             style={{ userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
         >
-            <Toolbar
-                canvasTitle={selectedCanvasTitle}
-                tool={tool}
-                setTool={setTool}
-                handleImageUpload={async (event) => {
-                    if (event.target.files?.[0]) recordHistory();
-                    await handleImageUpload(event, getDisplayedViewportCenter());
-                }}
-                handleSave={handleSave}
-                handleLoad={handleLoad}
-                cancelCanvasLoad={cancelCanvasLoad}
-                retryPendingSaves={retryPendingSaves}
-                cancelPendingSaves={cancelPendingSaves}
-                saveState={saveState}
-                handleUndo={undo}
-                canUndo={canUndo}
-                lassoSelectionCount={lassoSelectionCount}
-                hasCopiedLassoSelection={Boolean(lassoClipboard)}
-                onCopyLassoSelection={handleCopyLassoSelection}
-                onPasteLassoSelection={handlePasteLassoSelection}
-                onDeleteLassoSelection={handleDeleteLassoSelection}
-                onScaleLassoSelection={handleScaleLassoSelection}
-                onChangeLassoSelectionColor={handleChangeLassoSelectionColor}
-                onClearLassoSelection={() => setLassoSelection(null)}
-                penColor={penColor}
-                onPenColorChange={handlePenColorChange}
-                isCanvasSettingsVisible={isCanvasSettingsVisible}
-                onToggleCanvasSettingsVisible={() => setIsCanvasSettingsVisible((current) => !current)}
-                zoomPercent={Math.round(scale * 100)}
-                viewportCenter={viewportCenter}
-            />
             <div ref={canvasViewportRef} className="relative min-h-0 flex-1 overflow-hidden">
+                {/* 툴바는 폴더 패널과 같이 캔버스 위에 떠 있는 오버레이다(문서 흐름에서 제외 → 캔버스 전체 높이 사용). */}
+                <Toolbar
+                    canvasTitle={selectedCanvasTitle}
+                    tool={tool}
+                    setTool={setTool}
+                    handleImageUpload={async (event) => {
+                        if (event.target.files?.[0]) recordHistory();
+                        await handleImageUpload(event, getDisplayedViewportCenter());
+                    }}
+                    handleSave={handleSave}
+                    handleLoad={handleLoad}
+                    cancelCanvasLoad={cancelCanvasLoad}
+                    retryPendingSaves={retryPendingSaves}
+                    cancelPendingSaves={cancelPendingSaves}
+                    saveState={saveState}
+                    handleUndo={undo}
+                    canUndo={canUndo}
+                    lassoSelectionCount={lassoSelectionCount}
+                    hasCopiedLassoSelection={Boolean(lassoClipboard)}
+                    onCopyLassoSelection={handleCopyLassoSelection}
+                    onPasteLassoSelection={handlePasteLassoSelection}
+                    onDeleteLassoSelection={handleDeleteLassoSelection}
+                    onScaleLassoSelection={handleScaleLassoSelection}
+                    onChangeLassoSelectionColor={handleChangeLassoSelectionColor}
+                    onClearLassoSelection={() => setLassoSelection(null)}
+                    penColor={penColor}
+                    onPenColorChange={handlePenColorChange}
+                    isCanvasSettingsVisible={isCanvasSettingsVisible}
+                    onToggleCanvasSettingsVisible={() => setIsCanvasSettingsVisible((current) => !current)}
+                    zoomPercent={Math.round(scale * 100)}
+                    viewportCenter={viewportCenter}
+                />
                 {isCanvasSettingsVisible && (
                     <div
                         data-canvas-touch-allow="true"
-                        className="absolute right-4 top-4 z-40 w-72 rounded-lg border border-stone-300 bg-white p-3 text-stone-900 shadow-xl"
+                        className="absolute right-4 top-20 z-40 w-72 rounded-lg border border-stone-300 bg-white p-3 text-stone-900 shadow-xl"
                     >
                         <div className="mb-3 flex items-center justify-between">
                             <div>

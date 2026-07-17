@@ -208,9 +208,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   return (
     <div
       data-canvas-touch-allow="true"
-      className="pointer-events-none relative z-50 border-b border-stone-200 bg-stone-50 px-2 pt-2 text-stone-950 touch-pan-x touch-pan-y"
+      className="pointer-events-none absolute inset-x-2 top-2 z-50 flex flex-col items-center gap-2 text-stone-950 touch-pan-x touch-pan-y"
     >
-      <div className="canvas-toolbar-scroll pointer-events-auto flex min-w-0 items-start justify-between gap-2 overflow-x-auto pb-2">
+      {/* 폴더 패널처럼 캔버스 위에 떠 있는 플로팅 툴바 — 필 사이 빈 공간은 캔버스 입력을 통과시킨다. */}
+      <div className="canvas-toolbar-scroll pointer-events-auto flex w-max max-w-full items-start gap-2 overflow-x-auto p-1">
         <div className="flex min-w-max items-start gap-2">
           <div className="pointer-events-auto flex min-h-12 max-w-[128px] shrink-0 items-center rounded-full bg-white/95 px-4 text-sm font-black shadow-lg ring-1 ring-stone-200/80 backdrop-blur sm:max-w-[220px] xl:max-w-xs" title={canvasTitle}>
             <span className="truncate">{canvasTitle}</span>
@@ -254,7 +255,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </div>
         </div>
 
-        <div className="sticky right-0 z-10 flex shrink-0 justify-end gap-2 bg-stone-50 pl-2">
+        <div className="flex shrink-0 items-start gap-2">
           <div className="pointer-events-auto hidden min-h-12 shrink-0 items-center gap-1 rounded-full bg-white/95 px-2 shadow-lg ring-1 ring-stone-200/80 backdrop-blur sm:flex" title="현재 확대율과 화면 중앙 좌표">
             <span className="px-3 text-sm font-black">{zoomPercent}%</span>
             <span className="rounded-full bg-stone-100 px-3 py-2 text-xs font-black">⌂ {Math.round(viewportCenter.x)}, {Math.round(viewportCenter.y)}</span>
@@ -332,7 +333,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         </div>
       </div>
 
-      <div className="canvas-toolbar-scroll pointer-events-auto mt-2 flex items-start gap-3 overflow-x-auto pb-2 lg:hidden">
+      <div className="canvas-toolbar-scroll pointer-events-auto flex w-max max-w-full items-start gap-3 overflow-x-auto p-1 lg:hidden">
         <PenColorPill penColor={penColor} onPenColorChange={onPenColorChange} touchActivation={touchActivation} />
       </div>
 
