@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import './App.css';
 
 import { Header } from '@/widgets';
+import { useFullscreen } from '@/shared/lib/useFullscreen';
 import { AuthProvider, ProtectedRoute } from '@/features/auth';
 import { ThemeProvider } from '@/features/theme';
 import { capabilityManifest, type CapabilityRoute } from './capabilityManifest.tsx';
@@ -23,7 +24,9 @@ const renderRoute = (route: CapabilityRoute, key: string, isProtected?: boolean)
 
 const AppRoutes = () => {
   const location = useLocation();
-  const shouldShowHeader = !["/login", "/signup"].includes(location.pathname);
+  const { isFullscreen } = useFullscreen();
+  // 전체 화면(전체로 보기) 중에는 브라우저 UI와 함께 Flownote 헤더도 숨긴다.
+  const shouldShowHeader = !isFullscreen && !["/login", "/signup"].includes(location.pathname);
 
   return (
     <>
