@@ -51,6 +51,27 @@ const getLineBounds = (line: LineElement): IndexedNode => {
   };
 };
 
+// zIndex 오름차순(뒤→앞) 정렬. 미지정(undefined)은 0으로 보고, 동률은 배열 순서를 유지한다.
+const sortByZIndex = <T extends { zIndex?: number }>(items: T[]): T[] =>
+  items
+    .map((item, index) => ({ item, index }))
+    .sort((left, right) => (left.item.zIndex ?? 0) - (right.item.zIndex ?? 0) || left.index - right.index)
+    .map((entry) => entry.item);
+
+// 정렬된 id 순서를 Konva 자식 z-order에 반영한다. 순서가 그대로면 재정렬을 건너뛴다.
+const applyLayerOrder = <N extends Konva.Node>(
+  orderedIds: string[],
+  nodes: Map<string, N>,
+  signatureRef: { current: string },
+) => {
+  const signature = orderedIds.join("|");
+  if (signature === signatureRef.current) return;
+  signatureRef.current = signature;
+  orderedIds.forEach((id, index) => {
+    nodes.get(id)?.zIndex(index);
+  });
+};
+
 const stretchStageToContainer = (stage: Konva.Stage) => {
   stage.content.style.width = "100%";
   stage.content.style.height = "100%";
@@ -73,7 +94,12 @@ export const useCanvasRendering = (
   const activeStrokeLayerRef = useRef<Konva.Layer | null>(null);
   const overlayLayerRef = useRef<Konva.Layer | null>(null);
   const staticGroupRef = useRef<Konva.Group | null>(null);
+  const imageGroupRef = useRef<Konva.Group | null>(null);
+  const lineGroupRef = useRef<Konva.Group | null>(null);
   const overlayGroupRef = useRef<Konva.Group | null>(null);
+  const imageOrderRef = useRef("");
+  const lineOrderRef = useRef("");
+  const textOrderRef = useRef("");
   const lineNodesRef = useRef(new Map<string, Konva.Line>());
   const lineSourcesRef = useRef(new Map<string, LineElement>());
   const imageNodesRef = useRef(new Map<string, Konva.Group>());
@@ -95,6 +121,11 @@ export const useCanvasRendering = (
     const activeStrokeLayer = new Konva.Layer({ listening: false });
     const overlayLayer = new Konva.Layer({ listening: false });
     const staticGroup = new Konva.Group({ listening: false });
+    // 이미지 그룹(아래) → 선 그룹(위) 순서로 쌓아 "이미지 밑, 필기 위" 기본 층위를 유지한다.
+    // 각 그룹 안에서만 zIndex로 재정렬하므로 이미지끼리·선끼리 순서를 바꿔도 서로 침범하지 않는다.
+    const imageGroup = new Konva.Group({ listening: false });
+    const lineGroup = new Konva.Group({ listening: false });
+    staticGroup.add(imageGroup, lineGroup);
     const overlayGroup = new Konva.Group({ listening: false });
     staticLayer.add(staticGroup);
     overlayLayer.add(overlayGroup);
@@ -106,6 +137,8 @@ export const useCanvasRendering = (
     activeStrokeLayerRef.current = activeStrokeLayer;
     overlayLayerRef.current = overlayLayer;
     staticGroupRef.current = staticGroup;
+    imageGroupRef.current = imageGroup;
+    lineGroupRef.current = lineGroup;
     overlayGroupRef.current = overlayGroup;
 
     return () => {
@@ -124,6 +157,8 @@ export const useCanvasRendering = (
       activeStrokeLayerRef.current = null;
       overlayLayerRef.current = null;
       staticGroupRef.current = null;
+      imageGroupRef.current = null;
+      lineGroupRef.current = null;
       overlayGroupRef.current = null;
       currentLineShapeRef.current = null;
     };
@@ -137,7 +172,7 @@ export const useCanvasRendering = (
   }, [size]);
 
   const reconcileLines = useCallback((lines: LineElement[]) => {
-    const group = staticGroupRef.current;
+    const group = lineGroupRef.current;
     if (!group) return;
     const nextIds = new Set<string>();
 
@@ -182,10 +217,13 @@ export const useCanvasRendering = (
       if (bounds) lineIndexRef.current.remove(bounds);
       lineBoundsRef.current.delete(id);
     });
+
+    const orderedIds = sortByZIndex(lines.filter((line) => nextIds.has(line.id))).map((line) => line.id);
+    applyLayerOrder(orderedIds, lineNodesRef.current, lineOrderRef);
   }, []);
 
   const reconcileImages = useCallback((images: ImageElement[]) => {
-    const group = staticGroupRef.current;
+    const group = imageGroupRef.current;
     if (!group) return;
     const nextIds = new Set<string>();
     images.forEach((image) => {
@@ -197,7 +235,6 @@ export const useCanvasRendering = (
         node.add(new Konva.Image({ listening: false }), new Konva.Rect({ listening: false }));
         imageNodesRef.current.set(image.id, node);
         group.add(node);
-        node.moveToBottom();
       }
       if (imageSourcesRef.current.get(image.id) !== image) {
         const [imageNode, tintNode] = node.getChildren();
@@ -215,6 +252,9 @@ export const useCanvasRendering = (
       imageNodesRef.current.delete(id);
       imageSourcesRef.current.delete(id);
     });
+
+    const orderedIds = sortByZIndex(images.filter((image) => nextIds.has(image.id))).map((image) => image.id);
+    applyLayerOrder(orderedIds, imageNodesRef.current, imageOrderRef);
   }, []);
 
   const reconcileTexts = useCallback((texts: TextBoxElement[]) => {
@@ -250,6 +290,9 @@ export const useCanvasRendering = (
       textNodesRef.current.delete(id);
       textSourcesRef.current.delete(id);
     });
+
+    const orderedIds = sortByZIndex(texts.filter((textBox) => nextIds.has(textBox.id))).map((textBox) => textBox.id);
+    applyLayerOrder(orderedIds, textNodesRef.current, textOrderRef);
   }, []);
 
   const updateTransformsAndVisibility = useCallback(() => {

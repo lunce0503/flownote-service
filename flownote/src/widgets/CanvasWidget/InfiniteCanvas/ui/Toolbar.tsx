@@ -1,7 +1,8 @@
 import React from 'react';
 import type { ToolType } from '@/entities/canvas';
 import type { CanvasLoadTrigger, CanvasSaveState, CanvasSaveStatus } from '@/features/canvas';
-import { CheckCircle2, ClipboardPaste, Copy, Download, Eraser, Hand, ImagePlus, Lasso, Loader2, Palette, PenLine, RefreshCw, RotateCcw, Settings, Trash2, TriangleAlert, Type, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { BringToFront, CheckCircle2, ClipboardPaste, Copy, Download, Eraser, Hand, ImagePlus, Lasso, Loader2, Maximize, Minimize, Palette, PenLine, RefreshCw, RotateCcw, SendToBack, Settings, Trash2, TriangleAlert, Type, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { useFullscreen } from '@/shared/lib/useFullscreen';
 
 interface ToolbarProps {
   canvasTitle: string;
@@ -23,6 +24,8 @@ interface ToolbarProps {
   onDeleteLassoSelection: () => void;
   onScaleLassoSelection: (factor: number) => void;
   onChangeLassoSelectionColor: (color: string) => void;
+  onBringLassoSelectionToFront: () => void;
+  onSendLassoSelectionToBack: () => void;
   onClearLassoSelection: () => void;
   penColor: string;
   onPenColorChange: (color: string) => void;
@@ -142,6 +145,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onDeleteLassoSelection,
   onScaleLassoSelection,
   onChangeLassoSelectionColor,
+  onBringLassoSelectionToFront,
+  onSendLassoSelectionToBack,
   onClearLassoSelection,
   penColor,
   onPenColorChange,
@@ -150,6 +155,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   zoomPercent,
   viewportCenter,
 }) => {
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
   const touchStarts = React.useRef(new Map<number, { x: number; y: number }>());
   const lastTouchActivationAt = React.useRef(0);
   const toolButtons: Array<{ tool: ToolType; label: string; icon: React.ReactNode }> = [
@@ -322,6 +328,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             )}
             <button
               type="button"
+              {...touchActivation(() => { void toggleFullscreen(); })}
+              className={`${iconButtonClass} ${isFullscreen ? selectedIconButtonClass : ''}`}
+              title={isFullscreen ? '전체 화면 종료 (Esc)' : '전체 화면 (브라우저 툴바·헤더 숨김)'}
+              aria-label={isFullscreen ? '전체 화면 종료' : '전체 화면'}
+              aria-pressed={isFullscreen}
+            >
+              {isFullscreen ? <Minimize size={TOOLBAR_ICON_SIZE} /> : <Maximize size={TOOLBAR_ICON_SIZE} />}
+            </button>
+            <button
+              type="button"
               {...touchActivation(onToggleCanvasSettingsVisible)}
               className={`${iconButtonClass} ${isCanvasSettingsVisible ? selectedIconButtonClass : ''}`}
               title="그림판 설정"
@@ -370,6 +386,22 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 title="선택 영역 확대"
               >
                 <ZoomIn size={TOOLBAR_ICON_SIZE} />
+              </button>
+              <button
+                type="button"
+                {...touchActivation(onBringLassoSelectionToFront)}
+                className={iconButtonClass}
+                title="맨 앞으로 가져오기"
+              >
+                <BringToFront size={TOOLBAR_ICON_SIZE} />
+              </button>
+              <button
+                type="button"
+                {...touchActivation(onSendLassoSelectionToBack)}
+                className={iconButtonClass}
+                title="맨 뒤로 보내기"
+              >
+                <SendToBack size={TOOLBAR_ICON_SIZE} />
               </button>
               <div className="flex min-h-12 items-center gap-1 rounded-full bg-stone-100 px-2" title="선택한 선, 이미지, 텍스트 색상 변경">
                 <Palette size={16} className="text-stone-600" />

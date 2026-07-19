@@ -14,10 +14,12 @@ import { useNavigate, useParams } from "react-router-dom";
 import { getNoteData } from "@/entities/blog";
 import { API_CORE_BASE_URL, authHeaders } from "@/shared/api";
 import axios from "axios";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { LatexInline } from "./LatexInline";
 import { transformLatexInlineContent } from "./latexTransform";
 import NoteDrawingPad from "./NoteDrawingPad";
 import { getSyncClientId, subscribeSyncEvents } from "@/shared/lib/sync";
+import { useFullscreen } from "@/shared/lib/useFullscreen";
 
 const uploadFile = async (file: File) => {
   if (!API_CORE_BASE_URL) {
@@ -69,6 +71,7 @@ type PendingNoteSave = {
 const  BlockNote = () => {
   const { title } = useParams<{title:string}>();
   const navigate = useNavigate();
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
 
   const schema = useMemo(() => BlockNoteSchema.create({
     blockSpecs: {
@@ -545,6 +548,17 @@ const  BlockNote = () => {
           className="rounded-lg bg-stone-950 px-4 py-2 text-sm font-semibold text-white"
         >
           드로잉 필기
+        </button>
+        {/* 영상 전체 화면처럼 브라우저 UI와 Flownote 헤더를 숨기고 노트에 집중한다. */}
+        <button
+          type="button"
+          onClick={() => { void toggleFullscreen(); }}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-stone-950 px-4 py-2 text-sm font-semibold text-white"
+          title={isFullscreen ? "전체 보기 종료 (Esc)" : "브라우저 툴바와 헤더를 숨기고 전체 화면으로 봅니다"}
+          aria-pressed={isFullscreen}
+        >
+          {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          {isFullscreen ? "전체 보기 종료" : "전체로 보기"}
         </button>
       </div>
       

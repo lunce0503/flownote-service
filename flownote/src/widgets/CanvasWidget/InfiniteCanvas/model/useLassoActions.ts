@@ -1,7 +1,40 @@
 import { useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { markModified, type LassoSelection } from "@/features/canvas";
-import type { ImageElement, LineElement, Point, TextBoxElement, ToolType } from "@/entities/canvas";
+import type { CanvasElementStatus, ImageElement, LineElement, Point, TextBoxElement, ToolType } from "@/entities/canvas";
+
+type Layerable = { id: string; zIndex?: number; status?: CanvasElementStatus };
+
+// 선택 요소를 같은 타입 요소들 위(맨 앞)로 올린다. 선택 요소끼리의 상대 순서는 유지한다.
+const bringToFront = <T extends Layerable>(items: T[], ids: Set<string>): T[] => {
+    if (ids.size === 0) return items;
+    const maxZ = items.reduce((max, item) => (item.status !== "deleted" ? Math.max(max, item.zIndex ?? 0) : max), 0);
+    let slot = maxZ;
+    let changed = false;
+    const next = items.map((item) => {
+        if (!ids.has(item.id) || item.status === "deleted") return item;
+        slot += 1;
+        changed = true;
+        return markModified({ ...item, zIndex: slot });
+    });
+    return changed ? next : items;
+};
+
+// 선택 요소를 같은 타입 요소들 아래(맨 뒤)로 내린다. 선택 요소끼리의 상대 순서는 유지한다.
+const sendToBack = <T extends Layerable>(items: T[], ids: Set<string>): T[] => {
+    if (ids.size === 0) return items;
+    const minZ = items.reduce((min, item) => (item.status !== "deleted" ? Math.min(min, item.zIndex ?? 0) : min), 0);
+    const selectedCount = items.reduce((count, item) => (ids.has(item.id) && item.status !== "deleted" ? count + 1 : count), 0);
+    let slot = minZ - selectedCount - 1;
+    let changed = false;
+    const next = items.map((item) => {
+        if (!ids.has(item.id) || item.status === "deleted") return item;
+        slot += 1;
+        changed = true;
+        return markModified({ ...item, zIndex: slot });
+    });
+    return changed ? next : items;
+};
 
 export type LassoClipboard = {
     lines: LineElement[];
@@ -194,6 +227,22 @@ export const useLassoActions = ({
         setLassoSelection(null);
     };
 
+    const handleBringLassoSelectionToFront = () => {
+        if (!lassoSelection) return;
+        recordHistory();
+        setDrawnLines((prev) => bringToFront(prev, lassoSelection.lineIds));
+        setImages((prev) => bringToFront(prev, lassoSelection.imageIds));
+        setTextBoxes((prev) => bringToFront(prev, lassoSelection.textBoxIds));
+    };
+
+    const handleSendLassoSelectionToBack = () => {
+        if (!lassoSelection) return;
+        recordHistory();
+        setDrawnLines((prev) => sendToBack(prev, lassoSelection.lineIds));
+        setImages((prev) => sendToBack(prev, lassoSelection.imageIds));
+        setTextBoxes((prev) => sendToBack(prev, lassoSelection.textBoxIds));
+    };
+
     return {
         lassoClipboard,
         moveLassoSelection,
@@ -202,5 +251,7 @@ export const useLassoActions = ({
         handlePasteLassoSelection,
         handleChangeLassoSelectionColor,
         handleDeleteLassoSelection,
+        handleBringLassoSelectionToFront,
+        handleSendLassoSelectionToBack,
     };
 };

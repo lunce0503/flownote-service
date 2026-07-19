@@ -11,6 +11,7 @@ export type LineElement = {
     points: Point[];
     color?: string;
     strokeWidth?: number;
+    zIndex?: number; // 레이어 순서(클수록 앞). 미지정은 배열 순서를 따른다.
     status?: CanvasElementStatus; // 상태 추가
 };
 
@@ -27,6 +28,7 @@ export type ImageElement = {
     width: number;
     height: number;
     tintColor?: string;
+    zIndex?: number; // 레이어 순서(클수록 앞). 미지정은 배열 순서를 따른다.
     status?: CanvasElementStatus; // 상태 추가
 };
 
@@ -38,6 +40,7 @@ export type TextBoxElement = {
     width: number;
     height: number;
     color?: string;
+    zIndex?: number; // 레이어 순서(클수록 앞). 미지정은 배열 순서를 따른다.
     status?: CanvasElementStatus; // 상태 추가
 };
 

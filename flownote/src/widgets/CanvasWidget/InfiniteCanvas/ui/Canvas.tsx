@@ -504,6 +504,8 @@ const Canvas = () => {
         handlePasteLassoSelection,
         handleChangeLassoSelectionColor,
         handleDeleteLassoSelection,
+        handleBringLassoSelectionToFront,
+        handleSendLassoSelectionToBack,
     } = useLassoActions({
         lassoSelection,
         setLassoSelection,
@@ -893,6 +895,8 @@ const Canvas = () => {
                     onDeleteLassoSelection={handleDeleteLassoSelection}
                     onScaleLassoSelection={handleScaleLassoSelection}
                     onChangeLassoSelectionColor={handleChangeLassoSelectionColor}
+                    onBringLassoSelectionToFront={handleBringLassoSelectionToFront}
+                    onSendLassoSelectionToBack={handleSendLassoSelectionToBack}
                     onClearLassoSelection={() => setLassoSelection(null)}
                     penColor={penColor}
                     onPenColorChange={handlePenColorChange}
