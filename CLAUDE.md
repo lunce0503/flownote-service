@@ -43,12 +43,12 @@
 
 ## 하네스 자산
 
-- 프로젝트 하네스 개요: `.codex/README.md`
-- 공통 및 스택별 규칙: `.codex/rules/`
-- 재사용 작업 프롬프트: `.codex/prompts/`
-- 품질 체크리스트: `.codex/checklists/`
-- 장기 프로젝트 메모리 후보: `.codex/memories/`
-- 하네스 워크플로우와 라우팅: `.codex/harness/`
+- 프로젝트 하네스 개요: `.claude/README.md`
+- 공통 및 스택별 규칙: `.claude/rules/`
+- 재사용 작업 프롬프트: `.claude/prompts/`
+- 품질 체크리스트: `.claude/checklists/`
+- 장기 프로젝트 메모리 후보: `.claude/memories/`
+- 하네스 워크플로우와 라우팅: `.claude/harness/`
 
 ## 지식 저장소 (System of Record)
 
@@ -74,7 +74,7 @@ Flownote의 컨텍스트는 채팅이나 개인의 기억이 아니라 저장소
 3. 구현: 기존 컨벤션을 사용해 집중된 변경만 수행한다.
 4. 검증: 변경에 맞는 lint, build, test, targeted check를 실행한다.
 5. 리뷰: 회귀, 보안, API 계약, UI 동작을 확인한다.
-6. 기록: 버그와 실행 로그는 `logs/`, 분석 산출물과 작업 결과는 `logs/report/`, 재사용 가능한 프로젝트 컨벤션은 `.codex/memories/`에 남긴다. 제품 행동·아키텍처·검증 기준이 바뀌면 `docs/`의 소유 문서(System of Record)를 같은 변경에서 갱신하고 교차 링크를 확인한다.
+6. 기록: 버그와 실행 로그는 `logs/`, 분석 산출물과 작업 결과는 `logs/report/`, 재사용 가능한 프로젝트 컨벤션은 `.claude/memories/`에 남긴다. 제품 행동·아키텍처·검증 기준이 바뀌면 `docs/`의 소유 문서(System of Record)를 같은 변경에서 갱신하고 교차 링크를 확인한다.
 7. Docker 빌드 및 실행: 작업 종료 전 저장소 루트에서 `docker compose up -d --build`를 실행해 통합 빌드와 백그라운드 실행을 확인한다.
 8. 클라우드 배포: 파일을 수정한 작업은 Docker 검증 뒤 Vercel production 및 영향받는 Railway 서비스를 배포하고 URL, deployment id, 헬스체크 결과를 확인한다. `logs/report/` 전용 보고서 작성/수정은 Docker와 클라우드 배포를 생략한다.
 9. 보고: 최종 응답에는 하위 프로젝트 검증 결과, `docker compose up -d --build` 결과, 클라우드 배포 결과를 함께 포함한다.
