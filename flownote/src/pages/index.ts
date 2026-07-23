@@ -1,6 +1,7 @@
 export { default as AgentPage } from "./AgentPage";
 export { default as BlogDetailPage } from "./BlogDetailPage";
 export { default as BlogPage } from "./BlogPage";
+export { default as DiaryPage } from "./DiaryPage";
 export { default as LoginPage } from "./LoginPage";
 export { default as LolBanpickPage } from "./LolBanpick";
 export { default as SignUpPage } from "./SignUpPage";

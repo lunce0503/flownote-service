@@ -14,6 +14,7 @@ import (
 	"github.com/flownote/flownote-serve/internal/auth"
 	"github.com/flownote/flownote-serve/internal/chat"
 	"github.com/flownote/flownote-serve/internal/config"
+	"github.com/flownote/flownote-serve/internal/diary"
 	"github.com/flownote/flownote-serve/internal/schedule"
 	"github.com/flownote/flownote-serve/internal/social"
 	"github.com/flownote/flownote-serve/internal/stocks"
@@ -50,6 +51,13 @@ func main() {
 		log.Printf("경고: 오브젝트 스토리지 미설정 — 메모/메시지 본문 오프로드가 503으로 응답합니다.")
 	}
 
+	// diary는 Go 소유의 신규 테이블이라 시작 시 스키마를 보장한다(마이그레이션 러너 부재).
+	schemaCtx, schemaCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer schemaCancel()
+	if err := diary.EnsureSchema(schemaCtx, pool); err != nil {
+		log.Fatalf("diary schema: %v", err)
+	}
+
 	authenticator := auth.New(pool)
 
 	mux := http.NewServeMux()
@@ -68,6 +76,7 @@ func main() {
 	stocks.NewHandler(stocks.NewRepo(pool), stocks.NewMarketClient(cfg.MarketDataURL), authenticator).Register(mux)
 	social.NewHandler(social.NewRepo(pool, store), authenticator).Register(mux)
 	chat.NewHandler(chat.NewRepo(pool, store), authenticator).Register(mux)
+	diary.NewHandler(diary.NewRepo(pool), authenticator).Register(mux)
 
 	root := withCORS(cfg.CORSOrigins, withRequestLog(mux))
 

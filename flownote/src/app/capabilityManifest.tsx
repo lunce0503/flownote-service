@@ -12,6 +12,7 @@ import LolBanPickRoute from './routers/LolBanpick/route.tsx';
 import ScrewPuzzleRoute from './routers/ScrewPuzzle/route.tsx';
 import CanvasRoute from './routers/Canvas/route.tsx';
 import CanvasListRoute from './routers/Canvas/list.tsx';
+import DiaryRoute from './routers/Diary/route.tsx';
 import StockRoute from './routers/Stock/route.tsx';
 import StockChartRoute from './routers/Stock/chart.tsx';
 import SettingsRoute from './routers/Settings/route.tsx';
@@ -76,6 +77,15 @@ export const capabilityManifest: Capability[] = [
       { path: '/canvas', element: <CanvasListRoute /> },
       { path: '/canvas/:canvasId', element: <CanvasRoute /> },
     ],
+  },
+  {
+    id: 'diary',
+    label: '일기장',
+    nav: true,
+    enabled: true,
+    protected: true,
+    // /diary = 하루 단위 일기장(펜슬 시간표 + 할일 색칠 + BlockNote 저널).
+    routes: [{ path: '/diary', element: <DiaryRoute /> }],
   },
   {
     id: 'stocks',

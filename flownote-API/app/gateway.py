@@ -39,7 +39,7 @@ SERVE_API_BASE_URL = (os.getenv("SERVE_API_BASE_URL") or "http://serve-server:80
 # flownote-ai(AI 백엔드)가 소유하는 경로 접두어.
 _AI_PREFIXES = ("aiclient", "agent-note", "market")
 # flownote-serve(부가기능 백엔드: 일정·작업·주식·소셜·채팅)가 소유하는 접두어 — Spring에서 이관.
-_SERVE_PREFIXES = ("schedule-items", "tasks", "stocks", "social", "chat")
+_SERVE_PREFIXES = ("schedule-items", "tasks", "stocks", "social", "chat", "diary")
 # flownote-canvas(Go)가 소유하는 접두어: 캔버스 + 이관된 노트 도메인(노트·폴더·업로드) + 관리자 진단.
 _CANVAS_PREFIXES = ("canvas", "notes", "note-folders", "upload", "admin")
 
