@@ -4,7 +4,10 @@ import type { LineElement, CanvasSavePayload } from '@/entities/canvas';
 import { authHeaders } from '@/shared/api';
 import { isAbortError, type CanvasSaveTrigger } from './canvasPersistenceModel';
 
-export const CANVAS_SAVE_REQUEST_TIMEOUT_MS = 30_000;
+// 게이트웨이 저장 포워딩 타임아웃(CANVAS_SAVE_FORWARD_TIMEOUT_SECONDS=90s)보다 살짝 크게 잡는다.
+// 30s로 두면 대용량 필기·느린 백엔드(30~90s)에서 클라이언트가 먼저 포기→재시도하며,
+// 백엔드가 결국 성공해도 성공 ack를 못 받아 "재시도"만 무한 반복하는 루프가 생긴다.
+export const CANVAS_SAVE_REQUEST_TIMEOUT_MS = 95_000;
 export const CANVAS_SOCKET_REQUEST_TIMEOUT_MS = 30_000;
 export const CANVAS_SOCKET_LOAD_TIMEOUT_MS = 180_000;
 export const CANVAS_SOCKET_UPLOAD_TIMEOUT_MS = 120_000;
@@ -14,7 +17,28 @@ export type CanvasSocketResponse<T> = {
   data?: T;
   error?: string;
   status?: number;
+  retryable?: boolean;
 };
+
+// 게이트웨이가 실어 보낸 status/retryable을 보존한다.
+// 메시지만 남기면 호출부가 "영구 오류(4xx)"와 "일시 오류"를 구분하지 못해 무한 재시도에 빠진다.
+export class CanvasSocketError extends Error {
+  readonly status?: number;
+  readonly retryable?: boolean;
+
+  constructor(message: string, status?: number, retryable?: boolean) {
+    super(message);
+    this.name = "CanvasSocketError";
+    this.status = status;
+    this.retryable = retryable;
+  }
+}
+
+// 저장 멱등성 충돌(409): 서버에 이미 기록된 mutationId에 다른 payload를 보낸 경우.
+// 같은 (mutationId, payload) 조합으로는 영원히 409이므로 새 mutationId로 갈아타야 자가 치유된다.
+export const isCanvasMutationConflict = (error: unknown) => (
+  error instanceof CanvasSocketError && error.status === 409
+);
 
 export type CanvasSaveResponse = {
   mutationId: string;
@@ -112,7 +136,11 @@ export const emitCanvasSocket = <T,>(
           return;
         }
         if (!response?.ok) {
-          reject(new Error(response?.error || `${eventName} socket request failed`));
+          reject(new CanvasSocketError(
+            response?.error || `${eventName} socket request failed`,
+            response?.status,
+            response?.retryable,
+          ));
           return;
         }
         resolve(response.data as T);

@@ -29,7 +29,10 @@ type RenderQueue = {
   activeOnly?: boolean;
 };
 
-const LINE_TENSION = 0.12;
+// 손그림 획은 이미 촘촘히 보간(≤8px)되고 smoothLinePoints로 평활화된다.
+// Konva tension(Catmull-Rom)을 주면 끝점에서 오버슈트하거나(획이 조금 더 그려짐),
+// 빠른 획처럼 점이 적을 때 곡선이 되말려 양끝이 연결되어 보인다. tension 0으로 폴리라인 렌더.
+const LINE_TENSION = 0;
 const VIEWPORT_OVERSCAN_PX = 160;
 const pointsToFlatArray = (points: Point[]) => points.flatMap((point) => [point.x, point.y]);
 
@@ -59,6 +62,11 @@ const sortByZIndex = <T extends { zIndex?: number }>(items: T[]): T[] =>
     .map((entry) => entry.item);
 
 // 정렬된 id 순서를 Konva 자식 z-order에 반영한다. 순서가 그대로면 재정렬을 건너뛴다.
+// Konva의 zIndex 세터는 1회 호출이 O(n)이다(children splice ×2 + _setChildrenIndices 전체 순회 + _requestDraw).
+// 그래서 모든 노드에 무조건 적용하면 요소를 하나 추가할 때마다 O(n²)가 되어 필기 직후 딜레이가 생긴다.
+// 오름차순으로 훑으며 "실제 위치가 어긋난 노드"만 옮긴다. 앞쪽 index는 이미 확정되어 있으므로
+// 뒤에서 앞으로 끌어오는 이동은 index < i 구간을 건드리지 않아 결과 순서가 동일하다.
+// zIndex를 명시적으로 바꾸지 않은 일반적인 append 상황에서는 이동이 0회가 된다.
 const applyLayerOrder = <N extends Konva.Node>(
   orderedIds: string[],
   nodes: Map<string, N>,
@@ -68,7 +76,9 @@ const applyLayerOrder = <N extends Konva.Node>(
   if (signature === signatureRef.current) return;
   signatureRef.current = signature;
   orderedIds.forEach((id, index) => {
-    nodes.get(id)?.zIndex(index);
+    const node = nodes.get(id);
+    if (!node || node.index === index) return;
+    node.zIndex(index);
   });
 };
 

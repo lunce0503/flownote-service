@@ -32,6 +32,7 @@ import {
   CANVAS_SOCKET_LOAD_TIMEOUT_MS,
   getCanvasSocket,
   emitCanvasSocket,
+  isCanvasMutationConflict,
   saveCanvasPayload,
   type CanvasChangedEvent,
   type CanvasStreamCallbacks,
@@ -420,10 +421,16 @@ export const usePersistence = (
         } catch (error) {
           if (retryCancelRequestedRef.current || isAbortError(error)) break;
           failedCount += 1;
+          // 멱등성 충돌(409)은 같은 mutationId로 재시도하면 영원히 같은 409다(백오프만 늘어난다).
+          // 되돌리기처럼 대기 중 payload가 바뀌면 이 상태가 되므로, 새 mutationId를 발급해
+          // 백오프 없이 즉시 다시 시도한다. 서버 반영은 upsert/삭제 모두 멱등이라 중복 적용도 안전하다.
+          const conflicted = isCanvasMutationConflict(error);
           updateCanvasRetryQueueItem(item.id, {
-            attempts: item.attempts + 1,
+            attempts: conflicted ? item.attempts : item.attempts + 1,
             lastError: error instanceof Error ? error.message : String(error),
-            nextAttemptAt: Date.now() + Math.min(300_000, 2 ** Math.min(item.attempts + 1, 8) * 1000),
+            ...(conflicted
+              ? { mutationId: uuidv4(), nextAttemptAt: Date.now() }
+              : { nextAttemptAt: Date.now() + Math.min(300_000, 2 ** Math.min(item.attempts + 1, 8) * 1000) }),
           });
         }
       }
@@ -585,7 +592,9 @@ export const usePersistence = (
           attemptCanvasId,
           payload,
           err instanceof Error ? err.message : String(err),
-          activeMutation?.mutationId,
+          // 409로 실패한 mutationId를 큐에 그대로 넣으면 재시도가 같은 409를 무한 반복한다.
+          // 충돌한 경우엔 새 mutationId로 큐에 넣어 다음 시도가 성공할 수 있게 한다.
+          isCanvasMutationConflict(err) ? uuidv4() : activeMutation?.mutationId,
           SAVE_TRIGGER_PRIORITY[trigger],
         );
       }

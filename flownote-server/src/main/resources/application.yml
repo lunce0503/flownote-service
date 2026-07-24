@@ -40,6 +40,12 @@ management:
     web:
       exposure:
         include: health,info
+  health:
+    # Redis는 세션 캐시(무음 폴백) 용도라 필수 의존성이 아니다.
+    # Redis 장애/지연이 /actuator/health 를 DOWN 시키면 Railway 헬스체크 실패 →
+    # 게이트웨이 502 → 로그인 불가로 이어지므로 전체 health 게이팅에서 제외한다.
+    redis:
+      enabled: false
 
 flownote:
   cors:
