@@ -16,6 +16,7 @@ import StockRoute from './routers/Stock/route.tsx';
 import StockChartRoute from './routers/Stock/chart.tsx';
 import SettingsRoute from './routers/Settings/route.tsx';
 import AdminCanvasRoute from './routers/AdminCanvas/route.tsx';
+import AdminFeedbackRoute from './routers/AdminFeedback/route.tsx';
 import Magic from './routers/Magic/magic.tsx';
 
 // 하나의 라우트 노드. index 라우트, 또는 children을 가진 부모 라우트를 표현한다.
@@ -149,6 +150,15 @@ export const capabilityManifest: Capability[] = [
     enabled: true,
     protected: true,
     routes: [{ path: '/admin/canvas', element: <AdminCanvasRoute /> }],
+  },
+  {
+    id: 'admin-feedback',
+    label: '피드백 관리',
+    nav: false,
+    enabled: true,
+    protected: true,
+    // 관리자 전용. 설정 화면에서 접수된 사용자 피드백을 확인한다.
+    routes: [{ path: '/admin/feedback', element: <AdminFeedbackRoute /> }],
   },
   {
     id: 'auth',
