@@ -1,13 +1,12 @@
 export { default as AgentPage } from "./AgentPage";
 export { default as BlogDetailPage } from "./BlogDetailPage";
 export { default as BlogPage } from "./BlogPage";
-export { default as DiaryPage } from "./DiaryPage";
+export { default as PlannerPage } from "./PlannerPage";
 export { default as LoginPage } from "./LoginPage";
 export { default as LolBanpickPage } from "./LolBanpick";
 export { default as SignUpPage } from "./SignUpPage";
 export { default as SocialPage } from "./SocialPage";
 export { default as ScrewPuzzlePage } from "./ScrewPuzzlePage";
-export { default as TaskPage } from "./TaskPage";
 export { default as SettingsPage } from "./SettingsPage";
 export { default as StockChartPage } from "./StockChartPage";
 export { default as StockPage } from "./StockPage";

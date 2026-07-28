@@ -15,6 +15,7 @@ import (
 	"github.com/flownote/flownote-serve/internal/chat"
 	"github.com/flownote/flownote-serve/internal/config"
 	"github.com/flownote/flownote-serve/internal/diary"
+	"github.com/flownote/flownote-serve/internal/feedback"
 	"github.com/flownote/flownote-serve/internal/schedule"
 	"github.com/flownote/flownote-serve/internal/social"
 	"github.com/flownote/flownote-serve/internal/stocks"
@@ -57,6 +58,9 @@ func main() {
 	if err := diary.EnsureSchema(schemaCtx, pool); err != nil {
 		log.Fatalf("diary schema: %v", err)
 	}
+	if err := feedback.EnsureSchema(schemaCtx, pool); err != nil {
+		log.Fatalf("feedback schema: %v", err)
+	}
 
 	authenticator := auth.New(pool)
 
@@ -77,6 +81,7 @@ func main() {
 	social.NewHandler(social.NewRepo(pool, store), authenticator).Register(mux)
 	chat.NewHandler(chat.NewRepo(pool, store), authenticator).Register(mux)
 	diary.NewHandler(diary.NewRepo(pool), authenticator).Register(mux)
+	feedback.NewHandler(feedback.NewRepo(pool), authenticator).Register(mux)
 
 	root := withCORS(cfg.CORSOrigins, withRequestLog(mux))
 

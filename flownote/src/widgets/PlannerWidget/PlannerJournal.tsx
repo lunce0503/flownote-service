@@ -10,9 +10,9 @@ type Props = {
   onChange: (blocks: DiaryJournalBlock[]) => void;
 };
 
-// BlockNote 기반 자유 타이핑 영역. 부모가 날짜를 key로 remount 하므로
-// initialContent는 마운트 시 한 번만 반영하면 된다(날짜별 저장 내용 로드).
-const DiaryJournal = ({ initialContent, onChange }: Props) => {
+// 게시글(노트)에서 쓰는 BlockNote 에디터를 그대로 재사용한다.
+// 부모가 날짜를 key로 remount 하므로 initialContent는 마운트 시 한 번만 반영하면 된다.
+const PlannerJournal = ({ initialContent, onChange }: Props) => {
   const editor = useCreateBlockNote({
     initialContent: Array.isArray(initialContent) && initialContent.length > 0
       ? (initialContent as PartialBlock[])
@@ -20,10 +20,10 @@ const DiaryJournal = ({ initialContent, onChange }: Props) => {
   });
 
   return (
-    <div className="diary-journal min-h-64 rounded-lg border border-slate-200 bg-white py-2">
+    <div className="min-h-56 rounded-lg border border-neutral-200 bg-white py-2 text-black">
       <BlockNoteView editor={editor} theme="light" onChange={() => onChange(editor.document)} />
     </div>
   );
 };
 
-export default DiaryJournal;
+export default PlannerJournal;
