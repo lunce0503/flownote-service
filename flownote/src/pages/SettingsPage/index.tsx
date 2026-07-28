@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useTheme, type ThemeMode } from "@/features/theme";
 import { useAuth } from "@/features/auth";
+import { postFeedback, listMyFeedback, FEEDBACK_CATEGORIES, type FeedbackItem } from "@/entities/feedback";
 
 type FontScale = "normal" | "large";
 type Density = "comfortable" | "compact";
@@ -29,7 +30,6 @@ type UserPreferences = {
 };
 
 const PREF_STORAGE_KEY = "flownote_user_preferences";
-const FEEDBACK_STORAGE_KEY = "flownote_user_feedback";
 
 const defaultPreferences: UserPreferences = {
   fontScale: "normal",
@@ -110,11 +110,13 @@ const SettingsPage = () => {
     window.localStorage.getItem("flownote_language") === "en" ? "en" : "ko"
   ));
   const [feedback, setFeedback] = useState({
-    category: "사용 어려움",
+    category: FEEDBACK_CATEGORIES[0] as string,
     message: "",
     contact: "",
   });
-  const [feedbackSaved, setFeedbackSaved] = useState(false);
+  // 피드백은 서버(DB)에 저장한다. 전송 상태를 명시적으로 다룬다.
+  const [feedbackStatus, setFeedbackStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [myFeedback, setMyFeedback] = useState<FeedbackItem[]>([]);
 
   const updatePreferences = (next: Partial<UserPreferences>) => {
     setPreferences((prev) => {
@@ -136,30 +138,36 @@ const SettingsPage = () => {
     document.documentElement.classList.toggle("motion-reduced", preferences.reduceMotion);
   }, [preferences]);
 
-  const submitFeedback = () => {
+  // 내가 보낸 피드백 목록을 서버에서 불러온다.
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const items = await listMyFeedback();
+        if (active) setMyFeedback(items);
+      } catch (error) {
+        console.warn("피드백 목록 불러오기 실패:", error);
+      }
+    };
+    void load();
+    return () => { active = false; };
+  }, []);
+
+  const submitFeedback = async () => {
     const trimmedMessage = feedback.message.trim();
-    if (!trimmedMessage) return;
+    if (!trimmedMessage || feedbackStatus === "sending") return;
 
-    const stored = window.localStorage.getItem(FEEDBACK_STORAGE_KEY);
-    let previousFeedback: unknown[] = [];
+    setFeedbackStatus("sending");
     try {
-      previousFeedback = stored ? JSON.parse(stored) as unknown[] : [];
-    } catch {
-      previousFeedback = [];
+      const created = await postFeedback({ ...feedback, message: trimmedMessage });
+      setMyFeedback((prev) => [created, ...prev]);
+      setFeedback({ category: FEEDBACK_CATEGORIES[0], message: "", contact: "" });
+      setFeedbackStatus("sent");
+      window.setTimeout(() => setFeedbackStatus("idle"), 2500);
+    } catch (error) {
+      console.error("피드백 전송 실패:", error);
+      setFeedbackStatus("error");
     }
-    const nextFeedback = [
-      {
-        ...feedback,
-        message: trimmedMessage,
-        createdAt: new Date().toISOString(),
-      },
-      ...previousFeedback,
-    ].slice(0, 20);
-
-    window.localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(nextFeedback));
-    setFeedback({ category: "사용 어려움", message: "", contact: "" });
-    setFeedbackSaved(true);
-    window.setTimeout(() => setFeedbackSaved(false), 2500);
   };
 
   return (
@@ -261,11 +269,9 @@ const SettingsPage = () => {
                     value={feedback.category}
                     onChange={(event) => setFeedback((prev) => ({ ...prev, category: event.target.value }))}
                   >
-                    <option>사용 어려움</option>
-                    <option>오류 제보</option>
-                    <option>기능 제안</option>
-                    <option>성능 문제</option>
-                    <option>기타</option>
+                    {FEEDBACK_CATEGORIES.map((category) => (
+                      <option key={category}>{category}</option>
+                    ))}
                   </select>
                 </label>
                 <label className="space-y-1">
@@ -289,15 +295,42 @@ const SettingsPage = () => {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <button
                     type="button"
-                    onClick={submitFeedback}
-                    disabled={!feedback.message.trim()}
+                    onClick={() => { void submitFeedback(); }}
+                    disabled={!feedback.message.trim() || feedbackStatus === "sending"}
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-stone-300"
                   >
                     <ClipboardList size={18} />
-                    피드백 저장
+                    {feedbackStatus === "sending" ? "보내는 중…" : "피드백 보내기"}
                   </button>
-                  {feedbackSaved ? <span className="text-sm font-bold text-emerald-700">피드백이 저장되었습니다.</span> : null}
+                  {feedbackStatus === "sent" && (
+                    <span className="text-sm font-bold text-emerald-700">피드백이 전송되었습니다. 감사합니다!</span>
+                  )}
+                  {feedbackStatus === "error" && (
+                    <span className="text-sm font-bold text-red-600">전송에 실패했습니다. 잠시 후 다시 시도해 주세요.</span>
+                  )}
                 </div>
+
+                {myFeedback.length > 0 && (
+                  <div className="mt-2 border-t border-stone-200 pt-3">
+                    <p className="mb-2 text-xs font-bold text-stone-500">내가 보낸 피드백 ({myFeedback.length})</p>
+                    <ul className="flex max-h-56 flex-col gap-2 overflow-y-auto">
+                      {myFeedback.map((item) => (
+                        <li key={item.id} className="rounded-xl border border-stone-200 bg-stone-50 p-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-md bg-stone-200 px-1.5 py-0.5 text-[11px] font-bold text-stone-700">
+                              {item.category || "기타"}
+                            </span>
+                            <span className="text-[11px] text-stone-500">
+                              {new Date(item.created_at).toLocaleString("ko-KR")}
+                            </span>
+                            <span className="ml-auto text-[11px] font-bold text-emerald-700">{item.status}</span>
+                          </div>
+                          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-stone-800">{item.message}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </section>
           </div>
