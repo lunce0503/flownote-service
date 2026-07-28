@@ -7,11 +7,10 @@ Flownote는 로컬 통합 실행을 기준으로 여러 하위 프로젝트가 �
 | 하위 프로젝트 | 역할 | 주요 기술 |
 | --- | --- | --- |
 | `flownote/` | 주요 Vite React 웹 앱 | React 19, Tailwind, BlockNote, 캔버스, SSE |
-| `flownote-next/` | Next.js 앱과 일부 API/업로드 흐름 | Next.js 16, Prisma, PostgreSQL |
 | `flownote-server/` | 인증, 작업, 노트, 소셜, 주식, 모바일 설정 WAS | Java 17, Spring Boot, JDBC, Flyway |
 | `flownote-API/` | AI/에이전트 + MCP 도구, 캔버스 Socket.IO 실시간, Yahoo Finance 시장 데이터 | FastAPI, uv, python-socketio, yfinance, Google GenAI |
 | `flownote-mobile/` | Expo WebView 모바일 앱 | Expo, React Native WebView |
-| `docker-compose.yml` | 로컬 통합 오케스트레이션 | PostgreSQL, Spring, FastAPI, React, Next, Expo |
+| `docker-compose.yml` | 로컬 통합 오케스트레이션 | PostgreSQL, Spring, FastAPI, React, Expo |
 
 ## 서비스 경계
 
@@ -48,5 +47,4 @@ Flownote는 로컬 통합 실행을 기준으로 여러 하위 프로젝트가 �
 - Vite UI 변경: `cd flownote && yarn build`
 - Spring 변경: `cd flownote-server && ./gradlew test`
 - FastAPI 변경: `cd flownote-API && uv run ...`
-- Next.js 변경: `cd flownote-next && yarn lint && yarn build`
 - 통합 확인: 저장소 루트에서 `docker compose up -d --build`

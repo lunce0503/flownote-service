@@ -156,26 +156,7 @@ services:
       redis:
         condition: service_healthy
 
-  # 3. Next.js 프론트엔드
-  next-app:
-    build: ./flownote-next
-    container_name: flownote-next
-    restart: always
-    ports:
-      - "3000:3000"
-    env_file:
-      - ./flownote-next/.env.local
-    environment:
-      - CORE_API_URL=http://spring-server:8080
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-      - WEB_ORIGIN=${WEB_ORIGIN}
-      - REPORT_PATH=/app/report/server-db-role-report.html
-    depends_on:
-      - spring-server
-    volumes:
-      - ./logs/report:/app/report:ro
-
-  # 4. React (Vite) SPA
+  # 3. React (Vite) SPA
   react-app:
     build:
       context: ./flownote

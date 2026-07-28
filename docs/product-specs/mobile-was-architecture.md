@@ -7,7 +7,7 @@ Flownote 모바일 앱은 Spring Boot WAS를 설정 진입점으로 사용한다
 - `flownote-server`: 모바일 설정을 관리하는 WAS다.
 - `flownote-mobile`: Expo 기반 iOS/Android 앱이다.
 - `flownote-API`: AI API URL로 노출될 수 있는 Python 서비스다.
-- `flownote/`, `flownote-next/`: 기존 웹 클라이언트다.
+- `flownote/`: 기존 웹 클라이언트다.
 
 ## 설정 흐름
 

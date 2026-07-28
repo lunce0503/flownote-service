@@ -3,7 +3,6 @@
 ## 프로젝트 구성
 
 - `flownote/`: Vite React 앱. React 19, BlockNote, Mantine, Tailwind, PDF 렌더링, Markdown/수식 렌더링을 사용한다.
-- `flownote-next/`: Next.js 16 앱. React 19, Prisma, PostgreSQL, Tailwind, app-router API를 사용한다.
 - `flownote-API/`: Python FastAPI 서비스. `uv`, SQLModel, asyncpg, Google GenAI, MCP 서버, 환경 변수 기반 설정을 사용한다.
 - `flownote-server/`: Java 17 Spring Boot 서비스. Gradle, JDBC, Flyway, validation, actuator, PostgreSQL을 사용한다.
 - `docker-compose.yml`: 로컬 통합 실행 기준이다.
@@ -36,7 +35,6 @@
 ## 하위 프로젝트 명령
 
 - `flownote/`: 프로덕션 빌드 검증은 `yarn build`를 사용한다. 브라우저나 개발 서버 확인이 필요할 때만 `yarn dev`를 사용한다.
-- `flownote-next/`: 린트는 `yarn lint`, 프로덕션 검증은 `yarn build`를 사용한다.
 - `flownote-API/`: `flownote-API/` 내부에서 `uv run ...` 명령을 사용한다. 프로젝트 로컬 가상환경과 `uv.lock`을 우선한다.
 - `flownote-server/`: `flownote-server/` 내부에서 `./gradlew test`를 사용한다.
 - 통합 작업: 포트, 환경 변수, 볼륨, DB 가정을 바꾸기 전 `docker-compose.yml`을 확인하고 서비스 경계를 검증한다.

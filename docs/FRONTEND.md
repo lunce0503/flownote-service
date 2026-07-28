@@ -2,7 +2,7 @@
 
 ## 범위
 
-이 문서는 `flownote/`, `flownote-next/`, `flownote-mobile/`의 UI 변경 기준을 정리한다. 세부 구현 규칙은 `.codex/rules/typescript-react.md`와 `.codex/checklists/frontend.md`를 함께 본다.
+이 문서는 `flownote/`, `flownote-mobile/`의 UI 변경 기준을 정리한다. 세부 구현 규칙은 `.codex/rules/typescript-react.md`와 `.codex/checklists/frontend.md`를 함께 본다.
 
 ## 제품 UI 원칙
 
@@ -29,7 +29,6 @@
 ## 검증
 
 - `cd flownote && yarn build`
-- `cd flownote-next && yarn lint && yarn build`
 - 모바일 정적 검증은 `cd flownote-mobile && yarn verify`
 - 최종 통합은 저장소 루트에서 `docker compose up -d --build`
 - 파일을 수정한 작업이면 `flownote/`에서 Vercel production 배포를 실행하고, 연동 백엔드 변경이 있으면 Railway 배포와 헬스체크도 함께 확인한다.

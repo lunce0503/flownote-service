@@ -17,7 +17,6 @@ Flownote는 기획한 내용을 바탕으로 관련 필기를 텍스트와 그�
 ## `flownote/` : flownote의 프론트엔드를 다루는 곳이다.
 ## `flownote/src` : flownote의 프론트와 직접관련된 소스 코드를 작성하는 곳으로 FSD 방식으로 코드를 작성하는 것을 주로 둔다.
 ## `flownote-mobile/` : flownote의 IOS/Android 앱을 다루는 서버이다.
-## `flownote-next/` : `flownote/`에서 클라이언트가 요청한 데이터를 가공해 전송하는 서버이다.
 ## `flownote-server/` : 인증(계정·세션)과 모바일 설정만 담당하는 **인증 서버**다. 노트는 `flownote-canvas/`로, 일정·작업·주식·소셜·채팅은 `flownote-serve/`로 완전 이관되었다.
 ## `flownote-canvas/` : 캔버스와 노트(필기 도메인)를 담당하는 Go 서버이다.
 ## `flownote-serve/` : 부가기능(일정·작업·주식·소셜·채팅)을 담당하는 Go 서버로, 게이트웨이 뒤에서 요청 시에만 깨어난다(서버리스).
