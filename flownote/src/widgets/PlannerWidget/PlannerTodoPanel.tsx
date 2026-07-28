@@ -45,60 +45,106 @@ const TodoRow = ({ todo, active, onSelect, onUpdate, onToggleDone, onDelete, onP
   onToggleDone: Props["onToggleDone"];
   onDelete: Props["onDelete"];
   onPromote: () => void;
-}) => (
-  <li className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 transition ${
-    active ? "border-black bg-neutral-50" : "border-neutral-200 bg-white hover:bg-neutral-50"
-  }`}>
-    <label
-      className="relative h-6 w-6 shrink-0 cursor-pointer rounded-md border border-neutral-200"
-      style={{ backgroundColor: todo.color }}
-      title="색상 변경"
-    >
-      <input
-        type="color"
-        value={todo.color}
-        onChange={(event) => onUpdate(todo.id, { color: event.target.value })}
-        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-        aria-label={`${todo.label} 색상`}
-      />
-    </label>
-    <button
-      type="button"
-      onClick={() => onSelect(todo.id)}
-      className={`min-w-0 flex-1 truncate text-left text-sm ${todo.done ? "text-neutral-400 line-through" : "text-black"}`}
-      title="이 할일 색으로 시간표 칠하기"
-    >
-      {todo.label}
-    </button>
-    <button
-      type="button"
-      onClick={onPromote}
-      className="hidden h-6 w-6 items-center justify-center rounded-md text-neutral-400 hover:text-black sm:flex"
-      title="캘린더에 오늘 마감 작업으로 올리기"
-    >
-      <CalendarPlus size={14} />
-    </button>
-    <button
-      type="button"
-      onClick={() => onToggleDone(todo.id)}
-      className={`flex h-6 w-6 items-center justify-center rounded-md border ${
-        todo.done ? "border-black bg-black text-white" : "border-neutral-300 text-neutral-400 hover:text-black"
-      }`}
-      title={todo.done ? "완료 해제" : "완료로 표시"}
-      aria-pressed={todo.done}
-    >
-      <Check size={14} />
-    </button>
-    <button
-      type="button"
-      onClick={() => onDelete(todo.id)}
-      className="flex h-6 w-6 items-center justify-center rounded-md text-neutral-400 hover:text-red-600"
-      title="삭제"
-    >
-      <Trash2 size={14} />
-    </button>
-  </li>
-);
+}) => {
+  // 이름 인라인 편집: 연필 버튼 또는 이름 더블클릭으로 시작, Enter 저장 / Esc 취소.
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState(todo.label);
+
+  const startEdit = () => {
+    setDraft(todo.label);
+    setIsEditing(true);
+  };
+
+  const commit = () => {
+    const next = draft.trim();
+    if (next && next !== todo.label) onUpdate(todo.id, { label: next });
+    setIsEditing(false);
+  };
+
+  return (
+    <li className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 transition ${
+      active ? "border-black bg-neutral-50" : "border-neutral-200 bg-white hover:bg-neutral-50"
+    }`}>
+      <label
+        className="relative h-6 w-6 shrink-0 cursor-pointer rounded-md border border-neutral-200"
+        style={{ backgroundColor: todo.color }}
+        title="색상 변경"
+      >
+        <input
+          type="color"
+          value={todo.color}
+          onChange={(event) => onUpdate(todo.id, { color: event.target.value })}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          aria-label={`${todo.label} 색상`}
+        />
+      </label>
+
+      {isEditing ? (
+        <input
+          type="text"
+          value={draft}
+          autoFocus
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") commit();
+            if (event.key === "Escape") setIsEditing(false);
+          }}
+          className="min-w-0 flex-1 rounded border border-black bg-white px-1.5 py-0.5 text-sm text-black outline-none"
+          aria-label="할일 이름 수정"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => onSelect(todo.id)}
+          onDoubleClick={startEdit}
+          className={`min-w-0 flex-1 truncate text-left text-sm ${todo.done ? "text-neutral-400 line-through" : "text-black"}`}
+          title="클릭: 이 색으로 시간표 칠하기 · 더블클릭: 이름 수정"
+        >
+          {todo.label}
+        </button>
+      )}
+
+      {!isEditing && (
+        <button
+          type="button"
+          onClick={startEdit}
+          className="flex h-6 w-6 items-center justify-center rounded-md text-neutral-400 hover:text-black"
+          title="이름 수정"
+        >
+          <Pencil size={13} />
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={onPromote}
+        className="hidden h-6 w-6 items-center justify-center rounded-md text-neutral-400 hover:text-black sm:flex"
+        title="캘린더에 오늘 마감 작업으로 올리기"
+      >
+        <CalendarPlus size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={() => onToggleDone(todo.id)}
+        className={`flex h-6 w-6 items-center justify-center rounded-md border ${
+          todo.done ? "border-black bg-black text-white" : "border-neutral-300 text-neutral-400 hover:text-black"
+        }`}
+        title={todo.done ? "완료 해제" : "완료로 표시"}
+        aria-pressed={todo.done}
+      >
+        <Check size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={() => onDelete(todo.id)}
+        className="flex h-6 w-6 items-center justify-center rounded-md text-neutral-400 hover:text-red-600"
+        title="삭제"
+      >
+        <Trash2 size={14} />
+      </button>
+    </li>
+  );
+};
 
 const PlannerTodoPanel = ({
   todos, tasks, activeTodoId, tool, penColor, date,
@@ -123,7 +169,8 @@ const PlannerTodoPanel = ({
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-white p-3 text-black">
+    // lg 이상에서는 옆의 시간표와 같은 높이로 늘어나고, 목록이 길면 내부에서만 스크롤한다.
+    <div className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-white p-3 text-black lg:h-full">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-bold">할 일</h3>
         <div className="flex items-center gap-1 rounded-lg bg-neutral-100 p-0.5">
@@ -192,6 +239,8 @@ const PlannerTodoPanel = ({
         ))}
       </div>
 
+      {/* 목록 영역: 큰 화면에서 남는 높이를 채우고, 넘치면 이 영역만 스크롤한다. */}
+      <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
       {todos.length === 0 ? (
         <p className="py-2 text-center text-xs text-neutral-500">할일을 추가하고 색을 골라 시간표를 칠해보세요.</p>
       ) : (
@@ -260,6 +309,7 @@ const PlannerTodoPanel = ({
             ))}
           </ul>
         )}
+      </div>
       </div>
     </div>
   );

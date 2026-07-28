@@ -119,7 +119,8 @@ const PlannerWidget = () => {
 
         {diary.loadStatus === "ready" && planner.view === "day" && (
           <>
-            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[320px_1fr]">
+            {/* 큰 화면(lg↑)에서는 할 일 패널과 시간표를 같은 높이로 맞춘다(stretch). */}
+            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[320px_1fr] lg:items-stretch">
               <PlannerTodoPanel
                 todos={diary.todos}
                 tasks={planner.tasks}
@@ -139,7 +140,7 @@ const PlannerWidget = () => {
                 onPromoteTodo={planner.promoteTodoToTask}
               />
 
-              <section className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-3">
+              <section className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-3 lg:h-full">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-bold">오늘의 시간표</h3>
                   <div className="flex items-center gap-1">
