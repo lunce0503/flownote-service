@@ -7,12 +7,14 @@ import {
   DIARY_COLOR_PRESETS,
   type DiaryGrid,
   type DiaryJournalBlock,
+  type DiaryStroke,
   type DiaryTodo,
 } from "@/entities/diary";
 
 export type DiaryLoadStatus = "loading" | "ready" | "error";
 export type DiarySaveStatus = "idle" | "saving" | "saved" | "error";
-export type DiaryTool = "paint" | "erase";
+// paint: 할일 색으로 칸 칠하기, erase: 칠한 칸 지우기, draw: 그림판처럼 자유 필기
+export type DiaryTool = "paint" | "erase" | "draw";
 
 export const toDateKey = (date: Date) => {
   const y = date.getFullYear();
@@ -33,7 +35,7 @@ const SAVE_DEBOUNCE_MS = 800;
 export const useDiary = () => {
   const [date, setDateState] = useState(() => toDateKey(new Date()));
   const [todos, setTodos] = useState<DiaryTodo[]>([]);
-  const [grid, setGrid] = useState<DiaryGrid>({ ...DEFAULT_DIARY_GRID, cells: {} });
+  const [grid, setGrid] = useState<DiaryGrid>({ ...DEFAULT_DIARY_GRID, cells: {}, strokes: [] });
   const [journal, setJournal] = useState<DiaryJournalBlock[]>([]);
   const [loadStatus, setLoadStatus] = useState<DiaryLoadStatus>("loading");
   const [saveStatus, setSaveStatus] = useState<DiarySaveStatus>("idle");
@@ -166,6 +168,25 @@ export const useDiary = () => {
     scheduleSave();
   }, [activeTodoId, tool, scheduleSave]);
 
+  // 그림판 기반 필기: 오늘 시간표 위에 직접 그린 획을 그리드와 함께 저장한다.
+  const addStroke = useCallback((stroke: DiaryStroke) => {
+    if (stroke.points.length === 0) return;
+    setGrid((current) => ({ ...current, strokes: [...current.strokes, stroke] }));
+    scheduleSave();
+  }, [scheduleSave]);
+
+  const undoStroke = useCallback(() => {
+    setGrid((current) => (
+      current.strokes.length === 0 ? current : { ...current, strokes: current.strokes.slice(0, -1) }
+    ));
+    scheduleSave();
+  }, [scheduleSave]);
+
+  const clearStrokes = useCallback(() => {
+    setGrid((current) => (current.strokes.length === 0 ? current : { ...current, strokes: [] }));
+    scheduleSave();
+  }, [scheduleSave]);
+
   const setJournalBlocks = useCallback((blocks: DiaryJournalBlock[]) => {
     setJournal(blocks);
     scheduleSave();
@@ -179,6 +200,9 @@ export const useDiary = () => {
     tool, setTool,
     addTodo, updateTodo, toggleTodoDone, deleteTodo,
     paintCell,
+    addStroke, undoStroke, clearStrokes,
     setJournalBlocks,
   };
 };
+
+export type UseDiaryResult = ReturnType<typeof useDiary>;

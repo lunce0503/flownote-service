@@ -5,14 +5,13 @@ import Blog from './routers/Blog/index.tsx';
 import BlogDetail from './routers/BlogDetail/index.tsx';
 import Social from './routers/Social/index.tsx';
 import Agent from './routers/Agent/index.tsx';
-import TaskRoute from './routers/Task/route.tsx';
 import LoginRoute from './routers/Login/route.tsx';
 import SignUpRoute from './routers/SignUp/routes.tsx';
 import LolBanPickRoute from './routers/LolBanpick/route.tsx';
 import ScrewPuzzleRoute from './routers/ScrewPuzzle/route.tsx';
 import CanvasRoute from './routers/Canvas/route.tsx';
 import CanvasListRoute from './routers/Canvas/list.tsx';
-import DiaryRoute from './routers/Diary/route.tsx';
+import PlannerRoute from './routers/Planner/route.tsx';
 import StockRoute from './routers/Stock/route.tsx';
 import StockChartRoute from './routers/Stock/chart.tsx';
 import SettingsRoute from './routers/Settings/route.tsx';
@@ -79,13 +78,13 @@ export const capabilityManifest: Capability[] = [
     ],
   },
   {
-    id: 'diary',
-    label: '일기장',
+    id: 'planner',
+    label: '플래너',
     nav: true,
     enabled: true,
     protected: true,
-    // /diary = 하루 단위 일기장(펜슬 시간표 + 할일 색칠 + BlockNote 저널).
-    routes: [{ path: '/diary', element: <DiaryRoute /> }],
+    // /planner = 할 일 · 시간표 · 일기 통합 화면(일간/주간/월간 보기).
+    routes: [{ path: '/planner', element: <PlannerRoute /> }],
   },
   {
     id: 'stocks',
@@ -97,14 +96,6 @@ export const capabilityManifest: Capability[] = [
       { path: '/stocks', element: <StockRoute /> },
       { path: '/stocks/chart', element: <StockChartRoute /> },
     ],
-  },
-  {
-    id: 'task',
-    label: '할 일',
-    nav: true,
-    enabled: true,
-    protected: true,
-    routes: [{ path: '/task', element: <TaskRoute /> }],
   },
   {
     id: 'social',

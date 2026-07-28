@@ -1,4 +1,3 @@
-import { TaskWidget } from "@/widgets";
 import {
     BookOpen,
     Bot,
@@ -27,9 +26,9 @@ const quickActions = [
         icon: PenLine,
     },
     {
-        label: "작업 관리",
-        description: "일정과 우선순위를 조정",
-        href: "/task",
+        label: "플래너",
+        description: "할 일·시간표·일기를 한 곳에서",
+        href: "/planner",
         icon: CheckSquare,
     },
     {
@@ -108,18 +107,24 @@ const Home = () => {
                     <section className="min-w-0">
                         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                             <div>
-                                <p className="text-sm font-semibold text-amber-700">Task Board</p>
-                                <h2 className="mt-1 text-2xl font-bold text-stone-900">진행 중인 작업</h2>
+                                <p className="text-sm font-semibold text-amber-700">Planner</p>
+                                <h2 className="mt-1 text-2xl font-bold text-stone-900">오늘의 계획</h2>
                             </div>
                             <Link
                                 className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
-                                to="/task"
+                                to="/planner"
                             >
-                                전체 작업 보기
+플래너 열기
                             </Link>
                         </div>
-                        <div className="-mx-4 sm:mx-0">
-          <TaskWidget />
+                        <div className="rounded-lg border border-stone-200 bg-white p-5 text-stone-700">
+                            <p className="text-sm">할 일, 주간 시간표, 일기를 한 화면에서 관리합니다.</p>
+                            <Link
+                                to="/planner"
+                                className="mt-3 inline-flex rounded-md bg-stone-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-stone-700"
+                            >
+                                플래너로 이동
+                            </Link>
                         </div>
                     </section>
 
