@@ -9,7 +9,7 @@ Flownote는 로컬 통합 실행을 기준으로 여러 하위 프로젝트가 �
 | `flownote/` | 주요 Vite React 웹 앱 | React 19, Tailwind, BlockNote, 캔버스, SSE |
 | `flownote-server/` | 인증, 작업, 노트, 소셜, 주식, 모바일 설정 WAS | Java 17, Spring Boot, JDBC, Flyway |
 | `flownote-API/` | AI/에이전트 + MCP 도구, 캔버스 Socket.IO 실시간, Yahoo Finance 시장 데이터 | FastAPI, uv, python-socketio, yfinance, Google GenAI |
-| `flownote-mobile/` | Expo WebView 모바일 앱 | Expo, React Native WebView |
+| `flownote-mobile/` | 네이티브 모바일 앱·Railway 웹 테스트 클라이언트 | Expo Router, React Native, SVG |
 | `docker-compose.yml` | 로컬 통합 오케스트레이션 | PostgreSQL, Spring, FastAPI, React, Expo |
 
 ## 서비스 경계
@@ -18,7 +18,7 @@ Flownote는 로컬 통합 실행을 기준으로 여러 하위 프로젝트가 �
 - AI/시장 데이터처럼 Python 생태계 의존성이 필요한 기능은 `flownote-API`에 둔다.
 - React 웹 앱은 사용자 경험의 중심이며 Spring/ FastAPI API를 호출한다.
 - Next.js 앱은 독립된 앱 라우터 기능과 업로드/Prisma 기반 기능을 담당한다.
-- 모바일 앱은 Spring WAS의 `/api/mobile/config`를 시작점으로 삼고 웹 URL을 WebView로 연다.
+- 모바일 앱은 FastAPI 게이트웨이를 단일 공개 진입점으로 사용하고 계정·작업·노트·에이전트·캔버스를 React Native 화면으로 직접 렌더링한다.
 - 캔버스 실시간 협업은 `flownote-API`의 Socket.IO가 담당한다. 발신자는 `canvas:join`(코어 권한 검증을 거치는 유일한 경로)으로 룸에 참여한 뒤에만 `canvas:line-*` 이벤트를 브로드캐스트할 수 있고, 미참여 발신자는 `canvas_socket._require_room_membership`에서 403으로 거부된다.
 - `flownote-API`의 MCP 도구(note/task/schedule)는 Spring 코어를 `core_api.forward_request_async`(= `asyncio.to_thread`)로 호출한다. 동기 프록시를 스레드로 넘겨 같은 프로세스의 캔버스 실시간 이벤트 루프가 코어 왕복에 막히지 않게 한다.
 

@@ -187,7 +187,9 @@ services:
 
   # 5. Expo 모바일 앱 개발 서버
   mobile-app:
-    build: ./flownote-mobile
+    build:
+      context: ./flownote-mobile
+      target: development
     container_name: flownote-mobile
     restart: always
     init: true

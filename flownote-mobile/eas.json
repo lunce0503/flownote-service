@@ -12,13 +12,13 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_WAS_URL": "https://replace-with-spring-api.example.com"
+        "EXPO_PUBLIC_WAS_URL": "https://flownote-api-production.up.railway.app"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_WAS_URL": "https://replace-with-spring-api.example.com"
+        "EXPO_PUBLIC_WAS_URL": "https://flownote-api-production.up.railway.app"
       }
     }
   },

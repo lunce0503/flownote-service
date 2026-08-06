@@ -1,148 +1,89 @@
-# 모바일 WAS 아키텍처
+# 모바일 클라이언트 아키텍처
 
-Flownote 모바일 앱은 Spring Boot WAS를 설정 진입점으로 사용한다. 앱은 시작 시 `EXPO_PUBLIC_WAS_URL`의 `/api/mobile/config`를 호출하고, WAS가 응답한 `web_url`을 iOS/Android 네이티브 WebView로 연다.
+Flownote 모바일은 Expo Router 기반 React Native 클라이언트다. WebView로 기존 웹 앱을 감싸지 않고 계정, 작업, 노트, 에이전트, 캔버스를 네이티브 컴포넌트로 직접 렌더링한다.
 
-## 구성
+## 서비스 경계
 
-- `flownote-server`: 모바일 설정을 관리하는 WAS다.
-- `flownote-mobile`: Expo 기반 iOS/Android 앱이다.
-- `flownote-API`: AI API URL로 노출될 수 있는 Python 서비스다.
-- `flownote/`: 기존 웹 클라이언트다.
+- `flownote-mobile`: iOS/Android 네이티브 앱과 Railway용 정적 웹 테스트 클라이언트다.
+- `flownote-API`: 모바일이 호출하는 단일 공개 HTTP 게이트웨이다.
+- `flownote-server`: 인증, 사용자, `/api/mobile/config`를 소유한다.
+- `flownote-canvas`: 캔버스 문서·폴더·요소·이미지와 노트 API를 소유한다.
+- `flownote-serve`: 작업과 기타 부가 기능 API를 소유한다.
+- `flownote-ai`: 에이전트 API를 소유한다.
 
-## 설정 흐름
+## 통신 흐름
 
-1. 모바일 앱이 `EXPO_PUBLIC_WAS_URL`을 읽는다.
-2. 모바일 앱이 `GET /api/mobile/config`를 호출한다.
-3. Spring WAS가 `MOBILE_CORE_API_URL`, `MOBILE_AI_API_URL`, `MOBILE_WEB_URL`, `MOBILE_MIN_SUPPORTED_VERSION`, `MOBILE_ENABLED_FEATURES` 기반 응답을 반환한다.
-4. 모바일 앱은 응답의 `enabled_features`에서 `webview`가 활성화되어 있는지 확인한다.
-5. 모바일 앱은 응답의 `minimum_supported_version`으로 현재 앱 버전 지원 여부를 확인한다.
-6. 모바일 앱은 응답의 `web_url`을 `react-native-webview`로 렌더링한다.
+1. 빌드 또는 개발 실행 시 `EXPO_PUBLIC_WAS_URL`을 공개 FastAPI 게이트웨이 URL로 주입한다.
+2. 계정, 작업, 노트, 캔버스 요청은 같은 게이트웨이의 `/api/**`를 호출한다.
+3. 보호 API는 Spring이 발급한 세션 UUID를 `Authorization: Bearer <token>`으로 전달한다.
+4. 게이트웨이는 경로에 따라 Spring, Go canvas, Go serve, Python AI 서비스로 요청을 전달한다.
+5. `/api/mobile/config` 응답은 운영 URL과 최소 지원 버전 표시용이다. 일반 데이터 API의 기준 URL은 빌드에 주입한 게이트웨이다.
+6. GET 요청은 12초 타임아웃을 사용하고 502·503·504 또는 네트워크 실패 시 700ms, 1.4초 간격으로 최대 두 번 재시도한다. 변경 요청은 중복을 피하기 위해 자동 재시도하지 않는다.
 
-## 주요 파일
+운영 기본 URL은 다음과 같다.
 
-- `flownote-server/src/main/java/com/flownote/mobile/MobileConfigController.java`
-- `flownote-server/src/main/resources/application.yml`
-- `docker-compose.yml`
-- `flownote-mobile/src/api/client.ts`
-- `flownote-mobile/App.tsx`
+```text
+https://flownote-api-production.up.railway.app
+```
 
-## 로컬 실행
+`EXPO_PUBLIC_*` 값은 앱 번들에 공개되므로 비밀값을 넣지 않는다.
+
+## 캔버스 동작
+
+`app/canvas.tsx`는 선, 이미지, 텍스트 상자를 SVG로 렌더링한다. 펜, 지우개, 올가미, 이동, 텍스트, 색상 선택, 이미지 추가, 2점 확대·이동, 실행 취소를 제공한다.
+
+변경 내용은 AsyncStorage 로컬 초안에 먼저 기록하고 700ms 디바운스 후 `/api/canvas/save`로 자동 저장한다. 앱이 비활성 상태로 전환될 때도 로컬 초안과 서버 저장을 시도한다. 서버 로드 실패 시 해당 캔버스의 로컬 초안이 있으면 복원한다.
+
+현재 입력은 일반 React Native 터치 좌표다. Apple Pencil 압력·기울기·전용 팜 리젝션은 지원하지 않으며 PencilKit 기반 네이티브 캔버스로 전환할 때 별도 development build가 필요하다.
+
+## 실행 형태
+
+### Expo Go
+
+무료 Apple 계정으로 iPad 실기기에서 네이티브 컴포넌트 동작을 확인한다.
 
 ```bash
 cd flownote-mobile
-yarn install
-cp .env.example .env
-yarn start
+EXPO_PUBLIC_WAS_URL=https://flownote-api-production.up.railway.app npm run start -- --tunnel
 ```
 
-실기기에서는 `localhost` 대신 개발 PC의 LAN IP를 사용한다.
+### 로컬 Docker
+
+루트 Compose는 `flownote-mobile/Dockerfile`의 `development` 단계를 사용해 Expo 개발 서버를 `8081`에 실행한다.
 
 ```bash
-EXPO_PUBLIC_WAS_URL=http://192.168.0.10:8080 yarn start
+HOST_LAN_IP=192.168.0.10 docker compose up --build mobile-app
 ```
 
-## Docker 실행
+### Railway 웹 테스트
 
-루트에서 모바일용 compose 실행 스크립트를 사용한다.
+Dockerfile의 최종 production 단계는 `expo export --platform web` 결과를 정적 서버로 제공한다. `/health`는 Railway 헬스체크이며 공개 HTTPS URL은 iPad Safari와 홈 화면 바로가기에서 사용한다.
 
-```bash
-./scripts/docker-mobile-up.sh
-```
+이 배포는 Apple 서명 없이 개인 iPad에서 필기 UX를 확인하기 위한 경로다. 네이티브 `.ipa`, TestFlight, App Store 배포는 Expo EAS와 Apple Developer Program을 사용한다.
 
-이 스크립트는 개발 PC의 LAN IP를 감지해서 휴대폰 접근용 모바일 URL을 compose 실행 환경에 주입한 뒤 `spring-server`, `react-app`, `mobile-app`을 `--build`로 실행한다.
+## 운영 설정
 
-자동 감지가 잘못되면 직접 지정한다.
+Spring 모바일 설정에는 localhost가 아닌 공개 HTTPS 주소를 지정한다.
 
-```bash
-HOST_LAN_IP=192.168.0.10 ./scripts/docker-mobile-up.sh
-```
-
-Expo QR 로그는 아래 명령으로 본다.
-
-```bash
-docker compose logs -f mobile-app
-```
-
-## EAS 빌드
-
-`flownote-mobile/eas.json`은 Expo EAS 문서의 build profile 구조를 따른다.
-
-- `development`: 내부 배포 및 iOS simulator 빌드
-- `preview`: 내부 테스트용 Android APK/iOS internal distribution
-- `production`: 스토어 제출용 빌드
-
-EAS 원격 빌드는 로컬 `.env` 파일을 사용하지 않으므로 `EXPO_PUBLIC_WAS_URL`은 EAS 환경변수로 등록한다.
-
-```bash
-cd flownote-mobile
-yarn eas:env:preview --value https://your-was.example.com
-yarn build:android
-```
-
-운영 빌드는 공개 HTTPS WAS 주소를 production 환경에 등록한 뒤 실행한다.
-
-```bash
-yarn eas:env:production --value https://your-was.example.com
-yarn build:android:production
-yarn build:ios:production
-```
-
-Spring WAS도 같은 LAN 기준 URL을 내려주도록 설정한다.
-
-```bash
-MOBILE_CORE_API_URL=http://192.168.0.10:8080
-MOBILE_AI_API_URL=http://192.168.0.10:8000
-MOBILE_WEB_URL=http://192.168.0.10:5173
+```text
+MOBILE_CORE_API_URL=https://flownote-api-production.up.railway.app
+MOBILE_AI_API_URL=https://flownote-api-production.up.railway.app
+MOBILE_WEB_URL=<Railway flownote-mobile public URL>
 MOBILE_MIN_SUPPORTED_VERSION=1.0.0
-MOBILE_ENABLED_FEATURES=webview,auth,tasks,notes,canvas,agent
+MOBILE_ENABLED_FEATURES=auth,tasks,notes,canvas,agent
 ```
 
-`MOBILE_ENABLED_FEATURES`는 쉼표로 구분된 기능 목록이다. 모바일 앱은 현재 `webview`가 포함된 경우에만 웹앱 화면을 연다.
-앱 버전을 올릴 때는 `flownote-mobile/package.json`, `flownote-mobile/app.json`, `flownote-mobile/App.tsx`의 버전 값을 함께 변경한다.
-
-개발 중 실기기에서 LAN의 HTTP 웹 주소를 열 수 있도록 Android cleartext traffic과 iOS ATS 예외를 설정했다. 운영 환경에서는 `MOBILE_WEB_URL`을 HTTPS 주소로 설정한다.
+브라우저 기반 Railway 모바일 클라이언트를 제공할 때 해당 공개 origin을 `flownote-api`의 `CORS_ORIGINS`에 추가한다.
 
 ## 검증
 
-루트에서 전체 게이트를 순서대로 실행:
-
-```bash
-./scripts/verify-mobile-was.sh
-```
-
-로컬에서는 Java 17과 `flownote-mobile/yarn.lock`, `flownote-mobile/node_modules`가 없으면 위 스크립트가 실패한다. GitHub Actions는 Java 17과 Node.js를 준비하지만, 모바일 lockfile이 커밋되어 있어야 진행된다.
-
-의존성 설치 전에도 가능한 정적 검증:
-
 ```bash
 cd flownote-mobile
-yarn verify
+npm ci
+npm run verify
+
+cd ..
+docker compose up -d --build
 ```
 
-모바일 의존성 설치 후 실제 Expo 타입 검증:
-
-```bash
-cd flownote-mobile
-yarn install
-yarn typecheck
-```
-
-`flownote-mobile/yarn.lock`은 첫 `yarn install` 이후 생성해서 커밋한다. CI는 설치 전에 lockfile 존재 여부를 확인하고 `yarn install --frozen-lockfile`로 의존성을 설치한다.
-lockfile을 커밋한 뒤에는 `.github/workflows/mobile-was.yml`의 `cache-dependency-path`에 `flownote-mobile/yarn.lock`도 추가한다.
-
-Spring WAS 계약 테스트:
-
-```bash
-cd flownote-server
-./gradlew test --tests com.flownote.mobile.MobileConfigControllerTest
-```
-
-통합 배포 전 Compose 설정 확인:
-
-```bash
-docker compose config --services
-```
-
-Java 17과 모바일 의존성 설치가 끝난 뒤 위 검증이 모두 통과하면 `docker compose up -d --build`로 배포한다.
-
-GitHub Actions에서는 `.github/workflows/mobile-was.yml`이 Java 17과 Node.js 20.19를 준비하고 `./scripts/verify-mobile-was.sh`를 실행한다.
+배포 후 `/health`, `/api/mobile/config`, 인증이 필요한 `/api/canvas/documents`의 CORS와 상태 코드를 확인한다.

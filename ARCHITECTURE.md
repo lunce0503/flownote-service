@@ -2,13 +2,13 @@
 
 Flownote는 캔버스와 텍스트 노트를 중심으로 일정, 작업, 주식, 소셜, 채팅, AI 기능을 결합한 멀티 서비스 노트 애플리케이션이다. 이 문서는 저장소를 탐색할 때 사용하는 코드맵이며, 서비스 경계는 `docker-compose.yml`, HTTP 라우팅은 `flownote-API/app/gateway.py`, DB 스키마는 `flownote-server/src/main/resources/db/migration/`을 우선 기준으로 삼는다.
 
-현재 코드 기준은 `main` 브랜치의 `cdc3528`(2026-07-28, 종료된 `flownote-next` 제거) 이후 작업 트리다. 런타임 상태나 배포 ID처럼 자주 변하는 정보는 `logs/report/`에 기록하고, 이 문서에는 코드와 함께 유지되는 구조만 기록한다.
+현재 구조는 소스 코드와 배포 구성 파일을 기준으로 유지한다. 런타임 상태나 배포 ID처럼 자주 변하는 정보는 `logs/report/`에 기록하고, 이 문서에는 코드와 함께 유지되는 구조만 기록한다.
 
 # 시스템 구성 (조감도)
 
 ```text
 Browser (flownote/)              Mobile (flownote-mobile/)
-  | HTTP/SSE + Bearer              | /api/mobile/config + Web/API
+  | HTTP/SSE + Bearer              | REST + Bearer (native/Expo web)
   +------------------+-------------+
                      v
           flownote-API (FastAPI gateway, :8000)
@@ -44,7 +44,7 @@ Flownote는 기획한 내용을 바탕으로 관련 필기를 텍스트와 그�
 | 경로 | 실행 단위 | 시작점 | 책임 |
 | --- | --- | --- | --- |
 | `flownote/` | Vite React SPA | `src/main.tsx`, `src/app/App.tsx`, `src/app/capabilityManifest.tsx` | 웹 화면, FSD 상태/기능 조합, REST/SSE/Socket.IO 클라이언트 |
-| `flownote-mobile/` | Expo React Native | `app/_layout.tsx`, `app/(tabs)/_layout.tsx` | iOS/Android 셸, 모바일 API/WebView 진입 |
+| `flownote-mobile/` | Expo React Native | `app/_layout.tsx`, `app/canvas.tsx` | iOS/Android 네이티브 화면, 캔버스, Railway 정적 웹 테스트 배포 |
 | `flownote-API/` | FastAPI + Socket.IO | `app/main.py` | 공개 API 게이트웨이, 캔버스 실시간 허브, 요청 추적/콜드스타트 연결 재시도 |
 | `flownote-server/` | Spring Boot | `FlownoteServerApplication.java` | 인증·사용자·모바일 설정, 전체 PostgreSQL Flyway 스키마 소유 |
 | `flownote-canvas/` | Go HTTP 서버 | `main.go` | 캔버스, 노트, 폴더, 업로드, 캔버스 관리자 진단 |
@@ -53,17 +53,16 @@ Flownote는 기획한 내용을 바탕으로 관련 필기를 텍스트와 그�
 | `docker-compose.yml` | 로컬 통합 오케스트레이션 | Compose 서비스 정의 | Postgres, Redis, 5개 백엔드, 웹, 모바일, Ollama 네트워크 구성 |
 | `docs/`, `logs/` | 지식/운영 기록 | `docs/README.md`, `logs/report/` | 설계 기준, 제품 사양, 분석·배포 결과 |
 
-## 현재 작업 트리 변경 코드맵 (2026-08-05)
-
-Git 추적 변경은 `ARCHITECTURE.md`와 아래 두 `flownote/` 파일이다. `logs/` 산출물은 루트 `.gitignore` 정책에 따라 로컬 운영 기록으로만 존재한다.
+## 모바일 Railway 배포 코드맵
 
 | 변경 파일 | 실제 변경 | 영향 경로 | 런타임 영향 |
 | --- | --- | --- | --- |
-| `flownote/tsconfig.app.json` | `compilerOptions.ignoreDeprecations = "6.0"` 추가 | `yarn build` → Vite/TypeScript가 `src/` 전체를 검사 | 컴파일러 진단 억제 설정이며 브라우저 번들 동작과 API 계약은 바꾸지 않는다. 현재 TypeScript는 `^5.9.3`이다. |
-| `flownote/src/entities/canvas/model/types.ts` | 파일 끝 개행 제거 | `entities/canvas/index.ts` → canvas feature hooks/models → Canvas widgets | 타입 선언 내용은 동일하므로 의미 변화는 없다. 포맷 차이만 존재한다. |
-| `ARCHITECTURE.md` | 현재 서비스/통신/변경 영향 코드맵 보강 | 저장소 탐색과 변경 영향 분석 기준 | 문서 전용 변경이며 실행 코드에는 영향이 없다. |
-| `logs/bugs/2026-08-05-flownote-ai-docker-venv-overwrite.md` | 통합 검증 중 발견한 AI 컨테이너 exit 127 원인 기록 | `flownote-ai/.dockerignore` 후속 수정 근거 | 기록 전용이며 이번 작업에서는 실행 코드를 수정하지 않는다. |
-| `logs/report/2026-08-05-0143-architecture-code-map.md` | 검증 및 배포 결과 기록 | 빌드·Compose·Vercel·Railway 상태 근거 | 기록 전용이다. |
+| `flownote-mobile/app/canvas.tsx` | 모바일 필기·요소 편집·로컬 초안·서버 자동 저장 | React Native responder → SVG 요소 → `/api/canvas/**` | Expo Go, 네이티브 앱, Expo 웹에서 같은 캔버스 모델을 사용한다. |
+| `flownote-mobile/lib/flownote-api.ts` | 모바일 REST 클라이언트와 캔버스 DTO | `EXPO_PUBLIC_WAS_URL` → FastAPI gateway | 모든 공개 요청을 Railway 게이트웨이 한 곳으로 보낸다. |
+| `flownote-mobile/Dockerfile` | 개발 Expo 서버와 production 정적 웹의 다중 단계 빌드 | Compose는 `development`, Railway는 최종 `production` 단계 | 로컬 QR 개발과 Railway 웹 배포를 하나의 Dockerfile로 분리한다. |
+| `flownote-mobile/scripts/serve-static.mjs` | Expo 정적 결과와 `/health` 제공 | Railway public domain → iPad Safari | 확장자 없는 Expo Router 경로와 SPA fallback을 제공한다. |
+| `flownote-mobile/eas.json` | preview/production 공개 API 주소 | EAS iOS/Android build → Railway gateway | 향후 서명된 네이티브 빌드도 같은 운영 API를 사용한다. |
+| `flownote-mobile/railway.json` | Dockerfile builder와 healthcheck | Railway deployment | 모바일 웹 테스트 서비스의 배포 계약이다. |
 
 캔버스 타입의 실제 의존 흐름은 다음과 같다.
 
@@ -231,6 +230,6 @@ entities/canvas/model/types.ts
 | --- | --- | --- |
 | 로컬/내부망 | `docker-compose.yml`, 각 서비스 `Dockerfile` | `db`, `redis`, `spring-server`, `canvas-server`, `serve-server`, `ai-server`, `api-server`, `react-app`, `mobile-app`, 내부 전용 `ollama` |
 | Vercel production | `flownote/vercel.json` | Vite SPA와 SPA fallback rewrite |
-| Railway | 각 백엔드의 `railway.json` | `flownote-API`, `flownote-server`, `flownote-canvas`, `flownote-serve`, `flownote-ai`; Dockerfile 빌드와 서비스별 healthcheck |
+| Railway | 각 서비스의 `railway.json` | 5개 백엔드와 `flownote-mobile` 정적 웹 테스트 클라이언트; Dockerfile 빌드와 서비스별 healthcheck |
 
 로컬 포트는 React `5173`, gateway `8000`, Spring `8080`, canvas `8090`, serve `8095`, AI host `8010`, mobile `8081`, PostgreSQL `5432`, Redis `6379`다. Ollama는 Compose 내부의 `ollama:11434`로만 접근하며 공개 포트를 두지 않는다.

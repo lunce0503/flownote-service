@@ -1,45 +1,50 @@
 # Flownote Mobile
 
-Expo Router 기반 모바일 앱입니다. `EXPO_PUBLIC_WAS_URL`로 지정한 Flownote Spring API에 연결해 로그인, 회원가입, 작업, 노트를 사용할 수 있습니다.
+Expo Router 기반 iOS/Android/Web 클라이언트다. 계정, 작업, 노트, AI, 캔버스 화면을 React Native로 직접 렌더링하며 `EXPO_PUBLIC_WAS_URL`의 Flownote FastAPI 게이트웨이를 단일 공개 API 진입점으로 사용한다.
 
-## 실행
+## iPad 개발 실행
+
+Expo Go를 설치한 iPad에서 QR 코드를 열어 테스트한다. 운영 Railway API를 사용할 때는 다음과 같이 실행한다.
 
 ```bash
-npm install
-EXPO_PUBLIC_WAS_URL=http://<LAN_IP>:8080 npm run start
+cd flownote-mobile
+EXPO_PUBLIC_WAS_URL=https://flownote-api-production.up.railway.app npm run start -- --tunnel
 ```
 
-Android/iOS 시뮬레이터로 바로 열 때는 각각 `npm run android`, `npm run ios`를 사용합니다.
+로컬 통합 백엔드를 사용할 때 `localhost`는 iPad 자신을 가리키므로 개발 PC의 LAN 주소와 FastAPI 게이트웨이 포트 `8000`을 사용한다.
 
-앱은 `EXPO_PUBLIC_WAS_URL`의 `/api/mobile/config`를 호출해 서버 설정을 확인하고, 같은 API 기준 URL로 `/api/users`, `/api/tasks`, `/api/notes`를 호출합니다. 실기기에서 테스트할 때는 `localhost`가 휴대폰 자신을 가리키므로 개발 PC의 LAN 주소를 사용해야 합니다.
+```bash
+EXPO_PUBLIC_WAS_URL=http://192.168.0.10:8000 npm run start
+```
 
-## Docker로 실행
+## Railway 웹 테스트 배포
 
-루트 `docker-compose.yml`에는 `mobile-app` 서비스가 포함되어 있습니다. 루트 `.env`의 `HOST_LAN_IP`를 모바일 기기에서 접근 가능한 개발 PC 주소로 설정한 뒤 실행합니다.
+`npm run build:web`은 Expo 정적 웹 결과를 `dist/`에 생성한다. `Dockerfile`의 기본 production 단계와 `railway.json`은 결과물을 `$PORT`에서 제공하고 `/health`를 헬스체크로 노출한다.
+
+Railway 배포본은 iPad Safari에서 열 수 있고 웹 매니페스트를 사용해 홈 화면에 추가할 수 있다. 이는 무료 Apple 계정으로 필기 UX를 검증하기 위한 웹 테스트 클라이언트이며 TestFlight/App Store 네이티브 배포를 대체하지 않는다.
+
+```bash
+npm run build:web
+npm run start:web
+```
+
+## 로컬 Docker
+
+루트 Compose의 `mobile-app`은 Dockerfile의 `development` 단계를 사용해 Expo 개발 서버를 실행한다.
 
 ```bash
 HOST_LAN_IP=192.168.0.10 docker compose up --build mobile-app
-```
-
-실행 후 로그에서 Expo QR을 확인합니다.
-
-```bash
 docker compose logs -f mobile-app
-```
-
-Spring WAS 모바일 설정 환경 변수 예시:
-
-```bash
-MOBILE_CORE_API_URL=http://192.168.0.10:8080
-MOBILE_AI_API_URL=http://192.168.0.10:8000
-MOBILE_WEB_URL=http://192.168.0.10:5173
-MOBILE_ENABLED_FEATURES=webview,auth,tasks,notes,canvas,agent
 ```
 
 ## 검증
 
 ```bash
-npm run lint
+npm run verify
 ```
 
-현재 앱은 Expo SDK 54와 `expo-router`를 사용합니다. 의존성이 없는 환경에서는 먼저 `npm install` 또는 Docker 빌드를 실행해야 합니다.
+`verify`는 ESLint, TypeScript, 정적 서버 테스트, Expo 웹 프로덕션 빌드를 순서대로 실행한다.
+
+## 네이티브 배포
+
+`eas.json`의 preview/production 프로필은 Railway 운영 게이트웨이를 사용한다. 실제 iOS 기기용 development build, TestFlight, App Store 배포에는 Apple Developer Program 권한이 필요하다.

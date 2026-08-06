@@ -10,6 +10,45 @@ type RequestOptions = {
   baseUrl?: string;
 };
 
+const REQUEST_TIMEOUT_MS = 12_000;
+const GET_RETRY_DELAYS_MS = [700, 1_400];
+const RETRYABLE_GATEWAY_STATUSES = new Set([502, 503, 504]);
+
+const delay = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+
+const fetchWithTimeout = async (url: string, init: RequestInit) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+const fetchRequest = async (url: string, init: RequestInit, retryGet: boolean) => {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const response = await fetchWithTimeout(url, init);
+      const retryDelay = GET_RETRY_DELAYS_MS[attempt];
+      if (
+        retryGet
+        && retryDelay !== undefined
+        && RETRYABLE_GATEWAY_STATUSES.has(response.status)
+      ) {
+        await delay(retryDelay);
+        continue;
+      }
+      return response;
+    } catch (error) {
+      const retryDelay = GET_RETRY_DELAYS_MS[attempt];
+      if (!retryGet || retryDelay === undefined) throw error;
+      await delay(retryDelay);
+    }
+  }
+};
+
 export type FlownoteUser = {
   id: string;
   username: string;
@@ -194,11 +233,12 @@ const request = async <T>(path: string, options: RequestOptions = {}): Promise<T
     body = JSON.stringify(options.body);
   }
 
-  const response = await fetch(`${(options.baseUrl ?? apiBaseUrl()).replace(/\/$/, '')}${path}`, {
-    method: options.method ?? 'GET',
+  const method = options.method ?? 'GET';
+  const response = await fetchRequest(`${(options.baseUrl ?? apiBaseUrl()).replace(/\/$/, '')}${path}`, {
+    method,
     headers,
     body,
-  });
+  }, method === 'GET');
   const text = await response.text();
   const contentType = response.headers.get('content-type') ?? '';
   const data = text && contentType.includes('application/json') ? JSON.parse(text) : text || null;
@@ -470,7 +510,7 @@ export const flownoteApi = {
     await appendUploadFile(formData, input);
 
     const baseUrl = apiBaseUrl();
-    const response = await fetch(`${baseUrl}/api/upload`, {
+    const response = await fetchWithTimeout(`${baseUrl}/api/upload`, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
