@@ -14,6 +14,7 @@ import {
   TrendingUp,
   Settings,
   Activity,
+  MessageSquare,
   Puzzle,
   Ellipsis,
   Sparkles,
@@ -39,7 +40,7 @@ export default function Header() {
       social: "소셜",
       agent: "에이전트",
       canvas: "그림판",
-      task: "일정",
+      task: "플래너",
       stocks: "주식",
       puzzle: "퍼즐",
       stockChart: "주식 차트",
@@ -52,13 +53,14 @@ export default function Header() {
       menu: "메뉴",
       closeMenu: "메뉴 닫기",
       admin: "운영 진단",
+      adminFeedback: "피드백 관리",
     },
     en: {
       blog: "Blog",
       social: "Social",
       agent: "Agent",
       canvas: "Canvas",
-      task: "Task",
+      task: "Planner",
       stocks: "Stocks",
       puzzle: "Puzzle",
       stockChart: "Stock Chart",
@@ -71,6 +73,7 @@ export default function Header() {
       menu: "Menu",
       closeMenu: "Close menu",
       admin: "Diagnostics",
+      adminFeedback: "Feedback",
     },
   }[language];
 
@@ -119,14 +122,17 @@ export default function Header() {
   const extraNavLinks = [
     { name: labels.social, href: "/social", icon: <Users size={22} /> },
     { name: labels.agent, href: "/agent", icon: <Bot size={22} /> },
-    { name: labels.task, href: "/task", icon: <CheckSquare size={22} /> },
+    { name: labels.task, href: "/planner", icon: <CheckSquare size={22} /> },
     { name: labels.stocks, href: "/stocks", icon: <TrendingUp size={22} /> },
     { name: labels.stockChart, href: "/stocks/chart", icon: <TrendingUp size={22} /> },
     { name: labels.puzzle, href: "/screw-puzzle", icon: <Puzzle size={22} /> },
     { name: labels.banpick, href: "/banpick", icon: <Trophy size={22} /> },
     { name: labels.magic, href: "/magic", icon: <Sparkles size={22} /> },
     { name: labels.settings, href: "/settings", icon: <Settings size={22} /> },
-    ...(user?.role === "ADMIN" ? [{ name: labels.admin, href: "/admin/canvas", icon: <Activity size={22} /> }] : []),
+    ...(user?.role === "ADMIN" ? [
+      { name: labels.admin, href: "/admin/canvas", icon: <Activity size={22} /> },
+      { name: labels.adminFeedback, href: "/admin/feedback", icon: <MessageSquare size={22} /> },
+    ] : []),
   ];
 
   const sidebarLinks = [...primaryNavLinks, ...extraNavLinks];
@@ -135,10 +141,13 @@ export default function Header() {
     { name: labels.canvas, href: "/canvas", icon: <Palette size={18} /> },
     { name: labels.social, href: "/social", icon: <Users size={18} /> },
     { name: labels.agent, href: "/agent", icon: <Bot size={18} /> },
-    { name: labels.task, href: "/task", icon: <CheckSquare size={18} /> },
+    { name: labels.task, href: "/planner", icon: <CheckSquare size={18} /> },
     { name: labels.stocks, href: "/stocks", icon: <TrendingUp size={18} /> },
     { name: labels.settings, href: "/settings", icon: <Settings size={18} /> },
-    ...(user?.role === "ADMIN" ? [{ name: labels.admin, href: "/admin/canvas", icon: <Activity size={18} /> }] : []),
+    ...(user?.role === "ADMIN" ? [
+      { name: labels.admin, href: "/admin/canvas", icon: <Activity size={18} /> },
+      { name: labels.adminFeedback, href: "/admin/feedback", icon: <MessageSquare size={18} /> },
+    ] : []),
   ];
 
   return (
