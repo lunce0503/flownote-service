@@ -71,6 +71,44 @@ type TouchActivation = (action: () => void) => {
   onClick: (event: React.MouseEvent<HTMLElement>) => void;
 };
 
+const useTouchActivation = (): TouchActivation => {
+  const touchStartsRef = React.useRef(new Map<number, { x: number; y: number }>());
+  const lastTouchActivationAtRef = React.useRef(0);
+
+  return React.useCallback((action: () => void) => ({
+    onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
+      if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
+      event.stopPropagation();
+      touchStartsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    },
+    onPointerUp: (event: React.PointerEvent<HTMLElement>) => {
+      if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
+      const start = touchStartsRef.current.get(event.pointerId);
+      touchStartsRef.current.delete(event.pointerId);
+      event.stopPropagation();
+      if (!start) return;
+
+      const moved = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+      if (moved > TOUCH_TAP_MAX_MOVEMENT) return;
+
+      event.preventDefault();
+      lastTouchActivationAtRef.current = performance.now();
+      action();
+    },
+    onPointerCancel: (event: React.PointerEvent<HTMLElement>) => {
+      touchStartsRef.current.delete(event.pointerId);
+    },
+    onClick: (event: React.MouseEvent<HTMLElement>) => {
+      if (performance.now() - lastTouchActivationAtRef.current < TOUCH_CLICK_SUPPRESSION_MS) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      action();
+    },
+  }), []);
+};
+
 interface ColorSwatchButtonProps {
   color: { label: string; value: string };
   selected?: boolean;
@@ -156,8 +194,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   viewportCenter,
 }) => {
   const { isFullscreen, toggleFullscreen } = useFullscreen();
-  const touchStarts = React.useRef(new Map<number, { x: number; y: number }>());
-  const lastTouchActivationAt = React.useRef(0);
+  const touchActivation = useTouchActivation();
   const toolButtons: Array<{ tool: ToolType; label: string; icon: React.ReactNode }> = [
     { tool: 'pen', label: '펜', icon: <PenLine size={TOOLBAR_ICON_SIZE} /> },
     { tool: 'eraser', label: '지우개', icon: <Eraser size={TOOLBAR_ICON_SIZE} /> },
@@ -165,39 +202,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     { tool: 'handle', label: '이동', icon: <Hand size={TOOLBAR_ICON_SIZE} /> },
     { tool: 'text', label: '텍스트', icon: <Type size={TOOLBAR_ICON_SIZE} /> },
   ];
-  const touchActivation: TouchActivation = (action: () => void) => ({
-    onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
-      if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
-      event.stopPropagation();
-      touchStarts.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    },
-    onPointerUp: (event: React.PointerEvent<HTMLElement>) => {
-      if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
-      const start = touchStarts.current.get(event.pointerId);
-      touchStarts.current.delete(event.pointerId);
-      event.stopPropagation();
-      if (!start) return;
-
-      const moved = Math.hypot(event.clientX - start.x, event.clientY - start.y);
-      if (moved > TOUCH_TAP_MAX_MOVEMENT) return;
-
-      event.preventDefault();
-      lastTouchActivationAt.current = performance.now();
-      action();
-    },
-    onPointerCancel: (event: React.PointerEvent<HTMLElement>) => {
-      touchStarts.current.delete(event.pointerId);
-    },
-    onClick: (event: React.MouseEvent<HTMLElement>) => {
-      if (performance.now() - lastTouchActivationAt.current < TOUCH_CLICK_SUPPRESSION_MS) {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-      }
-
-      action();
-    },
-  });
   const shouldShowLassoActions = lassoSelectionCount > 0 || (tool === 'lasso' && hasCopiedLassoSelection);
   const isSaveBusy = saveState.status === 'loading' || saveState.status === 'saving' || saveState.status === 'retrying';
   const canCancelRetry = saveState.status === 'retrying' || saveState.pendingRetries > 0;

@@ -98,6 +98,7 @@ const ScrewPuzzleWidget = () => {
       .sort((a, b) => a.layer - b.layer);
   }, [stage, puzzleState]);
   const solution = useMemo(() => {
+    void checkRun;
     if (isSolved(stage, puzzleState)) return createSolvedResult();
     return solve(stage, puzzleState, { maxNodes: 160000, deadlineMs: 420 });
   }, [stage, puzzleState, checkRun]);

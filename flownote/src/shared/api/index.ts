@@ -72,7 +72,7 @@ const clearAuth = () => {
 
 const isAuthenticated = () => Boolean(getAuthToken() && getAuthUser());
 
-const authHeaders = () => {
+const authHeaders = (): Record<string, string> => {
   const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 };

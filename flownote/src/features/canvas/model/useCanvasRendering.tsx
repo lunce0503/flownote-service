@@ -95,7 +95,7 @@ export const useCanvasRendering = (
   rendererRef: RefObject<HTMLDivElement | null>,
   offset: Point,
   scale: number,
-  currentDrawingLine: Point[],
+  currentDrawingLineRef: RefObject<Point[]>,
   currentLineStyle: CurrentLineStyle,
   size: RendererSize,
 ) => {
@@ -126,7 +126,7 @@ export const useCanvasRendering = (
     const container = rendererRef.current;
     if (!container || stageRef.current) return;
 
-    const stage = new Konva.Stage({ container, width: size.width, height: size.height, listening: false });
+    const stage = new Konva.Stage({ container, width: 1, height: 1, listening: false });
     const staticLayer = new Konva.Layer({ listening: false });
     const activeStrokeLayer = new Konva.Layer({ listening: false });
     const overlayLayer = new Konva.Layer({ listening: false });
@@ -151,16 +151,25 @@ export const useCanvasRendering = (
     lineGroupRef.current = lineGroup;
     overlayGroupRef.current = overlayGroup;
 
+    const lineNodes = lineNodesRef.current;
+    const lineSources = lineSourcesRef.current;
+    const imageNodes = imageNodesRef.current;
+    const imageSources = imageSourcesRef.current;
+    const textNodes = textNodesRef.current;
+    const textSources = textSourcesRef.current;
+    const lineIndex = lineIndexRef.current;
+    const lineBounds = lineBoundsRef.current;
+
     return () => {
       if (renderFrameRef.current !== null) window.cancelAnimationFrame(renderFrameRef.current);
-      lineNodesRef.current.clear();
-      lineSourcesRef.current.clear();
-      imageNodesRef.current.clear();
-      imageSourcesRef.current.clear();
-      textNodesRef.current.clear();
-      textSourcesRef.current.clear();
-      lineIndexRef.current.clear();
-      lineBoundsRef.current.clear();
+      lineNodes.clear();
+      lineSources.clear();
+      imageNodes.clear();
+      imageSources.clear();
+      textNodes.clear();
+      textSources.clear();
+      lineIndex.clear();
+      lineBounds.clear();
       stage.destroy();
       stageRef.current = null;
       staticLayerRef.current = null;
@@ -242,7 +251,7 @@ export const useCanvasRendering = (
       let node = imageNodesRef.current.get(image.id);
       if (!node) {
         node = new Konva.Group({ listening: false });
-        node.add(new Konva.Image({ listening: false }), new Konva.Rect({ listening: false }));
+        node.add(new Konva.Image({ image: image.image, listening: false }), new Konva.Rect({ listening: false }));
         imageNodesRef.current.set(image.id, node);
         group.add(node);
       }
@@ -330,6 +339,7 @@ export const useCanvasRendering = (
     }
 
     const activeLayer = activeStrokeLayerRef.current;
+    const currentDrawingLine = currentDrawingLineRef.current;
     if (activeLayer && currentDrawingLine.length > 0) {
       if (!currentLineShapeRef.current) {
         currentLineShapeRef.current = new Konva.Line({
@@ -350,7 +360,7 @@ export const useCanvasRendering = (
     staticLayerRef.current?.batchDraw();
     activeStrokeLayerRef.current?.batchDraw();
     overlayLayerRef.current?.batchDraw();
-  }, [currentDrawingLine, currentLineStyle.color, currentLineStyle.strokeWidth, offset.x, offset.y, reconcileImages, reconcileLines, reconcileTexts, scale, updateTransformsAndVisibility]);
+  }, [currentDrawingLineRef, currentLineStyle.color, currentLineStyle.strokeWidth, offset.x, offset.y, reconcileImages, reconcileLines, reconcileTexts, scale, updateTransformsAndVisibility]);
 
   const redrawWith = useCallback((lines: LineElement[], images: ImageElement[], texts: TextBoxElement[]) => {
     queuedRenderStateRef.current = { lines, images, texts };

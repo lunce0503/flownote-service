@@ -1,4 +1,4 @@
-import { PlannerPage } from "@/pages";
+import PlannerPage from "@/pages/PlannerPage";
 
 const PlannerRoute = () => {
   return <PlannerPage />;

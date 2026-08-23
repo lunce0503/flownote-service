@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 import { ChatBlock, ChatSendBlock, type ChatMessage } from "@/shared/ui/ChatBlock";
 import { v4 as uuidv4 } from 'uuid';
 import { postSocialData, postSocialRoom } from "@/entities/social";
@@ -93,7 +93,7 @@ const Chat = () => {
 
     const buildFileMarkdown = (file: File, fileUrl: string) => {
         const absoluteUrl = fileUrl.startsWith("http") ? fileUrl : `${API_CORE_BASE_URL}${fileUrl}`;
-        const safeName = file.name.replace(/[\[\]()]/g, "_");
+        const safeName = file.name.replace(/[()[\]]/g, "_");
 
         if (file.type.startsWith("image/")) {
             return `![${safeName}](${absoluteUrl})`;
@@ -106,18 +106,18 @@ const Chat = () => {
         return `[파일: ${safeName}](${absoluteUrl})`;
     };
 
-    const getRooms = async () => {
+    const getRooms = useCallback(async () => {
         const response = await getSocialRooms();
-        const data = Array.isArray(response) ? response : response.rooms || [];
+        const data = (Array.isArray(response) ? response : response.rooms || []) as SocialRoomResponse[];
         const nextRooms = data.map(toSocialRoom);
         setRooms(nextRooms);
         setSelectedRoomId((currentRoomId) => {
             if (!currentRoomId) return nextRooms[0]?.id ?? null;
             return nextRooms.some((room) => room.id === currentRoomId) ? currentRoomId : nextRooms[0]?.id ?? null;
         });
-    };
+    }, []);
 
-    const getMessages = async () => {
+    const getMessages = useCallback(async () => {
             if (!selectedRoomId) {
                 setMessages([]);
                 return;
@@ -125,7 +125,7 @@ const Chat = () => {
             const response = await getSocialMessages(selectedRoomId);
             const data = Array.isArray(response) ? response : response.messages || [];
             setMessages(data.map(toChatMessage)); 
-        };
+        }, [selectedRoomId]);
 
     const sendUserMessage = async (text:string) => {
         if (!selectedRoomId) return;
@@ -254,17 +254,18 @@ const Chat = () => {
     };
 
     useEffect(() => {
-        getRooms();
+        const initialTimer = window.setTimeout(() => void getRooms(), 0);
 
         const intervalId = window.setInterval(getRooms, 3000);
         window.addEventListener("focus", getRooms);
         document.addEventListener("visibilitychange", getRooms);
         return () => {
+            window.clearTimeout(initialTimer);
             window.clearInterval(intervalId);
             window.removeEventListener("focus", getRooms);
             document.removeEventListener("visibilitychange", getRooms);
         };
-    },[]);
+    },[getRooms]);
 
     useEffect(() => {
         if (!openRoomMenuId) return;
@@ -300,10 +301,13 @@ const Chat = () => {
     }, [selectedUsers, userQuery]);
 
     useEffect(() => {
-        getMessages();
+        const initialTimer = window.setTimeout(() => void getMessages(), 0);
         const intervalId = window.setInterval(getMessages, 5000);
-        return () => window.clearInterval(intervalId);
-    },[selectedRoomId]);
+        return () => {
+            window.clearTimeout(initialTimer);
+            window.clearInterval(intervalId);
+        };
+    },[getMessages]);
 
     useEffect(() => {
         scrollToBottom();

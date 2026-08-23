@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { CanvasWidget } from "@/widgets";
+import CanvasWidget from "@/widgets/CanvasWidget";
 
 export default function CanvasRoute() {
     // canvasId가 바뀌면 위젯을 리마운트해 해당 캔버스를 새로 연다(URL이 곧 선택 캔버스).

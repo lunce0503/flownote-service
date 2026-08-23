@@ -1,6 +1,6 @@
-import React,{ useRef, useState }from "react";
+import React from "react";
 import MagicCircle from "./magicCircle";
-import { Atom, Circle, Cross, Hexagon, LifeBuoy, Plus, Triangle, TriangleDashed } from "lucide-react";
+import { Atom, Circle, Cross, Hexagon, Triangle } from "lucide-react";
 
 interface Rune {
   id: number;
@@ -20,8 +20,8 @@ const Magic = () => {
         {id:4, name:"소환", icon: Atom, color: "#88ff00", description:"대상을 소환합니다"},
         {id:5, name:"보호", icon: Hexagon, color: "#cc00ff", description:"대상을 보호합니다."}
     ];
-    const handeRune = (rune : Rune) => {
-        console.log("룬 버튼 클릭됨");
+    const handleRune = (rune: Rune) => {
+        console.log("룬 버튼 클릭됨", rune.name);
     }
     return (
         <div className="flex flex-row p-4 gap-6">
@@ -40,7 +40,7 @@ const Magic = () => {
                     <div className="rune-palette">
                         {runetype.map((rune) => (
                             <button key={rune.id} className="flex flex-row items-center gap-2 p-2 rounded-md hover:bg-gray-700 transition-colors"
-                                onClick={() => handeRune(rune)}
+                                onClick={() => handleRune(rune)}
                             >
                                 {rune.icon && <rune.icon size={20} />} {rune.name}
                             </button>

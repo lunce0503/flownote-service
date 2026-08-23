@@ -1,22 +1,9 @@
 import { v4 as uuidv4 } from "uuid";
-import type { BlockDataProps } from "@/entities/blog";
+import { getFirstNoteText, type BlockDataProps } from "@/entities/blog";
 import { getSyncClientId } from "@/shared/lib/sync";
 import type { NoteFolder } from "@/entities/blog";
 
-export type NoteBlock = {
-    content?: Array<{
-        text?: string;
-    }>;
-};
-
-export type BlogNote = {
-    id: string;
-    title: string;
-    content: NoteBlock[];
-    created_at?: string | Date;
-    revision?: number;
-    client_id?: string;
-};
+export type BlogNote = BlockDataProps;
 
 export type FolderForm = {
     category: string;
@@ -30,7 +17,7 @@ export const EMPTY_BLOG_FOLDER_FORM: FolderForm = {
 
 export const BLOG_COLLAPSED_FOLDERS_STORAGE_KEY = "flownote.blog.collapsedFolderIds";
 
-export const getNotePreview = (note: BlogNote) => note.content?.[0]?.content?.[0]?.text || "No content";
+export const getNotePreview = (note: BlogNote) => getFirstNoteText(note.content) ?? "No content";
 
 export const createBlankNote = (title: string): BlockDataProps => ({
     title,

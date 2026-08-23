@@ -14,9 +14,9 @@ const updateTaskData = async (id: string, updateData: Partial<TaskProps>) => {
         
         console.log("updated task:", response.data);
         return response.data;
-    } catch (error: any) {
-        // 상세한 에러 로그 확인
-        console.error("Error updating tasks:", error.response?.data || error.message);
+    } catch (error: unknown) {
+        const detail = axios.isAxiosError(error) ? error.response?.data ?? error.message : error;
+        console.error("Error updating tasks:", detail);
         throw error;
     }
 };

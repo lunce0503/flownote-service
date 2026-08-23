@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
 import { Link } from "react-router-dom";
 import { Check, Folder, MoreVertical, Pencil, Plus, Trash2, X } from "lucide-react";
 import { getNoteData } from "@/entities/blog";
@@ -41,16 +41,6 @@ const BlogList = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    void handleBlogList();
-  }, []);
-
-  useEffect(() => subscribeSyncEvents((event) => {
-    if (event.resource === "notes" || event.resource === "all") {
-      void handleBlogList();
-    }
-  }), []);
-
   const noteFolderIdByNoteId = useMemo(() => buildNoteFolderIdByNoteId(folders), [folders]);
 
   const unfiledNotes = useMemo(
@@ -60,7 +50,7 @@ const BlogList = () => {
 
   const foldersByCategory = useMemo(() => groupNoteFoldersByCategory(folders), [folders]);
 
-  const handleBlogList = async () => {
+  const handleBlogList = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -73,7 +63,18 @@ const BlogList = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void handleBlogList(), 0);
+    return () => window.clearTimeout(timer);
+  }, [handleBlogList]);
+
+  useEffect(() => subscribeSyncEvents((event) => {
+    if (event.resource === "notes" || event.resource === "all") {
+      void handleBlogList();
+    }
+  }), [handleBlogList]);
 
   const addBlogNote = async (folderId?: string) => {
     const blankNote = createBlankNote(`새 노트_${new Date().getTime()}`);

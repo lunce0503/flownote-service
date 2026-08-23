@@ -177,7 +177,7 @@ export const saveCanvasPayload = async (
   } catch (error) {
     if (isAbortError(error)) {
       if (init?.signal?.aborted) throw error;
-      throw new Error("캔버스 저장 시간이 초과되어 최신 변경만 다시 저장합니다.");
+      throw new Error("캔버스 저장 시간이 초과되어 최신 변경만 다시 저장합니다.", { cause: error });
     }
     throw error;
   }

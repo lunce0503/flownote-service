@@ -1,17 +1,7 @@
 import type { TaskProps } from "@/entities/task";
+import { getFirstNoteText, type BlockDataProps } from "@/entities/blog";
 
-export type NoteBlock = {
-    content?: Array<{
-        text?: string;
-    }>;
-};
-
-export type KnowledgeNote = {
-    id: string;
-    title: string;
-    content?: NoteBlock[];
-    created_at?: string | Date;
-};
+export type KnowledgeNote = Pick<BlockDataProps, "id" | "title" | "content" | "created_at">;
 
 export type WorkspaceSnapshot = {
     notes: KnowledgeNote[];
@@ -57,8 +47,7 @@ export const statusLabel: Record<TaskProps["status"], string> = {
 };
 
 export const getNotePreview = (note: KnowledgeNote) => {
-    const firstText = note.content?.flatMap((block) => block.content ?? []).find((item) => item.text?.trim())?.text;
-    return firstText?.trim() || "아직 요약할 본문이 없습니다.";
+    return getFirstNoteText(note.content) ?? "아직 요약할 본문이 없습니다.";
 };
 
 export const formatDueDate = (value?: string) => {

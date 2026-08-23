@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   axios,
@@ -11,16 +11,7 @@ import {
   setAuthUser,
 } from "@/shared/api";
 import type { AuthUser } from "@/shared/api";
-
-type AuthContextValue = {
-  token: string | null;
-  user: AuthUser | null;
-  isAuthenticated: boolean;
-  login: (token: string, user: AuthUser) => void;
-  logout: () => void;
-};
-
-const AuthContext = createContext<AuthContextValue | null>(null);
+import { AuthContext } from "./authContext";
 
 // 스테이징 전용 게스트 자동 로그인 설정(빌드 타임 주입).
 // 프로덕션 빌드는 VITE_ALLOW_ANONYMOUS를 설정하지 않으므로 anonymousEnabled=false → 동작 무변화.
@@ -150,13 +141,4 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within AuthProvider.");
-  }
-
-  return context;
-};
-
-export { AuthProvider, useAuth };
+export { AuthProvider };

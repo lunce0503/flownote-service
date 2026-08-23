@@ -1,4 +1,4 @@
-import { PlannerWidget } from "@/widgets";
+import PlannerWidget from "@/widgets/PlannerWidget";
 
 const PlannerPage = () => {
   return (

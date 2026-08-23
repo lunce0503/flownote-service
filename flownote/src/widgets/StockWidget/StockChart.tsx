@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, ArrowLeft, BarChart3, RefreshCw } from "lucide-react";
+import { Activity, ArrowLeft, RefreshCw } from "lucide-react";
 import {
   createStockStream,
   listStockHistory,
@@ -188,14 +188,15 @@ const StockChart = () => {
   };
 
   useEffect(() => {
-    void refresh();
+    const timer = window.setTimeout(() => void refresh(), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     const source = createStockStream();
     if (!source) return undefined;
 
-    setStreaming(true);
+    source.onopen = () => setStreaming(true);
     source.addEventListener("quotes", (event) => {
       const nextQuotes = JSON.parse((event as MessageEvent).data) as StockQuote[];
       setQuotes(Object.fromEntries(nextQuotes.map((quote) => [quote.symbol, quote])));
@@ -233,18 +234,22 @@ const StockChart = () => {
     if (!selectedHolding) return;
 
     const cacheKey = `${selectedHolding.symbol}:${period}`;
-    setHistoryLoading(true);
-    listStockHistory(selectedHolding.symbol, period)
-      .then((points) => {
+    const loadHistory = async () => {
+      await Promise.resolve();
+      setHistoryLoading(true);
+      try {
+        const points = await listStockHistory(selectedHolding.symbol, period);
         setHistoryCandles((prev) => ({
           ...prev,
           [cacheKey]: points.map(candleFromHistory),
         }));
-      })
-      .catch((err) => {
+      } catch (err) {
         setError(err instanceof Error ? err.message : "과거 차트 데이터를 불러오지 못했습니다.");
-      })
-      .finally(() => setHistoryLoading(false));
+      } finally {
+        setHistoryLoading(false);
+      }
+    };
+    void loadHistory();
   }, [selectedHolding, period]);
 
   return (

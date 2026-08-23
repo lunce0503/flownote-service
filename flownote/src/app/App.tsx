@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import './App.css';
 
-import { Header } from '@/widgets';
+import Header from '@/widgets/Header';
 import { useFullscreen } from '@/shared/lib/useFullscreen';
 import { AuthProvider, ProtectedRoute } from '@/features/auth';
 import { ThemeProvider } from '@/features/theme';

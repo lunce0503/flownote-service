@@ -112,14 +112,24 @@ const simplifyLinePoints = (points: LineElement["points"]) => {
   return simplified;
 };
 
-export const serializeLine = ({ status: _status, ...line }: LineElement) => ({
-  ...line,
-  points: simplifyLinePoints(line.points),
-});
+export const serializeLine = (line: LineElement) => {
+  const serialized = { ...line, points: simplifyLinePoints(line.points) };
+  Reflect.deleteProperty(serialized, "status");
+  return serialized;
+};
 
-export const serializeImage = ({ image: _image, status: _status, ...image }: ImageElement) => image;
+export const serializeImage = (image: ImageElement) => {
+  const serialized = { ...image };
+  Reflect.deleteProperty(serialized, "image");
+  Reflect.deleteProperty(serialized, "status");
+  return serialized;
+};
 
-export const serializeTextBox = ({ status: _status, ...textBox }: TextBoxElement) => textBox;
+export const serializeTextBox = (textBox: TextBoxElement) => {
+  const serialized = { ...textBox };
+  Reflect.deleteProperty(serialized, "status");
+  return serialized;
+};
 
 export const buildDeletedElement = <T extends { id: string }>(element: T) => ({ id: element.id } as Omit<T, "status">);
 

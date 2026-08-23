@@ -5,14 +5,10 @@ import { v4 as uuidv4 } from "uuid";
 import { useCanvasState } from "@/features/canvas";
 import { useDrawing } from "@/features/canvas";
 import { useElementManipulation } from "@/features/canvas";
-import {
-    usePersistence,
-    type CanvasLineStreamEndEvent,
-    type CanvasLineStreamPointsEvent,
-    type CanvasLineStreamStartEvent,
-} from "@/features/canvas";
+import { usePersistence } from "@/features/canvas";
 import { useCanvasRendering } from "@/features/canvas";
 import { useCanvasHistory } from "@/features/canvas";
+import { useLineStreaming } from "@/features/canvas";
 import {
     CANVAS_ERASER_IMAGES_STORAGE_KEY,
     CANVAS_ERASER_LINES_STORAGE_KEY,
@@ -27,19 +23,18 @@ import {
 } from "@/features/canvas";
 import { useStoredCanvasViewport } from "@/features/canvas";
 import { isCanvasInteractiveTarget } from "@/features/canvas";
-import { isPointInsideBounds } from "@/features/canvas";
 import { getCanvasTitle } from "@/features/canvas";
 import {
-    buildLassoSelection,
     getLassoSelectionBounds,
     getLassoSelectionCount,
     type LassoSelection,
 } from "@/features/canvas";
 import { getAutoTextBoxSize } from "@/features/canvas";
-import type { CanvasDocumentSummary, CanvasFolder, LineElement, Point, TextBoxElement } from "@/entities/canvas";
+import type { CanvasDocumentSummary, CanvasFolder, Point, TextBoxElement } from "@/entities/canvas";
 import { getCanvasDocuments, getCanvasFolders, createCanvasDocument } from "@/entities/canvas";
 import { useLocalStorageBoolean } from "@/shared/lib/useLocalStorageBoolean";
 import { subscribeSyncEvents } from "@/shared/lib/sync";
+import { useCanvasPointerInput } from "../model/useCanvasPointerInput";
 import { useLassoActions } from "../model/useLassoActions";
 import { CanvasLibraryPanel } from "./CanvasLibraryPanel";
 import { Toolbar } from "./Toolbar";
@@ -98,11 +93,11 @@ const Canvas = () => {
         setIsDrawing,
         drawnLines,
         setDrawnLines,
-        currentLine,
+        currentLineRef,
         appendPointerToCurrentLine,
         finishCurrentLine,
         eraseAtPointer,
-    } = useDrawing(getCanvasCoords, tool);
+    } = useDrawing(getCanvasCoords);
     const {
         images,
         setImages,
@@ -112,61 +107,24 @@ const Canvas = () => {
         setMovingObject,
         eraseElementAtPointer,
         moveElement,
-    } = useElementManipulation(getCanvasCoords, tool);
-    const clearHistoryRef = useRef<() => void>(() => undefined);
-    const [remoteStreamingLinesById, setRemoteStreamingLinesById] = useState<Record<string, LineElement>>({});
-    const handleRemoteLineStart = useCallback((event: CanvasLineStreamStartEvent) => {
-        const line = event.line;
-        if (!line?.id || !Array.isArray(line.points)) return;
-        setRemoteStreamingLinesById((prev) => ({
-            ...prev,
-            [line.id]: { ...line, points: line.points.map((point) => ({ ...point })), status: "unchanged" },
-        }));
-    }, []);
-    const handleRemoteLinePoints = useCallback((event: CanvasLineStreamPointsEvent) => {
-        if (!event.lineId || !Array.isArray(event.points) || event.points.length === 0) return;
-        setRemoteStreamingLinesById((prev) => {
-            const current = prev[event.lineId!];
-            if (!current) return prev;
-            return {
-                ...prev,
-                [event.lineId!]: {
-                    ...current,
-                    points: [...current.points, ...event.points!.map((point) => ({ ...point }))],
-                },
-            };
-        });
-    }, []);
-    const handleRemoteLineEnd = useCallback((event: CanvasLineStreamEndEvent) => {
-        if (!event.lineId) return;
-        const lineId = event.lineId;
-        const line = event.line;
-        setRemoteStreamingLinesById((prev) => {
-            if (!line?.id || !Array.isArray(line.points)) return prev;
-            return {
-                ...prev,
-                [lineId]: { ...line, points: line.points.map((point) => ({ ...point })), status: "unchanged" },
-            };
-        });
-        window.setTimeout(() => {
-            setRemoteStreamingLinesById((prev) => {
-                if (!prev[lineId]) return prev;
-                const { [lineId]: _removed, ...rest } = prev;
-                return rest;
-            });
-        }, 10_000);
-    }, []);
-    const clearRemoteStreamingLines = useCallback(() => {
-        setRemoteStreamingLinesById({});
-        clearHistoryRef.current();
-    }, []);
-    const remoteStreamingLines = useMemo(() => Object.values(remoteStreamingLinesById), [remoteStreamingLinesById]);
-    const streamCallbacks = useMemo(() => ({
-        onLineStreamStart: handleRemoteLineStart,
-        onLineStreamPoints: handleRemoteLinePoints,
-        onLineStreamEnd: handleRemoteLineEnd,
-        onRemoteCanvasChanged: clearRemoteStreamingLines,
-    }), [clearRemoteStreamingLines, handleRemoteLineEnd, handleRemoteLinePoints, handleRemoteLineStart]);
+    } = useElementManipulation(getCanvasCoords);
+    const { canUndo, clearHistory, recordHistory, undo } = useCanvasHistory({
+        lines: drawnLines,
+        images,
+        textBoxes,
+        setDrawnLines,
+        setImages,
+        setTextBoxes,
+    });
+    const {
+        remoteLines: remoteStreamingLines,
+        streamCallbacks,
+        beginLocalLine,
+        streamLocalPoints,
+        finishLocalLine,
+        resetLocalLine,
+        clearRemoteLines,
+    } = useLineStreaming(clearHistory);
     const {
         handleSave,
         requestSave,
@@ -191,28 +149,9 @@ const Canvas = () => {
         selectedCanvasId,
         streamCallbacks,
     );
-    const { canUndo, clearHistory, recordHistory, undo } = useCanvasHistory({
-        lines: drawnLines,
-        images,
-        textBoxes,
-        setDrawnLines,
-        setImages,
-        setTextBoxes,
-    });
-    clearHistoryRef.current = clearHistory;
-    const pointers = useRef<Map<number, Point>>(new Map());
-    const lastTouchDistance = useRef<number | null>(null);
-    const lastTouchCenter = useRef<Point | null>(null);
-    const isTouchGestureActive = useRef(false);
-    const middleDragStart = useRef<Point | null>(null);
-    const lassoDragStart = useRef<Point | null>(null);
-    const activeStreamingLineIdRef = useRef<string | null>(null);
-    const lastStreamedPointIndexRef = useRef(0);
     const handleFlushSaveRef = useRef(handleFlushSave);
     const selectedCanvasIdRef = useRef(selectedCanvasId);
-    const [isMiddleDragging, setIsMiddleDragging] = useState(false);
     const [lassoSelection, setLassoSelection] = useState<LassoSelection | null>(null);
-    const [isLassoDragging, setIsLassoDragging] = useState(false);
     const [pencilOnlyMode, setPencilOnlyMode] = useLocalStorageBoolean(CANVAS_PENCIL_ONLY_MODE_STORAGE_KEY, true);
     const [penColor, setPenColor] = useState(() => localStorage.getItem(CANVAS_PEN_COLOR_STORAGE_KEY) || DEFAULT_PEN_COLOR);
     const [editingTextBoxId, setEditingTextBoxId] = useState<string | null>(null);
@@ -231,7 +170,7 @@ const Canvas = () => {
         images: canEraseImages,
         textBoxes: canEraseTextBoxes,
     }), [canEraseImages, canEraseLines, canEraseTextBoxes]);
-    const { redrawWith, redrawActiveStroke } = useCanvasRendering(konvaRendererRef, offset, scale, currentLine.current, currentLineStyle, viewport);
+    const { redrawWith, redrawActiveStroke } = useCanvasRendering(konvaRendererRef, offset, scale, currentLineRef, currentLineStyle, viewport);
     const { offsetRef, scaleRef } = useStoredCanvasViewport({
         selectedCanvasId,
         offset,
@@ -248,7 +187,8 @@ const Canvas = () => {
     const loadCanvasLibrary = useCallback(async () => {
         setLibraryError(null);
         try {
-            let [documents, folders] = await Promise.all([getCanvasDocuments(), getCanvasFolders()]);
+            const [loadedDocuments, folders] = await Promise.all([getCanvasDocuments(), getCanvasFolders()]);
+            let documents = loadedDocuments;
             if (documents.length === 0) {
                 const created = await createCanvasDocument("기본 캔버스");
                 documents = [created];
@@ -310,17 +250,25 @@ const Canvas = () => {
     }, []);
 
     useEffect(() => {
-        void loadCanvasLibrary();
+        const timer = window.setTimeout(() => void loadCanvasLibrary(), 0);
+        return () => window.clearTimeout(timer);
     }, [loadCanvasLibrary]);
 
     useEffect(() => {
-        if (selectedCanvasId) {
+        if (!selectedCanvasId) return undefined;
+        let active = true;
+        const loadSelection = async () => {
+            await Promise.resolve();
+            if (!active) return;
             setEditingTextBoxId(null);
             setEditingTextValue("");
-            setRemoteStreamingLinesById({});
-            void handleLoad("selection").then(clearHistory);
-        }
-    }, [clearHistory, handleLoad, selectedCanvasId]);
+            clearRemoteLines();
+            await handleLoad("selection");
+            if (active) clearHistory();
+        };
+        void loadSelection();
+        return () => { active = false; };
+    }, [clearHistory, clearRemoteLines, handleLoad, selectedCanvasId]);
 
     useEffect(() => subscribeSyncEvents((event) => {
         if (event.resource === "canvas" || event.resource === "all") {
@@ -386,7 +334,7 @@ const Canvas = () => {
         y: (viewport.height / 2 - offset.y) / scale,
     }), [offset.x, offset.y, scale, viewport.height, viewport.width]);
 
-    const getDisplayedViewportCenter = () => {
+    const getDisplayedViewportCenter = useCallback(() => {
         const canvas = canvasRef.current;
         if (!canvas) return viewportCenter;
 
@@ -399,7 +347,7 @@ const Canvas = () => {
             x: ((rect.width / 2) * scaleX - offsetRef.current.x) / scaleRef.current,
             y: ((rect.height / 2) * scaleY - offsetRef.current.y) / scaleRef.current,
         };
-    };
+    }, [offsetRef, scaleRef, viewportCenter]);
 
     const selectedCanvasTitle = useMemo(() => (
         getCanvasTitle(canvasDocuments, selectedCanvasId)
@@ -492,10 +440,6 @@ const Canvas = () => {
         setEditingTextValue("");
     };
 
-    const blocksTouchDrawing = (event: React.PointerEvent<HTMLCanvasElement>) => (
-        pencilOnlyMode && event.pointerType === "touch" && (tool === "pen" || tool === "eraser" || tool === "lasso")
-    );
-
     const {
         lassoClipboard,
         moveLassoSelection,
@@ -518,6 +462,58 @@ const Canvas = () => {
         setTextBoxes,
         setTool,
         recordHistory,
+    });
+
+    const {
+        handlePointerDown,
+        handlePointerMove,
+        handlePointerUp,
+        handleWheel,
+        isMiddleDragging,
+    } = useCanvasPointerInput({
+        tool,
+        pencilOnlyMode,
+        penColor,
+        offsetRef,
+        scaleRef,
+        setOffset,
+        setScale,
+        getCanvasCoords,
+        isDrawing,
+        setIsDrawing,
+        currentLineRef,
+        appendPointerToCurrentLine,
+        finishCurrentLine,
+        eraseAtPointer,
+        drawnLines,
+        setDrawnLines,
+        images,
+        textBoxes,
+        movingObject,
+        setMovingObject,
+        eraseElementAtPointer,
+        moveElement,
+        eraserTargets,
+        editingTextBoxId,
+        commitTextBoxEdit,
+        beginTextBoxEdit,
+        createTextBoxAt,
+        lassoSelection,
+        setLassoSelection,
+        lassoBounds,
+        moveLassoSelection,
+        recordHistory,
+        redrawActiveStroke,
+        togglePenEraserTool,
+        beginLocalLine,
+        streamLocalPoints,
+        finishLocalLine,
+        resetLocalLine,
+        streamLineStart,
+        streamLinePoints,
+        streamLineEnd,
+        createLineId: uuidv4,
+        strokeWidth: DEFAULT_STROKE_WIDTH,
     });
 
     useEffect(() => {
@@ -567,299 +563,7 @@ const Canvas = () => {
 
         window.addEventListener("paste", handlePaste);
         return () => window.removeEventListener("paste", handlePaste);
-    }, [addImageFile, handlePasteLassoSelection, lassoClipboard, recordHistory]);
-
-    const resetActiveCanvasAction = () => {
-        currentLine.current = [];
-        activeStreamingLineIdRef.current = null;
-        lastStreamedPointIndexRef.current = 0;
-        setIsDrawing(false);
-        setIsLassoDragging(false);
-        lassoDragStart.current = null;
-        setMovingObject(null);
-    };
-
-    const getCanvasViewportPoint = (canvas: HTMLCanvasElement, point: Pick<PointerEvent, "clientX" | "clientY">): Point => {
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        return {
-            x: (point.clientX - rect.left) * scaleX,
-            y: (point.clientY - rect.top) * scaleY,
-        };
-    };
-
-    const updateTouchGestureBaseline = () => {
-        const touchPoints = Array.from(pointers.current.values()).slice(0, 2);
-        if (touchPoints.length < 2) {
-            lastTouchDistance.current = null;
-            lastTouchCenter.current = null;
-            return;
-        }
-
-        const [p1, p2] = touchPoints;
-        lastTouchDistance.current = Math.hypot(p1.x - p2.x, p1.y - p2.y);
-        lastTouchCenter.current = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
-    };
-
-    const moveViewportWithTouchGesture = () => {
-        const touchPoints = Array.from(pointers.current.values()).slice(0, 2);
-        if (touchPoints.length < 2) return;
-
-        const [p1, p2] = touchPoints;
-        const newDistance = Math.hypot(p1.x - p2.x, p1.y - p2.y);
-        const newCenter = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
-        const previousCenter = lastTouchCenter.current;
-
-        if (lastTouchDistance.current && previousCenter) {
-            const previousScale = scaleRef.current;
-            const nextScale = Math.min(5, Math.max(0.2, previousScale * (newDistance / lastTouchDistance.current)));
-            const zoomRatio = nextScale / previousScale;
-            const previousOffset = offsetRef.current;
-            const nextOffset = {
-                x: newCenter.x - (previousCenter.x - previousOffset.x) * zoomRatio,
-                y: newCenter.y - (previousCenter.y - previousOffset.y) * zoomRatio,
-            };
-
-            scaleRef.current = nextScale;
-            offsetRef.current = nextOffset;
-            setScale(nextScale);
-            setOffset(nextOffset);
-        }
-
-        lastTouchDistance.current = newDistance;
-        lastTouchCenter.current = newCenter;
-    };
-
-    const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
-        event.preventDefault();
-        const pos = getCanvasViewportPoint(event.currentTarget, event.nativeEvent);
-        pointers.current.set(event.pointerId, pos);
-        if (!event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.setPointerCapture(event.pointerId);
-
-        const isPenAuxiliaryAction = event.pointerType === "pen" && (event.button !== 0 || (event.buttons & 2) === 2 || (event.buttons & 32) === 32);
-        if (isPenAuxiliaryAction) {
-            togglePenEraserTool();
-            return;
-        }
-
-        if (event.pointerType === "mouse" && event.button === 1) {
-            setIsMiddleDragging(true);
-            middleDragStart.current = pos;
-            return;
-        }
-
-        if (event.pointerType === "touch" && pointers.current.size >= 2) {
-            isTouchGestureActive.current = true;
-            resetActiveCanvasAction();
-            updateTouchGestureBaseline();
-            return;
-        }
-
-        if (isTouchGestureActive.current || blocksTouchDrawing(event)) return;
-
-        if (tool === "eraser") {
-            if (editingTextBoxId) commitTextBoxEdit();
-            setLassoSelection(null);
-            recordHistory();
-            eraseAtPointer(event, eraserTargets.lines);
-            eraseElementAtPointer(event, { images: eraserTargets.images, textBoxes: eraserTargets.textBoxes });
-        } else if (tool === "pen") {
-            if (editingTextBoxId) commitTextBoxEdit();
-            setLassoSelection(null);
-            recordHistory();
-            const lineId = uuidv4();
-            currentLine.current = [];
-            appendPointerToCurrentLine(event);
-            activeStreamingLineIdRef.current = lineId;
-            lastStreamedPointIndexRef.current = currentLine.current.length;
-            streamLineStart({
-                id: lineId,
-                points: currentLine.current.map((point) => ({ ...point })),
-                color: penColor,
-                strokeWidth: DEFAULT_STROKE_WIDTH,
-            });
-            setIsDrawing(true);
-        } else if (tool === "lasso") {
-            if (editingTextBoxId) commitTextBoxEdit();
-            const point = getCanvasCoords(event);
-            if (lassoSelection && isPointInsideBounds(point, lassoBounds)) {
-                recordHistory();
-                setIsLassoDragging(true);
-                lassoDragStart.current = point;
-                return;
-            }
-            recordHistory();
-            currentLine.current = [];
-            appendPointerToCurrentLine(event);
-            setIsDrawing(true);
-        } else if (tool === "handle") {
-            setLassoSelection(null);
-            setMovingObject(null);
-            const { x, y } = getCanvasCoords(event);
-            for (let index = images.length - 1; index >= 0; index -= 1) {
-                const image = images[index];
-                if (image.status !== "deleted" && x >= image.x && x <= image.x + image.width && y >= image.y && y <= image.y + image.height) {
-                    if (editingTextBoxId) commitTextBoxEdit();
-                    recordHistory();
-                    setMovingObject({ type: "image", index, id: image.id, status: image.status || "new", grabOffset: { x: x - image.x, y: y - image.y } });
-                    return;
-                }
-            }
-            for (let index = textBoxes.length - 1; index >= 0; index -= 1) {
-                const textBox = textBoxes[index];
-                if (textBox.status !== "deleted" && x >= textBox.x && x <= textBox.x + textBox.width && y >= textBox.y && y <= textBox.y + textBox.height) {
-                    if (editingTextBoxId) commitTextBoxEdit();
-                    recordHistory();
-                    setMovingObject({ type: "text", index, id: textBox.id, status: textBox.status || "new", grabOffset: { x: x - textBox.x, y: y - textBox.y } });
-                    return;
-                }
-            }
-        } else if (tool === "text") {
-            setLassoSelection(null);
-            recordHistory();
-            const point = getCanvasCoords(event);
-            const targetTextBox = [...textBoxes].reverse().find((textBox) => (
-                textBox.status !== "deleted"
-                && point.x >= textBox.x
-                && point.x <= textBox.x + textBox.width
-                && point.y >= textBox.y
-                && point.y <= textBox.y + textBox.height
-            ));
-            if (targetTextBox) beginTextBoxEdit(targetTextBox);
-            else {
-                if (editingTextBoxId) commitTextBoxEdit();
-                createTextBoxAt(point);
-            }
-        }
-    };
-
-    const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
-        event.preventDefault();
-        const pos = getCanvasViewportPoint(event.currentTarget, event.nativeEvent);
-
-        if (isMiddleDragging && middleDragStart.current) {
-            const nextOffset = {
-                x: offsetRef.current.x + pos.x - middleDragStart.current.x,
-                y: offsetRef.current.y + pos.y - middleDragStart.current.y,
-            };
-            offsetRef.current = nextOffset;
-            setOffset(nextOffset);
-            middleDragStart.current = pos;
-            return;
-        }
-
-        if (!pointers.current.has(event.pointerId)) return;
-        pointers.current.set(event.pointerId, pos);
-
-        if (isTouchGestureActive.current && pointers.current.size >= 2) {
-            moveViewportWithTouchGesture();
-            return;
-        }
-        if (isTouchGestureActive.current) return;
-
-        if (isLassoDragging && lassoDragStart.current) {
-            const current = getCanvasCoords(event);
-            moveLassoSelection(current.x - lassoDragStart.current.x, current.y - lassoDragStart.current.y);
-            lassoDragStart.current = current;
-        } else if (blocksTouchDrawing(event)) {
-            return;
-        } else if (tool === "eraser") {
-            eraseAtPointer(event, eraserTargets.lines);
-            eraseElementAtPointer(event, { images: eraserTargets.images, textBoxes: eraserTargets.textBoxes });
-        } else if ((tool === "pen" || tool === "lasso") && isDrawing) {
-            const previousPointCount = currentLine.current.length;
-            appendPointerToCurrentLine(event);
-            if (tool === "pen" && activeStreamingLineIdRef.current) {
-                const newPoints = currentLine.current.slice(Math.max(previousPointCount, lastStreamedPointIndexRef.current));
-                if (newPoints.length > 0) {
-                    lastStreamedPointIndexRef.current = currentLine.current.length;
-                    streamLinePoints(activeStreamingLineIdRef.current, newPoints.map((point) => ({ ...point })));
-                }
-            }
-            redrawActiveStroke();
-        } else if (tool === "handle" && movingObject) {
-            moveElement(event);
-        }
-    };
-
-    const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
-        event.preventDefault();
-        pointers.current.delete(event.pointerId);
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-
-        if (isMiddleDragging && event.button === 1) {
-            setIsMiddleDragging(false);
-            middleDragStart.current = null;
-        }
-
-        if (isTouchGestureActive.current) {
-            if (pointers.current.size >= 2) updateTouchGestureBaseline();
-            else {
-                lastTouchDistance.current = null;
-                lastTouchCenter.current = null;
-            }
-            if (pointers.current.size === 0) isTouchGestureActive.current = false;
-            return;
-        }
-
-        if (isLassoDragging) {
-            setIsLassoDragging(false);
-            lassoDragStart.current = null;
-        } else if ((tool === "pen" || tool === "lasso") && isDrawing) {
-            const previousPointCount = currentLine.current.length;
-            appendPointerToCurrentLine(event);
-            if (tool === "pen" && activeStreamingLineIdRef.current) {
-                const newPoints = currentLine.current.slice(Math.max(previousPointCount, lastStreamedPointIndexRef.current));
-                if (newPoints.length > 0) {
-                    lastStreamedPointIndexRef.current = currentLine.current.length;
-                    streamLinePoints(activeStreamingLineIdRef.current, newPoints.map((point) => ({ ...point })));
-                }
-            }
-            const finishedLine = finishCurrentLine();
-            if (tool === "lasso") {
-                setLassoSelection(buildLassoSelection(finishedLine, drawnLines, images, textBoxes));
-            } else if (finishedLine.length > 0) {
-                const lineId = activeStreamingLineIdRef.current ?? uuidv4();
-                const line = {
-                    id: lineId,
-                    points: finishedLine,
-                    color: penColor,
-                    strokeWidth: DEFAULT_STROKE_WIDTH,
-                };
-                streamLineEnd(line);
-                setDrawnLines((prev) => [...prev, {
-                    ...line,
-                    status: "new",
-                }]);
-            }
-            activeStreamingLineIdRef.current = null;
-            lastStreamedPointIndexRef.current = 0;
-        }
-        setMovingObject(null);
-    };
-
-    const handleWheel = (event: React.WheelEvent<HTMLCanvasElement>) => {
-        event.preventDefault();
-        const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
-        const previousScale = scaleRef.current;
-        const nextScale = Math.min(5, Math.max(0.2, previousScale * factor));
-        const zoomRatio = nextScale / previousScale;
-        if (zoomRatio === 1) return; // 스케일 한계 도달 시 위치 이동 없이 종료
-
-        // 0,0 이 아니라 마우스 포인터 좌표를 기준으로 확대/축소 (캔버스 픽셀 공간, 터치 핀치줌과 동일 공식)
-        const focus = getCanvasViewportPoint(event.currentTarget, event.nativeEvent);
-        const previousOffset = offsetRef.current;
-        const nextOffset = {
-            x: focus.x - (focus.x - previousOffset.x) * zoomRatio,
-            y: focus.y - (focus.y - previousOffset.y) * zoomRatio,
-        };
-
-        scaleRef.current = nextScale;
-        offsetRef.current = nextOffset;
-        setScale(nextScale);
-        setOffset(nextOffset);
-    };
+    }, [addImageFile, getDisplayedViewportCenter, handlePasteLassoSelection, lassoClipboard, recordHistory]);
 
     const handleContextMenu = (event: React.MouseEvent) => event.preventDefault();
 
@@ -988,6 +692,7 @@ const Canvas = () => {
                 />
 
                 <canvas
+                    data-testid="canvas-input-surface"
                     ref={canvasRef}
                     width={viewport.width}
                     height={viewport.height}

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import type { Point, LineElement, ToolType } from '@/entities/canvas';
+import type { Point, LineElement } from '@/entities/canvas';
 import { CanvasSpatialIndex } from './canvasSpatialIndex';
 
 type GetCanvasCoords = (e: React.PointerEvent | MouseEvent) => Point;
@@ -47,10 +47,10 @@ const smoothLinePoints = (points: Point[]) => {
   });
 };
 
-export const useDrawing = (getCanvasCoords: GetCanvasCoords, tool: ToolType) => {
+export const useDrawing = (getCanvasCoords: GetCanvasCoords) => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawnLines, setDrawnLines] = useState<LineElement[]>([]);
-  const currentLine = useRef<Point[]>([]); // 현재 그리고 있는 선의 점들
+  const currentLineRef = useRef<Point[]>([]); // 현재 그리고 있는 선의 점들
   // 공간 인덱스는 지우개에서만 쓴다. drawnLines가 바뀔 때마다 미리 만들면
   // 획을 하나 그릴 때마다 전체 선의 모든 점을 순회(O(전체 점 수))해 필기 직후 딜레이가 생긴다.
   // 실제로 필요할 때 지연 생성하고, 같은 drawnLines 동안은 재사용한다.
@@ -69,13 +69,13 @@ export const useDrawing = (getCanvasCoords: GetCanvasCoords, tool: ToolType) => 
       : [event.nativeEvent];
 
     coalescedEvents.forEach((sample) => {
-      appendPoint(currentLine.current, getCanvasCoords(sample));
+      appendPoint(currentLineRef.current, getCanvasCoords(sample));
     });
   }, [getCanvasCoords]);
 
   const finishCurrentLine = useCallback(() => {
-    const finishedLine = smoothLinePoints([...currentLine.current]);
-    currentLine.current = [];
+    const finishedLine = smoothLinePoints([...currentLineRef.current]);
+    currentLineRef.current = [];
     setIsDrawing(false);
     return finishedLine;
   }, []);
@@ -104,7 +104,7 @@ export const useDrawing = (getCanvasCoords: GetCanvasCoords, tool: ToolType) => 
     setIsDrawing,
     drawnLines,
     setDrawnLines,
-    currentLine,
+    currentLineRef,
     appendPointerToCurrentLine,
     finishCurrentLine,
     eraseAtPointer,

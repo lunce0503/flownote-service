@@ -1,5 +1,5 @@
 import { Moon, Sun } from "lucide-react";
-import { useTheme, type ThemeMode } from "../model/ThemeContext";
+import { useTheme, type ThemeMode } from "../model/themeContext";
 
 const options: Array<{ value: ThemeMode; label: string; icon: typeof Sun }> = [
   { value: "light", label: "라이트", icon: Sun },

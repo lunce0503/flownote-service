@@ -130,14 +130,15 @@ const StockDashboard = () => {
   };
 
   useEffect(() => {
-    void refresh();
+    const timer = window.setTimeout(() => void refresh(), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     const source = createStockStream();
     if (!source) return undefined;
 
-    setStreaming(true);
+    source.onopen = () => setStreaming(true);
     source.addEventListener("quotes", (event) => {
       const nextQuotes = JSON.parse((event as MessageEvent).data) as StockQuote[];
       setQuotes(Object.fromEntries(nextQuotes.map((quote) => [quote.symbol, quote])));
@@ -156,8 +157,8 @@ const StockDashboard = () => {
   useEffect(() => {
     const normalized = assetSearchQuery.trim();
     if (normalized.length < 2) {
-      setAssetSearchResults([]);
-      return undefined;
+      const timeout = window.setTimeout(() => setAssetSearchResults([]), 0);
+      return () => window.clearTimeout(timeout);
     }
 
     const timeout = window.setTimeout(() => {

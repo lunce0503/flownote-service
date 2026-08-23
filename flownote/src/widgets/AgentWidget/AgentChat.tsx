@@ -3,8 +3,13 @@ import { v4 as uuidv4 } from "uuid";
 import type { ChatMessage } from "@/shared/ui/ChatBlock";
 import { API_AI_BASE_URL, authHeaders } from "@/shared/api";
 import { getNoteData } from "@/entities/blog";
-import { getTasksData } from "@/features/task";
-import { getChatData, postChatData, deleteChatMessage, deleteAllChatMessages } from "@/features/chat";
+import { getTasksData } from "@/entities/task";
+import { getChatData, postChatData } from "@/entities/chat";
+import {
+    clearChatMessagesOptimistically,
+    deleteChatMessageOptimistically,
+    sendChatMessageOptimistically,
+} from "@/features/chat";
 import AgentConversationPanel from "./AgentConversationPanel";
 import AgentFocusQueue from "./AgentFocusQueue";
 import AgentInsightsPanel from "./AgentInsightsPanel";
@@ -182,11 +187,10 @@ const AgentChat = () => {
             message: sanitizeInternalApiMentions(text),
         };
 
-        setMessages((prev) => [...prev, userMessage]);
         setIsLoading(true);
 
         try {
-            await postChatData(userMessage);
+            await sendChatMessageOptimistically(userMessage, setMessages);
             await askAgent(text);
         } catch (err) {
             console.error("Unexpected Error:", err);
@@ -195,27 +199,21 @@ const AgentChat = () => {
     };
 
     const handleDeleteMessage = async (messageId: string) => {
-        setMessages((prev) => prev.filter((message) => message.id !== messageId));
-
         try {
-            await deleteChatMessage(messageId);
+            await deleteChatMessageOptimistically(messageId, setMessages, getMessages);
         } catch (err) {
             console.error("Failed to delete agent message:", err);
             setError("메시지를 삭제하지 못했습니다.");
-            void getMessages();
         }
     };
 
     const handleClearMessages = async () => {
         if (messages.length === 0) return;
-        setMessages([]);
-
         try {
-            await deleteAllChatMessages();
+            await clearChatMessagesOptimistically(setMessages, getMessages);
         } catch (err) {
             console.error("Failed to clear agent messages:", err);
             setError("대화 기록을 지우지 못했습니다.");
-            void getMessages();
         }
     };
 
@@ -250,9 +248,12 @@ const AgentChat = () => {
     };
 
     useEffect(() => {
-        void getMessages();
-        void getWorkspace();
-        scrollToBottom();
+        const timer = window.setTimeout(() => {
+            void getMessages();
+            void getWorkspace();
+            scrollToBottom();
+        }, 0);
+        return () => window.clearTimeout(timer);
     }, []);
 
     useEffect(() => {

@@ -611,7 +611,9 @@ export const usePersistence = (
     }
   }, [CANVAS_SOCKET_URL, buildCurrentSavePayload, commitSavedCanvasState, drainRemoteChangeQueue, retryPendingSaves]);
 
-  handleSaveRef.current = handleSave;
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+  }, [handleSave]);
 
   const requestSave = useCallback(() => {
     if (!CANVAS_SOCKET_URL) return;
@@ -864,7 +866,9 @@ export const usePersistence = (
     return loadPromise;
   }, [cancelActiveLoadRequest, performLoad]);
 
-  handleLoadRef.current = handleLoad;
+  useEffect(() => {
+    handleLoadRef.current = handleLoad;
+  }, [handleLoad]);
 
   useEffect(() => {
     if (!CANVAS_SOCKET_URL || !canvasId) return undefined;

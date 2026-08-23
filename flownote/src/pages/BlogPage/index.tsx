@@ -1,4 +1,4 @@
-import { BlogListWidget } from "@/widgets";
+import { BlogListWidget } from "@/widgets/BlogWidget";
 
 const BlogPage = () => {
     return (

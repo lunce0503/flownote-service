@@ -169,7 +169,11 @@ export const serializeCanvasDraftInWorker = (
     canvasDraftWorker!.postMessage({
       requestId,
       lines: drawnLines,
-      images: images.map(({ image: _image, ...image }) => image),
+      images: images.map((image) => {
+        const serialized = { ...image };
+        Reflect.deleteProperty(serialized, "image");
+        return serialized;
+      }),
       textBoxes,
       baseRevision,
     });

@@ -1,23 +1,36 @@
-import type { ReactElement } from 'react';
+import { lazy, Suspense, type ComponentType, type ReactElement } from 'react';
 
-import Home from './routers/Home/route.tsx';
-import Blog from './routers/Blog/index.tsx';
-import BlogDetail from './routers/BlogDetail/index.tsx';
-import Social from './routers/Social/index.tsx';
-import Agent from './routers/Agent/index.tsx';
-import LoginRoute from './routers/Login/route.tsx';
-import SignUpRoute from './routers/SignUp/routes.tsx';
-import LolBanPickRoute from './routers/LolBanpick/route.tsx';
-import ScrewPuzzleRoute from './routers/ScrewPuzzle/route.tsx';
-import CanvasRoute from './routers/Canvas/route.tsx';
-import CanvasListRoute from './routers/Canvas/list.tsx';
-import PlannerRoute from './routers/Planner/route.tsx';
-import StockRoute from './routers/Stock/route.tsx';
-import StockChartRoute from './routers/Stock/chart.tsx';
-import SettingsRoute from './routers/Settings/route.tsx';
-import AdminCanvasRoute from './routers/AdminCanvas/route.tsx';
-import AdminFeedbackRoute from './routers/AdminFeedback/route.tsx';
-import Magic from './routers/Magic/magic.tsx';
+type RouteModule = { default: ComponentType };
+
+const lazyRoute = (loader: () => Promise<RouteModule>) => {
+  const Component = lazy(loader);
+  return (
+    <Suspense fallback={<div className="flex min-h-[40vh] items-center justify-center text-sm text-stone-500">불러오는 중...</div>}>
+      <Component />
+    </Suspense>
+  );
+};
+
+const routes = {
+  home: lazyRoute(() => import('./routers/Home/route.tsx')),
+  blog: lazyRoute(() => import('./routers/Blog/index.tsx')),
+  blogDetail: lazyRoute(() => import('./routers/BlogDetail/index.tsx')),
+  social: lazyRoute(() => import('./routers/Social/index.tsx')),
+  agent: lazyRoute(() => import('./routers/Agent/index.tsx')),
+  login: lazyRoute(() => import('./routers/Login/route.tsx')),
+  signup: lazyRoute(() => import('./routers/SignUp/routes.tsx')),
+  banpick: lazyRoute(() => import('./routers/LolBanpick/route.tsx')),
+  screwPuzzle: lazyRoute(() => import('./routers/ScrewPuzzle/route.tsx')),
+  canvas: lazyRoute(() => import('./routers/Canvas/route.tsx')),
+  canvasList: lazyRoute(() => import('./routers/Canvas/list.tsx')),
+  planner: lazyRoute(() => import('./routers/Planner/route.tsx')),
+  stocks: lazyRoute(() => import('./routers/Stock/route.tsx')),
+  stockChart: lazyRoute(() => import('./routers/Stock/chart.tsx')),
+  settings: lazyRoute(() => import('./routers/Settings/route.tsx')),
+  adminCanvas: lazyRoute(() => import('./routers/AdminCanvas/route.tsx')),
+  adminFeedback: lazyRoute(() => import('./routers/AdminFeedback/route.tsx')),
+  magic: lazyRoute(() => import('./routers/Magic/magic.tsx')),
+};
 
 // 하나의 라우트 노드. index 라우트, 또는 children을 가진 부모 라우트를 표현한다.
 export type CapabilityRoute = {
@@ -49,7 +62,7 @@ export const capabilityManifest: Capability[] = [
     label: '홈',
     nav: false,
     enabled: true,
-    routes: [{ path: '/', element: <Home /> }],
+    routes: [{ path: '/', element: routes.home }],
   },
   {
     id: 'blog',
@@ -60,8 +73,8 @@ export const capabilityManifest: Capability[] = [
       {
         path: '/blog',
         children: [
-          { index: true, element: <Blog /> },
-          { path: ':title', element: <BlogDetail /> },
+          { index: true, element: routes.blog },
+          { path: ':title', element: routes.blogDetail },
         ],
       },
     ],
@@ -74,8 +87,8 @@ export const capabilityManifest: Capability[] = [
     protected: true,
     // /canvas = 그림판 목록, /canvas/:canvasId = 해당 캔버스 편집기(멀티 캔버스 URL 구분).
     routes: [
-      { path: '/canvas', element: <CanvasListRoute /> },
-      { path: '/canvas/:canvasId', element: <CanvasRoute /> },
+      { path: '/canvas', element: routes.canvasList },
+      { path: '/canvas/:canvasId', element: routes.canvas },
     ],
   },
   {
@@ -85,7 +98,7 @@ export const capabilityManifest: Capability[] = [
     enabled: true,
     protected: true,
     // /planner = 할 일 · 시간표 · 일기 통합 화면(일간/주간/월간 보기).
-    routes: [{ path: '/planner', element: <PlannerRoute /> }],
+    routes: [{ path: '/planner', element: routes.planner }],
   },
   {
     id: 'stocks',
@@ -94,8 +107,8 @@ export const capabilityManifest: Capability[] = [
     enabled: true,
     protected: true,
     routes: [
-      { path: '/stocks', element: <StockRoute /> },
-      { path: '/stocks/chart', element: <StockChartRoute /> },
+      { path: '/stocks', element: routes.stocks },
+      { path: '/stocks/chart', element: routes.stockChart },
     ],
   },
   {
@@ -104,7 +117,7 @@ export const capabilityManifest: Capability[] = [
     nav: true,
     enabled: true,
     protected: true,
-    routes: [{ path: '/social', element: <Social /> }],
+    routes: [{ path: '/social', element: routes.social }],
   },
   {
     id: 'agent',
@@ -112,28 +125,28 @@ export const capabilityManifest: Capability[] = [
     nav: true,
     enabled: true,
     protected: true,
-    routes: [{ path: '/agent', element: <Agent /> }],
+    routes: [{ path: '/agent', element: routes.agent }],
   },
   {
     id: 'banpick',
     label: '밴픽',
     nav: false,
     enabled: true,
-    routes: [{ path: '/banpick', element: <LolBanPickRoute /> }],
+    routes: [{ path: '/banpick', element: routes.banpick }],
   },
   {
     id: 'screw-puzzle',
     label: '나사 퍼즐',
     nav: true,
     enabled: true,
-    routes: [{ path: '/screw-puzzle', element: <ScrewPuzzleRoute /> }],
+    routes: [{ path: '/screw-puzzle', element: routes.screwPuzzle }],
   },
   {
     id: 'magic',
     label: 'Magic',
     nav: false,
     enabled: true,
-    routes: [{ path: '/magic', element: <Magic /> }],
+    routes: [{ path: '/magic', element: routes.magic }],
   },
   {
     id: 'settings',
@@ -141,7 +154,7 @@ export const capabilityManifest: Capability[] = [
     nav: false,
     enabled: true,
     protected: true,
-    routes: [{ path: '/settings', element: <SettingsRoute /> }],
+    routes: [{ path: '/settings', element: routes.settings }],
   },
   {
     id: 'admin-canvas',
@@ -149,7 +162,7 @@ export const capabilityManifest: Capability[] = [
     nav: false,
     enabled: true,
     protected: true,
-    routes: [{ path: '/admin/canvas', element: <AdminCanvasRoute /> }],
+    routes: [{ path: '/admin/canvas', element: routes.adminCanvas }],
   },
   {
     id: 'admin-feedback',
@@ -158,7 +171,7 @@ export const capabilityManifest: Capability[] = [
     enabled: true,
     protected: true,
     // 관리자 전용. 설정 화면에서 접수된 사용자 피드백을 확인한다.
-    routes: [{ path: '/admin/feedback', element: <AdminFeedbackRoute /> }],
+    routes: [{ path: '/admin/feedback', element: routes.adminFeedback }],
   },
   {
     id: 'auth',
@@ -166,8 +179,8 @@ export const capabilityManifest: Capability[] = [
     nav: false,
     enabled: true,
     routes: [
-      { path: '/login', element: <LoginRoute /> },
-      { path: '/signup', element: <SignUpRoute /> },
+      { path: '/login', element: routes.login },
+      { path: '/signup', element: routes.signup },
     ],
   },
 ];

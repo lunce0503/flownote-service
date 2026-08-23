@@ -32,18 +32,18 @@ const NoteDrawingCanvas = ({ isSaving, onCancel, onSave }: NoteDrawingCanvasProp
     setIsDrawing,
     drawnLines,
     setDrawnLines,
-    currentLine,
+    currentLineRef,
     appendPointerToCurrentLine,
     finishCurrentLine,
     eraseAtPointer,
-  } = useDrawing(getCanvasCoords, tool);
+  } = useDrawing(getCanvasCoords);
   const {
     images,
     setImages,
     textBoxes,
     setTextBoxes,
     eraseElementAtPointer,
-  } = useElementManipulation(getCanvasCoords, tool);
+  } = useElementManipulation(getCanvasCoords);
   const {
     canUndo,
     recordHistory,
@@ -60,7 +60,7 @@ const NoteDrawingCanvas = ({ isSaving, onCancel, onSave }: NoteDrawingCanvasProp
     rendererRef,
     offset,
     scale,
-    currentLine.current,
+    currentLineRef,
     { color: "#000000", strokeWidth: 2 },
     { width: CANVAS_WIDTH, height: CANVAS_HEIGHT },
   );
@@ -91,7 +91,7 @@ const NoteDrawingCanvas = ({ isSaving, onCancel, onSave }: NoteDrawingCanvasProp
 
     if (tool === "pen") {
       recordHistory();
-      currentLine.current = [];
+      currentLineRef.current = [];
       appendPointerToCurrentLine(event);
       setIsDrawing(true);
     }
@@ -143,7 +143,7 @@ const NoteDrawingCanvas = ({ isSaving, onCancel, onSave }: NoteDrawingCanvasProp
     setDrawnLines([]);
     setImages([]);
     setTextBoxes([]);
-    currentLine.current = [];
+    currentLineRef.current = [];
   };
 
   const handleExport = async () => {

@@ -65,9 +65,12 @@ const AdminCanvasRoute = () => {
   }, []);
 
   useEffect(() => {
-    void load();
+    const initialTimer = window.setTimeout(() => void load(), 0);
     const timer = window.setInterval(() => void load(), 15_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
   }, [load]);
 
   if (user?.role !== "ADMIN") return <Navigate to="/" replace />;

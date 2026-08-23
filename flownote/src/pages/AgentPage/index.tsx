@@ -1,4 +1,4 @@
-import { AgentWidget } from "@/widgets";
+import AgentWidget from "@/widgets/AgentWidget";
 
 const AgentPage = () => {
     return <AgentWidget />;

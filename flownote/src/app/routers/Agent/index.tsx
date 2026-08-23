@@ -1,4 +1,4 @@
-import { AgentPage } from "@/pages";
+import AgentPage from "@/pages/AgentPage";
 
 const Agent = () => {
     return <AgentPage />;

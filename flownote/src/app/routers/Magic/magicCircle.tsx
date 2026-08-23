@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Activity, ShieldCheck, Zap, Layers, Info, 
+  Activity, Layers, Info,
   Sun, Moon, Flame, Droplets, Wind, Mountain, Eye, Sparkles,
   Sword, Shield, Heart, Ghost, Cloud, Star, Anchor, Compass,
-  Play, Pause, SkipForward, RotateCcw
+  Play, Pause, RotateCcw
 } from 'lucide-react';
 
 /**
@@ -18,6 +18,8 @@ interface Rune {
 }
 
 type MagicCircleStage = 'SENSING' | 'SYNC' | 'RESONANCE' | 'RENDERING' | 'PROJECTION';
+
+const MAGIC_CIRCLE_STAGES: MagicCircleStage[] = ['SENSING', 'SYNC', 'RESONANCE', 'RENDERING', 'PROJECTION'];
 
 // --- 서브 컴포넌트 분리 ---
 
@@ -133,16 +135,15 @@ const MagicCircle: React.FC = () => {
 
   const [activeRunes, setActiveRunes] = useState<Rune[]>(runeLibrary.slice(0, 8));
 
-  const stages: MagicCircleStage[] = ['SENSING', 'SYNC', 'RESONANCE', 'RENDERING', 'PROJECTION'];
-  const currentIdx = stages.indexOf(stage);
+  const currentIdx = MAGIC_CIRCLE_STAGES.indexOf(stage);
 
   useEffect(() => {
     let timer: number;
     if (isPlaying) {
       timer = window.setInterval(() => {
         setStage(prev => {
-          const nextIdx = (stages.indexOf(prev) + 1) % stages.length;
-          return stages[nextIdx];
+          const nextIdx = (MAGIC_CIRCLE_STAGES.indexOf(prev) + 1) % MAGIC_CIRCLE_STAGES.length;
+          return MAGIC_CIRCLE_STAGES[nextIdx];
         });
       }, 5000);
     }
@@ -245,7 +246,7 @@ const MagicCircle: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {stages.map((s, i) => (
+              {MAGIC_CIRCLE_STAGES.map((s, i) => (
                 <button
                   key={s}
                   onClick={() => {
@@ -267,7 +268,7 @@ const MagicCircle: React.FC = () => {
 
             {/* 단계별 상태 인디케이터 */}
             <div className="grid grid-cols-5 gap-1 pt-1">
-              {stages.map((_, i) => (
+              {MAGIC_CIRCLE_STAGES.map((_, i) => (
                 <div key={i} className={`h-1 rounded-full transition-all duration-500 ${i <= currentIdx ? 'bg-cyan-400 shadow-[0_0_5px_rgba(34,211,238,1)]' : 'bg-cyan-900/30'}`} />
               ))}
             </div>

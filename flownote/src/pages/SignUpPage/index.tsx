@@ -1,4 +1,4 @@
-import { SignUpWidget } from "@/widgets";
+import SignUpWidget from "@/widgets/SignUpWidget";
 
 const SignUpPage = () => {
     return <SignUpWidget />;

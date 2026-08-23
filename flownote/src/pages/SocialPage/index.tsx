@@ -1,4 +1,4 @@
-import { SocialWidget } from "@/widgets";
+import SocialWidget from "@/widgets/SocialWidget";
 
 const SocialPage = () => (
     <section className="min-h-[calc(100vh-56px)] bg-stone-100 py-4 text-stone-900">

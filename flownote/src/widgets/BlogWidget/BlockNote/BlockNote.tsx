@@ -48,21 +48,6 @@ const areBlocksEqual = (left: BlockDataProps["content"], right: BlockDataProps["
   }
 };
 
-const normalizeBlocksForSave = (blocks: BlockDataProps["content"]): BlockDataProps["content"] => (
-  blocks.map((block) => {
-    const nextBlock = { ...block } as typeof block;
-
-    if (Array.isArray(block.content)) {
-      nextBlock.content = transformLatexInlineContent(block.content).content as typeof block.content;
-    }
-    if (block.children.length > 0) {
-      nextBlock.children = normalizeBlocksForSave(block.children) as typeof block.children;
-    }
-
-    return nextBlock;
-  }) as BlockDataProps["content"]
-);
-
 type PendingNoteSave = {
   revision: number;
   note: BlockDataProps;
@@ -87,6 +72,26 @@ const  BlockNote = () => {
     schema,
     uploadFile,    
   });
+  type EditorDocument = typeof editor.document;
+  type EditorBlock = EditorDocument[number];
+
+  const toEditorDocument = useCallback((content: BlockDataProps["content"]): EditorDocument => (
+    content as EditorDocument
+  ), []);
+
+  const normalizeBlocksForSave = useCallback((blocks: EditorDocument): BlockDataProps["content"] => {
+    const normalize = (currentBlocks: EditorDocument): EditorDocument => currentBlocks.map((block) => {
+      const nextBlock = structuredClone(block);
+      if (Array.isArray(block.content)) {
+        nextBlock.content = transformLatexInlineContent(block.content).content as typeof nextBlock.content;
+      }
+      if (block.children.length > 0) {
+        nextBlock.children = normalize(block.children as EditorDocument) as typeof nextBlock.children;
+      }
+      return nextBlock;
+    });
+    return normalize(blocks);
+  }, []);
   const [noteData,setNoteData] = useState<BlockDataProps | null>(null);
   const [isLoading,setIsLoading] = useState<boolean>(true);
   const [isDrawingOpen, setIsDrawingOpen] = useState(false);
@@ -106,14 +111,15 @@ const  BlockNote = () => {
   const ignoredDocumentHashRef = useRef<string | null>(null);
 
   const replaceEditorContent = useCallback((content: BlockDataProps["content"]) => {
-    if (content.length === 0 || areBlocksEqual(editor.document, content)) {
+    const editorContent = toEditorDocument(content);
+    if (editorContent.length === 0 || areBlocksEqual(editor.document, editorContent)) {
       return false;
     }
 
     isApplyingRemoteContentRef.current = true;
     ignoredDocumentHashRef.current = JSON.stringify(content);
     try {
-      editor.replaceBlocks(editor.document, content);
+      editor.replaceBlocks(editor.document, editorContent);
     } finally {
       window.setTimeout(() => {
         isApplyingRemoteContentRef.current = false;
@@ -122,7 +128,7 @@ const  BlockNote = () => {
     }
 
     return true;
-  }, [editor]);
+  }, [editor, toEditorDocument]);
 
   useEffect(() => {
     noteDataRef.current = noteData;
@@ -176,7 +182,7 @@ const  BlockNote = () => {
         client_id: clientId,
       },
     };
-  }, [clientId, editor]);
+  }, [clientId, editor, normalizeBlocksForSave]);
 
   const applyServerNote = useCallback((targetData: BlockDataProps) => {
     const revision = targetData.revision ?? 0;
@@ -254,7 +260,8 @@ const  BlockNote = () => {
             continue;
           }
 
-          if (!pendingSaveRef.current || pendingSaveRef.current.revision < pending.revision) {
+          const queuedPending = pendingSaveRef.current as PendingNoteSave | null;
+          if (!queuedPending || queuedPending.revision < pending.revision) {
             pendingSaveRef.current = pending;
           }
           retryScheduled = true;
@@ -275,7 +282,9 @@ const  BlockNote = () => {
     return loopPromise;
   }, [applyServerNote, createSaveSnapshot, editor, fetchCurrentNote]);
 
-  saveQueueRunnerRef.current = processSaveQueue;
+  useEffect(() => {
+    saveQueueRunnerRef.current = processSaveQueue;
+  }, [processSaveQueue]);
 
   useEffect(() => subscribeSyncEvents((event) => {
     if (event.resource !== "notes" && event.resource !== "all") return;
@@ -454,13 +463,13 @@ const  BlockNote = () => {
   };
 
   const findImageBlockByUrl = useCallback((url: string) => {
-    const visit = (blocks: typeof editor.document): any => {
+    const visit = (blocks: EditorDocument): EditorBlock | null => {
       for (const block of blocks) {
-        if (block.type === "image" && (block.props as any)?.url === url) {
+        if (block.type === "image" && block.props.url === url) {
           return block;
         }
 
-        const found = visit(block.children as typeof editor.document);
+        const found = visit(block.children as EditorDocument);
         if (found) return found;
       }
 
@@ -488,13 +497,14 @@ const  BlockNote = () => {
       const imageUrl = await uploadFile(file);
       if (editingDrawingBlockId) {
         editor.updateBlock(editingDrawingBlockId, {
+          type: "image",
           props: {
             url: imageUrl,
             name: file.name,
             caption: "드로잉 필기 수정본",
             showPreview: true,
           },
-        } as any);
+        });
       } else {
         const referenceBlock = editor.getTextCursorPosition().block;
 
@@ -509,7 +519,7 @@ const  BlockNote = () => {
                 showPreview: true,
               },
             },
-          ] as any,
+          ],
           referenceBlock,
           "after",
         );

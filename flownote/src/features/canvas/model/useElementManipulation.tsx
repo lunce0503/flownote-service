@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { Point, ImageElement, TextBoxElement, ToolType, CanvasElementStatus } from '@/entities/canvas';
+import type { Point, ImageElement, TextBoxElement, CanvasElementStatus } from '@/entities/canvas';
 
 type GetCanvasCoords = (e: React.PointerEvent | MouseEvent) => Point;
 
@@ -16,7 +16,7 @@ export type MovingCanvasObject = {
   grabOffset: Point;
 };
 
-export const useElementManipulation = (getCanvasCoords: GetCanvasCoords, tool: ToolType) => {
+export const useElementManipulation = (getCanvasCoords: GetCanvasCoords) => {
   const [images, setImages] = useState<ImageElement[]>([]);
   const [textBoxes, setTextBoxes] = useState<TextBoxElement[]>([]);
   const [movingObject, setMovingObject] = useState<MovingCanvasObject | null>(null);

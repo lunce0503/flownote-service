@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import type { ImageElement, LineElement, TextBoxElement } from "@/entities/canvas";
+import type { CanvasElementStatus, ImageElement, LineElement, TextBoxElement } from "@/entities/canvas";
 import { markModified } from "./canvasGeometry";
 
 type CanvasSnapshot = {
@@ -72,25 +72,27 @@ const buildCommand = (before: CanvasSnapshot, after: CanvasSnapshot): CanvasComm
   return { type: classifyCommand(lines, images, textBoxes), lines, images, textBoxes };
 };
 
-const restoreExistingElement = <T extends { id: string; status?: string }>(before: T, current?: T): T => {
+type HistoryElement = { id: string; status?: CanvasElementStatus };
+
+const restoreExistingElement = <T extends HistoryElement>(before: T, current?: T): T => {
   if (before.status === "new") return before;
   if (!current || current.status === "new") return before;
   return markModified(before);
 };
 
-const buildUndoTombstone = <T extends { id: string; status?: string }>(current: T): T | null => {
+const buildUndoTombstone = <T extends HistoryElement>(current: T): T | null => {
   if (current.status === "new") return null;
   return { ...current, status: "deleted" };
 };
 
-const restoreChanges = <T extends { id: string; status?: string }>(current: T[], changes: ElementChange<T>[]): T[] => {
+const restoreChanges = <T extends HistoryElement>(current: T[], changes: ElementChange<T>[]): T[] => {
   if (changes.length === 0) return current;
   const changedIds = new Set(changes.map((change) => change.id));
   const currentById = new Map(current.map((element) => [element.id, element]));
   const restored = current.filter((element) => !changedIds.has(element.id));
 
   changes
-    .filter((change) => !change.before)
+    .filter((change): change is ElementChange<T> & { after: T } => !change.before && Boolean(change.after))
     .sort((left, right) => left.beforeIndex - right.beforeIndex)
     .forEach((change) => {
       const tombstone = buildUndoTombstone(currentById.get(change.id) ?? change.after);
@@ -121,13 +123,13 @@ export const useCanvasHistory = ({
   const historyRef = useRef<CanvasCommand[]>([]);
   const pendingBeforeRef = useRef<CanvasSnapshot | null>(null);
   const latestRef = useRef<CanvasSnapshot>({ lines, images, textBoxes });
-  const [historyVersion, setHistoryVersion] = useState(0);
+  const [canUndo, setCanUndo] = useState(false);
 
   useEffect(() => {
     latestRef.current = { lines, images, textBoxes };
-    if (pendingBeforeRef.current && buildCommand(pendingBeforeRef.current, latestRef.current)) {
-      setHistoryVersion((version) => version + 1);
-    }
+    setCanUndo(historyRef.current.length > 0 || Boolean(
+      pendingBeforeRef.current && buildCommand(pendingBeforeRef.current, latestRef.current),
+    ));
   }, [images, lines, textBoxes]);
 
   const finalizePendingCommand = useCallback(() => {
@@ -143,7 +145,7 @@ export const useCanvasHistory = ({
   const recordHistory = useCallback(() => {
     finalizePendingCommand();
     pendingBeforeRef.current = shallowSnapshot(latestRef.current);
-    setHistoryVersion((version) => version + 1);
+    setCanUndo(historyRef.current.length > 0);
   }, [finalizePendingCommand]);
 
   const undo = useCallback(() => {
@@ -153,21 +155,17 @@ export const useCanvasHistory = ({
     setDrawnLines((current) => restoreChanges(current, command.lines));
     setImages((current) => restoreChanges(current, command.images));
     setTextBoxes((current) => restoreChanges(current, command.textBoxes));
-    setHistoryVersion((version) => version + 1);
+    setCanUndo(historyRef.current.length > 0);
   }, [finalizePendingCommand, setDrawnLines, setImages, setTextBoxes]);
 
   const clearHistory = useCallback(() => {
     historyRef.current = [];
     pendingBeforeRef.current = null;
-    setHistoryVersion((version) => version + 1);
+    setCanUndo(false);
   }, []);
 
-  const pendingCommand = pendingBeforeRef.current
-    ? buildCommand(pendingBeforeRef.current, latestRef.current)
-    : null;
-
   return {
-    canUndo: historyVersion >= 0 && (historyRef.current.length > 0 || Boolean(pendingCommand)),
+    canUndo,
     clearHistory,
     recordHistory,
     undo,

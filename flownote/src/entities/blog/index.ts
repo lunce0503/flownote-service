@@ -11,4 +11,5 @@ export {
   updateNoteFolder,
 } from "./api/noteFolderData";
 export type { NoteFolder, NoteFolderPayload } from "./api/noteFolderData";
-export type { BlockDataProps } from "./model/types";
+export { getFirstNoteText } from "./model/types";
+export type { BlockDataProps, NoteContent } from "./model/types";
