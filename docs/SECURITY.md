@@ -15,8 +15,8 @@ Flownote는 로그인 세션을 기반으로 사용자 데이터를 분리한다
 - 인증과 세션: `flownote-server`의 auth service와 session table.
 - 업로드: 파일 크기, MIME 타입, 저장 경로, 공개 URL 처리.
 - 외부 API: Yahoo Finance, Google GenAI, MCP 연동.
-- SQL: Flyway migration, JDBC query, Prisma schema.
-- 모바일 WebView: WAS 설정 URL, HTTP cleartext, 운영 HTTPS 전환.
+- SQL: Flyway migration, Spring JDBC, Go pgx query.
+- 모바일/Expo web: 공개 gateway URL, 개발용 HTTP cleartext, 운영 HTTPS 전환, 로컬 토큰 저장.
 
 ## 필수 점검
 

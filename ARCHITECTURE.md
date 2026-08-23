@@ -187,9 +187,12 @@ entities/canvas/model/types.ts
 | `app/services/agent_service.py` | 에이전트 요청 오케스트레이션과 MCP 도구 결합 |
 | `app/services/agent_note_{service,store}.py` | Ollama 임베딩/질의와 로컬 SQLite 인덱스 관리 |
 | `app/services/ollama_client.py` | 내부망 Ollama HTTP 클라이언트 |
+| `app/capabilities.py` | Gemini 설정 및 내부망 Ollama 기능 가용성을 `/api/capabilities`로 노출 |
 | `app/core_api.py` | MCP/AI 서비스가 게이트웨이의 코어 API를 다시 호출하는 클라이언트 |
 
 `flownote-ai/app/api/chat_router.py`와 `social_router.py`에는 호환 코드가 남아 있지만, 현재 게이트웨이의 `/api/chat`과 `/api/social` 라우팅 소유자는 `flownote-serve`다. 외부 클라이언트 기준 계약은 게이트웨이 라우팅을 우선한다.
+
+`agent-note`는 `AGENT_NOTE_ENABLED=true`인 Compose/내부망에서만 활성화한다. 기능 요청은 Core API 세션을 검증하고 인덱스를 `userId + roomId`로 격리한다. Railway처럼 Ollama가 없는 환경은 앱 전체를 실패시키지 않고 health/capability에서 비활성을 보고하며 기능 요청에는 503을 반환한다.
 
 ## 프론트엔드 도메인 탐색
 
@@ -225,6 +228,8 @@ entities/canvas/model/types.ts
 스키마 변경은 Spring Flyway에 새 버전을 추가한다. 실제 읽기/쓰기를 Go 서비스가 수행하는 테이블은 마이그레이션과 해당 Go DTO·쿼리를 같은 변경에서 검증한다.
 
 ## 실행 및 배포 코드맵
+
+반복 가능한 검증·production 배포·롤백 절차는 `docs/DEPLOYMENT.md`를 기준으로 한다.
 
 | 환경 | 구성 파일 | 실행/배포 대상 |
 | --- | --- | --- |

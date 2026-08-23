@@ -1,0 +1,93 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Service target to deploy
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - web
+          - api
+          - main
+          - canvas
+          - serve
+          - ai
+          - mobile
+      release_message:
+        description: Release summary
+        required: true
+        default: Manual production deployment
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flownote-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Install deployment tools
+        run: |
+          npm install --global yarn@1.22.22 @railway/cli@5.34.2 vercel@58.9.0
+          pip install uv==0.11.7
+
+      - name: Install selected dependencies
+        env:
+          TARGET: ${{ inputs.target }}
+        run: |
+          case "$TARGET" in
+            all|web) (cd flownote && yarn install --frozen-lockfile --non-interactive) ;;
+          esac
+          case "$TARGET" in
+            all|mobile) (cd flownote-mobile && yarn install --frozen-lockfile --non-interactive) ;;
+          esac
+          case "$TARGET" in
+            all|api) (cd flownote-API && uv sync --locked --group dev) ;;
+          esac
+          case "$TARGET" in
+            all|ai) (cd flownote-ai && uv sync --locked --group dev) ;;
+          esac
+
+      - name: Prepare Compose validation files
+        if: inputs.target == 'all'
+        run: |
+          cp .env.example .env
+          touch flownote/.env flownote-API/.env
+
+      - name: Verify and deploy selected target
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          RELEASE_MESSAGE: ${{ inputs.release_message }}
+        run: ./scripts/deploy-production.sh "${{ inputs.target }}"

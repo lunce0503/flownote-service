@@ -4,7 +4,7 @@
 
 ## 기존 사양
 
-- `mobile-was-architecture.md`: Expo 모바일 앱이 Spring WAS 설정을 통해 WebView를 여는 구조.
+- `mobile-was-architecture.md`: Expo 네이티브 앱과 Railway 웹 테스트 클라이언트의 gateway 통신, 캔버스 저장, 실행 방식.
 
 ## 사양 작성 기준
 

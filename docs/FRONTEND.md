@@ -22,7 +22,8 @@
 
 ## 모바일
 
-- 모바일 앱은 Spring WAS 설정을 읽고 WebView를 연다.
+- 모바일 앱은 `EXPO_PUBLIC_WAS_URL`의 FastAPI 게이트웨이를 호출하고 React Native 화면을 직접 렌더링한다.
+- `/api/mobile/config`는 운영 URL과 최소 지원 버전 표시용이며 일반 데이터 API의 base URL을 런타임에 교체하는 용도가 아니다.
 - 실기기에서는 `localhost` 대신 개발 PC LAN IP를 사용한다.
 - 모바일 기능 변경은 `docs/product-specs/mobile-was-architecture.md`와 함께 검토한다.
 

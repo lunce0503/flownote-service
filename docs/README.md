@@ -13,6 +13,7 @@
 5. `docs/PLANS.md`: 실행 계획과 기술 부채 관리 방식.
 6. `docs/QUALITY_SCORE.md`: 품질 상태와 개선 추적.
 7. `docs/FRONTEND.md`, `docs/SECURITY.md`, `docs/RELIABILITY.md`: 관심사별 운영 기준.
+8. `docs/DEPLOYMENT.md`: 로컬 검증부터 Vercel/Railway 배포, 헬스체크, 롤백까지의 실행 기준.
 
 ## 디렉터리 구조
 
@@ -24,6 +25,7 @@
 | `exec-plan/` | 실행 계획 아티팩트: `active/`(진행 중), `completed/`(완료+의사결정 로그), `tech-debt-tracker.md`. 작성 요령은 `exec-plan/README.md` |
 | `references/` | 외부 문서/docs 자료 보관 |
 | `DESIGN.md` | 시스템 맵과 서비스 경계 |
+| `DEPLOYMENT.md` | 서비스별 검증, 배포 대상, 운영 변수, 헬스체크와 롤백 절차 |
 | `FRONTEND.md` | 웹/모바일 UI 작업 기준 |
 | `PLANS.md` | 계획 문서 작성과 완료 기록 기준 |
 | `PRODUCT_SENSE.md` | 제품 원칙과 우선순위 |

@@ -4,9 +4,14 @@
 DB/
 node_modules/
 .DS_Store
-logs/
+/logs/*
+!/logs/report/
+/logs/report/*
+!/logs/report/*.md
+!/logs/bugs/
+/logs/bugs/*
+!/logs/bugs/*.md
 *.log
-docs/
 .codex/
 .agent/
 .vscode/

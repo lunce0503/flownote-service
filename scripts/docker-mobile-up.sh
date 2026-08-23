@@ -19,7 +19,7 @@ export MOBILE_CORE_API_URL="${MOBILE_CORE_API_URL:-http://${HOST_LAN_IP}:8080}"
 export MOBILE_AI_API_URL="${MOBILE_AI_API_URL:-http://${HOST_LAN_IP}:8000}"
 export MOBILE_WEB_URL="${MOBILE_WEB_URL:-http://${HOST_LAN_IP}:5173}"
 export EXPO_PUBLIC_WAS_URL="${EXPO_PUBLIC_WAS_URL:-http://${HOST_LAN_IP}:8080}"
-export CORS_ORIGINS="${CORS_ORIGINS:-http://${HOST_LAN_IP}:3000,http://${HOST_LAN_IP}:5173,http://${HOST_LAN_IP}:8081,http://localhost:3000,http://localhost:5173,http://localhost:8081}"
+export CORS_ORIGINS="${CORS_ORIGINS:-http://${HOST_LAN_IP}:5173,http://${HOST_LAN_IP}:8081,http://localhost:5173,http://localhost:8081}"
 
 echo "Using HOST_LAN_IP=${HOST_LAN_IP}"
 echo "Expo will load WAS from ${EXPO_PUBLIC_WAS_URL}"
