@@ -16,7 +16,7 @@ load_dotenv()
 class AgentService:
     def __init__(self):
         self.GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-        self.client = genai.Client(api_key=self.GEMINI_API_KEY)
+        self.client = genai.Client(api_key=self.GEMINI_API_KEY) if self.GEMINI_API_KEY else None
         self.AI_MODEL = "gemini-3-flash-preview"
         self.SYSTEM_PROMPT = f"""
             너는 사용자의 개인 비서 '플래너 에이전트'야.
@@ -29,6 +29,11 @@ class AgentService:
             2. 답변은 친절하고 간결하게 한국어로 해줘.
             3. 저장/수정 요청에 필수 정보가 부족하면 먼저 질문해.
         """
+
+    def _client(self) -> genai.Client:
+        if self.client is None:
+            raise RuntimeError("GEMINI_API_KEY가 설정되지 않아 AI 에이전트를 사용할 수 없습니다.")
+        return self.client
 
     def _config(self):
         return types.GenerateContentConfig(
@@ -68,12 +73,13 @@ class AgentService:
         return function_calls
 
     async def _build_tool_augmented_contents(self, content: str, authorization: str | None) -> list[types.Content]:
+        client = self._client()
         contents: list[types.Content] = [
             types.Content(role="user", parts=[types.Part(text=content)])
         ]
 
         for _ in range(4):
-            response = self.client.models.generate_content(
+            response = client.models.generate_content(
                 model=self.AI_MODEL,
                 contents=contents,
                 config=self._config(),
@@ -110,8 +116,9 @@ class AgentService:
     ): # Body로 데이터를 받음
         async def generate():
             try:
+                client = self._client()
                 contents = await self._build_tool_augmented_contents(prompt, authorization)
-                responses = self.client.models.generate_content_stream(
+                responses = client.models.generate_content_stream(
                     model=self.AI_MODEL,
                     contents=contents,
                     config=self._config(),
@@ -132,8 +139,9 @@ class AgentService:
     ):
         async def event_generator():
             try:
+                client = self._client()
                 contents = await self._build_tool_augmented_contents(user_text, authorization)
-                responses = self.client.models.generate_content_stream(
+                responses = client.models.generate_content_stream(
                     model=self.AI_MODEL,
                     contents=contents,
                     config=self._config(),

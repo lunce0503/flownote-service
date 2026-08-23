@@ -10,6 +10,7 @@ from app.api.agent_note_router import router as agent_note_router
 from app.api.chat_router import router as chat_router
 from app.api.market_router import router as market_router
 from app.api.social_router import router as social_router
+from app.capabilities import capabilities
 
 # flownote-ai: flownote-API에서 분리된 AI/데이터 백엔드 전담 서비스.
 # - /api/aiclient   : 메인 에이전트(Gemini) 스트리밍
@@ -39,6 +40,11 @@ app.add_middleware(
 @app.get("/")
 async def root():
     return {"status": "UP", "service": "flownote-ai"}
+
+
+@app.get("/api/capabilities")
+async def get_capabilities():
+    return {"service": "flownote-ai", "capabilities": capabilities()}
 
 
 app.include_router(agent_router)

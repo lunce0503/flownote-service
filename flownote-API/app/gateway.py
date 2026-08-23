@@ -7,7 +7,7 @@ flownote-API는 클라이언트의 모든 `/api/**` 요청을 받아 경로에 �
 - `/api/{canvas,notes,note-folders,upload,admin}/**` → flownote-canvas(Go) : CANVAS_API_BASE_URL
 - `/uploads/**`(정적 파일)                            → flownote-canvas(Go) : CANVAS_API_BASE_URL
 - `/api/{schedule-items,tasks,stocks,social,chat}/**` → flownote-serve(Go)  : SERVE_API_BASE_URL
-- `/api/{aiclient,agent-note,market}/**`              → flownote-ai         : AI_API_BASE_URL
+- `/api/{aiclient,agent-note,market,capabilities}/**` → flownote-ai         : AI_API_BASE_URL
 - 그 외 코어(인증 `/api/users`, `/api/mobile`)         → flownote-server(Spring): CORE_API_BASE_URL
 
 게이트웨이 기능(완전성):
@@ -37,7 +37,7 @@ AI_API_BASE_URL = (os.getenv("AI_API_BASE_URL") or "http://ai-server:8000").rstr
 SERVE_API_BASE_URL = (os.getenv("SERVE_API_BASE_URL") or "http://serve-server:8095").rstrip("/")
 
 # flownote-ai(AI 백엔드)가 소유하는 경로 접두어.
-_AI_PREFIXES = ("aiclient", "agent-note", "market")
+_AI_PREFIXES = ("aiclient", "agent-note", "market", "capabilities")
 # flownote-serve(부가기능 백엔드: 일정·작업·주식·소셜·채팅)가 소유하는 접두어 — Spring에서 이관.
 _SERVE_PREFIXES = ("schedule-items", "tasks", "stocks", "social", "chat", "diary", "feedback")
 # flownote-canvas(Go)가 소유하는 접두어: 캔버스 + 이관된 노트 도메인(노트·폴더·업로드) + 관리자 진단.
