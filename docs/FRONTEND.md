@@ -19,6 +19,9 @@
 - 인증이 필요한 화면은 기존 `ProtectedRoute` 패턴을 따른다.
 - API 호출은 `shared/api`의 기본 URL과 인증 헤더 헬퍼를 우선 사용한다.
 - 사용자에게 보이는 새 기능은 로딩, 빈 상태, 오류 상태를 포함한다.
+- Canvas와 Blog 라이브러리는 `최근 항목 → 카테고리별 폴더 → 폴더 없음` 순서를 사용하고 `shared/lib/librarySorting.ts`의 정렬 기준을 공유한다.
+- 라이브러리 상세 URL은 제목이 아닌 안정적인 ID를 사용한다(`/canvas/:canvasId`, `/blog/:noteId`).
+- 라우트 공개 단계는 `capabilityManifest.tsx`의 `stage`로 관리한다. `development` 기능은 라우트를 유지하되 헤더·기타·사이드바·프로필 탐색에서 노출하지 않는다.
 
 ## 모바일
 

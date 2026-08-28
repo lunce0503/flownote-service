@@ -10,7 +10,7 @@ import {
 } from "@blocknote/core";
 import { postNoteData } from "@/entities/blog";
 import type { BlockDataProps } from "@/entities/blog";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { getNoteData } from "@/entities/blog";
 import { API_CORE_BASE_URL, authHeaders } from "@/shared/api";
 import axios from "axios";
@@ -54,8 +54,7 @@ type PendingNoteSave = {
 };
 
 const  BlockNote = () => {
-  const { title } = useParams<{title:string}>();
-  const navigate = useNavigate();
+  const { noteId } = useParams<{ noteId: string }>();
   const { isFullscreen, toggleFullscreen } = useFullscreen();
 
   const schema = useMemo(() => BlockNoteSchema.create({
@@ -137,14 +136,13 @@ const  BlockNote = () => {
   // 1. 페이지 진입 시 데이터 로드 로직
   useEffect(() => {
     const fetchData = async () => {
-      if (title) {
-        const decodedTitle = decodeURIComponent(title);
+      if (noteId) {
         try {
           setIsLoading(true);
           // 실제 환경에서는 여기서 API 호출을 합니다.
           // const data = await getNoteByTitle(decodedTitle);
           const data: BlockDataProps[] = await getNoteData();
-          const targetData = data.find((note)=>note.title===decodedTitle)
+          const targetData = data.find((note) => note.id === noteId);
           if (targetData){
             setNoteData(targetData);
             noteDataRef.current = targetData;
@@ -167,7 +165,7 @@ const  BlockNote = () => {
       }
     };
     fetchData();
-  }, [editor, title, replaceEditorContent]);
+  }, [editor, noteId, replaceEditorContent]);
 
   const createSaveSnapshot = useCallback((revision: number): PendingNoteSave | null => {
     const currentNote = noteDataRef.current;
@@ -288,12 +286,11 @@ const  BlockNote = () => {
 
   useEffect(() => subscribeSyncEvents((event) => {
     if (event.resource !== "notes" && event.resource !== "all") return;
-    if (!title) return;
+    if (!noteId) return;
 
     const refreshNote = async () => {
-      const decodedTitle = decodeURIComponent(title);
       const data: BlockDataProps[] = await getNoteData();
-      const targetData = data.find((note) => note.title === decodedTitle || note.id === noteDataRef.current?.id);
+      const targetData = data.find((note) => note.id === noteId);
       if (!targetData) return;
 
       const currentNote = noteDataRef.current;
@@ -316,7 +313,7 @@ const  BlockNote = () => {
     };
 
     void refreshNote();
-  }), [applyServerNote, clientId, title]);
+  }), [applyServerNote, clientId, noteId]);
 
   const queueSave = useCallback((delay = 700) => {
     if (saveTimerRef.current) {
@@ -369,7 +366,7 @@ const  BlockNote = () => {
     };
   }, [flushSave, processSaveQueue]);
 
-  const saveTitle = useCallback(async (nextTitle: string, shouldReplaceRoute = false) => {
+  const saveTitle = useCallback(async (nextTitle: string) => {
     const currentNote = noteDataRef.current;
     const trimmedTitle = nextTitle.trim();
     if (!currentNote || !trimmedTitle) return;
@@ -386,10 +383,7 @@ const  BlockNote = () => {
     pendingSaveRef.current = createSaveSnapshot(nextRevision);
     await flushSave();
 
-    if (shouldReplaceRoute) {
-      navigate(`/blog/${encodeURIComponent(trimmedTitle)}`, { replace: true });
-    }
-  }, [createSaveSnapshot, flushSave, navigate]);
+  }, [createSaveSnapshot, flushSave]);
 
   const handleTitle = (nextTitle:string) => {
     const currentNote = noteDataRef.current;
@@ -424,7 +418,7 @@ const  BlockNote = () => {
       titleTimerRef.current = null;
     }
 
-    void saveTitle(currentNote.title, true);
+    void saveTitle(currentNote.title);
   };
 
   const handleNoteData = () => {

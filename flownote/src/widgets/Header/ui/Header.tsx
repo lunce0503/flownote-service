@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { 
+import {
   Notebook, 
   Menu, 
   LogIn, 
@@ -24,7 +24,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth";
 import { ThemeModeControl } from "@/features/theme";
 
-export default function Header() {
+type HeaderProps = {
+  isCapabilityVisible: (id: string) => boolean;
+};
+
+export default function Header({ isCapabilityVisible }: HeaderProps) {
   // 사이드바 상태 관리
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
@@ -115,40 +119,40 @@ export default function Header() {
   };
 
   const primaryNavLinks = [
-    { name: labels.canvas, href: "/canvas", icon: <Palette size={22} /> },
-    { name: labels.blog, href: "/blog", icon: <BookOpen size={22} /> },
-  ];
+    { capabilityId: "canvas", name: labels.canvas, href: "/canvas", icon: <Palette size={22} /> },
+    { capabilityId: "blog", name: labels.blog, href: "/blog", icon: <BookOpen size={22} /> },
+  ].filter((link) => isCapabilityVisible(link.capabilityId));
 
   const extraNavLinks = [
-    { name: labels.social, href: "/social", icon: <Users size={22} /> },
-    { name: labels.agent, href: "/agent", icon: <Bot size={22} /> },
-    { name: labels.task, href: "/planner", icon: <CheckSquare size={22} /> },
-    { name: labels.stocks, href: "/stocks", icon: <TrendingUp size={22} /> },
-    { name: labels.stockChart, href: "/stocks/chart", icon: <TrendingUp size={22} /> },
-    { name: labels.puzzle, href: "/screw-puzzle", icon: <Puzzle size={22} /> },
-    { name: labels.banpick, href: "/banpick", icon: <Trophy size={22} /> },
-    { name: labels.magic, href: "/magic", icon: <Sparkles size={22} /> },
-    { name: labels.settings, href: "/settings", icon: <Settings size={22} /> },
+    { capabilityId: "social", name: labels.social, href: "/social", icon: <Users size={22} /> },
+    { capabilityId: "agent", name: labels.agent, href: "/agent", icon: <Bot size={22} /> },
+    { capabilityId: "planner", name: labels.task, href: "/planner", icon: <CheckSquare size={22} /> },
+    { capabilityId: "stocks", name: labels.stocks, href: "/stocks", icon: <TrendingUp size={22} /> },
+    { capabilityId: "stocks", name: labels.stockChart, href: "/stocks/chart", icon: <TrendingUp size={22} /> },
+    { capabilityId: "screw-puzzle", name: labels.puzzle, href: "/screw-puzzle", icon: <Puzzle size={22} /> },
+    { capabilityId: "banpick", name: labels.banpick, href: "/banpick", icon: <Trophy size={22} /> },
+    { capabilityId: "magic", name: labels.magic, href: "/magic", icon: <Sparkles size={22} /> },
+    { capabilityId: "settings", name: labels.settings, href: "/settings", icon: <Settings size={22} /> },
     ...(user?.role === "ADMIN" ? [
-      { name: labels.admin, href: "/admin/canvas", icon: <Activity size={22} /> },
-      { name: labels.adminFeedback, href: "/admin/feedback", icon: <MessageSquare size={22} /> },
+      { capabilityId: "admin-canvas", name: labels.admin, href: "/admin/canvas", icon: <Activity size={22} /> },
+      { capabilityId: "admin-feedback", name: labels.adminFeedback, href: "/admin/feedback", icon: <MessageSquare size={22} /> },
     ] : []),
-  ];
+  ].filter((link) => isCapabilityVisible(link.capabilityId));
 
   const sidebarLinks = [...primaryNavLinks, ...extraNavLinks];
 
   const profileLinks = [
-    { name: labels.canvas, href: "/canvas", icon: <Palette size={18} /> },
-    { name: labels.social, href: "/social", icon: <Users size={18} /> },
-    { name: labels.agent, href: "/agent", icon: <Bot size={18} /> },
-    { name: labels.task, href: "/planner", icon: <CheckSquare size={18} /> },
-    { name: labels.stocks, href: "/stocks", icon: <TrendingUp size={18} /> },
-    { name: labels.settings, href: "/settings", icon: <Settings size={18} /> },
+    { capabilityId: "canvas", name: labels.canvas, href: "/canvas", icon: <Palette size={18} /> },
+    { capabilityId: "social", name: labels.social, href: "/social", icon: <Users size={18} /> },
+    { capabilityId: "agent", name: labels.agent, href: "/agent", icon: <Bot size={18} /> },
+    { capabilityId: "planner", name: labels.task, href: "/planner", icon: <CheckSquare size={18} /> },
+    { capabilityId: "stocks", name: labels.stocks, href: "/stocks", icon: <TrendingUp size={18} /> },
+    { capabilityId: "settings", name: labels.settings, href: "/settings", icon: <Settings size={18} /> },
     ...(user?.role === "ADMIN" ? [
-      { name: labels.admin, href: "/admin/canvas", icon: <Activity size={18} /> },
-      { name: labels.adminFeedback, href: "/admin/feedback", icon: <MessageSquare size={18} /> },
+      { capabilityId: "admin-canvas", name: labels.admin, href: "/admin/canvas", icon: <Activity size={18} /> },
+      { capabilityId: "admin-feedback", name: labels.adminFeedback, href: "/admin/feedback", icon: <MessageSquare size={18} /> },
     ] : []),
-  ];
+  ].filter((link) => isCapabilityVisible(link.capabilityId));
 
   return (
     <>

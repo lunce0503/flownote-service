@@ -4,6 +4,7 @@
 
 ## 현재 참조 문서
 
+- `docs/design-docs/canvas/canvas.md`: Canvas 목록, 편집, 저장, 실시간 통신 코드맵과 상태 불변식.
 - `docs/DESIGN.md`: 하위 프로젝트, 서비스 경계, 데이터 소유권.
 - `docs/HARNESS.md`: Codex 하네스 운영 모델.
 - `docs/generated/db-schema.md`: PostgreSQL 스키마 참조.

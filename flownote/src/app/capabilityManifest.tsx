@@ -40,10 +40,14 @@ export type CapabilityRoute = {
   children?: CapabilityRoute[];
 };
 
+export type CapabilityStage = 'available' | 'development';
+
 // "역량 모듈" 한 단위. enabled 플래그로 조합/분리를 데이터로 토글한다.
 export type Capability = {
   id: string;
   label: string;
+  // 사용자 공개 단계. development는 직접 URL 접근은 유지하되 메뉴에서 숨긴다.
+  stage?: CapabilityStage;
   // 네비게이션/대시보드 노출 여부. 시스템 라우트(로그인 등)는 false.
   nav: boolean;
   // 조합·분리 토글. false면 라우트가 등록되지 않는다.
@@ -74,7 +78,7 @@ export const capabilityManifest: Capability[] = [
         path: '/blog',
         children: [
           { index: true, element: routes.blog },
-          { path: ':title', element: routes.blogDetail },
+          { path: ':noteId', element: routes.blogDetail },
         ],
       },
     ],
@@ -103,7 +107,8 @@ export const capabilityManifest: Capability[] = [
   {
     id: 'stocks',
     label: '주식',
-    nav: true,
+    stage: 'development',
+    nav: false,
     enabled: true,
     protected: true,
     routes: [
@@ -130,6 +135,7 @@ export const capabilityManifest: Capability[] = [
   {
     id: 'banpick',
     label: '밴픽',
+    stage: 'development',
     nav: false,
     enabled: true,
     routes: [{ path: '/banpick', element: routes.banpick }],
@@ -137,13 +143,15 @@ export const capabilityManifest: Capability[] = [
   {
     id: 'screw-puzzle',
     label: '나사 퍼즐',
-    nav: true,
+    stage: 'development',
+    nav: false,
     enabled: true,
     routes: [{ path: '/screw-puzzle', element: routes.screwPuzzle }],
   },
   {
     id: 'magic',
     label: 'Magic',
+    stage: 'development',
     nav: false,
     enabled: true,
     routes: [{ path: '/magic', element: routes.magic }],
@@ -151,7 +159,7 @@ export const capabilityManifest: Capability[] = [
   {
     id: 'settings',
     label: '설정',
-    nav: false,
+    nav: true,
     enabled: true,
     protected: true,
     routes: [{ path: '/settings', element: routes.settings }],
@@ -159,7 +167,7 @@ export const capabilityManifest: Capability[] = [
   {
     id: 'admin-canvas',
     label: '캔버스 관리',
-    nav: false,
+    nav: true,
     enabled: true,
     protected: true,
     routes: [{ path: '/admin/canvas', element: routes.adminCanvas }],
@@ -167,7 +175,7 @@ export const capabilityManifest: Capability[] = [
   {
     id: 'admin-feedback',
     label: '피드백 관리',
-    nav: false,
+    nav: true,
     enabled: true,
     protected: true,
     // 관리자 전용. 설정 화면에서 접수된 사용자 피드백을 확인한다.
@@ -184,3 +192,8 @@ export const capabilityManifest: Capability[] = [
     ],
   },
 ];
+
+export const isCapabilityVisibleInNavigation = (id: string) => {
+  const capability = capabilityManifest.find((item) => item.id === id);
+  return Boolean(capability?.enabled && capability.nav && capability.stage !== 'development');
+};

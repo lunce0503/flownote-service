@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import type { Point, LineElement } from '@/entities/canvas';
+import { removeOrMarkDeleted } from './canvasGeometry';
 import { CanvasSpatialIndex } from './canvasSpatialIndex';
 
 type GetCanvasCoords = (e: React.PointerEvent | MouseEvent) => Point;
@@ -87,15 +88,13 @@ export const useDrawing = (getCanvasCoords: GetCanvasCoords) => {
     const threshold = 10;
     const candidateIds = getLineSpatialIndex().searchPoint({ x, y }, threshold, "line");
     setDrawnLines(prev => {
-      let changed = false;
-      const next = prev.flatMap(line => {
-        if (!candidateIds.has(line.id)) return [line];
+      const hitIds = new Set<string>();
+      prev.forEach(line => {
+        if (!candidateIds.has(line.id)) return;
         const hit = line.points.some(pt => Math.hypot(pt.x - x, pt.y - y) < threshold);
-        if (!hit) return [line];
-        changed = true;
-        return line.status === 'new' ? [] : [{ ...line, status: 'deleted' as const }];
+        if (hit) hitIds.add(line.id);
       });
-      return changed ? next : prev;
+      return hitIds.size > 0 ? removeOrMarkDeleted(prev, hitIds) : prev;
     });
   }, [getCanvasCoords, getLineSpatialIndex]);
 

@@ -1,11 +1,12 @@
 import React from 'react';
 import type { ToolType } from '@/entities/canvas';
 import type { CanvasLoadTrigger, CanvasSaveState, CanvasSaveStatus } from '@/features/canvas';
-import { BringToFront, CheckCircle2, ClipboardPaste, Copy, Download, Eraser, Hand, ImagePlus, Lasso, Loader2, Maximize, Minimize, Palette, PenLine, RefreshCw, RotateCcw, SendToBack, Settings, Trash2, TriangleAlert, Type, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowLeft, BringToFront, CheckCircle2, ClipboardPaste, Copy, Download, Eraser, Hand, ImagePlus, Lasso, Loader2, Maximize, Minimize, Palette, PenLine, RefreshCw, RotateCcw, SendToBack, Settings, Trash2, TriangleAlert, Type, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useFullscreen } from '@/shared/lib/useFullscreen';
 
 interface ToolbarProps {
   canvasTitle: string;
+  onNavigateToCanvasList: () => void;
   tool: ToolType;
   setTool: (tool: ToolType) => void;
   handleImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
@@ -165,6 +166,7 @@ const PenColorPill: React.FC<PenColorPillProps> = ({ penColor, onPenColorChange,
 
 export const Toolbar: React.FC<ToolbarProps> = ({
   canvasTitle,
+  onNavigateToCanvasList,
   tool,
   setTool,
   handleImageUpload,
@@ -223,6 +225,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       {/* 폴더 패널처럼 캔버스 위에 떠 있는 플로팅 툴바 — 필 사이 빈 공간은 캔버스 입력을 통과시킨다. */}
       <div className="canvas-toolbar-scroll pointer-events-auto flex w-max max-w-full items-start gap-2 overflow-x-auto p-1">
         <div className="flex min-w-max items-start gap-2">
+          <button
+            type="button"
+            {...touchActivation(onNavigateToCanvasList)}
+            className={`${iconButtonClass} bg-white/95 shadow-lg ring-1 ring-stone-200/80 backdrop-blur`}
+            title="그림판 목록으로"
+            aria-label="그림판 목록으로"
+          >
+            <ArrowLeft size={TOOLBAR_ICON_SIZE} />
+          </button>
           <div className="pointer-events-auto flex min-h-12 max-w-[128px] shrink-0 items-center rounded-full bg-white/95 px-4 text-sm font-black shadow-lg ring-1 ring-stone-200/80 backdrop-blur sm:max-w-[220px] xl:max-w-xs" title={canvasTitle}>
             <span className="truncate">{canvasTitle}</span>
           </div>
