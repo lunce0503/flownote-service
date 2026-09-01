@@ -20,6 +20,7 @@ import { transformLatexInlineContent } from "./latexTransform";
 import NoteDrawingPad from "./NoteDrawingPad";
 import { getSyncClientId, subscribeSyncEvents } from "@/shared/lib/sync";
 import { useFullscreen } from "@/shared/lib/useFullscreen";
+import { useDocumentTitle } from "@/shared/lib/useDocumentTitle";
 
 const uploadFile = async (file: File) => {
   if (!API_CORE_BASE_URL) {
@@ -97,6 +98,7 @@ const  BlockNote = () => {
     return normalize(blocks);
   }, []);
   const [noteData,setNoteData] = useState<BlockDataProps | null>(null);
+  useDocumentTitle("게시글", noteData?.title || "문서");
   const [isLoading,setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);

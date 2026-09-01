@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { v4 as uuidv4 } from "uuid";
-import type { DiaryGrid, DiaryStroke, DiaryTodo } from "@/entities/diary";
+import type { DiaryGrid, DiaryTodo } from "@/entities/diary";
 import type { ScheduleItem } from "@/entities/schedule";
 import type { DiaryTool } from "@/features/planner";
 import { timeToMinutes } from "@/features/schedule";
@@ -12,33 +11,29 @@ type Props = {
   scheduleItems: ScheduleItem[];
   tool: DiaryTool;
   activeTodoId: string | null;
-  penColor: string;
+  onPaintStart: () => void;
   onPaintCell: (slot: number) => void;
-  onAddStroke: (stroke: DiaryStroke) => void;
+  onPaintEnd: () => void;
 };
 
 const GUTTER_W = 44;
 const CELL_H = 26;
 const SCHEDULE_ALPHA = 0.22; // 반복 일정은 "임의 지정"한 참고용이라 투명하게 깔린다.
-const STROKE_WIDTH = 2.5;
-const MIN_POINT_DISTANCE = 0.0015; // 정규화 좌표 기준 최소 점 간격(과도한 점 저장 방지)
 
 /**
  * 하루 시간표 캔버스.
  * - 배경: 주별로 임의 지정한 반복 일정(투명)
  * - 중간: 할일 색으로 칠한 칸
- * - 위: 그림판처럼 직접 그린 필기(오늘 새로 저장되는 내용)
- * 좌표는 정규화(0~1) 저장이라 화면 폭이 바뀌어도 위치가 유지된다.
+ * - 위: 이전 버전에서 저장한 필기 획(읽기 호환)
  */
 const PlannerTimetableCanvas = ({
-  grid, todos, scheduleItems, tool, activeTodoId, penColor, onPaintCell, onAddStroke,
+  grid, todos, scheduleItems, tool, activeTodoId, onPaintStart, onPaintCell, onPaintEnd,
 }: Props) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [width, setWidth] = useState(0);
-  const actionRef = useRef<"none" | "cell" | "draw">("none");
+  const actionRef = useRef<"none" | "cell">("none");
   const lastSlotRef = useRef<number | null>(null);
-  const draftPointsRef = useRef<Array<{ x: number; y: number }>>([]);
 
   const rows = Math.max(1, grid.endHour - grid.startHour);
   const cols = Math.max(1, grid.cols);
@@ -167,10 +162,7 @@ const PlannerTimetableCanvas = ({
       ctx.stroke();
     };
     grid.strokes.forEach(renderStroke);
-    if (draftPointsRef.current.length > 0) {
-      renderStroke({ color: penColor, width: STROKE_WIDTH, points: draftPointsRef.current });
-    }
-  }, [width, height, rows, cols, grid.cells, grid.strokes, grid.startHour, colorById, scheduleItems, penColor]);
+  }, [width, height, rows, cols, grid.cells, grid.strokes, grid.startHour, colorById, scheduleItems]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -192,29 +184,18 @@ const PlannerTimetableCanvas = ({
     return row * cols + col;
   }, [width, cols, rows]);
 
-  const normalized = useCallback((point: { x: number; y: number }) => ({
-    x: (point.x - GUTTER_W) / (width - GUTTER_W),
-    y: point.y / height,
-  }), [width, height]);
-
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     event.preventDefault();
     const point = localPoint(event);
     if (!point) return;
     event.currentTarget.setPointerCapture(event.pointerId);
 
-    if (tool === "draw") {
-      actionRef.current = "draw";
-      draftPointsRef.current = [normalized(point)];
-      draw();
-      return;
-    }
     if (tool === "paint" && !activeTodoId) return;
-    actionRef.current = "cell";
-    lastSlotRef.current = null;
     const slot = slotFrom(point);
     if (slot !== null) {
+      actionRef.current = "cell";
       lastSlotRef.current = slot;
+      onPaintStart();
       onPaintCell(slot);
     }
   };
@@ -225,15 +206,6 @@ const PlannerTimetableCanvas = ({
     const point = localPoint(event);
     if (!point) return;
 
-    if (actionRef.current === "draw") {
-      const next = normalized(point);
-      const previous = draftPointsRef.current.at(-1);
-      if (previous && Math.hypot(next.x - previous.x, next.y - previous.y) < MIN_POINT_DISTANCE) return;
-      draftPointsRef.current.push(next);
-      draw();
-      return;
-    }
-
     const slot = slotFrom(point);
     if (slot === null || slot === lastSlotRef.current) return;
     lastSlotRef.current = slot;
@@ -241,15 +213,7 @@ const PlannerTimetableCanvas = ({
   };
 
   const stopAction = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (actionRef.current === "draw" && draftPointsRef.current.length > 0) {
-      onAddStroke({
-        id: uuidv4(),
-        color: penColor,
-        width: STROKE_WIDTH,
-        points: draftPointsRef.current,
-      });
-      draftPointsRef.current = [];
-    }
+    if (actionRef.current === "cell") onPaintEnd();
     actionRef.current = "none";
     lastSlotRef.current = null;
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
@@ -258,7 +222,7 @@ const PlannerTimetableCanvas = ({
   };
 
   const needsTodo = tool === "paint" && !activeTodoId;
-  const cursor = needsTodo ? "not-allowed" : tool === "erase" ? "cell" : "crosshair";
+  const cursor = needsTodo ? "not-allowed" : "cell";
 
   return (
     <div ref={containerRef} className="w-full select-none">
@@ -274,7 +238,7 @@ const PlannerTimetableCanvas = ({
       />
       {needsTodo && (
         <p className="mt-2 text-center text-xs text-neutral-500">
-          칠할 할일을 먼저 추가하고 선택하세요. (필기는 펜 도구로 바로 가능)
+          칠할 할일을 먼저 추가하고 선택하세요.
         </p>
       )}
     </div>

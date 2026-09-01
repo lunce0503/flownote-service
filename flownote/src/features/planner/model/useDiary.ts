@@ -7,14 +7,12 @@ import {
   DIARY_COLOR_PRESETS,
   type DiaryGrid,
   type DiaryJournalBlock,
-  type DiaryStroke,
   type DiaryTodo,
 } from "@/entities/diary";
 
 export type DiaryLoadStatus = "loading" | "ready" | "error";
 export type DiarySaveStatus = "idle" | "saving" | "saved" | "error";
-// paint: 할일 색으로 칸 칠하기, erase: 칠한 칸 지우기, draw: 그림판처럼 자유 필기
-export type DiaryTool = "paint" | "erase" | "draw";
+export type DiaryTool = "paint" | "erase";
 
 export const toDateKey = (date: Date) => {
   const y = date.getFullYear();
@@ -41,6 +39,7 @@ export const useDiary = () => {
   const [saveStatus, setSaveStatus] = useState<DiarySaveStatus>("idle");
   const [activeTodoId, setActiveTodoId] = useState<string | null>(null);
   const [tool, setTool] = useState<DiaryTool>("paint");
+  const [canUndoPaint, setCanUndoPaint] = useState(false);
 
   // 저장 디바운스는 effect가 아니라 액션에서 직접 호출한다(로드 시의 setState가 저장을 유발하지 않도록).
   const todosRef = useRef(todos);
@@ -49,6 +48,9 @@ export const useDiary = () => {
   const dateRef = useRef(date);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadTokenRef = useRef(0);
+  const paintHistoryRef = useRef<Array<Record<string, string>>>([]);
+  const paintActionSnapshotRef = useRef<Record<string, string> | null>(null);
+  const paintActionRecordedRef = useRef(false);
 
   useEffect(() => { todosRef.current = todos; }, [todos]);
   useEffect(() => { gridRef.current = grid; }, [grid]);
@@ -93,6 +95,10 @@ export const useDiary = () => {
         if (!active || token !== loadTokenRef.current) return;
         setTodos(entry.todos);
         setGrid(entry.grid);
+        paintHistoryRef.current = [];
+        paintActionSnapshotRef.current = null;
+        paintActionRecordedRef.current = false;
+        setCanUndoPaint(false);
         setJournal(entry.journal);
         setActiveTodoId(entry.todos.find((todo) => !todo.done)?.id ?? entry.todos[0]?.id ?? null);
         setLoadStatus("ready");
@@ -138,6 +144,10 @@ export const useDiary = () => {
   }, [scheduleSave]);
 
   const deleteTodo = useCallback((id: string) => {
+    paintHistoryRef.current = [];
+    paintActionSnapshotRef.current = null;
+    paintActionRecordedRef.current = false;
+    setCanUndoPaint(false);
     setTodos((current) => current.filter((todo) => todo.id !== id));
     // 삭제된 할일로 칠해진 칸도 함께 제거한다.
     setGrid((current) => {
@@ -148,42 +158,54 @@ export const useDiary = () => {
     scheduleSave();
   }, [scheduleSave]);
 
+  const beginPaintAction = useCallback(() => {
+    paintActionSnapshotRef.current = { ...gridRef.current.cells };
+    paintActionRecordedRef.current = false;
+  }, []);
+
   const paintCell = useCallback((slot: number) => {
+    const currentGrid = gridRef.current;
+    const currentCells = currentGrid.cells;
+    const slotKey = String(slot);
+    let nextCells: Record<string, string>;
+
     if (tool === "erase") {
-      setGrid((current) => {
-        if (!(slot in current.cells)) return current;
-        const cells = { ...current.cells };
-        delete cells[String(slot)];
-        return { ...current, cells };
-      });
-      scheduleSave();
-      return;
+      if (!(slotKey in currentCells)) return;
+      nextCells = { ...currentCells };
+      delete nextCells[slotKey];
+    } else {
+      const todoId = activeTodoId;
+      if (!todoId || currentCells[slotKey] === todoId) return;
+      nextCells = { ...currentCells, [slotKey]: todoId };
     }
-    const todoId = activeTodoId;
-    if (!todoId) return;
-    setGrid((current) => {
-      if (current.cells[String(slot)] === todoId) return current;
-      return { ...current, cells: { ...current.cells, [String(slot)]: todoId } };
-    });
+
+    if (!paintActionRecordedRef.current && paintActionSnapshotRef.current) {
+      paintHistoryRef.current = [
+        ...paintHistoryRef.current.slice(-49),
+        paintActionSnapshotRef.current,
+      ];
+      paintActionRecordedRef.current = true;
+      setCanUndoPaint(true);
+    }
+
+    const nextGrid = { ...currentGrid, cells: nextCells };
+    gridRef.current = nextGrid;
+    setGrid(nextGrid);
     scheduleSave();
   }, [activeTodoId, tool, scheduleSave]);
 
-  // 그림판 기반 필기: 오늘 시간표 위에 직접 그린 획을 그리드와 함께 저장한다.
-  const addStroke = useCallback((stroke: DiaryStroke) => {
-    if (stroke.points.length === 0) return;
-    setGrid((current) => ({ ...current, strokes: [...current.strokes, stroke] }));
-    scheduleSave();
-  }, [scheduleSave]);
+  const endPaintAction = useCallback(() => {
+    paintActionSnapshotRef.current = null;
+    paintActionRecordedRef.current = false;
+  }, []);
 
-  const undoStroke = useCallback(() => {
-    setGrid((current) => (
-      current.strokes.length === 0 ? current : { ...current, strokes: current.strokes.slice(0, -1) }
-    ));
-    scheduleSave();
-  }, [scheduleSave]);
-
-  const clearStrokes = useCallback(() => {
-    setGrid((current) => (current.strokes.length === 0 ? current : { ...current, strokes: [] }));
+  const undoPaint = useCallback(() => {
+    const previousCells = paintHistoryRef.current.pop();
+    if (!previousCells) return;
+    const nextGrid = { ...gridRef.current, cells: previousCells };
+    gridRef.current = nextGrid;
+    setGrid(nextGrid);
+    setCanUndoPaint(paintHistoryRef.current.length > 0);
     scheduleSave();
   }, [scheduleSave]);
 
@@ -198,9 +220,9 @@ export const useDiary = () => {
     loadStatus, saveStatus,
     activeTodoId, setActiveTodoId,
     tool, setTool,
+    canUndoPaint,
     addTodo, updateTodo, toggleTodoDone, deleteTodo,
-    paintCell,
-    addStroke, undoStroke, clearStrokes,
+    beginPaintAction, paintCell, endPaintAction, undoPaint,
     setJournalBlocks,
   };
 };

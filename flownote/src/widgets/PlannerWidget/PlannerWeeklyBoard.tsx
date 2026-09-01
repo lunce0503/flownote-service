@@ -266,6 +266,7 @@ const PlannerWeeklyBoard = ({ items, today, onSave, onDelete }: Props) => {
               <div className="grid max-w-sm grid-cols-2 gap-2">
                 <input
                   type="time"
+                  step={300}
                   aria-label="시작 시간"
                   value={form.startTime}
                   onChange={(event) => setForm((current) => ({ ...current, startTime: event.target.value }))}
@@ -273,6 +274,7 @@ const PlannerWeeklyBoard = ({ items, today, onSave, onDelete }: Props) => {
                 />
                 <input
                   type="time"
+                  step={300}
                   aria-label="종료 시간"
                   value={form.endTime}
                   onChange={(event) => setForm((current) => ({ ...current, endTime: event.target.value }))}

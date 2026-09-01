@@ -43,9 +43,9 @@ export type DiaryEntry = {
 };
 
 export const DEFAULT_DIARY_GRID: DiaryGrid = {
-  startHour: 6,
+  startHour: 0,
   endHour: 24,
-  cols: 6,
+  cols: 12,
   cells: {},
   strokes: [],
 };
@@ -56,10 +56,76 @@ export const DIARY_COLOR_PRESETS = [
   "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899",
 ] as const;
 
-// 서버가 준 값이 부분적이거나 비어 있어도 안전한 그리드로 정규화한다.
+const migrateCells = (
+  cells: Record<string, string>,
+  sourceStartHour: number,
+  sourceEndHour: number,
+  sourceCols: number,
+) => {
+  if (
+    sourceStartHour === DEFAULT_DIARY_GRID.startHour
+    && sourceEndHour === DEFAULT_DIARY_GRID.endHour
+    && sourceCols === DEFAULT_DIARY_GRID.cols
+  ) {
+    return { ...cells };
+  }
+
+  const migrated: Record<string, string> = {};
+  const sourceRows = Math.max(1, sourceEndHour - sourceStartHour);
+  const sourceSlotMinutes = 60 / sourceCols;
+  const targetSlotMinutes = 60 / DEFAULT_DIARY_GRID.cols;
+  const targetSlotCount = (DEFAULT_DIARY_GRID.endHour - DEFAULT_DIARY_GRID.startHour) * DEFAULT_DIARY_GRID.cols;
+
+  Object.entries(cells).forEach(([slotKey, todoId]) => {
+    const slot = Number(slotKey);
+    if (!Number.isInteger(slot) || slot < 0) return;
+    const row = Math.floor(slot / sourceCols);
+    const col = slot % sourceCols;
+    if (row >= sourceRows) return;
+
+    const sourceStartMinutes = sourceStartHour * 60 + row * 60 + col * sourceSlotMinutes;
+    const sourceEndMinutes = sourceStartMinutes + sourceSlotMinutes;
+    const firstTargetSlot = Math.floor(sourceStartMinutes / targetSlotMinutes);
+    const lastTargetSlot = Math.ceil(sourceEndMinutes / targetSlotMinutes);
+
+    for (let targetSlot = firstTargetSlot; targetSlot < lastTargetSlot; targetSlot += 1) {
+      if (targetSlot >= 0 && targetSlot < targetSlotCount) migrated[String(targetSlot)] = todoId;
+    }
+  });
+
+  return migrated;
+};
+
+const migrateStrokes = (
+  strokes: DiaryStroke[],
+  sourceStartHour: number,
+  sourceEndHour: number,
+) => {
+  if (
+    sourceStartHour === DEFAULT_DIARY_GRID.startHour
+    && sourceEndHour === DEFAULT_DIARY_GRID.endHour
+  ) {
+    return strokes;
+  }
+
+  const sourceDurationMinutes = Math.max(60, (sourceEndHour - sourceStartHour) * 60);
+  const targetDurationMinutes = (DEFAULT_DIARY_GRID.endHour - DEFAULT_DIARY_GRID.startHour) * 60;
+  return strokes.map((stroke) => ({
+    ...stroke,
+    points: stroke.points.map((point) => ({
+      ...point,
+      y: Math.min(1, Math.max(0, (sourceStartHour * 60 + point.y * sourceDurationMinutes) / targetDurationMinutes)),
+    })),
+  }));
+};
+
+// 서버가 준 값이 부분적이거나 이전 6시·10분 격자여도 현재 24시간·5분 격자로 정규화한다.
 export const normalizeDiaryGrid = (raw: unknown): DiaryGrid => {
   const source = (raw && typeof raw === "object") ? (raw as Partial<DiaryGrid>) : {};
   const num = (value: unknown, fallback: number) => (typeof value === "number" && Number.isFinite(value) ? value : fallback);
+  const sourceStartHour = Math.max(0, Math.min(23, Math.floor(num(source.startHour, DEFAULT_DIARY_GRID.startHour))));
+  const sourceEndHour = Math.max(sourceStartHour + 1, Math.min(24, Math.floor(num(source.endHour, DEFAULT_DIARY_GRID.endHour))));
+  const sourceCols = Math.max(1, Math.floor(num(source.cols, DEFAULT_DIARY_GRID.cols)));
   const cells = (source.cells && typeof source.cells === "object" && !Array.isArray(source.cells))
     ? (source.cells as Record<string, string>)
     : {};
@@ -69,10 +135,10 @@ export const normalizeDiaryGrid = (raw: unknown): DiaryGrid => {
     ))
     : [];
   return {
-    startHour: num(source.startHour, DEFAULT_DIARY_GRID.startHour),
-    endHour: num(source.endHour, DEFAULT_DIARY_GRID.endHour),
-    cols: Math.max(1, num(source.cols, DEFAULT_DIARY_GRID.cols)),
-    cells: { ...cells },
-    strokes,
+    startHour: DEFAULT_DIARY_GRID.startHour,
+    endHour: DEFAULT_DIARY_GRID.endHour,
+    cols: DEFAULT_DIARY_GRID.cols,
+    cells: migrateCells(cells, sourceStartHour, sourceEndHour, sourceCols),
+    strokes: migrateStrokes(strokes, sourceStartHour, sourceEndHour),
   };
 };

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Eraser, Pen, Pencil, Plus, Trash2, CalendarPlus } from "lucide-react";
+import { Check, Eraser, Pencil, Plus, Trash2, CalendarPlus } from "lucide-react";
 import { DIARY_COLOR_PRESETS, type DiaryTodo } from "@/entities/diary";
 import type { DiaryTool, PlannerTaskSummary } from "@/features/planner";
 
@@ -8,7 +8,6 @@ type Props = {
   tasks: PlannerTaskSummary[];
   activeTodoId: string | null;
   tool: DiaryTool;
-  penColor: string;
   date: string;
   onSelect: (id: string) => void;
   onAdd: (label: string, color: string) => void;
@@ -16,7 +15,6 @@ type Props = {
   onToggleDone: (id: string) => void;
   onDelete: (id: string) => void;
   onToolChange: (tool: DiaryTool) => void;
-  onPenColorChange: (color: string) => void;
   onToggleTask: (id: string) => void;
   onDeleteTask: (id: string) => void;
   onPromoteTodo: (label: string, dueDate: string) => void;
@@ -147,9 +145,9 @@ const TodoRow = ({ todo, active, onSelect, onUpdate, onToggleDone, onDelete, onP
 };
 
 const PlannerTodoPanel = ({
-  todos, tasks, activeTodoId, tool, penColor, date,
+  todos, tasks, activeTodoId, tool, date,
   onSelect, onAdd, onUpdate, onToggleDone, onDelete,
-  onToolChange, onPenColorChange, onToggleTask, onDeleteTask, onPromoteTodo,
+  onToolChange, onToggleTask, onDeleteTask, onPromoteTodo,
 }: Props) => {
   const [label, setLabel] = useState("");
   const [color, setColor] = useState<string>(DIARY_COLOR_PRESETS[0]);
@@ -175,24 +173,9 @@ const PlannerTodoPanel = ({
         <h3 className="text-sm font-bold">할 일</h3>
         <div className="flex items-center gap-1 rounded-lg bg-neutral-100 p-0.5">
           <ToolButton active={tool === "paint"} onClick={() => onToolChange("paint")} icon={<Pencil size={13} />} label="칠하기" />
-          <ToolButton active={tool === "draw"} onClick={() => onToolChange("draw")} icon={<Pen size={13} />} label="펜" />
           <ToolButton active={tool === "erase"} onClick={() => onToolChange("erase")} icon={<Eraser size={13} />} label="지우개" />
         </div>
       </div>
-
-      {tool === "draw" && (
-        <label className="flex items-center gap-2 rounded-lg border border-neutral-200 px-2 py-1.5 text-xs">
-          <span className="text-neutral-600">펜 색</span>
-          <input
-            type="color"
-            value={penColor}
-            onChange={(event) => onPenColorChange(event.target.value)}
-            className="h-6 w-10 cursor-pointer rounded border border-neutral-200 bg-white"
-            aria-label="펜 색상"
-          />
-          <span className="text-neutral-500">시간표 위에 직접 필기합니다.</span>
-        </label>
-      )}
 
       <div className="flex items-center gap-2">
         <label

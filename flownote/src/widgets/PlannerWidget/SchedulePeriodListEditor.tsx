@@ -13,7 +13,7 @@ type Props = {
 
 const addMinutes = (time: string, minutesToAdd: number) => {
   const [hours = 0, minutes = 0] = time.split(":").map(Number);
-  const nextMinutes = Math.min(hours * 60 + minutes + minutesToAdd, 23 * 60 + 59);
+  const nextMinutes = (hours * 60 + minutes + minutesToAdd) % (24 * 60);
   return `${String(Math.floor(nextMinutes / 60)).padStart(2, "0")}:${String(nextMinutes % 60).padStart(2, "0")}`;
 };
 
@@ -107,6 +107,7 @@ const SchedulePeriodListEditor = ({ periods, onChange }: Props) => {
                 <span className="mb-1 block text-[11px] font-medium text-neutral-500">시작</span>
                 <input
                   type="time"
+                  step={300}
                   value={period.startTime}
                   onChange={(event) => updatePeriod(period.id, { startTime: event.target.value })}
                   className="w-full min-w-0 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm text-black outline-none focus:border-black"
@@ -116,6 +117,7 @@ const SchedulePeriodListEditor = ({ periods, onChange }: Props) => {
                 <span className="mb-1 block text-[11px] font-medium text-neutral-500">종료</span>
                 <input
                   type="time"
+                  step={300}
                   value={period.endTime}
                   onChange={(event) => updatePeriod(period.id, { endTime: event.target.value })}
                   className="w-full min-w-0 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm text-black outline-none focus:border-black"

@@ -4,7 +4,9 @@ const isCi = Boolean(process.env.CI);
 
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: true,
+  // The shared mock server stores canvas and schedule scenarios in memory.
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: isCi,
   retries: isCi ? 2 : 0,
   reporter: isCi ? "github" : "list",

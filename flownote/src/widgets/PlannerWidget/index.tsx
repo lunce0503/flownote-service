@@ -1,8 +1,8 @@
-import { useState } from "react";
 import {
-  ChevronLeft, ChevronRight, CalendarDays, Loader2, Check, AlertCircle, Undo2, Trash2,
+  ChevronLeft, ChevronRight, CalendarDays, Loader2, Check, AlertCircle, Undo2,
 } from "lucide-react";
 import { usePlanner, toDateKey, dayOfWeekOf } from "@/features/planner";
+import { useDocumentTitle } from "@/shared/lib/useDocumentTitle";
 import PlannerTodoPanel from "./PlannerTodoPanel";
 import PlannerTimetableCanvas from "./PlannerTimetableCanvas";
 import PlannerJournal from "./PlannerJournal";
@@ -26,7 +26,7 @@ const SaveIndicator = ({ status }: { status: "idle" | "saving" | "saved" | "erro
 
 /**
  * 플래너: 할 일 · 시간표 · 일기를 한 화면에서 다룬다.
- * - 일간: 할일(+작업 요약) / 시간표 캔버스(반복 일정은 투명, 오늘 필기는 그림판) / 저널
+ * - 일간: 할일(+작업 요약) / 5분 단위 시간표(반복 일정은 투명) / 저널
  * - 주간: 반복 일정을 임의로 지정
  * - 월간: 캘린더 + .ics 내보내기(모바일 캘린더 연동 대비)
  * 디자인은 항상 흰 배경 + 검은 글씨.
@@ -34,7 +34,7 @@ const SaveIndicator = ({ status }: { status: "idle" | "saving" | "saved" | "erro
 const PlannerWidget = () => {
   const planner = usePlanner();
   const { diary } = planner;
-  const [penColor, setPenColor] = useState("#111111");
+  useDocumentTitle("플래너", diary.date);
   const isToday = diary.date === toDateKey(new Date());
   const today = dayOfWeekOf(new Date());
 
@@ -126,7 +126,6 @@ const PlannerWidget = () => {
                 tasks={planner.tasks}
                 activeTodoId={diary.activeTodoId}
                 tool={diary.tool}
-                penColor={penColor}
                 date={diary.date}
                 onSelect={diary.setActiveTodoId}
                 onAdd={(label, color) => diary.addTodo(label, color)}
@@ -134,7 +133,6 @@ const PlannerWidget = () => {
                 onToggleDone={diary.toggleTodoDone}
                 onDelete={diary.deleteTodo}
                 onToolChange={diary.setTool}
-                onPenColorChange={setPenColor}
                 onToggleTask={planner.toggleTaskDone}
                 onDeleteTask={planner.removeTask}
                 onPromoteTodo={planner.promoteTodoToTask}
@@ -146,26 +144,17 @@ const PlannerWidget = () => {
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={diary.undoStroke}
-                      disabled={diary.grid.strokes.length === 0}
+                      onClick={diary.undoPaint}
+                      disabled={!diary.canUndoPaint}
                       className="flex items-center gap-1 rounded-md border border-neutral-200 px-2 py-1 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 disabled:opacity-40"
-                      title="마지막 필기 되돌리기"
+                      title="마지막 칠하기 되돌리기"
                     >
-                      <Undo2 size={13} /> 되돌리기
-                    </button>
-                    <button
-                      type="button"
-                      onClick={diary.clearStrokes}
-                      disabled={diary.grid.strokes.length === 0}
-                      className="flex items-center gap-1 rounded-md border border-neutral-200 px-2 py-1 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 disabled:opacity-40"
-                      title="필기 전체 지우기"
-                    >
-                      <Trash2 size={13} /> 필기 지움
+                      <Undo2 size={13} /> 칠하기 되돌리기
                     </button>
                   </div>
                 </div>
                 <p className="text-xs text-neutral-500">
-                  주간 일정은 투명하게 겹쳐 보이고, 오늘 칠한 칸과 펜 필기가 그 위에 저장됩니다.
+                  주간 일정은 투명하게 겹쳐 보이고, 오늘 칠한 5분 칸이 그 위에 저장됩니다.
                 </p>
                 <PlannerTimetableCanvas
                   grid={diary.grid}
@@ -173,9 +162,9 @@ const PlannerWidget = () => {
                   scheduleItems={planner.scheduleForSelectedDay}
                   tool={diary.tool}
                   activeTodoId={diary.activeTodoId}
-                  penColor={penColor}
+                  onPaintStart={diary.beginPaintAction}
                   onPaintCell={diary.paintCell}
-                  onAddStroke={diary.addStroke}
+                  onPaintEnd={diary.endPaintAction}
                 />
               </section>
             </div>

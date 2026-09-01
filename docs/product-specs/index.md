@@ -8,6 +8,7 @@
 - `expo-go-railway-access.md`: Railway production Metro를 통한 Expo Go 접속, iPhone·iPad·Android 사용 절차와 장애 대응.
 - `web-workspace-ux.md`: 웹 홈·인증·Blog·Canvas의 상태 처리, 모바일 도구 배치, 키보드 접근성.
 - `weekly-schedule-period-list.md`: 주간 일정 생성 시 여러 요일·시간 구간을 기간 리스트로 저장하는 흐름.
+- `planner-daily-timetable.md`: 오늘 시간표의 24시간·5분 격자, 레거시 데이터 변환, 칠하기 되돌리기 동작.
 
 ## 사양 작성 기준
 

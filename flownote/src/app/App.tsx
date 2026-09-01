@@ -3,6 +3,7 @@ import './App.css';
 
 import Header from '@/widgets/Header';
 import { useFullscreen } from '@/shared/lib/useFullscreen';
+import { getRouteDocumentTitle, useDocumentTitle } from '@/shared/lib/useDocumentTitle';
 import { AuthProvider, ProtectedRoute } from '@/features/auth';
 import { ThemeProvider } from '@/features/theme';
 import {
@@ -29,6 +30,8 @@ const renderRoute = (route: CapabilityRoute, key: string, isProtected?: boolean)
 const AppRoutes = () => {
   const location = useLocation();
   const { isFullscreen } = useFullscreen();
+  const [titleFeature, titleDetail] = getRouteDocumentTitle(location.pathname);
+  useDocumentTitle(titleFeature, titleDetail, 0);
   // 전체 화면(전체로 보기) 중에는 브라우저 UI와 함께 Flownote 헤더도 숨긴다.
   const shouldShowHeader = !isFullscreen && !["/login", "/signup"].includes(location.pathname);
 

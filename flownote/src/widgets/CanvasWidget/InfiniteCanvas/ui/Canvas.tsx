@@ -32,6 +32,7 @@ import { getAutoTextBoxSize } from "@/features/canvas";
 import type { CanvasDocumentSummary, Point, TextBoxElement } from "@/entities/canvas";
 import { getCanvasDocuments } from "@/entities/canvas";
 import { useLocalStorageBoolean } from "@/shared/lib/useLocalStorageBoolean";
+import { useDocumentTitle } from "@/shared/lib/useDocumentTitle";
 import { subscribeSyncEvents } from "@/shared/lib/sync";
 import { useCanvasPointerInput } from "../model/useCanvasPointerInput";
 import { useLassoActions } from "../model/useLassoActions";
@@ -326,6 +327,7 @@ const Canvas = () => {
     const selectedCanvasTitle = useMemo(() => (
         getCanvasTitle(canvasDocuments, selectedCanvasId)
     ), [canvasDocuments, selectedCanvasId]);
+    useDocumentTitle("그림판", selectedCanvasTitle || selectedCanvasId || "캔버스");
 
     const lassoBounds = useMemo(() => (
         getLassoSelectionBounds(lassoSelection, drawnLines, images, textBoxes)

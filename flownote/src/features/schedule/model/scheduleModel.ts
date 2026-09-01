@@ -327,10 +327,13 @@ export const buildWeeklyChart = (items: ScheduleItem[]) => {
 
 export const SCHEDULE_WEEKLY_VIEW_STORAGE_KEY = "flownote.schedule.weeklyView";
 
+const isFiveMinuteTime = (time: string) => /^\d{2}:\d{2}$/.test(time) && timeToMinutes(time) % 5 === 0;
+
 export const validateScheduleInput = (form: ScheduleItemInput) => {
     if (!form.title.trim()) return "시간표 제목을 입력하세요.";
     if (form.daysOfWeek.length === 0) return "반복 요일을 하나 이상 선택하세요.";
     if (!form.startTime || !form.endTime) return "시작 시간과 종료 시간을 입력하세요.";
+    if (!isFiveMinuteTime(form.startTime) || !isFiveMinuteTime(form.endTime)) return "시간은 5분 단위로 입력하세요.";
     if (form.startTime === form.endTime) return "시작 시간과 종료 시간은 같을 수 없습니다. 자정을 넘기는 일정은 종료 시간을 더 이른 시각으로 입력하세요.";
     return null;
 };
@@ -346,6 +349,9 @@ export const validateSchedulePeriods = (
         const label = `기간 ${index + 1}`;
         if (period.daysOfWeek.length === 0) return `${label}의 반복 요일을 하나 이상 선택하세요.`;
         if (!period.startTime || !period.endTime) return `${label}의 시작 시간과 종료 시간을 입력하세요.`;
+        if (!isFiveMinuteTime(period.startTime) || !isFiveMinuteTime(period.endTime)) {
+            return `${label}의 시간은 5분 단위로 입력하세요.`;
+        }
         if (period.startTime === period.endTime) {
             return `${label}의 시작 시간과 종료 시간은 같을 수 없습니다.`;
         }
