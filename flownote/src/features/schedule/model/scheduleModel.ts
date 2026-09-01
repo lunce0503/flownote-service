@@ -21,7 +21,40 @@ export const EMPTY_SCHEDULE_FORM: ScheduleItemInput = {
     isActive: true,
 };
 
+export type SchedulePeriodInput = {
+    id: string;
+    daysOfWeek: DayOfWeek[];
+    startTime: string;
+    endTime: string;
+};
+
 export const createDraftId = () => `draft-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+export const createSchedulePeriod = (
+    overrides: Partial<Omit<SchedulePeriodInput, "id">> = {},
+): SchedulePeriodInput => ({
+    id: createDraftId(),
+    daysOfWeek: [],
+    startTime: "09:00",
+    endTime: "10:00",
+    ...overrides,
+});
+
+export const toSchedulePeriod = (item: ScheduleItem): SchedulePeriodInput => createSchedulePeriod({
+    daysOfWeek: item.days_of_week,
+    startTime: item.start_time.slice(0, 5),
+    endTime: item.end_time.slice(0, 5),
+});
+
+export const buildScheduleInputs = (
+    form: ScheduleItemInput,
+    periods: SchedulePeriodInput[],
+): ScheduleItemInput[] => periods.map((period) => ({
+    ...form,
+    daysOfWeek: period.daysOfWeek,
+    startTime: period.startTime,
+    endTime: period.endTime,
+}));
 
 export const toScheduleInput = (item: ScheduleItem): ScheduleItemInput => ({
     title: item.title,
@@ -299,5 +332,24 @@ export const validateScheduleInput = (form: ScheduleItemInput) => {
     if (form.daysOfWeek.length === 0) return "반복 요일을 하나 이상 선택하세요.";
     if (!form.startTime || !form.endTime) return "시작 시간과 종료 시간을 입력하세요.";
     if (form.startTime === form.endTime) return "시작 시간과 종료 시간은 같을 수 없습니다. 자정을 넘기는 일정은 종료 시간을 더 이른 시각으로 입력하세요.";
+    return null;
+};
+
+export const validateSchedulePeriods = (
+    form: ScheduleItemInput,
+    periods: SchedulePeriodInput[],
+) => {
+    if (!form.title.trim()) return "시간표 제목을 입력하세요.";
+    if (periods.length === 0) return "기간을 하나 이상 추가하세요.";
+
+    for (const [index, period] of periods.entries()) {
+        const label = `기간 ${index + 1}`;
+        if (period.daysOfWeek.length === 0) return `${label}의 반복 요일을 하나 이상 선택하세요.`;
+        if (!period.startTime || !period.endTime) return `${label}의 시작 시간과 종료 시간을 입력하세요.`;
+        if (period.startTime === period.endTime) {
+            return `${label}의 시작 시간과 종료 시간은 같을 수 없습니다.`;
+        }
+    }
+
     return null;
 };

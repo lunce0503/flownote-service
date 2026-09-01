@@ -38,7 +38,20 @@ const notes = [
 const noteFolders = [
   { id: "note-folder", category: "업무", name: "프로젝트", noteIds: ["older-note"], updated_at: "2026-08-20T00:00:00Z" },
 ];
-const state = { saves: [], canvasData: emptyCanvasData() };
+const state = { saves: [], canvasData: emptyCanvasData(), scheduleItems: [] };
+
+const readJson = (request) => new Promise((resolve, reject) => {
+  const chunks = [];
+  request.on("data", (chunk) => chunks.push(chunk));
+  request.on("end", () => {
+    try {
+      resolve(chunks.length > 0 ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {});
+    } catch (error) {
+      reject(error);
+    }
+  });
+  request.on("error", reject);
+});
 
 const sendJson = (response, status, body) => {
   response.writeHead(status, {
@@ -50,7 +63,7 @@ const sendJson = (response, status, body) => {
   response.end(JSON.stringify(body));
 };
 
-const httpServer = createServer((request, response) => {
+const httpServer = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", `http://${request.headers.host}`);
 
   if (request.method === "OPTIONS") {
@@ -70,6 +83,7 @@ const httpServer = createServer((request, response) => {
     state.canvasData = url.searchParams.get("scenario") === "existing-line"
       ? existingLineCanvasData()
       : emptyCanvasData();
+    state.scheduleItems = [];
     sendJson(response, 200, state);
     return;
   }
@@ -95,6 +109,42 @@ const httpServer = createServer((request, response) => {
   }
   if (request.method === "GET" && url.pathname === "/api/note-folders") {
     sendJson(response, 200, noteFolders);
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/diary") {
+    sendJson(response, 200, { entry_date: url.searchParams.get("date"), todos: [], grid: {}, journal: [] });
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/diary/dates") {
+    sendJson(response, 200, []);
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/tasks") {
+    sendJson(response, 200, []);
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/schedule-items") {
+    sendJson(response, 200, state.scheduleItems);
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/schedule-items") {
+    const body = await readJson(request);
+    const now = new Date().toISOString();
+    const item = {
+      id: `schedule-${state.scheduleItems.length + 1}`,
+      ...body,
+      created_at: now,
+      updated_at: now,
+    };
+    state.scheduleItems.push(item);
+    sendJson(response, 201, item);
+    return;
+  }
+  if (request.method === "DELETE" && url.pathname.startsWith("/api/schedule-items/")) {
+    const id = url.pathname.split("/").at(-1);
+    const index = state.scheduleItems.findIndex((item) => item.id === id);
+    const [deletedScheduleItem] = index >= 0 ? state.scheduleItems.splice(index, 1) : [];
+    sendJson(response, deletedScheduleItem ? 200 : 404, { deletedScheduleItem });
     return;
   }
 
