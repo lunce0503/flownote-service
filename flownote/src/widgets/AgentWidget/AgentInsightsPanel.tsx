@@ -53,7 +53,7 @@ const AgentInsightsPanel = ({ activeTasks, recentNotes, knowledgeThemes }: Agent
                     recentNotes.map((note) => (
                         <Link
                             key={note.id}
-                            to={`/blog/${encodeURIComponent(note.title)}`}
+                            to={`/blog/${note.id}`}
                             className="block rounded-md border border-stone-200 p-3 hover:bg-stone-50"
                         >
                             <p className="flex items-center gap-2 truncate text-sm font-semibold">

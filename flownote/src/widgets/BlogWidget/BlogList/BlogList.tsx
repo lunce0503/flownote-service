@@ -25,6 +25,7 @@ import {
   type FolderForm,
 } from "@/features/blog";
 import { useLocalStorageStringSet } from "@/shared/lib/useLocalStorageStringSet";
+import { getRecentLibraryItems, sortLibraryCategoryEntries, sortLibraryItemsByRecent } from "@/shared/lib/librarySorting";
 import { getSyncClientId, subscribeSyncEvents } from "@/shared/lib/sync";
 
 const BlogList = () => {
@@ -44,11 +45,19 @@ const BlogList = () => {
   const noteFolderIdByNoteId = useMemo(() => buildNoteFolderIdByNoteId(folders), [folders]);
 
   const unfiledNotes = useMemo(
-    () => getUnfiledNotes(blogList, noteFolderIdByNoteId),
+    () => sortLibraryItemsByRecent(getUnfiledNotes(blogList, noteFolderIdByNoteId), (note) => note.title),
     [blogList, noteFolderIdByNoteId],
   );
 
   const foldersByCategory = useMemo(() => groupNoteFoldersByCategory(folders), [folders]);
+  const folderCategoryEntries = useMemo(
+    () => sortLibraryCategoryEntries(foldersByCategory, (folder) => folder.name),
+    [foldersByCategory],
+  );
+  const recentNotes = useMemo(
+    () => getRecentLibraryItems(blogList, (note) => note.title),
+    [blogList],
+  );
 
   const handleBlogList = useCallback(async () => {
     setLoading(true);
@@ -239,7 +248,7 @@ const BlogList = () => {
     <div
       draggable
       onDragStart={(event) => event.dataTransfer.setData("text/plain", note.id)}
-      className="mb-2 w-full rounded-md border border-stone-200 bg-white text-black shadow-sm transition hover:border-stone-300 hover:bg-stone-50"
+      className="min-h-28 w-full rounded-md border border-stone-200 bg-white text-black shadow-sm transition hover:border-amber-400 hover:shadow-md"
       key={note.id}
     >
       <div className="flex items-start gap-2 p-3">
@@ -260,7 +269,7 @@ const BlogList = () => {
               autoFocus
             />
           ) : (
-            <Link to={`/blog/${encodeURIComponent(note.title)}`} className="block min-w-0">
+            <Link to={`/blog/${note.id}`} className="block min-w-0">
               <h3 className="truncate font-semibold">{note.title}</h3>
             </Link>
           )}
@@ -318,23 +327,13 @@ const BlogList = () => {
   );
 
   return (
-    <div className="min-h-[calc(100vh-56px)] bg-stone-950 p-3 text-stone-900 md:p-5">
-      <div className="mx-auto max-w-7xl rounded-2xl border border-stone-200 bg-stone-50 p-4 shadow-xl md:p-5">
-      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+    <div className="min-h-[calc(100vh-56px)] bg-stone-50 px-4 py-6 text-stone-900">
+      <div className="mx-auto max-w-7xl">
+      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-bold uppercase text-amber-700">Knowledge Stream</p>
           <h1 className="text-2xl font-black text-stone-950 md:text-3xl">게시글 관리</h1>
           <p className="text-sm text-stone-500">폴더, 최근 노트, 드로잉 필기를 한 화면에서 정리합니다.</p>
-        </div>
-        <div className="grid grid-cols-2 gap-2 text-center">
-          <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
-            <div className="text-lg font-black">{blogList.length}</div>
-            <div className="text-xs text-stone-500">노트</div>
-          </div>
-          <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
-            <div className="text-lg font-black">{folders.length}</div>
-            <div className="text-xs text-stone-500">폴더</div>
-          </div>
         </div>
       </div>
 
@@ -361,32 +360,67 @@ const BlogList = () => {
         </button>
       </div>
 
-      {error && <p className="mb-3 rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {error && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+          <p>{error}</p>
+          <button
+            type="button"
+            className="rounded-md border border-red-200 bg-white px-3 py-1.5 font-semibold hover:bg-red-100"
+            onClick={() => void handleBlogList()}
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
-        <div className="space-y-4">
-          {Object.entries(foldersByCategory).map(([category, categoryFolders]) => (
+      <section data-testid="blog-recent-section" className="mb-6 border-y border-stone-200 py-4">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-black text-stone-900">최근 노트</h2>
+            <p className="text-xs text-stone-500">최근 수정하거나 만든 순서</p>
+          </div>
+          <button
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-stone-900 text-white hover:bg-stone-700"
+            onClick={() => void addBlogNote()}
+            title="노트 추가"
+          >
+            <Plus size={18} />
+          </button>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {recentNotes.length > 0
+            ? recentNotes.map(noteCard)
+            : !loading && !error && <p className="py-6 text-sm text-stone-500">작성된 글이 없습니다</p>}
+        </div>
+      </section>
+
+      <div className="space-y-7">
+        <div className="space-y-7">
+          {folderCategoryEntries.map(([category, categoryFolders]) => (
             <section key={category}>
-              <h2 className="mb-2 border-b border-stone-200 pb-1 text-xs font-bold uppercase tracking-wide text-stone-500">
+              <h2 className="mb-3 border-b border-stone-300 pb-2 text-xs font-bold uppercase text-stone-500">
                 {category}
               </h2>
-              <div className="space-y-3">
+              <div className="space-y-5">
                 {categoryFolders.map((folder) => {
                   const folderNoteIds = new Set(folder.noteIds);
-                  const folderNotes = blogList.filter((note) => folderNoteIds.has(note.id));
+                  const folderNotes = sortLibraryItemsByRecent(
+                    blogList.filter((note) => folderNoteIds.has(note.id)),
+                    (note) => note.title,
+                  );
                   const isEditing = editingFolderId === folder.id;
                   const isCollapsed = collapsedFolderIds.has(folder.id);
 
                   return (
                     <div
-                      className="rounded-lg border border-stone-200 bg-stone-50 p-3"
+                      className="border-l-2 border-amber-400 pl-3"
                       key={folder.id}
                       onDragOver={(event) => event.preventDefault()}
                       onDrop={(event) => void handleDropOnFolder(event, folder.id)}
                     >
-                      <div className="mb-2 flex items-start justify-between gap-2">
+                      <div className="mb-3 flex items-center justify-between gap-2">
                         {isEditing ? (
-                          <div className="grid flex-1 gap-2">
+                          <div className="grid flex-1 gap-2 sm:grid-cols-2">
                             <input
                               className="rounded-md border border-stone-300 px-2 py-1 text-sm text-stone-900"
                               value={editingForm.category}
@@ -469,11 +503,11 @@ const BlogList = () => {
                       </div>
 
                       {!isCollapsed && (
-                        <div className="min-h-14 rounded-md border border-dashed border-stone-300 bg-white/70 p-2">
+                        <div className="grid min-h-20 gap-2 rounded-md border border-dashed border-stone-300 p-2 sm:grid-cols-2 xl:grid-cols-3">
                           {folderNotes.length > 0 ? (
                             folderNotes.map(noteCard)
                           ) : (
-                            <p className="py-4 text-center text-xs text-stone-500">노트를 드래그해서 넣으세요</p>
+                            <p className="py-6 text-center text-xs text-stone-500 sm:col-span-2 xl:col-span-3">노트를 드래그해서 넣으세요</p>
                           )}
                         </div>
                       )}
@@ -485,13 +519,13 @@ const BlogList = () => {
           ))}
         </div>
 
-        <div
-          className="rounded-lg border border-dashed border-stone-300 p-3"
+        <section
+          className="border-t border-stone-300 pt-4"
           onDragOver={(event) => event.preventDefault()}
           onDrop={handleDropOnUnfiled}
         >
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-stone-700">최근 노트</h2>
+            <h2 className="text-sm font-bold text-stone-700">폴더 없음</h2>
             <button
               className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-stone-300 text-stone-700 hover:bg-stone-100"
               onClick={() => void addBlogNote()}
@@ -501,12 +535,14 @@ const BlogList = () => {
             </button>
           </div>
 
-          {unfiledNotes.length > 0 ? (
-            unfiledNotes.map(noteCard)
-          ) : (
-            !loading && <p className="py-8 text-center text-sm text-stone-500">작성된 글이 없습니다</p>
-          )}
-        </div>
+          <div className="grid min-h-20 gap-2 rounded-md border border-dashed border-stone-300 p-2 sm:grid-cols-2 xl:grid-cols-3">
+            {unfiledNotes.length > 0 ? (
+              unfiledNotes.map(noteCard)
+            ) : (
+              !loading && !error && <p className="py-8 text-center text-sm text-stone-500 sm:col-span-2 xl:col-span-3">작성된 글이 없습니다</p>
+            )}
+          </div>
+        </section>
       </div>
       </div>
     </div>

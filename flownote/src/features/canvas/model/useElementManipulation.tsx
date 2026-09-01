@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { Point, ImageElement, TextBoxElement, CanvasElementStatus } from '@/entities/canvas';
+import { removeOrMarkDeleted } from './canvasGeometry';
 
 type GetCanvasCoords = (e: React.PointerEvent | MouseEvent) => Point;
 
@@ -57,35 +58,29 @@ export const useElementManipulation = (getCanvasCoords: GetCanvasCoords) => {
 
     if (targets.images) {
       setImages(prev => {
-        let changed = false;
-        const next = prev.flatMap(image => {
+        const hitIds = new Set(prev.filter(image => {
           const hit = image.status !== 'deleted'
             && x >= image.x
             && x <= image.x + image.width
             && y >= image.y
             && y <= image.y + image.height;
-          if (!hit) return [image];
-          changed = true;
-          return image.status === 'new' ? [] : [{ ...image, status: 'deleted' as const }];
-        });
-        return changed ? next : prev;
+          return hit;
+        }).map(image => image.id));
+        return hitIds.size > 0 ? removeOrMarkDeleted(prev, hitIds) : prev;
       });
     }
 
     if (targets.textBoxes) {
       setTextBoxes(prev => {
-        let changed = false;
-        const next = prev.flatMap(textBox => {
+        const hitIds = new Set(prev.filter(textBox => {
           const hit = textBox.status !== 'deleted'
             && x >= textBox.x
             && x <= textBox.x + textBox.width
             && y >= textBox.y
             && y <= textBox.y + textBox.height;
-          if (!hit) return [textBox];
-          changed = true;
-          return textBox.status === 'new' ? [] : [{ ...textBox, status: 'deleted' as const }];
-        });
-        return changed ? next : prev;
+          return hit;
+        }).map(textBox => textBox.id));
+        return hitIds.size > 0 ? removeOrMarkDeleted(prev, hitIds) : prev;
       });
     }
   }, [getCanvasCoords]);

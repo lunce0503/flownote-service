@@ -2,19 +2,26 @@ import { useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import type { DayOfWeek, ScheduleItem, ScheduleItemInput } from "@/entities/schedule";
 import {
+  buildScheduleInputs,
+  createSchedulePeriod,
   DAY_OPTIONS,
   EMPTY_SCHEDULE_FORM,
-  toScheduleInput,
-  getScheduleItemsByDay,
   formatDays,
+  getScheduleItemsByDay,
   timeToMinutes,
+  toScheduleInput,
+  toSchedulePeriod,
+  validateScheduleInput,
+  validateSchedulePeriods,
+  type SchedulePeriodInput,
 } from "@/features/schedule";
 import { DIARY_COLOR_PRESETS } from "@/entities/diary";
+import SchedulePeriodListEditor from "./SchedulePeriodListEditor";
 
 type Props = {
   items: ScheduleItem[];
   today: DayOfWeek;
-  onSave: (input: ScheduleItemInput, id?: string) => Promise<void>;
+  onSave: (input: ScheduleItemInput, id?: string) => Promise<ScheduleItem | undefined>;
   onDelete: (id: string) => Promise<void>;
 };
 
@@ -28,14 +35,19 @@ const COLUMN_HEIGHT = (DAY_END_HOUR - DAY_START_HOUR) * 26;
  */
 const PlannerWeeklyBoard = ({ items, today, onSave, onDelete }: Props) => {
   const [form, setForm] = useState<ScheduleItemInput>(EMPTY_SCHEDULE_FORM);
+  const [periods, setPeriods] = useState<SchedulePeriodInput[]>(() => [
+    createSchedulePeriod({ daysOfWeek: EMPTY_SCHEDULE_FORM.daysOfWeek }),
+  ]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const openCreate = (day?: DayOfWeek) => {
+    const daysOfWeek = day ? [day] : EMPTY_SCHEDULE_FORM.daysOfWeek;
     setEditingId(null);
-    setForm({ ...EMPTY_SCHEDULE_FORM, daysOfWeek: day ? [day] : EMPTY_SCHEDULE_FORM.daysOfWeek });
+    setForm({ ...EMPTY_SCHEDULE_FORM, daysOfWeek });
+    setPeriods([createSchedulePeriod({ daysOfWeek })]);
     setIsFormOpen(true);
     setError(null);
   };
@@ -43,6 +55,7 @@ const PlannerWeeklyBoard = ({ items, today, onSave, onDelete }: Props) => {
   const openEdit = (item: ScheduleItem) => {
     setEditingId(item.id);
     setForm(toScheduleInput(item));
+    setPeriods([toSchedulePeriod(item)]);
     setIsFormOpen(true);
     setError(null);
   };
@@ -57,17 +70,30 @@ const PlannerWeeklyBoard = ({ items, today, onSave, onDelete }: Props) => {
   };
 
   const submit = async () => {
-    if (!form.title.trim()) { setError("일정 이름을 입력하세요."); return; }
-    if (form.daysOfWeek.length === 0) { setError("요일을 하나 이상 선택하세요."); return; }
+    const validationError = editingId
+      ? validateScheduleInput(form)
+      : validateSchedulePeriods(form, periods);
+    if (validationError) { setError(validationError); return; }
+
     setSaving(true);
     setError(null);
+    const createdIds: string[] = [];
     try {
-      await onSave(form, editingId ?? undefined);
+      if (editingId) {
+        await onSave(form, editingId);
+      } else {
+        for (const input of buildScheduleInputs(form, periods)) {
+          const created = await onSave(input);
+          if (created) createdIds.push(created.id);
+        }
+      }
       setIsFormOpen(false);
       setEditingId(null);
       setForm(EMPTY_SCHEDULE_FORM);
+      setPeriods([createSchedulePeriod({ daysOfWeek: EMPTY_SCHEDULE_FORM.daysOfWeek })]);
     } catch (submitError) {
       console.error("일정 저장 실패:", submitError);
+      await Promise.allSettled(createdIds.map((id) => onDelete(id)));
       setError("일정을 저장하지 못했습니다.");
     } finally {
       setSaving(false);
@@ -180,7 +206,7 @@ const PlannerWeeklyBoard = ({ items, today, onSave, onDelete }: Props) => {
 
       {/* 목록 (모바일에서 읽기 쉬움) */}
       {items.length > 0 && (
-        <ul className="flex flex-col gap-1.5">
+        <ul aria-label="주간 일정 목록" className="flex flex-col gap-1.5">
           {items.map((item) => (
             <li key={item.id} className="flex items-center gap-2 rounded-lg border border-neutral-200 px-2 py-1.5">
               <span className="h-4 w-4 shrink-0 rounded" style={{ backgroundColor: item.color || "#111111" }} />
@@ -207,7 +233,7 @@ const PlannerWeeklyBoard = ({ items, today, onSave, onDelete }: Props) => {
         <div className="flex flex-col gap-2 rounded-lg border border-neutral-300 bg-neutral-50 p-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-bold">{editingId ? "일정 수정" : "새 일정"}</p>
-            <button type="button" onClick={() => setIsFormOpen(false)} className="text-neutral-400 hover:text-black">
+            <button type="button" onClick={() => setIsFormOpen(false)} className="text-neutral-400 hover:text-black" aria-label="일정 입력 닫기">
               <X size={16} />
             </button>
           </div>
@@ -218,36 +244,46 @@ const PlannerWeeklyBoard = ({ items, today, onSave, onDelete }: Props) => {
             placeholder="일정 이름"
             className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-black outline-none focus:border-black"
           />
-          <div className="flex flex-wrap gap-1">
-            {DAY_OPTIONS.map((day) => (
-              <button
-                key={day.value}
-                type="button"
-                onClick={() => toggleDay(day.value)}
-                className={`h-8 w-8 rounded-lg border text-xs font-bold transition ${
-                  form.daysOfWeek.includes(day.value)
-                    ? "border-black bg-black text-white"
-                    : "border-neutral-200 bg-white text-neutral-600"
-                }`}
-              >
-                {day.label}
-              </button>
-            ))}
-          </div>
+          {editingId ? (
+            <>
+              <div className="flex flex-wrap gap-1">
+                {DAY_OPTIONS.map((day) => (
+                  <button
+                    key={day.value}
+                    type="button"
+                    onClick={() => toggleDay(day.value)}
+                    aria-pressed={form.daysOfWeek.includes(day.value)}
+                    className={`h-8 w-8 rounded-md border text-xs font-bold transition ${
+                      form.daysOfWeek.includes(day.value)
+                        ? "border-black bg-black text-white"
+                        : "border-neutral-200 bg-white text-neutral-600"
+                    }`}
+                  >
+                    {day.label}
+                  </button>
+                ))}
+              </div>
+              <div className="grid max-w-sm grid-cols-2 gap-2">
+                <input
+                  type="time"
+                  aria-label="시작 시간"
+                  value={form.startTime}
+                  onChange={(event) => setForm((current) => ({ ...current, startTime: event.target.value }))}
+                  className="min-w-0 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm text-black outline-none focus:border-black"
+                />
+                <input
+                  type="time"
+                  aria-label="종료 시간"
+                  value={form.endTime}
+                  onChange={(event) => setForm((current) => ({ ...current, endTime: event.target.value }))}
+                  className="min-w-0 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm text-black outline-none focus:border-black"
+                />
+              </div>
+            </>
+          ) : (
+            <SchedulePeriodListEditor periods={periods} onChange={setPeriods} />
+          )}
           <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="time"
-              value={form.startTime}
-              onChange={(event) => setForm((current) => ({ ...current, startTime: event.target.value }))}
-              className="rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-sm text-black outline-none focus:border-black"
-            />
-            <span className="text-neutral-500">~</span>
-            <input
-              type="time"
-              value={form.endTime}
-              onChange={(event) => setForm((current) => ({ ...current, endTime: event.target.value }))}
-              className="rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-sm text-black outline-none focus:border-black"
-            />
             <label className="flex items-center gap-1 text-xs text-neutral-600">
               색
               <input
@@ -278,7 +314,7 @@ const PlannerWeeklyBoard = ({ items, today, onSave, onDelete }: Props) => {
               disabled={saving}
               className="rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-50"
             >
-              {saving ? "저장 중…" : "저장"}
+              {saving ? "저장 중…" : editingId ? "저장" : `기간 ${periods.length}개 저장`}
             </button>
             {editingId && (
               <button

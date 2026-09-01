@@ -5,7 +5,11 @@ import Header from '@/widgets/Header';
 import { useFullscreen } from '@/shared/lib/useFullscreen';
 import { AuthProvider, ProtectedRoute } from '@/features/auth';
 import { ThemeProvider } from '@/features/theme';
-import { capabilityManifest, type CapabilityRoute } from './capabilityManifest.tsx';
+import {
+  capabilityManifest,
+  isCapabilityVisibleInNavigation,
+  type CapabilityRoute,
+} from './capabilityManifest.tsx';
 
 const renderRoute = (route: CapabilityRoute, key: string, isProtected?: boolean) => {
   const element =
@@ -30,7 +34,7 @@ const AppRoutes = () => {
 
   return (
     <>
-      {shouldShowHeader && <Header />}
+      {shouldShowHeader && <Header isCapabilityVisible={isCapabilityVisibleInNavigation} />}
       <Routes>
         {capabilityManifest
           .filter((capability) => capability.enabled)

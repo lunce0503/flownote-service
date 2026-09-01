@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Redirect, useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   Alert,
@@ -17,7 +18,8 @@ import { flownoteApi, type MobileConfig } from '@/lib/flownote-api';
 type AuthMode = 'login' | 'register';
 
 export default function AccountScreen() {
-  const { user, loading, login, logout, register } = useSession();
+  const router = useRouter();
+  const { token, user, loading, login, logout, register } = useSession();
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -54,14 +56,20 @@ export default function AccountScreen() {
       if (mode === 'register') {
         await register({ username, email, password, nickname });
         await login(email, password);
+        router.replace('/home');
         return;
       }
 
       await login(email, password);
+      router.replace('/home');
     } catch (error) {
       Alert.alert('Flownote', error instanceof Error ? error.message : '로그인에 실패했습니다.');
     }
   };
+
+  if (token && user) {
+    return <Redirect href="/home" />;
+  }
 
   return (
     <ThemedView style={styles.screen}>
@@ -186,6 +194,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    width: '100%',
+    maxWidth: 620,
+    alignSelf: 'center',
     gap: 18,
     padding: 20,
     paddingTop: 64,

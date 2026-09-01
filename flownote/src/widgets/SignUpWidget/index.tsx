@@ -3,6 +3,7 @@ import { postUserData } from "@/entities/users";
 import type { UserDataProps } from "@/entities/users";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Lock, Mail, Notebook, User } from "lucide-react";
+import axios from "axios";
 
 const SignUpWidget= () => {
     const [userdata, setUserdata] = useState<UserDataProps>({
@@ -13,18 +14,31 @@ const SignUpWidget= () => {
     });
     const navigate = useNavigate();
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
 
-    const handleSignUp = (e: FormEvent<HTMLFormElement>) => {
+    const handleSignUp = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        setErrorMessage("");
 
         if (userdata.password !== confirmPassword) {
-            alert("비밀번호가 일치하지 않습니다. 다시 확인해주세요.");
+            setErrorMessage("비밀번호가 일치하지 않습니다. 다시 확인해주세요.");
             return;
         }
 
-        postUserData(userdata);
-        alert("회원가입이 완료되었습니다! 로그인 페이지로 이동합니다.");
-        navigate("/login");
+        setIsSubmitting(true);
+        try {
+            await postUserData(userdata);
+            navigate("/login", { replace: true });
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                setErrorMessage(error.response?.data?.error ?? "회원가입에 실패했습니다.");
+            } else {
+                setErrorMessage("회원가입에 실패했습니다.");
+            }
+        } finally {
+            setIsSubmitting(false);
+        }
     }
 
     return (
@@ -136,11 +150,17 @@ const SignUpWidget= () => {
                         
                         <button 
                             type="submit"
-                            className="w-full bg-stone-800 text-amber-50 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-stone-700 transition-all shadow-md group mt-6"
+                            disabled={isSubmitting}
+                            className="group mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-stone-800 py-3 font-semibold text-amber-50 shadow-md transition-all hover:bg-stone-700 disabled:cursor-wait disabled:opacity-70"
                         >
-                            계정 만들기
+                            {isSubmitting ? "계정 생성 중..." : "계정 만들기"}
                             <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                         </button>
+                        {errorMessage && (
+                            <p className="rounded-lg bg-red-50 p-3 text-center text-sm text-red-700" role="alert">
+                                {errorMessage}
+                            </p>
+                        )}
                     </form>
                 </div>
 

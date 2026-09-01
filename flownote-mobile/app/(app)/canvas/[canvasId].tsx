@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   Alert,
@@ -245,12 +246,15 @@ const buildCanvasLocalDraft = (
 });
 
 export default function CanvasScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ canvasId: string }>();
+  const routeCanvasId = Array.isArray(params.canvasId) ? params.canvasId[0] : params.canvasId;
   const { token, loading: sessionLoading } = useSession();
   const [tool, setTool] = useState<Tool>('pen');
   const [canvasDocuments, setCanvasDocuments] = useState<CanvasDocumentSummary[]>([]);
   const [canvasFolders, setCanvasFolders] = useState<CanvasFolder[]>([]);
-  const [selectedCanvasId, setSelectedCanvasId] = useState<string | null>(null);
-  const [libraryVisible, setLibraryVisible] = useState(true);
+  const [selectedCanvasId, setSelectedCanvasId] = useState<string | null>(routeCanvasId ?? null);
+  const [libraryVisible, setLibraryVisible] = useState(false);
   const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(() => new Set());
   const [folderName, setFolderName] = useState('');
   const [folderCategory, setFolderCategory] = useState('');
@@ -347,6 +351,12 @@ export default function CanvasScreen() {
   useEffect(() => {
     selectedCanvasIdRef.current = selectedCanvasId;
   }, [selectedCanvasId]);
+
+  useEffect(() => {
+    if (routeCanvasId && routeCanvasId !== selectedCanvasIdRef.current) {
+      setSelectedCanvasId(routeCanvasId);
+    }
+  }, [routeCanvasId]);
 
   const setSyncedViewport = useCallback((nextViewport: typeof viewport) => {
     viewportRef.current = nextViewport;
@@ -578,10 +588,9 @@ export default function CanvasScreen() {
 
   useEffect(() => {
     const loadCanvasPreferences = async () => {
-      const [storedViewport, storedPenColor, storedLibraryVisible] = await Promise.all([
+      const [storedViewport, storedPenColor] = await Promise.all([
         AsyncStorage.getItem(CANVAS_VIEWPORT_STORAGE_KEY),
         AsyncStorage.getItem(CANVAS_PEN_COLOR_STORAGE_KEY),
-        AsyncStorage.getItem(CANVAS_LIBRARY_VISIBLE_STORAGE_KEY),
       ]);
 
       if (storedViewport) {
@@ -607,9 +616,6 @@ export default function CanvasScreen() {
         setPenColor(storedPenColor);
       }
 
-      if (storedLibraryVisible) {
-        setLibraryVisible(storedLibraryVisible !== 'false');
-      }
     };
 
     void loadCanvasPreferences();
@@ -685,6 +691,7 @@ export default function CanvasScreen() {
     setCurrentLine([]);
     setCurrentLasso([]);
     setLassoSelection(null);
+    router.replace({ pathname: '/canvas/[canvasId]', params: { canvasId } });
   };
 
   const createCanvas = async (folderId?: string) => {
@@ -836,10 +843,17 @@ export default function CanvasScreen() {
     if (!activeToken) return;
     try {
       await flownoteApi.deleteCanvasDocument(activeToken, canvasId);
+      const deletingSelectedCanvas = selectedCanvasIdRef.current === canvasId;
       setCanvasDocuments((current) => {
         const next = current.filter((document) => document.id !== canvasId);
-        if (selectedCanvasIdRef.current === canvasId) {
-          setSelectedCanvasId(next[0]?.id ?? null);
+        if (deletingSelectedCanvas) {
+          const nextCanvasId = next[0]?.id ?? null;
+          setSelectedCanvasId(nextCanvasId);
+          if (nextCanvasId) {
+            router.replace({ pathname: '/canvas/[canvasId]', params: { canvasId: nextCanvasId } });
+          } else {
+            router.replace('/canvas');
+          }
         }
         return next;
       });

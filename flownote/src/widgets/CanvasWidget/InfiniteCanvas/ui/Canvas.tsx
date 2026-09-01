@@ -13,7 +13,6 @@ import {
     CANVAS_ERASER_IMAGES_STORAGE_KEY,
     CANVAS_ERASER_LINES_STORAGE_KEY,
     CANVAS_ERASER_TEXT_BOXES_STORAGE_KEY,
-    CANVAS_LIBRARY_VISIBLE_STORAGE_KEY,
     CANVAS_PEN_COLOR_STORAGE_KEY,
     CANVAS_PENCIL_ONLY_MODE_STORAGE_KEY,
     DEFAULT_PEN_COLOR,
@@ -30,13 +29,12 @@ import {
     type LassoSelection,
 } from "@/features/canvas";
 import { getAutoTextBoxSize } from "@/features/canvas";
-import type { CanvasDocumentSummary, CanvasFolder, Point, TextBoxElement } from "@/entities/canvas";
-import { getCanvasDocuments, getCanvasFolders, createCanvasDocument } from "@/entities/canvas";
+import type { CanvasDocumentSummary, Point, TextBoxElement } from "@/entities/canvas";
+import { getCanvasDocuments } from "@/entities/canvas";
 import { useLocalStorageBoolean } from "@/shared/lib/useLocalStorageBoolean";
 import { subscribeSyncEvents } from "@/shared/lib/sync";
 import { useCanvasPointerInput } from "../model/useCanvasPointerInput";
 import { useLassoActions } from "../model/useLassoActions";
-import { CanvasLibraryPanel } from "./CanvasLibraryPanel";
 import { Toolbar } from "./Toolbar";
 import "../index.css";
 
@@ -77,14 +75,9 @@ const Canvas = () => {
     }));
 
     const [canvasDocuments, setCanvasDocuments] = useState<CanvasDocumentSummary[]>([]);
-    const [canvasFolders, setCanvasFolders] = useState<CanvasFolder[]>([]);
-    // 캔버스 id는 URL(/canvas/:canvasId)로 구분한다. 라우터가 canvasId로 위젯을 키잉해
-    // 리마운트하므로 URL→상태는 lazy 초기값으로 반영하고, 편집기 내 전환은 URL을 갱신한다.
     const { canvasId: routeCanvasId } = useParams<{ canvasId: string }>();
     const navigate = useNavigate();
-    const [selectedCanvasId, setSelectedCanvasId] = useState<string | null>(routeCanvasId ?? null);
-    const [isCanvasLibraryVisible, setIsCanvasLibraryVisible] = useLocalStorageBoolean(CANVAS_LIBRARY_VISIBLE_STORAGE_KEY, true);
-    const [libraryError, setLibraryError] = useState<string | null>(null);
+    const selectedCanvasId = routeCanvasId ?? null;
 
     const { offset, setOffset, scale, setScale, tool, setTool, getCanvasCoords } = useCanvasState(canvasRef);
 
@@ -156,6 +149,8 @@ const Canvas = () => {
     const [penColor, setPenColor] = useState(() => localStorage.getItem(CANVAS_PEN_COLOR_STORAGE_KEY) || DEFAULT_PEN_COLOR);
     const [editingTextBoxId, setEditingTextBoxId] = useState<string | null>(null);
     const [editingTextValue, setEditingTextValue] = useState("");
+    const editingTextBoxSnapshotRef = useRef<TextBoxElement | null>(null);
+    const skipTextBlurCommitRef = useRef(false);
     const [isCanvasSettingsVisible, setIsCanvasSettingsVisible] = useState(false);
     const [canEraseLines, setCanEraseLines] = useLocalStorageBoolean(CANVAS_ERASER_LINES_STORAGE_KEY, true);
     const [canEraseImages, setCanEraseImages] = useLocalStorageBoolean(CANVAS_ERASER_IMAGES_STORAGE_KEY, true);
@@ -184,24 +179,11 @@ const Canvas = () => {
         [editingTextBoxId, textBoxes],
     );
 
-    const loadCanvasLibrary = useCallback(async () => {
-        setLibraryError(null);
+    const loadCanvasDocuments = useCallback(async () => {
         try {
-            const [loadedDocuments, folders] = await Promise.all([getCanvasDocuments(), getCanvasFolders()]);
-            let documents = loadedDocuments;
-            if (documents.length === 0) {
-                const created = await createCanvasDocument("기본 캔버스");
-                documents = [created];
-            }
-            setCanvasDocuments(documents);
-            setCanvasFolders(folders);
-            setSelectedCanvasId((current) => {
-                if (current && documents.some((document) => document.id === current)) return current;
-                return documents[0]?.id ?? null;
-            });
+            setCanvasDocuments(await getCanvasDocuments());
         } catch (error) {
-            console.error("Failed to load canvas library:", error);
-            setLibraryError("캔버스 목록을 불러오는 중 오류가 발생했습니다.");
+            console.error("Failed to load canvas documents:", error);
         }
     }, []);
 
@@ -212,14 +194,6 @@ const Canvas = () => {
     useEffect(() => {
         selectedCanvasIdRef.current = selectedCanvasId;
     }, [selectedCanvasId]);
-
-    // 선택 상태 → URL. 편집기 안에서 다른 캔버스를 고르면 주소를 /canvas/:id로 맞춘다.
-    // (URL→상태는 route.tsx의 key={canvasId} 리마운트 + 위 lazy 초기값으로 처리)
-    useEffect(() => {
-        if (selectedCanvasId && selectedCanvasId !== routeCanvasId) {
-            navigate(`/canvas/${selectedCanvasId}`);
-        }
-    }, [selectedCanvasId, routeCanvasId, navigate]);
 
     useEffect(() => {
         handleFlushSaveRef.current = handleFlushSave;
@@ -250,9 +224,9 @@ const Canvas = () => {
     }, []);
 
     useEffect(() => {
-        const timer = window.setTimeout(() => void loadCanvasLibrary(), 0);
+        const timer = window.setTimeout(() => void loadCanvasDocuments(), 0);
         return () => window.clearTimeout(timer);
-    }, [loadCanvasLibrary]);
+    }, [loadCanvasDocuments]);
 
     useEffect(() => {
         if (!selectedCanvasId) return undefined;
@@ -272,9 +246,9 @@ const Canvas = () => {
 
     useEffect(() => subscribeSyncEvents((event) => {
         if (event.resource === "canvas" || event.resource === "all") {
-            void loadCanvasLibrary();
+            void loadCanvasDocuments();
         }
-    }), [loadCanvasLibrary]);
+    }), [loadCanvasDocuments]);
 
     useEffect(() => {
         if (selectedCanvasId) requestSave();
@@ -357,19 +331,6 @@ const Canvas = () => {
         getLassoSelectionBounds(lassoSelection, drawnLines, images, textBoxes)
     ), [drawnLines, images, lassoSelection, textBoxes]);
 
-    const flushCurrentCanvasSave = () => {
-        if (selectedCanvasIdRef.current) handleFlushSaveRef.current();
-    };
-
-    const handleSelectCanvas = (canvasId: string) => {
-        if (selectedCanvasIdRef.current !== canvasId) {
-            flushCurrentCanvasSave();
-        }
-        setSelectedCanvasId(canvasId);
-    };
-
-    const toggleCanvasLibraryVisible = () => setIsCanvasLibraryVisible((current) => !current);
-
     const togglePencilOnlyMode = () => setPencilOnlyMode((current) => !current);
 
 
@@ -384,6 +345,8 @@ const Canvas = () => {
     };
 
     const beginTextBoxEdit = (textBox: TextBoxElement) => {
+        editingTextBoxSnapshotRef.current = { ...textBox };
+        skipTextBlurCommitRef.current = false;
         setEditingTextBoxId(textBox.id);
         setEditingTextValue(textBox.text);
     };
@@ -422,6 +385,19 @@ const Canvas = () => {
         }));
         setEditingTextBoxId(null);
         setEditingTextValue("");
+        editingTextBoxSnapshotRef.current = null;
+    };
+
+    const cancelTextBoxEdit = () => {
+        if (!editingTextBoxId) return;
+        const original = editingTextBoxSnapshotRef.current;
+        skipTextBlurCommitRef.current = true;
+        setTextBoxes((prev) => original
+            ? prev.map((textBox) => (textBox.id === editingTextBoxId ? original : textBox))
+            : prev.filter((textBox) => textBox.id !== editingTextBoxId));
+        setEditingTextBoxId(null);
+        setEditingTextValue("");
+        editingTextBoxSnapshotRef.current = null;
     };
 
     const createTextBoxAt = (point: Point) => {
@@ -436,6 +412,8 @@ const Canvas = () => {
             color: penColor,
             status: "new",
         }]);
+        editingTextBoxSnapshotRef.current = null;
+        skipTextBlurCommitRef.current = false;
         setEditingTextBoxId(id);
         setEditingTextValue("");
     };
@@ -578,6 +556,7 @@ const Canvas = () => {
                 {/* 툴바는 폴더 패널과 같이 캔버스 위에 떠 있는 오버레이다(문서 흐름에서 제외 → 캔버스 전체 높이 사용). */}
                 <Toolbar
                     canvasTitle={selectedCanvasTitle}
+                    onNavigateToCanvasList={() => navigate("/canvas")}
                     tool={tool}
                     setTool={setTool}
                     handleImageUpload={async (event) => {
@@ -626,10 +605,6 @@ const Canvas = () => {
 
                         <div className="grid gap-2 text-sm">
                             <label className="flex items-center justify-between gap-3 rounded-md border border-stone-200 px-3 py-2">
-                                <span className="font-semibold">캔버스 폴더</span>
-                                <input type="checkbox" checked={isCanvasLibraryVisible} onChange={toggleCanvasLibraryVisible} />
-                            </label>
-                            <label className="flex items-center justify-between gap-3 rounded-md border border-stone-200 px-3 py-2">
                                 <span className="font-semibold">펜슬 전용 그리기</span>
                                 <input type="checkbox" checked={pencilOnlyMode} onChange={togglePencilOnlyMode} />
                             </label>
@@ -657,21 +632,6 @@ const Canvas = () => {
                         </div>
                     </div>
                 )}
-                <CanvasLibraryPanel
-                    documents={canvasDocuments}
-                    folders={canvasFolders}
-                    selectedCanvasId={selectedCanvasId}
-                    libraryError={libraryError}
-                    isVisible={isCanvasLibraryVisible}
-                    onToggleVisible={toggleCanvasLibraryVisible}
-                    onSelectCanvas={handleSelectCanvas}
-                    onFlushCurrentCanvasSave={flushCurrentCanvasSave}
-                    setCanvasDocuments={setCanvasDocuments}
-                    setCanvasFolders={setCanvasFolders}
-                    setSelectedCanvasId={setSelectedCanvasId}
-                    setLibraryError={setLibraryError}
-                />
-
                 <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full" width={viewport.width} height={viewport.height} viewBox={`0 0 ${viewport.width} ${viewport.height}`} aria-hidden="true">
                 <rect width="100%" height="100%" fill="#fafaf9" />
                 <g transform={`translate(${offset.x} ${offset.y}) scale(${scale})`}>
@@ -686,6 +646,8 @@ const Canvas = () => {
 
                 <div
                     ref={konvaRendererRef}
+                    data-testid="canvas-render-surface"
+                    data-visible-line-count={drawnLines.filter((line) => line.status !== "deleted").length}
                     className="pointer-events-none absolute inset-0 z-10"
                     style={{ width: viewport.width, height: viewport.height }}
                     aria-hidden="true"
@@ -720,17 +682,25 @@ const Canvas = () => {
                         data-canvas-touch-allow="true"
                         className="absolute z-30 resize-none overflow-hidden rounded-md border-2 border-blue-500 bg-white/95 p-2 font-bold leading-[1.4] text-stone-900 shadow-lg outline-none"
                         value={editingTextValue}
+                        placeholder="텍스트 입력"
                         onChange={(event) => updateEditingTextValue(event.target.value)}
-                        onBlur={commitTextBoxEdit}
+                        onBlur={() => {
+                            if (skipTextBlurCommitRef.current) {
+                                skipTextBlurCommitRef.current = false;
+                                return;
+                            }
+                            commitTextBoxEdit();
+                        }}
                         onKeyDown={(event) => {
-                            if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                            if (event.key === "Enter" && !event.shiftKey) {
                                 event.preventDefault();
                                 commitTextBoxEdit();
+                                setTool("handle");
                             }
                             if (event.key === "Escape") {
                                 event.preventDefault();
-                                setEditingTextBoxId(null);
-                                setEditingTextValue("");
+                                cancelTextBoxEdit();
+                                setTool("handle");
                             }
                         }}
                         style={{

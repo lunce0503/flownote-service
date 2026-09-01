@@ -2,6 +2,21 @@
 
 Expo Router 기반 iOS/Android/Web 클라이언트다. 계정, 작업, 노트, AI, 캔버스 화면을 React Native로 직접 렌더링하며 `EXPO_PUBLIC_WAS_URL`의 Flownote FastAPI 게이트웨이를 단일 공개 API 진입점으로 사용한다.
 
+## 화면 구조
+
+앱은 최초 진입 시 세션을 확인해 로그인 또는 홈으로 이동한다. 로그인 이후에는 홈이 상위 기능 진입점이며, 목록과 상세/편집 라우트를 분리한다.
+
+```text
+/login
+/home
+/tasks        → /tasks/:taskId
+/notes        → /notes/:noteId
+/canvas       → /canvas/:canvasId
+/agent
+```
+
+노트·작업·Canvas의 상위 라우트는 생성과 목록 탐색을 담당하고, 항목 선택 후 하위 라우트에서 편집과 삭제를 수행한다.
+
 ## iPad 개발 실행
 
 Expo Go를 설치한 iPad에서 QR 코드를 열어 테스트한다. 운영 Railway API를 사용할 때는 다음과 같이 실행한다.

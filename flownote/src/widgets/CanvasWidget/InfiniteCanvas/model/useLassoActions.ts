@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { markModified, type LassoSelection } from "@/features/canvas";
+import { markModified, removeOrMarkDeleted, type LassoSelection } from "@/features/canvas";
 import type { CanvasElementStatus, ImageElement, LineElement, Point, TextBoxElement, ToolType } from "@/entities/canvas";
 
 type Layerable = { id: string; zIndex?: number; status?: CanvasElementStatus };
@@ -221,9 +221,9 @@ export const useLassoActions = ({
     const handleDeleteLassoSelection = () => {
         if (!lassoSelection) return;
         recordHistory();
-        setDrawnLines((prev) => prev.map((line) => (lassoSelection.lineIds.has(line.id) ? markModified({ ...line, status: "deleted" }) : line)));
-        setImages((prev) => prev.map((image) => (lassoSelection.imageIds.has(image.id) ? markModified({ ...image, status: "deleted" }) : image)));
-        setTextBoxes((prev) => prev.map((textBox) => (lassoSelection.textBoxIds.has(textBox.id) ? markModified({ ...textBox, status: "deleted" }) : textBox)));
+        setDrawnLines((prev) => removeOrMarkDeleted(prev, lassoSelection.lineIds));
+        setImages((prev) => removeOrMarkDeleted(prev, lassoSelection.imageIds));
+        setTextBoxes((prev) => removeOrMarkDeleted(prev, lassoSelection.textBoxIds));
         setLassoSelection(null);
     };
 

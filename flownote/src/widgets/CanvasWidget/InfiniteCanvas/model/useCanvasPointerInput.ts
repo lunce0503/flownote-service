@@ -311,7 +311,10 @@ export const useCanvasPointerInput = ({
                 && point.y >= textBox.y
                 && point.y <= textBox.y + textBox.height
             ));
-            if (targetTextBox) beginTextBoxEdit(targetTextBox);
+            if (targetTextBox) {
+                if (editingTextBoxId && editingTextBoxId !== targetTextBox.id) commitTextBoxEdit();
+                beginTextBoxEdit(targetTextBox);
+            }
             else {
                 if (editingTextBoxId) commitTextBoxEdit();
                 createTextBoxAt(point);

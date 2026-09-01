@@ -15,8 +15,11 @@
 | `serve` | `flownote-serve/` | Railway `flownote-serve` | `go test ./...` | `/` |
 | `ai` | `flownote-ai/` | Railway `flownote-ai` | `uv run pytest -q` | `/`, `/api/capabilities` |
 | `mobile` | `flownote-mobile/` | Railway `flownote-mobile-production` 웹 테스트 | `yarn verify` | `/health` |
+| `mobile-expo-go` | `flownote-mobile/` | Railway `flownote-expo-go` Metro | `npm run verify` | `/` Expo manifest |
 
 웹과 모바일의 공개 API 기준 URL은 `https://flownote-api-production.up.railway.app`이다. Railway의 Spring·Go·AI 서비스 URL은 클라이언트에 노출하지 않는다.
+
+Expo Go용 `flownote-expo-go`는 `Dockerfile.expo-go`를 사용하고 `EXPO_PUBLIC_WAS_URL`을 공개 gateway로 설정한다. `RAILWAY_PUBLIC_DOMAIN`은 Railway가 주입하며 시작 스크립트가 이를 `EXPO_PACKAGER_PROXY_URL=https://<domain>`으로 변환한다. Safari용 `flownote-mobile-production` 정적 서비스와 배포·롤백을 분리한다.
 
 ## 로컬 검증
 
@@ -92,6 +95,14 @@ Railway sleep은 비용을 줄이지만 upstream 초기화 중 첫 gateway 요�
 - 클라이언트는 GET의 502·503·504와 네트워크 실패만 제한적으로 재시도한다.
 - POST·PATCH 등 변경 요청은 중복 처리 위험 때문에 자동 재시도하지 않는다.
 - 배포 직후 공개 API를 호출해 upstream 준비 상태까지 확인한다.
+
+## Railway 리전 기준
+
+production의 요청 경로에 있는 `flownote-api`, `flownote-main`, `flownote-canvas`, PostgreSQL, Redis는 `asia-southeast1-eqsg3a`(Singapore)에 함께 둔다. 앱과 데이터 저장소가 다른 리전에 있으면 단순 인증·목록 조회도 DB 왕복마다 수백 ms가 추가되므로, 서비스 생성·복제·복구 후 리전 정합성을 확인한다.
+
+```bash
+railway status --json | jq '[.environments.edges[].node | select(.name=="production") | .serviceInstances.edges[].node | select(.serviceName=="flownote-api" or .serviceName=="flownote-main" or .serviceName=="flownote-canvas" or .serviceName=="Postgres" or .serviceName=="Redis") | {service:.serviceName, region:.latestDeployment.meta.serviceManifest.deploy.multiRegionConfig}]'
+```
 
 ## 배포 후 확인
 

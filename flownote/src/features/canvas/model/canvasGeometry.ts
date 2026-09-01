@@ -12,6 +12,14 @@ export const markModified = <T extends { status?: CanvasElementStatus }>(item: T
     status: item.status === "new" ? "new" : "modified",
 });
 
+export const removeOrMarkDeleted = <T extends { id: string; status?: CanvasElementStatus }>(
+    items: T[],
+    ids: Set<string>,
+): T[] => items.flatMap((item) => {
+    if (!ids.has(item.id)) return [item];
+    return item.status === "new" ? [] : [{ ...item, status: "deleted" as const }];
+});
+
 export const isPointInPolygon = (point: Point, polygon: Point[]) => {
     if (polygon.length < 3) return false;
 

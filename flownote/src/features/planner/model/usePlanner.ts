@@ -92,10 +92,11 @@ export const usePlanner = () => {
       setScheduleItems((current) => current.map((item) => (
         item.id === id ? (updated ?? { ...item, ...input, days_of_week: input.daysOfWeek }) : item
       )));
-      return;
+      return updated;
     }
     const created = await createScheduleItem(input);
     setScheduleItems((current) => [...current, created]);
+    return created;
   }, []);
 
   const removeScheduleItem = useCallback(async (id: string) => {

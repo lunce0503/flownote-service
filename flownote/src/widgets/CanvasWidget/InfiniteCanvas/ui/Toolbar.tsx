@@ -1,11 +1,12 @@
 import React from 'react';
 import type { ToolType } from '@/entities/canvas';
 import type { CanvasLoadTrigger, CanvasSaveState, CanvasSaveStatus } from '@/features/canvas';
-import { BringToFront, CheckCircle2, ClipboardPaste, Copy, Download, Eraser, Hand, ImagePlus, Lasso, Loader2, Maximize, Minimize, Palette, PenLine, RefreshCw, RotateCcw, SendToBack, Settings, Trash2, TriangleAlert, Type, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowLeft, BringToFront, CheckCircle2, ClipboardPaste, Copy, Download, Eraser, Hand, ImagePlus, Lasso, Loader2, Maximize, Minimize, MoreVertical, Palette, PenLine, RefreshCw, RotateCcw, SendToBack, Settings, Trash2, TriangleAlert, Type, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useFullscreen } from '@/shared/lib/useFullscreen';
 
 interface ToolbarProps {
   canvasTitle: string;
+  onNavigateToCanvasList: () => void;
   tool: ToolType;
   setTool: (tool: ToolType) => void;
   handleImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
@@ -165,6 +166,7 @@ const PenColorPill: React.FC<PenColorPillProps> = ({ penColor, onPenColorChange,
 
 export const Toolbar: React.FC<ToolbarProps> = ({
   canvasTitle,
+  onNavigateToCanvasList,
   tool,
   setTool,
   handleImageUpload,
@@ -194,6 +196,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   viewportCenter,
 }) => {
   const { isFullscreen, toggleFullscreen } = useFullscreen();
+  const [isFileMenuOpen, setIsFileMenuOpen] = React.useState(false);
+  const fileMenuButtonRef = React.useRef<HTMLButtonElement>(null);
+  const fileMenuRef = React.useRef<HTMLDivElement>(null);
   const touchActivation = useTouchActivation();
   const toolButtons: Array<{ tool: ToolType; label: string; icon: React.ReactNode }> = [
     { tool: 'pen', label: '펜', icon: <PenLine size={TOOLBAR_ICON_SIZE} /> },
@@ -214,15 +219,160 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const saveStatusLabel = saveState.pendingRetries > 0
     ? `${saveState.message} ${saveState.pendingRetries}`
     : saveState.message;
+  const mobileSaveStatusLabel = saveStatusLabel.replace(/^저장\s+/, '');
+
+  React.useEffect(() => {
+    if (!isFileMenuOpen) return;
+    window.requestAnimationFrame(() => fileMenuRef.current?.querySelector<HTMLElement>("[role='menuitem']")?.focus());
+    const closeMenu = (restoreFocus: boolean) => {
+      setIsFileMenuOpen(false);
+      if (restoreFocus) window.requestAnimationFrame(() => fileMenuButtonRef.current?.focus());
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeMenu(true);
+    };
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!fileMenuRef.current?.contains(target) && !fileMenuButtonRef.current?.contains(target)) {
+        closeMenu(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [isFileMenuOpen]);
+
+  const handleFileMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("[role='menuitem']:not(:disabled)"));
+    if (items.length === 0) return;
+    event.preventDefault();
+    const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+    const offset = event.key === 'ArrowDown' ? 1 : -1;
+    items[(currentIndex + offset + items.length) % items.length].focus();
+  };
+
+  const mobileMenuItemClass = 'flex min-h-11 w-full items-center gap-3 px-3 text-left text-sm font-semibold text-stone-800 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50';
 
   return (
     <div
       data-canvas-touch-allow="true"
       className="pointer-events-none absolute inset-x-2 top-2 z-50 flex flex-col items-center gap-2 text-stone-950 touch-pan-x touch-pan-y"
     >
+      <div className="pointer-events-auto relative flex w-full items-center gap-2 p-1 lg:hidden">
+        <button
+          ref={fileMenuButtonRef}
+          type="button"
+          {...touchActivation(onNavigateToCanvasList)}
+          className={`${iconButtonClass} bg-white/95 shadow-lg ring-1 ring-stone-200/80 backdrop-blur`}
+          aria-label="그림판 목록으로"
+        >
+          <ArrowLeft size={TOOLBAR_ICON_SIZE} />
+        </button>
+        <div className="flex min-h-12 min-w-0 flex-1 items-center rounded-full bg-white/95 px-4 text-sm font-black shadow-lg ring-1 ring-stone-200/80 backdrop-blur" aria-label={`그림판 제목: ${canvasTitle}`}>
+          <span className="truncate">{canvasTitle}</span>
+        </div>
+        <div
+          className={`inline-flex min-h-10 max-w-[104px] shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-black shadow-lg ${saveStatusClassByStatus[saveState.status]}`}
+          title={saveStatusLabel}
+          aria-live="polite"
+        >
+          {saveStatusIcon}
+          <span className="truncate">{mobileSaveStatusLabel}</span>
+        </div>
+        <button
+          type="button"
+          {...touchActivation(() => setIsFileMenuOpen((open) => !open))}
+          className={`${iconButtonClass} bg-white/95 shadow-lg ring-1 ring-stone-200/80 backdrop-blur`}
+          aria-label="파일 동작"
+          aria-haspopup="menu"
+          aria-expanded={isFileMenuOpen}
+        >
+          <MoreVertical size={TOOLBAR_ICON_SIZE} />
+        </button>
+
+        {isFileMenuOpen && (
+          <div ref={fileMenuRef} className="absolute right-1 top-full z-50 mt-1 w-56 overflow-hidden rounded-lg bg-white py-1 shadow-xl ring-1 ring-stone-200" role="menu" onKeyDown={handleFileMenuKeyDown}>
+            {saveState.status === 'failed' && (
+              <button type="button" role="menuitem" className={mobileMenuItemClass} {...touchActivation(() => { setIsFileMenuOpen(false); void retryPendingSaves(); })}>
+                <RefreshCw size={18} /> 저장 재시도
+              </button>
+            )}
+            {canCancelRetry && (
+              <button type="button" role="menuitem" className={mobileMenuItemClass} {...touchActivation(() => { setIsFileMenuOpen(false); cancelPendingSaves(); })}>
+                <X size={18} /> 저장 재시도 취소
+              </button>
+            )}
+            <button type="button" role="menuitem" className={mobileMenuItemClass} {...touchActivation(() => { setIsFileMenuOpen(false); void handleSave(); })}>
+              <Download size={18} /> 캔버스 저장
+            </button>
+            <button type="button" role="menuitem" className={mobileMenuItemClass} disabled={saveState.status === 'loading'} {...touchActivation(() => { setIsFileMenuOpen(false); void handleLoad(); })}>
+              <Upload size={18} /> 캔버스 불러오기
+            </button>
+            {saveState.status === 'loading' && (
+              <button type="button" role="menuitem" className={mobileMenuItemClass} {...touchActivation(() => { setIsFileMenuOpen(false); cancelCanvasLoad(); })}>
+                <X size={18} /> 불러오기 취소
+              </button>
+            )}
+            <button type="button" role="menuitem" className={mobileMenuItemClass} {...touchActivation(() => { setIsFileMenuOpen(false); void toggleFullscreen(); })}>
+              {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+              {isFullscreen ? '전체 화면 종료' : '전체 화면'}
+            </button>
+            <button type="button" role="menuitem" className={mobileMenuItemClass} {...touchActivation(() => { setIsFileMenuOpen(false); onToggleCanvasSettingsVisible(); })}>
+              <Settings size={18} /> 그림판 설정
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="canvas-toolbar-scroll pointer-events-auto flex w-max max-w-full overflow-x-auto p-1 lg:hidden" aria-label="그리기 도구">
+        <div className={floatingPillClass}>
+          <button
+            type="button"
+            {...touchActivation(handleUndo)}
+            disabled={!canUndo}
+            className={`${iconButtonClass} ${canUndo ? '' : 'disabled:cursor-not-allowed disabled:opacity-40'}`}
+            aria-label="되돌리기"
+          >
+            <RotateCcw size={TOOLBAR_ICON_SIZE} />
+          </button>
+          {toolButtons.map((item) => {
+            const selected = tool === item.tool;
+            return (
+              <button
+                key={item.tool}
+                type="button"
+                {...touchActivation(() => setTool(item.tool))}
+                className={`${iconButtonClass} ${selected ? selectedIconButtonClass : ''}`}
+                aria-label={item.label}
+                aria-pressed={selected}
+              >
+                {item.icon}
+              </button>
+            );
+          })}
+          <label className={`${iconButtonClass} cursor-pointer`} aria-label="이미지 추가">
+            <ImagePlus size={TOOLBAR_ICON_SIZE} />
+            <input className="sr-only" type="file" accept="image/*" onChange={handleImageUpload} />
+          </label>
+        </div>
+      </div>
+
       {/* 폴더 패널처럼 캔버스 위에 떠 있는 플로팅 툴바 — 필 사이 빈 공간은 캔버스 입력을 통과시킨다. */}
-      <div className="canvas-toolbar-scroll pointer-events-auto flex w-max max-w-full items-start gap-2 overflow-x-auto p-1">
+      <div className="canvas-toolbar-scroll pointer-events-auto hidden w-max max-w-full items-start gap-2 overflow-x-auto p-1 lg:flex">
         <div className="flex min-w-max items-start gap-2">
+          <button
+            type="button"
+            {...touchActivation(onNavigateToCanvasList)}
+            className={`${iconButtonClass} bg-white/95 shadow-lg ring-1 ring-stone-200/80 backdrop-blur`}
+            title="그림판 목록으로"
+            aria-label="그림판 목록으로"
+          >
+            <ArrowLeft size={TOOLBAR_ICON_SIZE} />
+          </button>
           <div className="pointer-events-auto flex min-h-12 max-w-[128px] shrink-0 items-center rounded-full bg-white/95 px-4 text-sm font-black shadow-lg ring-1 ring-stone-200/80 backdrop-blur sm:max-w-[220px] xl:max-w-xs" title={canvasTitle}>
             <span className="truncate">{canvasTitle}</span>
           </div>

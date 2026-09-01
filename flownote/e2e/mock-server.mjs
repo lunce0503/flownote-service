@@ -9,7 +9,49 @@ const user = {
   nickname: "E2E",
   role: "USER",
 };
-const state = { saves: [] };
+const emptyCanvasData = () => ({
+  lines: [],
+  images: [],
+  textBoxes: [],
+});
+const existingLineCanvasData = () => ({
+  lines: [{
+    id: "existing-line",
+    points: [{ x: 500, y: 260 }, { x: 550, y: 290 }, { x: 600, y: 320 }],
+    color: "#000000",
+    strokeWidth: 12,
+  }],
+  images: [],
+  textBoxes: [],
+});
+const canvasDocuments = [
+  { id: "e2e-canvas", title: "E2E Canvas", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-20T00:00:00Z" },
+  { id: "recent-canvas", title: "최근 캔버스", created_at: "2026-08-25T00:00:00Z", updated_at: "2026-08-26T00:00:00Z" },
+];
+const canvasFolders = [
+  { id: "canvas-folder", category: "업무", name: "프로젝트", canvasIds: ["e2e-canvas"], updated_at: "2026-08-20T00:00:00Z" },
+];
+const notes = [
+  { id: "older-note", title: "이전 노트", content: [{ type: "paragraph", content: [{ type: "text", text: "이전 내용" }] }], created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-10T00:00:00Z", revision: 1 },
+  { id: "recent-note", title: "최근 노트", content: [{ type: "paragraph", content: [{ type: "text", text: "최근 내용" }] }], created_at: "2026-08-25T00:00:00Z", updated_at: "2026-08-26T00:00:00Z", revision: 1 },
+];
+const noteFolders = [
+  { id: "note-folder", category: "업무", name: "프로젝트", noteIds: ["older-note"], updated_at: "2026-08-20T00:00:00Z" },
+];
+const state = { saves: [], canvasData: emptyCanvasData(), scheduleItems: [] };
+
+const readJson = (request) => new Promise((resolve, reject) => {
+  const chunks = [];
+  request.on("data", (chunk) => chunks.push(chunk));
+  request.on("end", () => {
+    try {
+      resolve(chunks.length > 0 ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {});
+    } catch (error) {
+      reject(error);
+    }
+  });
+  request.on("error", reject);
+});
 
 const sendJson = (response, status, body) => {
   response.writeHead(status, {
@@ -21,7 +63,7 @@ const sendJson = (response, status, body) => {
   response.end(JSON.stringify(body));
 };
 
-const httpServer = createServer((request, response) => {
+const httpServer = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", `http://${request.headers.host}`);
 
   if (request.method === "OPTIONS") {
@@ -36,6 +78,15 @@ const httpServer = createServer((request, response) => {
     sendJson(response, 200, state);
     return;
   }
+  if (request.method === "POST" && url.pathname === "/__e2e/reset") {
+    state.saves = [];
+    state.canvasData = url.searchParams.get("scenario") === "existing-line"
+      ? existingLineCanvasData()
+      : emptyCanvasData();
+    state.scheduleItems = [];
+    sendJson(response, 200, state);
+    return;
+  }
   if (request.method === "POST" && url.pathname === "/api/users/login") {
     sendJson(response, 200, { token: "e2e-token", user });
     return;
@@ -45,11 +96,55 @@ const httpServer = createServer((request, response) => {
     return;
   }
   if (request.method === "GET" && url.pathname === "/api/canvas/documents") {
-    sendJson(response, 200, [{ id: "e2e-canvas", title: "E2E Canvas" }]);
+    sendJson(response, 200, canvasDocuments);
     return;
   }
   if (request.method === "GET" && url.pathname === "/api/canvas/folders") {
+    sendJson(response, 200, canvasFolders);
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/notes") {
+    sendJson(response, 200, notes);
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/note-folders") {
+    sendJson(response, 200, noteFolders);
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/diary") {
+    sendJson(response, 200, { entry_date: url.searchParams.get("date"), todos: [], grid: {}, journal: [] });
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/diary/dates") {
     sendJson(response, 200, []);
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/tasks") {
+    sendJson(response, 200, []);
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/schedule-items") {
+    sendJson(response, 200, state.scheduleItems);
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/schedule-items") {
+    const body = await readJson(request);
+    const now = new Date().toISOString();
+    const item = {
+      id: `schedule-${state.scheduleItems.length + 1}`,
+      ...body,
+      created_at: now,
+      updated_at: now,
+    };
+    state.scheduleItems.push(item);
+    sendJson(response, 201, item);
+    return;
+  }
+  if (request.method === "DELETE" && url.pathname.startsWith("/api/schedule-items/")) {
+    const id = url.pathname.split("/").at(-1);
+    const index = state.scheduleItems.findIndex((item) => item.id === id);
+    const [deletedScheduleItem] = index >= 0 ? state.scheduleItems.splice(index, 1) : [];
+    sendJson(response, deletedScheduleItem ? 200 : 404, { deletedScheduleItem });
     return;
   }
 
@@ -76,9 +171,7 @@ io.on("connection", (socket) => {
         title: "E2E Canvas",
         revision: state.saves.length,
         loadStatus: "COMPLETE",
-        lines: [],
-        images: [],
-        textBoxes: [],
+        ...state.canvasData,
       },
     });
   });

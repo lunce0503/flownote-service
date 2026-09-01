@@ -119,9 +119,9 @@ entities/canvas/model/types.ts
 | | `canvasGeometry` · `canvasSpatialIndex` · `canvasSelectionModel` · `canvasTextBoxModel` | 좌표·rbush 공간 인덱스·라쏘 선택·텍스트박스 모델 |
 | | `canvasLibraryModel` · `canvasViewportStorage` · `useStoredCanvasViewport` · `canvasDraftWorker` · `canvasConstants` · `canvasDom` | 목록 상태·뷰포트 저장·초안 워커·상수·DOM 헬퍼 |
 | `widgets/CanvasWidget/` | `InfiniteCanvas/ui/Canvas.tsx` | 캔버스 본체(포인터·뷰포트·생명주기 플러시) |
-| | `InfiniteCanvas/ui/Toolbar.tsx` · `CanvasLibraryPanel.tsx` · `NoteDrawingCanvas.tsx` | 툴바, 문서·폴더 사이드 패널, 노트 내 필기 |
+| | `InfiniteCanvas/ui/Toolbar.tsx` · `NoteDrawingCanvas.tsx` | 목록 이동·편집 도구 툴바, 노트 내 필기 |
 | | `InfiniteCanvas/model/useLassoActions.ts` | 라쏘 선택 액션 |
-| | `CanvasList.tsx` | 캔버스 목록 화면 |
+| | `CanvasList.tsx` | 최근 문서, 카테고리별 폴더, 폴더 없는 문서와 문서·폴더 CRUD |
 
 ### `flownote-API/` — 실시간 허브 (게이트웨이)
 
@@ -158,7 +158,7 @@ entities/canvas/model/types.ts
 
 | 서버 | 위치 | 책임 |
 | --- | --- | --- |
-| `flownote/` | `entities/blog/api/` · `widgets/BlogWidget/` | 노트 CRUD 호출(`/api/notes`·`/api/note-folders`, 게이트웨이 경유)과 BlockNote 에디터. 에디터 이미지는 `/api/notes/upload` → `/uploads/**` |
+| `flownote/` | `entities/blog/api/` · `widgets/BlogWidget/` | `/blog/:noteId` ID 라우트, 최근/카테고리 폴더 목록, 노트 CRUD와 BlockNote 에디터. 에디터 이미지는 `/api/notes/upload` → `/uploads/**` |
 | `flownote-API/` | `app/gateway.py` | `/api/{notes,note-folders,upload}`·`/uploads/**` → 캔버스 백엔드 프록시 |
 | `flownote-canvas/` | `internal/notes/{model,repo,handler}.go` | 노트 본문 S3 오프로드(`note-content/{user}/{note}/{rev}-{clientKey}.json`), revision+client_id 낙관적 동시성(409), 폴더 uuid[] 관리, 업로드 정적 서빙(`FLOWNOTE_UPLOAD_DIR`) |
 | DB | `notes` · `note_folders` | Flyway 소유는 Spring(V2·V6·V20) |
