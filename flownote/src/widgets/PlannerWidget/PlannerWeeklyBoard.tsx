@@ -207,7 +207,7 @@ const PlannerWeeklyBoard = ({ items, today, onSave, onDelete }: Props) => {
         <div className="flex flex-col gap-2 rounded-lg border border-neutral-300 bg-neutral-50 p-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-bold">{editingId ? "일정 수정" : "새 일정"}</p>
-            <button type="button" onClick={() => setIsFormOpen(false)} className="text-neutral-400 hover:text-black">
+            <button type="button" onClick={() => setIsFormOpen(false)} className="text-neutral-400 hover:text-black" aria-label="일정 입력 닫기">
               <X size={16} />
             </button>
           </div>

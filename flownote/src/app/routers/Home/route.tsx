@@ -1,192 +1,112 @@
-import {
-    BookOpen,
-    Bot,
-    CheckSquare,
-    FileText,
-    Palette,
-    PenLine,
-    Plus,
-    Search,
-    Users,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { Bot, CheckSquare, Palette, PenLine, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 
-const workspaceStats = [
-    { label: "오늘의 작업", value: "Task", detail: "할 일과 마감일을 한 곳에서 확인" },
-    { label: "문서 흐름", value: "Blog", detail: "노트와 글을 이어서 정리" },
-    { label: "AI 도구", value: "Agent", detail: "요약과 자동화를 빠르게 실행" },
-    { label: "캔버스", value: "Canvas", detail: "아이디어를 시각적으로 배치" },
-];
-
-const quickActions = [
+const destinations = [
     {
-        label: "새 노트 작성",
-        description: "생각을 바로 문서로 정리",
+        label: "게시글 관리",
+        description: "노트 작성과 폴더 정리",
+        keywords: "노트 문서 블로그 글",
         href: "/blog",
         icon: PenLine,
     },
     {
         label: "플래너",
-        description: "할 일·시간표·일기를 한 곳에서",
+        description: "할 일, 시간표, 일기 관리",
+        keywords: "일정 작업 달력 계획",
         href: "/planner",
         icon: CheckSquare,
     },
     {
         label: "AI 에이전트",
-        description: "문서 작업을 보조",
+        description: "노트와 작업을 바탕으로 대화",
+        keywords: "AI 요약 자동화 대화",
         href: "/agent",
         icon: Bot,
     },
     {
         label: "캔버스 열기",
         description: "아이디어를 자유롭게 배치",
+        keywords: "그림판 필기 드로잉",
         href: "/canvas",
         icon: Palette,
     },
 ];
 
-const recentItems = [
-    { title: "제품 회의록 정리", type: "회의록", updatedAt: "오늘", icon: FileText },
-    { title: "강의 노트 초안", type: "노트", updatedAt: "어제", icon: BookOpen },
-    { title: "팀 공유 내용", type: "소셜", updatedAt: "최근", icon: Users },
-];
-
 const Home = () => {
+    const [query, setQuery] = useState("");
+    const filteredDestinations = useMemo(() => {
+        const normalizedQuery = query.trim().toLocaleLowerCase("ko");
+        if (!normalizedQuery) return destinations;
+
+        return destinations.filter((destination) => (
+            `${destination.label} ${destination.description} ${destination.keywords}`
+                .toLocaleLowerCase("ko")
+                .includes(normalizedQuery)
+        ));
+    }, [query]);
+
     return (
         <main className="min-h-screen bg-amber-50 text-stone-900">
-            <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
-                <section className="grid gap-6 border-b border-stone-200 pb-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-end">
-                    <div className="min-w-0">
-                        <p className="text-sm font-semibold text-amber-700">Flownote Workspace</p>
-                        <h1 className="mt-3 max-w-3xl text-3xl font-bold text-stone-900 sm:text-4xl">
-                            오늘의 문서와 작업을 바로 이어가세요
-                        </h1>
-                        <p className="mt-4 max-w-2xl text-sm leading-6 text-stone-600 sm:text-base">
-                            노트, 작업, 대화, 캔버스를 한 화면에서 이동할 수 있도록 정리했습니다.
+            <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
+                <section className="border-b border-stone-200 pb-8">
+                    <p className="text-sm font-semibold text-amber-700">Flownote</p>
+                    <h1 className="mt-3 max-w-3xl text-3xl font-bold text-stone-900 sm:text-4xl">
+                        작업을 선택하세요
+                    </h1>
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600 sm:text-base">
+                        노트, 일정, 대화, 캔버스 중 이어서 작업할 기능을 찾을 수 있습니다.
+                    </p>
+
+                    <label className="relative mt-6 block max-w-2xl">
+                        <span className="sr-only">기능 검색</span>
+                        <Search
+                            aria-hidden="true"
+                            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-stone-400"
+                            size={18}
+                        />
+                        <input
+                            aria-label="기능 검색"
+                            className="h-12 w-full rounded-lg border border-stone-200 bg-white pl-11 pr-4 text-sm text-stone-900 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+                            placeholder="노트, 플래너, 캔버스 검색"
+                            type="search"
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                        />
+                    </label>
+                </section>
+
+                <section aria-labelledby="workspace-destinations">
+                    <h2 id="workspace-destinations" className="text-xl font-bold text-stone-900">
+                        기능 바로가기
+                    </h2>
+                    {filteredDestinations.length > 0 ? (
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                            {filteredDestinations.map((destination) => {
+                                const Icon = destination.icon;
+                                return (
+                                    <Link
+                                        className="flex min-h-24 items-center gap-4 rounded-lg border border-stone-200 bg-white p-4 transition hover:border-amber-300 hover:bg-amber-50 focus:outline-none focus:ring-4 focus:ring-amber-100"
+                                        key={destination.href}
+                                        to={destination.href}
+                                    >
+                                        <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-stone-900 text-amber-50">
+                                            <Icon size={21} aria-hidden="true" />
+                                        </span>
+                                        <span className="min-w-0">
+                                            <span className="block text-base font-semibold text-stone-900">{destination.label}</span>
+                                            <span className="mt-1 block text-sm text-stone-500">{destination.description}</span>
+                                        </span>
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <p className="mt-4 rounded-lg border border-stone-200 bg-white p-6 text-sm text-stone-500" role="status">
+                            일치하는 기능이 없습니다.
                         </p>
-                    </div>
-
-                    <div className="flex w-full flex-col gap-3 sm:flex-row lg:flex-col">
-                        <label className="relative flex-1">
-                            <span className="sr-only">작업 검색</span>
-                            <Search
-                                aria-hidden="true"
-                                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-stone-400"
-                                size={18}
-                            />
-                            <input
-                                className="h-12 w-full rounded-lg border border-stone-200 bg-white pl-11 pr-4 text-sm text-stone-900 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
-                                placeholder="문서, 작업, 태그 검색"
-                                type="search"
-                            />
-                        </label>
-                        <Link
-                            className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-stone-800 px-5 text-sm font-semibold text-amber-50 shadow-md transition hover:bg-stone-700"
-                            to="/blog"
-                        >
-                            <Plus size={18} />
-                            새 문서
-                        </Link>
-                    </div>
+                    )}
                 </section>
-
-                <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {workspaceStats.map((item) => (
-                        <article
-                            className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm"
-                            key={item.label}
-                        >
-                            <p className="text-sm font-medium text-stone-500">{item.label}</p>
-                            <p className="mt-2 text-2xl font-bold text-stone-900">{item.value}</p>
-                            <p className="mt-3 text-sm leading-5 text-stone-500">{item.detail}</p>
-                        </article>
-                    ))}
-                </section>
-
-                <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
-                    <section className="min-w-0">
-                        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-                            <div>
-                                <p className="text-sm font-semibold text-amber-700">Planner</p>
-                                <h2 className="mt-1 text-2xl font-bold text-stone-900">오늘의 계획</h2>
-                            </div>
-                            <Link
-                                className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
-                                to="/planner"
-                            >
-플래너 열기
-                            </Link>
-                        </div>
-                        <div className="rounded-lg border border-stone-200 bg-white p-5 text-stone-700">
-                            <p className="text-sm">할 일, 주간 시간표, 일기를 한 화면에서 관리합니다.</p>
-                            <Link
-                                to="/planner"
-                                className="mt-3 inline-flex rounded-md bg-stone-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-stone-700"
-                            >
-                                플래너로 이동
-                            </Link>
-                        </div>
-                    </section>
-
-                    <aside className="flex flex-col gap-6">
-                        <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-                            <h2 className="text-lg font-bold text-stone-900">빠른 이동</h2>
-                            <div className="mt-4 grid gap-3">
-                                {quickActions.map((action) => {
-                                    const Icon = action.icon;
-
-                                    return (
-                                        <Link
-                                            className="flex min-h-16 items-center gap-3 rounded-md border border-stone-200 px-4 text-left transition hover:border-amber-300 hover:bg-amber-50"
-                                            to={action.href}
-                                            key={action.label}
-                                        >
-                                            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-stone-800 text-amber-50">
-                                                <Icon size={20} />
-                                            </span>
-                                            <span className="min-w-0">
-                                                <span className="block text-sm font-semibold text-stone-900">
-                                                    {action.label}
-                                                </span>
-                                                <span className="mt-1 block text-xs text-stone-500">
-                                                    {action.description}
-                                                </span>
-                                            </span>
-                                        </Link>
-                                    );
-                                })}
-                            </div>
-                        </section>
-
-                        <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-                            <h2 className="text-lg font-bold text-stone-900">최근 흐름</h2>
-                            <div className="mt-4 grid gap-3">
-                                {recentItems.map((item) => {
-                                    const Icon = item.icon;
-
-                                    return (
-                                        <article
-                                            className="flex items-start gap-3 rounded-md border border-stone-100 bg-stone-50 p-3"
-                                            key={item.title}
-                                        >
-                                            <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-amber-100 text-stone-700">
-                                                <Icon size={17} />
-                                            </span>
-                                            <div className="min-w-0">
-                                                <p className="truncate text-sm font-semibold text-stone-900">
-                                                    {item.title}
-                                                </p>
-                                                <p className="mt-1 text-xs text-stone-500">
-                                                    {item.type} · {item.updatedAt}
-                                                </p>
-                                            </div>
-                                        </article>
-                                    );
-                                })}
-                            </div>
-                        </section>
-                    </aside>
-                </div>
             </div>
         </main>
     );

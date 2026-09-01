@@ -360,7 +360,18 @@ const BlogList = () => {
         </button>
       </div>
 
-      {error && <p className="mb-3 rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {error && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+          <p>{error}</p>
+          <button
+            type="button"
+            className="rounded-md border border-red-200 bg-white px-3 py-1.5 font-semibold hover:bg-red-100"
+            onClick={() => void handleBlogList()}
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
 
       <section data-testid="blog-recent-section" className="mb-6 border-y border-stone-200 py-4">
         <div className="mb-3 flex items-center justify-between">
@@ -379,7 +390,7 @@ const BlogList = () => {
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {recentNotes.length > 0
             ? recentNotes.map(noteCard)
-            : !loading && <p className="py-6 text-sm text-stone-500">작성된 글이 없습니다</p>}
+            : !loading && !error && <p className="py-6 text-sm text-stone-500">작성된 글이 없습니다</p>}
         </div>
       </section>
 
@@ -528,7 +539,7 @@ const BlogList = () => {
             {unfiledNotes.length > 0 ? (
               unfiledNotes.map(noteCard)
             ) : (
-              !loading && <p className="py-8 text-center text-sm text-stone-500 sm:col-span-2 xl:col-span-3">작성된 글이 없습니다</p>
+              !loading && !error && <p className="py-8 text-center text-sm text-stone-500 sm:col-span-2 xl:col-span-3">작성된 글이 없습니다</p>
             )}
           </div>
         </section>

@@ -2,6 +2,24 @@
 
 Flownote 모바일은 Expo Router 기반 React Native 클라이언트다. WebView로 기존 웹 앱을 감싸지 않고 계정, 작업, 노트, 에이전트, 캔버스를 네이티브 컴포넌트로 직접 렌더링한다.
 
+## 내비게이션 구조
+
+앱의 최초 진입점은 저장된 세션 유무를 확인한다. 세션이 없으면 `/login`, 세션이 있으면 `/home`으로 이동한다. 로그인과 회원가입이 성공하면 탭 화면에 머물지 않고 홈으로 교체 이동하며, 로그아웃하면 보호된 앱 Stack 전체가 다시 로그인으로 돌아간다.
+
+```text
+/
+├─ /login
+└─ /home
+   ├─ /tasks → /tasks/:taskId
+   ├─ /notes → /notes/:noteId
+   ├─ /canvas → /canvas/:canvasId
+   └─ /agent
+```
+
+`/tasks`, `/notes`, `/canvas`는 생성과 탐색을 담당하는 상위 목록 라우트다. 사용자가 항목을 선택하면 ID가 포함된 하위 상세 라우트에서 편집·삭제·세부 기능을 수행한다. `/agent`는 별도 목록이 없는 단일 기능 화면이므로 홈에서 직접 진입한다.
+
+웹 서식, 이미지 또는 하위 블록을 포함한 노트는 모바일 일반 텍스트 편집기로 변환 저장하지 않는다. 하위 노트 화면에서 본문은 읽기 전용으로 표시하고 제목만 저장해 원본 BlockNote 구조를 보존한다.
+
 ## 서비스 경계
 
 - `flownote-mobile`: iOS/Android 네이티브 앱과 Railway용 정적 웹 테스트 클라이언트다.
@@ -60,6 +78,12 @@ HOST_LAN_IP=192.168.0.10 docker compose up --build mobile-app
 Dockerfile의 최종 production 단계는 `expo export --platform web` 결과를 정적 서버로 제공한다. `/health`는 Railway 헬스체크이며 공개 HTTPS URL은 iPad Safari와 홈 화면 바로가기에서 사용한다.
 
 이 배포는 Apple 서명 없이 개인 iPad에서 필기 UX를 확인하기 위한 경로다. 네이티브 `.ipa`, TestFlight, App Store 배포는 Expo EAS와 Apple Developer Program을 사용한다.
+
+### Railway Expo Go
+
+production의 `flownote-expo-go` 서비스는 Expo Go용 Metro manifest와 bundle을 제공한다. 기존 `flownote-mobile-production` 정적 웹 서비스와 staging의 `flownote-mobile` 서비스에서 분리하며, `EXPO_PACKAGER_PROXY_URL`을 Railway HTTPS domain으로 고정한다. 모바일 앱의 API 기준은 계속 `EXPO_PUBLIC_WAS_URL=https://flownote-api-production.up.railway.app`이다.
+
+휴대폰과 태블릿 접속 절차 및 장애 대응은 `expo-go-railway-access.md`를 따른다.
 
 ## 운영 설정
 

@@ -80,9 +80,6 @@ export default function LoginPage() {
                 <label className="text-sm font-medium text-stone-700" htmlFor="password">
                   비밀번호
                 </label>
-                <a href="#" className="text-xs text-stone-500 hover:text-amber-600 transition-colors">
-                  비밀번호를 잊으셨나요?
-                </a>
               </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={20} />
@@ -115,23 +112,6 @@ export default function LoginPage() {
             )}
           </form>
 
-          {/* 구분선 */}
-          <div className="relative my-8 text-center">
-            <hr className="border-stone-200" />
-            <span className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 bg-stone-50 px-4 text-xs text-stone-400 uppercase tracking-widest">
-              또는
-            </span>
-          </div>
-
-          {/* 소셜 로그인 버튼 */}
-          <div className="grid grid-cols-2 gap-4">
-            <button className="flex items-center justify-center gap-2 py-2.5 border border-stone-200 rounded-xl hover:bg-stone-100 transition-colors">
-              <span className="text-sm font-medium text-stone-700">Google</span>
-            </button>
-            <button className="flex items-center justify-center gap-2 py-2.5 border border-stone-200 rounded-xl hover:bg-stone-100 transition-colors">
-              <span className="text-sm font-medium text-stone-700">Github</span>
-            </button>
-          </div>
         </div>
 
         {/* 하단 푸터 */}

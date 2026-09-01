@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
+    "start:expo-go": "node scripts/start-expo-go.mjs",
     "build:web": "expo export --platform web --output-dir dist",
     "start:web": "node scripts/serve-static.mjs",
     "typecheck": "tsc --noEmit",

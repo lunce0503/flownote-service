@@ -5,6 +5,8 @@
 ## 기존 사양
 
 - `mobile-was-architecture.md`: Expo 네이티브 앱과 Railway 웹 테스트 클라이언트의 gateway 통신, 캔버스 저장, 실행 방식.
+- `expo-go-railway-access.md`: Railway production Metro를 통한 Expo Go 접속, iPhone·iPad·Android 사용 절차와 장애 대응.
+- `web-workspace-ux.md`: 웹 홈·인증·Blog·Canvas의 상태 처리, 모바일 도구 배치, 키보드 접근성.
 
 ## 사양 작성 기준
 

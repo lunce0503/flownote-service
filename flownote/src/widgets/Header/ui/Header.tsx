@@ -33,6 +33,14 @@ export default function Header({ isCapabilityVisible }: HeaderProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
   const [isMoreOpen, setIsMoreOpen] = useState<boolean>(false);
+  const menuButtonRef = React.useRef<HTMLButtonElement>(null);
+  const moreButtonRef = React.useRef<HTMLButtonElement>(null);
+  const moreContainerRef = React.useRef<HTMLDivElement>(null);
+  const moreMenuRef = React.useRef<HTMLDivElement>(null);
+  const profileButtonRef = React.useRef<HTMLButtonElement>(null);
+  const profileContainerRef = React.useRef<HTMLDivElement>(null);
+  const profileMenuRef = React.useRef<HTMLDivElement>(null);
+  const sidebarCloseButtonRef = React.useRef<HTMLButtonElement>(null);
   const [language, setLanguage] = useState<"ko" | "en">(() => (
     localStorage.getItem("flownote_language") === "en" ? "en" : "ko"
   ));
@@ -92,6 +100,67 @@ export default function Header({ isCapabilityVisible }: HeaderProps) {
       window.removeEventListener("storage", handleLanguageChange);
     };
   }, []);
+
+  React.useEffect(() => {
+    if (isMoreOpen) {
+      window.requestAnimationFrame(() => moreMenuRef.current?.querySelector<HTMLElement>("[role='menuitem']")?.focus());
+    }
+  }, [isMoreOpen]);
+
+  React.useEffect(() => {
+    if (isProfileOpen) {
+      window.requestAnimationFrame(() => profileMenuRef.current?.querySelector<HTMLElement>("[role='menuitem']")?.focus());
+    }
+  }, [isProfileOpen]);
+
+  React.useEffect(() => {
+    if (isSidebarOpen) {
+      window.requestAnimationFrame(() => sidebarCloseButtonRef.current?.focus());
+    }
+  }, [isSidebarOpen]);
+
+  React.useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (isMoreOpen && !moreContainerRef.current?.contains(target)) setIsMoreOpen(false);
+      if (isProfileOpen && !profileContainerRef.current?.contains(target)) setIsProfileOpen(false);
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (isMoreOpen) {
+        event.preventDefault();
+        setIsMoreOpen(false);
+        window.requestAnimationFrame(() => moreButtonRef.current?.focus());
+      } else if (isProfileOpen) {
+        event.preventDefault();
+        setIsProfileOpen(false);
+        window.requestAnimationFrame(() => profileButtonRef.current?.focus());
+      } else if (isSidebarOpen) {
+        event.preventDefault();
+        setIsSidebarOpen(false);
+        window.requestAnimationFrame(() => menuButtonRef.current?.focus());
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isMoreOpen, isProfileOpen, isSidebarOpen]);
+
+  const handleMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("[role='menuitem']"));
+    if (items.length === 0) return;
+    event.preventDefault();
+    const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+    if (event.key === "Home") items[0].focus();
+    else if (event.key === "End") items[items.length - 1].focus();
+    else if (event.key === "ArrowDown") items[(currentIndex + 1 + items.length) % items.length].focus();
+    else items[(currentIndex - 1 + items.length) % items.length].focus();
+  };
 
   const onMenuClick = () => {
     setIsMoreOpen(false);
@@ -163,6 +232,7 @@ export default function Header({ isCapabilityVisible }: HeaderProps) {
           <div className="flex items-center gap-2 md:gap-2">
             {/* Menu button */}
             <button
+              ref={menuButtonRef}
               onClick={onMenuClick}
               className="rounded-md p-2 transition-colors duration-200 hover:bg-stone-800"
               aria-label={labels.menu}
@@ -197,8 +267,9 @@ export default function Header({ isCapabilityVisible }: HeaderProps) {
               </Link>
             ))}
 
-            <div className="relative">
+            <div ref={moreContainerRef} className="relative">
               <button
+                ref={moreButtonRef}
                 type="button"
                 className="group flex min-w-12 flex-col items-center rounded-lg px-2 py-1 text-xs font-bold text-stone-200 transition-colors hover:bg-stone-800 hover:text-amber-100"
                 title={labels.more}
@@ -218,8 +289,10 @@ export default function Header({ isCapabilityVisible }: HeaderProps) {
 
               {isMoreOpen && (
                 <div
+                  ref={moreMenuRef}
                   className="absolute left-0 top-full z-[950] mt-2 w-56 rounded-lg border border-stone-700 bg-stone-950 py-2 shadow-xl"
                   role="menu"
+                  onKeyDown={handleMenuKeyDown}
                 >
                   {extraNavLinks.map((link) => (
                     <Link
@@ -242,10 +315,11 @@ export default function Header({ isCapabilityVisible }: HeaderProps) {
           <div className="flex flex-row items-center gap-4 md:gap-8 font-medium"></div>
 
           {/* Right Section: Login/Profile Action */}
-          <div className="relative flex items-center">
+          <div ref={profileContainerRef} className="relative flex items-center">
             {isAuthenticated && user ? (
               <>
                 <button
+                  ref={profileButtonRef}
                   type="button"
                   className="flex items-center justify-center gap-2 rounded-full bg-amber-100 p-2 text-stone-950 shadow-md transition-all hover:bg-amber-200 md:px-4 md:py-2"
                   title={user.nickname}
@@ -264,8 +338,10 @@ export default function Header({ isCapabilityVisible }: HeaderProps) {
 
                 {isProfileOpen && (
                   <div
+                    ref={profileMenuRef}
                     className="absolute right-0 top-12 w-48 rounded-lg border border-stone-200 bg-stone-50 py-2 shadow-xl"
                     role="menu"
+                    onKeyDown={handleMenuKeyDown}
                   >
                     {profileLinks.map((link) => (
                       <Link
@@ -321,11 +397,12 @@ export default function Header({ isCapabilityVisible }: HeaderProps) {
       )}
 
       {/* Sidebar Panel */}
+      {isSidebarOpen && (
       <aside
-        className={`fixed top-0 left-0 z-[1000] h-full w-64 bg-stone-50 shadow-2xl transform transition-transform duration-300 ease-in-out ${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-        style={{ pointerEvents: isSidebarOpen ? 'auto' : 'none'} }
+        className="fixed left-0 top-0 z-[1000] h-full w-64 bg-stone-50 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-label={labels.menu}
       >
         <div className="p-5 flex flex-col h-full">
           {/* Sidebar Header */}
@@ -335,6 +412,7 @@ export default function Header({ isCapabilityVisible }: HeaderProps) {
               <span className="text-xl font-mono font-bold text-stone-800">Flownote</span>
             </div>
             <button 
+              ref={sidebarCloseButtonRef}
               onClick={closeSidebar}
               className="p-1 hover:bg-stone-200 rounded-full transition-colors"
               aria-label={labels.closeMenu}
@@ -406,6 +484,7 @@ export default function Header({ isCapabilityVisible }: HeaderProps) {
           </div>
         </div>
       </aside>
+      )}
     </>
   );
 }
