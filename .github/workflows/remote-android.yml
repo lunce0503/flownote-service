@@ -24,6 +24,9 @@ jobs:
           node-version: '24'
       - uses: gradle/actions/setup-gradle@v4
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          log-accepted-android-sdk-licenses: false
       - name: Bundle terminal and build Host fixture
         run: |
           npm ci --prefix apps/android/terminal
@@ -85,6 +88,9 @@ jobs:
           node-version: '24'
       - uses: gradle/actions/setup-gradle@v4
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          log-accepted-android-sdk-licenses: false
       - name: Build signed APK
         env:
           REMOTE_ANDROID_KEYSTORE_BASE64: ${{ secrets.REMOTE_ANDROID_KEYSTORE_BASE64 }}
