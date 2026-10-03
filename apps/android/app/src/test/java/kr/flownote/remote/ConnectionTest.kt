@@ -66,7 +66,7 @@ class ConnectionTest {
         fun requests(type: String) = messages.filter { it.getString("type") == type }
         override fun close() {
             action { it.dispose() }
-            scope.cancel(); dispatcher.close(); socket?.cancel(); server.shutdown()
+            scope.cancel(); dispatcher.close(); server.shutdown()
         }
     }
 
