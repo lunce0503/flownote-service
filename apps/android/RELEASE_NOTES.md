@@ -11,3 +11,5 @@ Android 10 이상에서 Remote Host 0.2.0을 실행 중인 Linux/Windows PC의 �
 `flownote-remote-v0.1.0.apk`를 설치한 뒤 PC의 WSS 주소, 기기 토큰과 인증서 지문을 등록하세요. Host와 Android가 같은 LAN 또는 기존 VPN에 있어야 합니다. Android는 명령을 전송하고 실제 실행은 PC 사용자 권한으로 이루어집니다.
 
 앱은 원격 터미널을 제공합니다. 데스크톱 그래픽 화면·마우스 제어, 인터넷 릴레이와 지속적인 백그라운드 연결은 포함하지 않습니다.
+
+이 APK는 실기기 확인용 사전 릴리스입니다. 자동화된 Android 에뮬레이터 시험과 별개로 실제 휴대폰의 한글 IME, PC Codex 대화형 동작과 30분 LAN 안정성 검증은 아직 완료되지 않았습니다. 확인 항목은 저장소의 `apps/android/ACCEPTANCE.md`에 있습니다.

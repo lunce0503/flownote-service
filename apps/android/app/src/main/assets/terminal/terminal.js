@@ -60,7 +60,7 @@
         // Reset between queued writes, never before pending old-session output.
         terminal.write('', () => terminal.reset());
         break;
-      case 'focus': terminal.focus(); break;
+      case 'focus': terminal.focus(); send({ type: 'keyboard' }); break;
       case 'enabled': enabled = !!message.value; terminal.options.disableStdin = !enabled; break;
       case 'font': terminal.options.fontSize = Math.max(10, Math.min(24, message.size)); fit.fit(); break;
       case 'modifier':

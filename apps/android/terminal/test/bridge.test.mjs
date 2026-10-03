@@ -83,3 +83,9 @@ test('foreign origins cannot write and OSC52 is consumed without clipboard acces
   assert.equal(p.terminal.key({ ctrlKey: true, key: 'v', type: 'keydown' }), false);
   assert.equal(p.messages.at(-1).type, 'paste');
 });
+
+test('keyboard command asks the native layer to show the IME after focus', () => {
+  const p = page();
+  p.deliver({ type: 'focus' });
+  assert.equal(p.messages.at(-1).type, 'keyboard');
+});

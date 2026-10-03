@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
 import android.webkit.*
+import android.view.inputmethod.InputMethodManager
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
@@ -39,7 +40,14 @@ class TerminalView(context: Context, private val receive: (JSONObject) -> Unit) 
         WebViewCompat.addWebMessageListener(this, "NativeTerminal", setOf(ORIGIN)) { _, message, origin, mainFrame, _ ->
             if (mainFrame && origin.toString() == ORIGIN) {
                 val data = message.data
-                if (data != null && data.length <= 512 * 1024) runCatching { receive(JSONObject(data)) }
+                if (data != null && data.length <= 512 * 1024) runCatching {
+                    val value = JSONObject(data)
+                    if (value.optString("type") == "keyboard") {
+                        requestFocus()
+                        (context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                            .showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
+                    } else receive(value)
+                }
             }
         }
         loadUrl("$ORIGIN/assets/terminal/index.html")

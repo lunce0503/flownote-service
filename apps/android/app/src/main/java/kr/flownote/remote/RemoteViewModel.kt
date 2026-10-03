@@ -36,7 +36,10 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     fun saveAndOpen(host: HostProfile) {
         runCatching {
             val validated = host.validated()
-            if (profile != validated && store.rememberedSession() != null) store.rememberSession(null)
+            val sameHost = profile?.let {
+                it.endpoint == validated.endpoint && it.token == validated.token && it.fingerprint == validated.fingerprint
+            } == true
+            if (!sameHost && store.rememberedSession() != null) store.rememberSession(null)
             store.save(validated); profile = validated; screenTerminal = true; error = null
         }.onFailure { error = it.message ?: "PC 정보를 저장하지 못했습니다." }
     }

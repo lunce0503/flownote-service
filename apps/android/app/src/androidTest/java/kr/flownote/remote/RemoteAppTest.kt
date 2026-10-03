@@ -1,6 +1,5 @@
 package kr.flownote.remote
 
-import android.graphics.Bitmap
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -12,6 +11,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.core.graphics.writeToTestStorage
 import androidx.test.uiautomator.UiDevice
 import androidx.lifecycle.Lifecycle
 import kr.flownote.remote.connection.*
@@ -50,7 +50,12 @@ class RemoteAppTest {
         return result.get()
     }
     private fun terminalContains(value: String) {
-        ui.waitUntil(20_000) { evaluate("document.querySelector('.xterm-rows')?.innerText || ''").contains(value) }
+        try {
+            ui.waitUntil(20_000) { evaluate("document.querySelector('.xterm-rows')?.innerText || ''").contains(value) }
+        } catch (failure: Throwable) {
+            screenshot("terminal-failure")
+            throw AssertionError("Missing $value, state=${ui.activity.model.state}; rows=${evaluate("document.querySelector('.xterm-rows')?.innerText || document.body.innerText")}", failure)
+        }
     }
     private fun phase(expected: Phase) { ui.waitUntil(25_000) { ui.activity.model.state.phase == expected } }
     private fun action(block: (RemoteViewModel) -> Unit) { instrumentation.runOnMainSync { block(ui.activity.model) } }
@@ -58,7 +63,7 @@ class RemoteAppTest {
         instrumentation.runOnMainSync { ui.activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
         val bitmap = instrumentation.uiAutomation.takeScreenshot()
         assertNotNull(bitmap)
-        File(instrumentation.targetContext.getExternalFilesDir(null), "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.writeToTestStorage(name)
         assertTrue(bitmap.width > 0 && bitmap.height > 0)
         bitmap.recycle()
     }
@@ -91,7 +96,7 @@ class RemoteAppTest {
         assertEquals(host.token, store.load()?.token)
         val raw = File(instrumentation.targetContext.applicationInfo.dataDir, "shared_prefs/remote-host-private.xml").readText()
         assertFalse(raw.contains(host.token))
-        action { it.input("printf '\\033[32mREMOTE_%s\\033[0m\\n' OK\rpwd\rgit status --short\r") }
+        action { it.input("PS1='remote-test$ '\rpwd\rgit status --short\rprintf '\\033[32mREMOTE_%s\\033[0m\\n' OK\r") }
         terminalContains("REMOTE_OK")
         ui.onNodeWithContentDescription("명령 입력창").performScrollTo().performClick()
         ui.onNodeWithTag("command-input").performTextInput("printf '한글%s\\n' 입력")
