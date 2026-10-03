@@ -19,7 +19,11 @@ const archiveName = `${bundleName}.tar.gz`;
 const archivePath = join(outputDir, archiveName);
 
 const run = (command, args, cwd = packageRoot) => {
-  const result = spawnSync(command, args, { cwd, stdio: "inherit", encoding: "utf8" });
+  const executable = process.platform === "win32"
+    ? ({ npm: "npm.cmd", tar: "tar.exe" }[command] || command)
+    : command;
+  const result = spawnSync(executable, args, { cwd, stdio: "inherit", encoding: "utf8" });
+  if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`${command} failed with exit code ${result.status}`);
 };
 
