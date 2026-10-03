@@ -33,6 +33,8 @@
 | `RELIABILITY.md` | 로컬/통합 실행, 관측, 복구 기준 |
 | `SECURITY.md` | 인증, 비밀값, 업로드, 외부 API 보안 기준 |
 
+Android에서 사용자 PC의 실제 터미널에 접속하는 Host Agent의 기준은 `product-specs/remote-host.md`, 실행·설치 방법은 `../apps/host/README.md`에서 확인한다.
+
 ## 관리 규칙
 
 - 새 기능이 제품 행동을 바꾸면 `product-specs/` 또는 관련 최상위 문서를 갱신한다.

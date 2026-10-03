@@ -50,6 +50,8 @@ Flownote는 기획한 내용을 바탕으로 관련 필기를 텍스트와 그�
 | `flownote-canvas/` | Go HTTP 서버 | `main.go` | 캔버스, 노트, 폴더, 업로드, 캔버스 관리자 진단 |
 | `flownote-serve/` | Go HTTP 서버 | `main.go` | 일기, 일정, 작업, 주식, 소셜, 채팅 |
 | `flownote-ai/` | FastAPI | `app/main.py` | AI 스트림, 에이전트 노트 검색, 시장 데이터, Ollama 연동 |
+| `apps/host/` | Node.js CLI/Host Agent | `src/cli.ts` | LAN/VPN WSS 인증, 실제 PTY, 재접속 출력 버퍼와 기기 폐기 |
+| `protocol/remote-host/v1/` | JSON Schema | `protocol.schema.json` | Android 원격 터미널과 Host가 공유하는 메시지 계약 |
 | `docker-compose.yml` | 로컬 통합 오케스트레이션 | Compose 서비스 정의 | Postgres, Redis, 5개 백엔드, 웹, 모바일, Ollama 네트워크 구성 |
 | `docs/`, `logs/` | 지식/운영 기록 | `docs/README.md`, `logs/report/` | 설계 기준, 제품 사양, 분석·배포 결과 |
 

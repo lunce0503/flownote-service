@@ -1,0 +1,14 @@
+export const PROTOCOL_VERSION = 1 as const;
+export const DEFAULT_PORT = 7443;
+export const DEFAULT_BIND = "127.0.0.1";
+export const MAX_MESSAGE_BYTES = 64 * 1024;
+export const MAX_INPUT_BYTES = 16 * 1024;
+export const MAX_OUTPUT_CHUNK_BYTES = 48 * 1024;
+export const MAX_REPLAY_BYTES = 1024 * 1024;
+export const MAX_SOCKET_BUFFER_BYTES = 1024 * 1024;
+export const SESSION_GRACE_MS = 5 * 60 * 1000;
+export const HEARTBEAT_INTERVAL_MS = 15_000;
+export const HEARTBEAT_TIMEOUT_MS = 45_000;
+export const REQUEST_CACHE_MS = 60_000;
+export const CONTROL_SOCKET_NAME = "control.sock";
+export const CONFIG_FILE_NAME = "config.json";

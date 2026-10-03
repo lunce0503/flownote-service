@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/lunce0503/flownote-service/protocol/remote-host/v1/server-message.schema.json",
+  "title": "Flownote Remote Host protocol v1 server messages",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["version", "type", "requestId", "payload"],
+      "properties": {
+        "version": { "const": 1 },
+        "type": { "const": "hello.result" },
+        "requestId": { "$ref": "#/$defs/requestId" },
+        "payload": {
+          "type": "object",
+          "required": ["hostId", "protocolVersion", "features"],
+          "properties": {
+            "hostId": { "$ref": "#/$defs/sessionId" },
+            "protocolVersion": { "const": 1 },
+            "features": { "type": "array", "items": { "enum": ["terminal", "resize", "reattach", "replay"] }, "uniqueItems": true }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": ["version", "type", "requestId", "payload"],
+      "properties": {
+        "version": { "const": 1 },
+        "type": { "enum": ["terminal.created", "terminal.attached"] },
+        "requestId": { "$ref": "#/$defs/requestId" },
+        "payload": { "$ref": "#/$defs/sessionStatus" }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": ["version", "type", "payload"],
+      "properties": {
+        "version": { "const": 1 },
+        "type": { "const": "terminal.output" },
+        "payload": {
+          "type": "object",
+          "required": ["sessionId", "seq", "data"],
+          "properties": {
+            "sessionId": { "$ref": "#/$defs/sessionId" },
+            "seq": { "type": "integer", "minimum": 1 },
+            "data": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": ["version", "type", "requestId", "payload"],
+      "properties": {
+        "version": { "const": 1 },
+        "type": { "const": "terminal.resized" },
+        "requestId": { "$ref": "#/$defs/requestId" },
+        "payload": {
+          "type": "object",
+          "required": ["sessionId", "cols", "rows"],
+          "properties": {
+            "sessionId": { "$ref": "#/$defs/sessionId" },
+            "cols": { "type": "integer", "minimum": 20, "maximum": 300 },
+            "rows": { "type": "integer", "minimum": 5, "maximum": 200 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": ["version", "type", "requestId", "payload"],
+      "properties": {
+        "version": { "const": 1 },
+        "type": { "const": "terminal.closed" },
+        "requestId": { "$ref": "#/$defs/requestId" },
+        "payload": { "type": "object", "required": ["sessionId"], "properties": { "sessionId": { "$ref": "#/$defs/sessionId" } }, "additionalProperties": false }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": ["version", "type", "payload"],
+      "properties": {
+        "version": { "const": 1 },
+        "type": { "const": "terminal.exited" },
+        "payload": {
+          "type": "object",
+          "required": ["sessionId", "exitCode", "signal"],
+          "properties": {
+            "sessionId": { "$ref": "#/$defs/sessionId" },
+            "exitCode": { "type": "integer" },
+            "signal": { "type": "integer" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": ["version", "type", "payload"],
+      "properties": {
+        "version": { "const": 1 },
+        "type": { "const": "error" },
+        "requestId": { "$ref": "#/$defs/requestId" },
+        "payload": {
+          "type": "object",
+          "required": ["code", "message"],
+          "properties": {
+            "code": { "enum": ["AUTH_FAILED", "BAD_MESSAGE", "CLIENT_CONFLICT", "INTERNAL_ERROR", "REPLAY_UNAVAILABLE", "SESSION_CONFLICT", "SESSION_NOT_FOUND", "SESSION_OWNERSHIP"] },
+            "message": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "$defs": {
+    "requestId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$" },
+    "sessionId": { "type": "string", "format": "uuid" },
+    "sessionStatus": {
+      "type": "object",
+      "required": ["sessionId", "ownerDeviceId", "lastSeq", "attached"],
+      "properties": {
+        "sessionId": { "$ref": "#/$defs/sessionId" },
+        "ownerDeviceId": { "type": "string" },
+        "lastSeq": { "type": "integer", "minimum": 0 },
+        "currentSeq": { "type": "integer", "minimum": 0 },
+        "attached": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

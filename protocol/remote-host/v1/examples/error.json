@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "type": "error",
+  "requestId": "attach-001",
+  "payload": {
+    "code": "REPLAY_UNAVAILABLE",
+    "message": "출력 재생 버퍼의 시작보다 오래된 위치입니다."
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "type": "hello",
+  "requestId": "hello-001",
+  "payload": {
+    "clientName": "Flownote Android"
+  }
+}

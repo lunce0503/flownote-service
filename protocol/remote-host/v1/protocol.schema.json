@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/lunce0503/flownote-service/protocol/remote-host/v1/protocol.schema.json",
+  "title": "Flownote Remote Host protocol v1 client messages",
+  "oneOf": [
+    { "$ref": "#/$defs/hello" },
+    { "$ref": "#/$defs/create" },
+    { "$ref": "#/$defs/input" },
+    { "$ref": "#/$defs/resize" },
+    { "$ref": "#/$defs/attach" },
+    { "$ref": "#/$defs/close" }
+  ],
+  "$defs": {
+    "base": {
+      "type": "object",
+      "required": ["version", "type", "requestId", "payload"],
+      "properties": {
+        "version": { "const": 1 },
+        "type": { "type": "string" },
+        "requestId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$" },
+        "payload": { "type": "object" }
+      }
+    },
+    "size": {
+      "type": "object",
+      "required": ["cols", "rows"],
+      "properties": {
+        "cols": { "type": "integer", "minimum": 20, "maximum": 300 },
+        "rows": { "type": "integer", "minimum": 5, "maximum": 200 }
+      },
+      "additionalProperties": false
+    },
+    "sessionId": { "type": "string", "format": "uuid" },
+    "hello": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        { "properties": { "type": { "const": "hello" }, "payload": { "type": "object", "required": ["clientName"], "properties": { "clientName": { "type": "string", "minLength": 1, "maxLength": 80 } }, "additionalProperties": false } } }
+      ],
+      "unevaluatedProperties": false
+    },
+    "create": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        { "properties": { "type": { "const": "terminal.create" }, "payload": { "$ref": "#/$defs/size" } } }
+      ],
+      "unevaluatedProperties": false
+    },
+    "input": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        { "properties": { "type": { "const": "terminal.input" }, "payload": { "type": "object", "required": ["sessionId", "data"], "properties": { "sessionId": { "$ref": "#/$defs/sessionId" }, "data": { "type": "string", "maxLength": 16384 } }, "additionalProperties": false } } }
+      ],
+      "unevaluatedProperties": false
+    },
+    "resize": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        { "properties": { "type": { "const": "terminal.resize" }, "payload": { "type": "object", "required": ["sessionId", "cols", "rows"], "properties": { "sessionId": { "$ref": "#/$defs/sessionId" }, "cols": { "type": "integer", "minimum": 20, "maximum": 300 }, "rows": { "type": "integer", "minimum": 5, "maximum": 200 } }, "additionalProperties": false } } }
+      ],
+      "unevaluatedProperties": false
+    },
+    "attach": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        { "properties": { "type": { "const": "terminal.attach" }, "payload": { "type": "object", "required": ["sessionId", "lastSeq"], "properties": { "sessionId": { "$ref": "#/$defs/sessionId" }, "lastSeq": { "type": "integer", "minimum": 0 } }, "additionalProperties": false } } }
+      ],
+      "unevaluatedProperties": false
+    },
+    "close": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        { "properties": { "type": { "const": "terminal.close" }, "payload": { "type": "object", "required": ["sessionId"], "properties": { "sessionId": { "$ref": "#/$defs/sessionId" } }, "additionalProperties": false } } }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}
