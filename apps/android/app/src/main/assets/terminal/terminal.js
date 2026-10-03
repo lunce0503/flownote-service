@@ -3,7 +3,7 @@
   const send = (value) => window.NativeTerminal?.postMessage(JSON.stringify(value));
   const terminal = new Terminal({
     cursorBlink: true, fontSize: 14, fontFamily: 'monospace', scrollback: 3000,
-    allowProposedApi: false, convertEol: false,
+    allowProposedApi: false, convertEol: false, disableStdin: true,
     theme: { background: '#101214', foreground: '#e4e7e9', cursor: '#63d4b1', selectionBackground: '#346052' },
   });
   const fit = new FitAddon.FitAddon();
@@ -53,7 +53,13 @@
         });
         break;
       }
-      case 'reset': generation++; lastQueued = 0; lastRendered = 0; terminal.reset(); break;
+      case 'reset':
+        generation++; lastQueued = 0; lastRendered = 0;
+        ctrl = false; alt = false;
+        send({ type: 'modifiers', ctrl, alt });
+        // Reset between queued writes, never before pending old-session output.
+        terminal.write('', () => terminal.reset());
+        break;
       case 'focus': terminal.focus(); break;
       case 'enabled': enabled = !!message.value; terminal.options.disableStdin = !enabled; break;
       case 'font': terminal.options.fontSize = Math.max(10, Math.min(24, message.size)); fit.fit(); break;

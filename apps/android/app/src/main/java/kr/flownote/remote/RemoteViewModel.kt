@@ -43,6 +43,8 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     fun onBridge(message: JSONObject) {
         when (message.getString("type")) {
             "ready" -> {
+                // A replacement WebView has no previous ANSI screen, even if the ViewModel survived.
+                if (ready) { connection.dispose(); connection = makeConnection() }
                 ready = true
                 connection.resize(message.getInt("cols"), message.getInt("rows"))
                 profile?.let { connection.connect(it, store.rememberedSession()) }
@@ -54,7 +56,11 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
             "paste" -> pasteRequested = true
         }
     }
-    fun input(text: String) { if (!connection.input(text)) error = "연결 후 다시 입력하세요." }
+    fun input(text: String): Boolean {
+        val sent = connection.input(text)
+        if (!sent) error = "입력을 보내지 못했습니다. 연결 상태와 PC의 실행 결과를 확인하세요. 입력은 자동 재전송되지 않습니다."
+        return sent
+    }
     fun reconnect() { if (ready) profile?.let { connection.connect(it) } }
     fun disconnect() = connection.disconnect()
     fun newSession() = connection.newSession()

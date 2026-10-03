@@ -59,6 +59,7 @@ class RemoteConnection(
 
     private fun open() {
         retry?.cancel(); deadline?.cancel()
+        stopSocket()
         val host = profile ?: return
         set(Phase.CONNECTING, "PC에 연결 중")
         val request = Request.Builder().url(host.endpoint).header("Authorization", "Bearer ${host.token}").build()
@@ -88,6 +89,11 @@ class RemoteConnection(
                 response?.close()
             }
         })
+        armDeadline()
+    }
+
+    private fun armDeadline() {
+        deadline?.cancel()
         deadline = scope.launch { delay(20_000); if (state.phase != Phase.CONNECTED && state.phase != Phase.RECOVERY) lost() }
     }
 
@@ -109,7 +115,7 @@ class RemoteConnection(
                 resize(cols, rows)
             }
             "terminal.output" -> {
-                if (payload.getString("sessionId") != sessionId) return
+                if (stateLost || payload.getString("sessionId") != sessionId) return
                 val seq = payload.getLong("seq")
                 if (seq <= received) return
                 if (seq != received + 1) { recovery("출력 일부가 유실되었습니다. 새 세션을 시작하세요."); return }
@@ -142,6 +148,8 @@ class RemoteConnection(
     }
 
     private fun create() {
+        set(Phase.AUTHENTICATING, "새 터미널 여는 중")
+        armDeadline()
         send("terminal.create", JSONObject().put("cols", cols).put("rows", rows), createRequest)
     }
     private fun send(type: String, payload: JSONObject, id: String = UUID.randomUUID().toString()): Boolean =
@@ -170,12 +178,18 @@ class RemoteConnection(
         if (socket == null) { clearSession(); profile?.let { connect(it) }; return }
         if (sessionId != null) {
             closingForNew = true
+            set(Phase.AUTHENTICATING, "기존 터미널 종료 중")
+            armDeadline()
             send("terminal.close", JSONObject().put("sessionId", sessionId))
         } else { clearSession(); create() }
     }
     fun closeSession() {
         if (state.phase != Phase.CONNECTED && state.phase != Phase.RECOVERY) return
-        if (sessionId != null) send("terminal.close", JSONObject().put("sessionId", sessionId))
+        if (sessionId != null) {
+            set(Phase.AUTHENTICATING, "터미널 종료 중")
+            armDeadline()
+            send("terminal.close", JSONObject().put("sessionId", sessionId))
+        }
         else disconnect()
     }
     fun disconnect() {

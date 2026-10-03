@@ -148,10 +148,14 @@ private fun ColumnScope.TerminalScreen(model: RemoteViewModel) {
             else -> TextButton(onClick = model::reconnect) { Icon(Icons.Default.Refresh, null); Text("다시 연결") }
         }
     }
-    AndroidView(factory = { ctx -> TerminalView(ctx, model::onBridge).also { view -> terminal = view; model.renderer = view::deliver } },
-        modifier = Modifier.weight(1f).fillMaxWidth().testTag("terminal"))
+    if (remember { TerminalView.supported() }) {
+        AndroidView(factory = { ctx -> TerminalView(ctx, model::onBridge).also { view -> terminal = view; model.renderer = view::deliver } },
+            modifier = Modifier.weight(1f).fillMaxWidth().testTag("terminal"))
+    } else {
+        Text("Android System WebView를 업데이트한 뒤 앱을 다시 실행하세요.", Modifier.weight(1f).padding(24.dp))
+    }
     if (composeInput) Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        fun submit() { if (inputText.isNotEmpty()) { model.input(inputText + "\r"); inputText = "" } }
+        fun submit() { if (connected && inputText.isNotEmpty() && model.input(inputText + "\r")) inputText = "" }
         OutlinedTextField(inputText, { inputText = it }, label = { Text("명령 입력") }, singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { submit() }),
             modifier = Modifier.weight(1f).testTag("command-input"))

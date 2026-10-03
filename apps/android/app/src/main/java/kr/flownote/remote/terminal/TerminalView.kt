@@ -13,7 +13,10 @@ import java.io.ByteArrayInputStream
 
 @SuppressLint("SetJavaScriptEnabled")
 class TerminalView(context: Context, private val receive: (JSONObject) -> Unit) : WebView(context) {
-    companion object { const val ORIGIN = "https://appassets.androidplatform.net" }
+    companion object {
+        const val ORIGIN = "https://appassets.androidplatform.net"
+        fun supported() = WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)
+    }
     private val loader = WebViewAssetLoader.Builder()
         .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context)).build()
     init {

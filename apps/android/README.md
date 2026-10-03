@@ -35,7 +35,7 @@ cd ..
 ./gradlew testDebugUnitTest lintDebug assembleDebug
 ```
 
-테스트 APK는 `app/build/outputs/apk/debug/app-debug.apk`다. GitHub Actions의 Android 에뮬레이터가 실제 Host를 시작해 연결·터미널·재접속을 검증한다. `remote-android-v*` 태그는 이 검증을 통과한 후 저장소 전용 서명키로 APK를 릴리스한다. 서명키는 GitHub Actions secrets에만 저장하며 테스트 Host의 일회용 토큰은 배포 APK에 포함하지 않는다.
+테스트 APK는 `app/build/outputs/apk/debug/app-debug.apk`다. GitHub Actions의 Android 에뮬레이터가 실제 Host를 시작해 연결·터미널·재접속을 검증한다. `remote-android-v*` 태그는 이 검증을 통과한 후 저장소 전용 서명키로 APK를 릴리스한다. 서명키는 GitHub Actions secrets에 등록하고 운영자 전용 위치에 권한 제한된 복구 사본을 보관한다. 키·비밀번호는 저장소에 넣지 않는다. 테스트 Host의 일회용 토큰은 배포 APK에 포함하지 않는다.
 
 ## 코드맵
 

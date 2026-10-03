@@ -31,6 +31,7 @@ jobs:
         run: |
           npm ci --prefix apps/android/terminal
           npm run build --prefix apps/android/terminal
+          npm test --prefix apps/android/terminal
           npm ci --prefix apps/host
           npm run build --prefix apps/host
           node apps/android/scripts/host-fixture.mjs > "$RUNNER_TEMP/remote-host.log" 2>&1 &
@@ -54,10 +55,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          script: |
-            cd apps/android
-            ./gradlew connectedDebugAndroidTest --stacktrace
-            adb pull /sdcard/Android/data/kr.flownote.remote/files/ screenshots/
+          script: bash apps/android/scripts/run-device-tests.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -96,6 +94,7 @@ jobs:
           REMOTE_ANDROID_KEYSTORE_BASE64: ${{ secrets.REMOTE_ANDROID_KEYSTORE_BASE64 }}
           REMOTE_ANDROID_SIGNING_PASSWORD: ${{ secrets.REMOTE_ANDROID_SIGNING_PASSWORD }}
         run: |
+          test "$GITHUB_REF_NAME" = "remote-android-v$(node -p "require('./apps/android/terminal/package.json').version")"
           test -n "$REMOTE_ANDROID_KEYSTORE_BASE64"
           export REMOTE_ANDROID_KEYSTORE="$RUNNER_TEMP/remote-android.jks"
           printf '%s' "$REMOTE_ANDROID_KEYSTORE_BASE64" | base64 -d > "$REMOTE_ANDROID_KEYSTORE"
@@ -104,6 +103,11 @@ jobs:
           npm run build --prefix apps/android/terminal
           cd apps/android
           ./gradlew assembleRelease
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
+          if unzip -l app/build/outputs/apk/release/app-release.apk | grep -q 'assets/host.json'; then
+            echo 'Test credentials must never be packaged in a release APK.'
+            exit 1
+          fi
           mkdir -p release
           cp app/build/outputs/apk/release/app-release.apk "release/flownote-remote-${GITHUB_REF_NAME#remote-android-}.apk"
           cd release
