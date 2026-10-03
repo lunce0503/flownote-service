@@ -54,13 +54,16 @@ class RemoteAppTest {
             ui.waitUntil(20_000) { evaluate("document.querySelector('.xterm-rows')?.innerText || ''").contains(value) }
         } catch (failure: Throwable) {
             screenshot("terminal-failure")
-            throw AssertionError("Missing $value, state=${ui.activity.model.state}; rows=${evaluate("document.querySelector('.xterm-rows')?.innerText || document.body.innerText")}", failure)
+            val layout = evaluate("JSON.stringify({viewport:[innerWidth,innerHeight,devicePixelRatio], elements:['html','body','#terminal','.xterm','.xterm-screen','.xterm-rows'].map(s=>{const e=document.querySelector(s);return {s,rect:e?.getBoundingClientRect(),height:e&&getComputedStyle(e).height,children:e?.children.length}})})")
+            throw AssertionError("Missing $value, state=${ui.activity.model.state}; rows=${evaluate("document.querySelector('.xterm-rows')?.innerText || document.body.innerText")}; layout=$layout", failure)
         }
     }
     private fun phase(expected: Phase) { ui.waitUntil(25_000) { ui.activity.model.state.phase == expected } }
     private fun action(block: (RemoteViewModel) -> Unit) { instrumentation.runOnMainSync { block(ui.activity.model) } }
     private fun screenshot(name: String) {
         instrumentation.runOnMainSync { ui.activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+        instrumentation.waitForIdleSync()
+        Thread.sleep(250)
         val bitmap = instrumentation.uiAutomation.takeScreenshot()
         assertNotNull(bitmap)
         bitmap.writeToTestStorage(name)

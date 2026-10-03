@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.Uri
 import android.webkit.*
 import android.view.inputmethod.InputMethodManager
+import android.view.ViewGroup
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
@@ -21,6 +22,7 @@ class TerminalView(context: Context, private val receive: (JSONObject) -> Unit) 
     private val loader = WebViewAssetLoader.Builder()
         .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context)).build()
     init {
+        layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         setBackgroundColor(android.graphics.Color.rgb(16, 18, 20))
         settings.apply {
             javaScriptEnabled = true
