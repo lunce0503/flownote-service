@@ -1,6 +1,6 @@
 # Flownote Remote Host
 
-`remote-host`는 Android 원격 터미널 클라이언트가 사용자의 Linux PC에 WSS로 연결해 실제 PTY 셸을 조작하게 하는 Host Agent다. 이 프로그램은 Flownote 클라우드나 인터넷 릴레이를 거치지 않는다.
+`remote-host`는 Android 원격 터미널 클라이언트가 사용자의 Linux 또는 Windows PC에 WSS로 연결해 실제 PTY 셸을 조작하게 하는 Host Agent다. 이 프로그램은 Flownote 클라우드나 인터넷 릴레이를 거치지 않는다.
 
 ## 보안 경계
 
@@ -16,24 +16,38 @@
 
 ## 지원 범위
 
-- Linux x64/arm64 우선
-- Node.js 20 이상, npm, OpenSSL, 지원 셸 필요
+- Linux x64/arm64, Windows 10/11 x64
+- Node.js 20 이상, npm과 지원 셸 필요
 - `node-pty` 설치에 사전 빌드 바이너리가 없으면 Python 3, `make`, C++ 컴파일러 필요
 - Android 앱, QR 등록, 인터넷 릴레이, systemd 상주 서비스는 이 릴리즈에 포함되지 않는다.
 
-## 설치
+## Linux 설치
 
 GitHub Release의 설치기를 확인한 뒤 실행한다.
 
 ```bash
 curl --proto '=https' --tlsv1.2 -fL \
-  https://github.com/lunce0503/flownote-service/releases/download/remote-host-v0.1.0/install-remote-host.sh \
+  https://github.com/lunce0503/flownote-service/releases/download/remote-host-v0.2.0/install-remote-host.sh \
   -o /tmp/install-remote-host.sh
 less /tmp/install-remote-host.sh
 sh /tmp/install-remote-host.sh
 ```
 
 기본 설치 위치는 `~/.local/lib/flownote-remote-host/<version>`이고 실행 링크는 `~/.local/bin/remote-host`다. PATH에 `~/.local/bin`이 없으면 셸 설정에 추가한다.
+
+## Windows 설치
+
+PowerShell에서 설치기를 내려받아 내용을 확인한 뒤 실행한다. 관리자 권한은 필요하지 않다.
+
+```powershell
+Invoke-WebRequest `
+  https://github.com/lunce0503/flownote-service/releases/download/remote-host-v0.2.0/install-remote-host.ps1 `
+  -OutFile .\install-remote-host.ps1
+notepad .\install-remote-host.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-remote-host.ps1
+```
+
+기본 설치 위치는 `%LOCALAPPDATA%\Flownote\RemoteHost`다. 설치기는 `bin` 경로를 사용자 PATH에 추가하므로 새 PowerShell 또는 명령 프롬프트에서 `remote-host`를 실행한다.
 
 ## 초기화와 실행
 
@@ -61,9 +75,9 @@ remote-host status
 remote-host revoke --device phone-01
 ```
 
-`status`와 `revoke`는 설정 디렉터리의 권한 `0600` Unix 소켓을 사용한다. `revoke`는 실행 중인 기기 연결과 그 기기의 PTY를 즉시 종료한다.
+`status`와 `revoke`는 Linux에서 권한 `0600` Unix 소켓, Windows에서 다른 사용자 공개 옵션을 끈 Named Pipe를 사용한다. `revoke`는 실행 중인 기기 연결과 그 기기의 PTY를 즉시 종료한다.
 
-기본 설정 디렉터리는 `${XDG_CONFIG_HOME:-~/.config}/flownote-remote-host`다. 다른 위치는 모든 명령에 `--config PATH`로 지정한다.
+Linux 기본 설정 디렉터리는 `${XDG_CONFIG_HOME:-~/.config}/flownote-remote-host`, Windows는 `%LOCALAPPDATA%\Flownote\RemoteHost`다. 다른 위치는 모든 명령에 `--config PATH`로 지정한다.
 
 ## 개발 검증
 

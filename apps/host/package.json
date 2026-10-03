@@ -1,6 +1,6 @@
 {
   "name": "@flownote/remote-host",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Authenticated WSS-to-PTY host agent for the Flownote remote terminal MVP",
   "type": "module",
@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "node-pty": "1.1.0",
+    "selfsigned": "5.5.0",
     "ws": "8.22.0",
     "zod": "4.6.5"
   },

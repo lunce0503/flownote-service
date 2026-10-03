@@ -22,10 +22,14 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "24"
           cache: npm
@@ -34,6 +38,19 @@ jobs:
         working-directory: apps/host
       - run: npm run verify
         working-directory: apps/host
+      - name: Smoke test Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: apps/host
+        run: |
+          $releaseDir = Join-Path $env:RUNNER_TEMP "remote-host-release"
+          $prefix = Join-Path $env:RUNNER_TEMP "remote-host-prefix"
+          npm run package:release -- "--out=$releaseDir"
+          if ($LASTEXITCODE -ne 0) { throw "Packaging failed." }
+          $version = node -p "require('./package.json').version"
+          ./install.ps1 -Version $version -Prefix $prefix -SourceDirectory $releaseDir -NoPathUpdate
+          & (Join-Path $prefix "bin\remote-host.cmd") version
+          if ($LASTEXITCODE -ne 0) { throw "Installed CLI smoke test failed." }
 
   release:
     if: startsWith(github.ref, 'refs/tags/remote-host-v')
@@ -42,8 +59,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "24"
           cache: npm

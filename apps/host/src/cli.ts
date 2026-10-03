@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
 import { access } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { constants as fsConstants } from "node:fs";
 import process from "node:process";
 import {
   controlSocketPathFor,
+  defaultShell,
   initializeHost,
   loadConfig,
   readCertificateFingerprint,
@@ -15,7 +15,7 @@ import { sendControlRequest } from "./control.js";
 import { DEFAULT_BIND, DEFAULT_PORT } from "./constants.js";
 import { HostServer } from "./server.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 const help = `Flownote Remote Host ${VERSION}
 
@@ -77,16 +77,17 @@ const main = async () => {
   switch (command) {
     case "doctor": {
       const checks: Array<{ name: string; ok: boolean; detail: string }> = [];
-      checks.push({ name: "platform", ok: process.platform === "linux", detail: `${process.platform} ${process.arch}` });
+      checks.push({ name: "platform", ok: process.platform === "linux" || process.platform === "win32", detail: `${process.platform} ${process.arch}` });
       checks.push({ name: "node", ok: Number(process.versions.node.split(".")[0]) >= 20, detail: process.versions.node });
       try {
-        checks.push({ name: "openssl", ok: true, detail: execFileSync("openssl", ["version"], { encoding: "utf8" }).trim() });
+        await access(defaultShell(), process.platform === "win32" ? fsConstants.F_OK : fsConstants.X_OK);
+        checks.push({ name: "shell", ok: true, detail: defaultShell() });
       } catch {
-        checks.push({ name: "openssl", ok: false, detail: "openssl을 실행할 수 없습니다." });
+        checks.push({ name: "shell", ok: false, detail: `기본 셸을 찾을 수 없습니다: ${defaultShell()}` });
       }
       try {
         const config = await loadConfig(configDir);
-        await access(config.shell, fsConstants.X_OK);
+        await access(config.shell, process.platform === "win32" ? fsConstants.F_OK : fsConstants.X_OK);
         checks.push({ name: "config", ok: true, detail: configDir });
       } catch (error) {
         checks.push({ name: "config", ok: false, detail: error instanceof Error ? error.message : String(error) });

@@ -2,7 +2,7 @@
 
 ## 목적과 범위
 
-Remote Host는 사용자가 소유한 Linux PC에서 실행되고 Android 원격 터미널 클라이언트에 실제 PTY를 제공하는 로컬 Host Agent다. MVP는 LAN 또는 사용자가 이미 구성한 VPN 안에서 직접 WSS 연결을 사용한다. Flownote 클라우드 중계, NAT 통과, 포트 자동 개방과 Android 앱은 이 릴리즈 범위가 아니다.
+Remote Host는 사용자가 소유한 Linux 또는 Windows PC에서 실행되고 Android 원격 터미널 클라이언트에 실제 PTY를 제공하는 로컬 Host Agent다. LAN 또는 사용자가 이미 구성한 VPN 안에서 직접 WSS 연결을 사용한다. Flownote 클라우드 중계, NAT 통과, 포트 자동 개방과 Android 앱은 이 릴리즈 범위가 아니다.
 
 원격 클라이언트는 Host 프로세스를 실행한 OS 사용자와 같은 권한을 가진다. 프로젝트 디렉터리에 한정된 파일 접근 도구가 아니라 완전한 원격 셸이므로 인터넷에 직접 공개하지 않는다.
 
@@ -14,10 +14,10 @@ Remote Host는 사용자가 소유한 Linux PC에서 실행되고 Android 원격
 | `apps/host/src/server.ts` | HTTPS/WSS, 인증 제한, 단일 쓰기 연결, 메시지 라우팅, heartbeat |
 | `apps/host/src/session.ts` | node-pty 세션, 출력 seq·1MiB 재생 버퍼, 5분 재접속 보존 |
 | `apps/host/src/config.ts` | 인증서·토큰 생성, scrypt 검증값, 권한 제한 설정 저장 |
-| `apps/host/src/control.ts` | 사용자 전용 Unix 제어 소켓 |
+| `apps/host/src/control.ts` | Linux Unix 소켓과 Windows Named Pipe 로컬 제어 채널 |
 | `protocol/remote-host/v1/` | Android와 Host가 공유할 JSON Schema와 예제 |
-| `apps/host/install.sh` | GitHub Release checksum 검증 후 사용자 홈에 설치 |
-| `.github/workflows/remote-host.yml` | Linux 검증과 태그 기반 설치기 릴리즈 |
+| `apps/host/install.sh`, `install.ps1` | GitHub Release checksum 검증 후 사용자 영역에 설치 |
+| `.github/workflows/remote-host.yml` | Linux·Windows 검증과 태그 기반 설치기 릴리즈 |
 
 ## 연결과 인증
 
@@ -40,13 +40,14 @@ Remote Host는 사용자가 소유한 Linux PC에서 실행되고 Android 원격
 
 ## 설치와 릴리즈
 
-릴리즈 태그는 `remote-host-v<semver>`다. 설치 자산은 다음 세 파일이다.
+릴리즈 태그는 `remote-host-v<semver>`다. 설치 자산은 다음 네 파일이다.
 
 - `install-remote-host.sh`
+- `install-remote-host.ps1`
 - `remote-host-v<version>.tar.gz`
 - `remote-host-v<version>.tar.gz.sha256`
 
-설치기는 HTTPS로 두 자산을 내려받아 SHA-256을 확인하고 `npm ci --omit=dev`로 대상 PC의 node-pty를 설치한다. `sudo`를 사용하지 않고 기본적으로 `~/.local` 아래만 변경한다.
+설치기는 HTTPS로 아카이브와 checksum을 내려받아 SHA-256과 압축 경로를 확인하고 `npm ci --omit=dev`로 대상 PC의 node-pty를 설치한다. Linux는 `sudo` 없이 `~/.local`, Windows는 관리자 권한 없이 `%LOCALAPPDATA%\Flownote\RemoteHost`를 사용한다.
 
 ## 검증 기준
 
@@ -57,4 +58,4 @@ npm run verify
 npm run package:release -- --out=/tmp/remote-host-release
 ```
 
-통합 테스트는 임시 TLS 인증서와 실제 PTY를 사용해 무효 토큰 거부, hello, 생성, 셸 입출력, 단절·reattach, resize와 종료를 검증한다. Android 실제 기기와 인증서 pinning, 모바일 키보드·한글 IME 시험은 Android 클라이언트 구현 단계의 남은 수용 조건이다.
+GitHub Actions의 Linux와 Windows runner에서 임시 TLS 인증서와 실제 PTY를 사용해 무효 토큰 거부, hello, 생성, 셸 입출력, 단절·reattach, resize와 종료를 검증한다. Windows runner는 PowerShell 설치기의 checksum, 압축 해제, 의존성 설치와 CMD shim도 확인한다. Android 실제 기기와 인증서 pinning, 모바일 키보드·한글 IME 시험은 Android 클라이언트 구현 단계의 남은 수용 조건이다.

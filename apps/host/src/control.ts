@@ -31,6 +31,7 @@ const readJsonLine = (socket: Socket) => new Promise<unknown>((resolve, reject) 
 });
 
 const removeStaleSocket = async (socketPath: string) => {
+  if (process.platform === "win32") return;
   try {
     const stat = await lstat(socketPath);
     if (!stat.isSocket()) throw new Error(`제어 소켓 경로가 소켓이 아닙니다: ${socketPath}`);
@@ -71,10 +72,12 @@ export const startControlServer = async (
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
-    server.listen(socketPath, resolve);
+    server.listen({ path: socketPath, readableAll: false, writableAll: false, exclusive: true }, resolve);
   });
-  await chmod(socketPath, 0o600);
-  server.on("close", () => { void unlink(socketPath).catch(() => undefined); });
+  if (process.platform !== "win32") {
+    await chmod(socketPath, 0o600);
+    server.on("close", () => { void unlink(socketPath).catch(() => undefined); });
+  }
   return server;
 };
 

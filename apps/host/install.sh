@@ -7,7 +7,7 @@ VERSION="${REMOTE_HOST_VERSION:-}"
 
 usage() {
   cat <<'EOF'
-Usage: install-remote-host.sh [--version 0.1.0] [--prefix PATH]
+Usage: install-remote-host.sh [--version X.Y.Z] [--prefix PATH]
 
 Installs Flownote Remote Host for the current user. No sudo is used.
 EOF

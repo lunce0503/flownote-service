@@ -32,17 +32,19 @@ try {
   await chmod(join(bundleRoot, "dist", "cli.js"), 0o755);
   await writeFile(join(bundleRoot, "VERSION"), `${version}\n`);
   await mkdir(outputDir, { recursive: true });
-  run("tar", [
-    "--sort=name", "--mtime=@0", "--owner=0", "--group=0", "--numeric-owner",
-    "-czf", archivePath, bundleName,
-  ], temporaryRoot);
+  const tarArguments = process.platform === "win32"
+    ? ["-czf", archivePath, bundleName]
+    : ["--sort=name", "--mtime=@0", "--owner=0", "--group=0", "--numeric-owner", "-czf", archivePath, bundleName];
+  run("tar", tarArguments, temporaryRoot);
 
   const digest = createHash("sha256").update(await readFile(archivePath)).digest("hex");
   await writeFile(`${archivePath}.sha256`, `${digest}  ${archiveName}\n`);
   const installerPath = join(outputDir, "install-remote-host.sh");
   await cp(join(packageRoot, "install.sh"), installerPath);
   await chmod(installerPath, 0o755);
-  console.log(JSON.stringify({ version, tag, archivePath, installerPath, sha256: digest }, null, 2));
+  const windowsInstallerPath = join(outputDir, "install-remote-host.ps1");
+  await cp(join(packageRoot, "install.ps1"), windowsInstallerPath);
+  console.log(JSON.stringify({ version, tag, archivePath, installerPath, windowsInstallerPath, sha256: digest }, null, 2));
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
 }

@@ -4,7 +4,9 @@ import { access, chmod, lstat, mkdir, readFile, rename, writeFile } from "node:f
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual, X509Certificate } from "node:crypto";
+import { createHash, randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual, X509Certificate } from "node:crypto";
+import { isIP } from "node:net";
+import { generate } from "selfsigned";
 import { z } from "zod";
 import { CONFIG_FILE_NAME, CONTROL_SOCKET_NAME, DEFAULT_BIND, DEFAULT_PORT } from "./constants.js";
 
@@ -36,20 +38,47 @@ const configSchema = z.object({
 export type HostConfig = z.infer<typeof configSchema>;
 export type DeviceConfig = z.infer<typeof deviceSchema>;
 
-export const defaultConfigDir = () => join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "flownote-remote-host");
+export const defaultConfigDir = () => process.platform === "win32"
+  ? join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "Flownote", "RemoteHost")
+  : join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "flownote-remote-host");
 export const resolveConfigDir = (input?: string) => resolve(input || defaultConfigDir());
 export const configPathFor = (configDir: string) => join(configDir, CONFIG_FILE_NAME);
-export const controlSocketPathFor = (configDir: string) => join(configDir, CONTROL_SOCKET_NAME);
+export const controlSocketPathFor = (configDir: string) => {
+  if (process.platform !== "win32") return join(configDir, CONTROL_SOCKET_NAME);
+  const suffix = createHash("sha256").update(resolve(configDir).toLowerCase()).digest("hex").slice(0, 32);
+  return `\\\\.\\pipe\\flownote-remote-host-${suffix}`;
+};
+
+export const defaultShell = () => process.platform === "win32"
+  ? join(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+  : (process.env.SHELL || "/bin/bash");
+
+const executableAccessMode = () => process.platform === "win32" ? fsConstants.F_OK : fsConstants.X_OK;
 
 const hashToken = async (token: string, salt: Buffer) => {
   const derived = await scrypt(token, salt, 32) as Buffer;
   return derived.toString("base64");
 };
 
-const isIpAddress = (value: string) => /^\d{1,3}(?:\.\d{1,3}){3}$/.test(value) || value.includes(":");
 const validateHost = (value: string) => {
-  if (!/^[A-Za-z0-9.:-]+$/.test(value)) throw new Error("Host에는 IP 주소나 DNS 이름만 사용할 수 있습니다.");
+  const dnsName = /^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/.test(value) && !value.includes("..");
+  if (!isIP(value) && !dnsName) throw new Error("Host에는 IP 주소나 DNS 이름만 사용할 수 있습니다.");
   return value;
+};
+
+const secureWindowsAcl = (path: string, directory: boolean) => {
+  const sid = execFileSync("powershell.exe", [
+    "-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
+    "[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value",
+  ], { encoding: "utf8", windowsHide: true }).trim();
+  const inheritance = directory ? "(OI)(CI)F" : "F";
+  execFileSync("icacls.exe", [
+    path,
+    "/inheritance:r",
+    "/grant:r",
+    `*${sid}:${inheritance}`,
+    `*S-1-5-18:${inheritance}`,
+  ], { stdio: "ignore", windowsHide: true });
 };
 
 const ensurePrivateDirectory = async (path: string) => {
@@ -60,13 +89,17 @@ const ensurePrivateDirectory = async (path: string) => {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     await mkdir(path, { recursive: true, mode: 0o700 });
   }
-  await chmod(path, 0o700);
+  if (process.platform === "win32") secureWindowsAcl(path, true);
+  else await chmod(path, 0o700);
 };
 
 const ensureRegularFile = async (path: string, requirePrivate = false) => {
   const stat = await lstat(path);
   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`일반 파일이 아닙니다: ${path}`);
-  if (requirePrivate && (stat.mode & 0o077) !== 0) throw new Error(`파일 권한이 너무 넓습니다. 0600으로 변경하세요: ${path}`);
+  if (requirePrivate) {
+    if (process.platform === "win32") secureWindowsAcl(path, false);
+    else if ((stat.mode & 0o077) !== 0) throw new Error(`파일 권한이 너무 넓습니다. 0600으로 변경하세요: ${path}`);
+  }
 };
 
 const rejectUnsafeExistingFile = async (path: string) => {
@@ -83,8 +116,9 @@ export const saveConfig = async (configDir: string, config: HostConfig) => {
   const target = configPathFor(configDir);
   const temporary = `${target}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
   await writeFile(temporary, `${JSON.stringify(parsed, null, 2)}\n`, { mode: 0o600, flag: "wx" });
-  await chmod(temporary, 0o600);
+  if (process.platform !== "win32") await chmod(temporary, 0o600);
   await rename(temporary, target);
+  await ensureRegularFile(target, true);
 };
 
 export const loadConfig = async (configDir: string): Promise<HostConfig> => {
@@ -96,7 +130,7 @@ export const loadConfig = async (configDir: string): Promise<HostConfig> => {
     throw new Error("인증서, 키, 셸과 작업 디렉터리는 절대 경로여야 합니다.");
   }
   await Promise.all([ensureRegularFile(parsed.certPath), ensureRegularFile(parsed.keyPath, true)]);
-  await access(parsed.shell, fsConstants.X_OK);
+  await access(parsed.shell, executableAccessMode());
   return parsed;
 };
 
@@ -133,18 +167,40 @@ export const initializeHost = async (options: InitOptions): Promise<InitResult> 
   const certPath = join(configDir, "host-cert.pem");
   const keyPath = join(configDir, "host-key.pem");
   await Promise.all([rejectUnsafeExistingFile(certPath), rejectUnsafeExistingFile(keyPath)]);
-  const shell = resolve(options.shell || process.env.SHELL || "/bin/bash");
+  const shell = resolve(options.shell || defaultShell());
   const cwd = resolve(options.cwd || homedir());
-  await Promise.all([access(shell, fsConstants.X_OK), access(cwd, fsConstants.R_OK | fsConstants.X_OK)]);
-  const san = isIpAddress(advertisedHost) ? `IP:${advertisedHost}` : `DNS:${advertisedHost}`;
-  execFileSync("openssl", [
-    "req", "-x509", "-newkey", "rsa:3072", "-sha256", "-nodes", "-days", "825",
-    "-subj", "/CN=Flownote Remote Host",
-    "-addext", `subjectAltName=${san},DNS:localhost,IP:127.0.0.1`,
-    "-keyout", keyPath,
-    "-out", certPath,
-  ], { stdio: "ignore" });
-  await Promise.all([chmod(keyPath, 0o600), chmod(certPath, 0o600)]);
+  await Promise.all([access(shell, executableAccessMode()), access(cwd, fsConstants.R_OK)]);
+  const notBeforeDate = new Date(Date.now() - 5 * 60 * 1000);
+  const notAfterDate = new Date(notBeforeDate);
+  notAfterDate.setUTCDate(notAfterDate.getUTCDate() + 825);
+  const advertisedAltName = isIP(advertisedHost)
+    ? { type: 7 as const, ip: advertisedHost }
+    : { type: 2 as const, value: advertisedHost };
+  const certificate = await generate([{ name: "commonName", value: advertisedHost }], {
+    keyType: "rsa",
+    keySize: 3072,
+    algorithm: "sha256",
+    notBeforeDate,
+    notAfterDate,
+    extensions: [
+      { name: "basicConstraints", cA: false, critical: true },
+      { name: "keyUsage", digitalSignature: true, keyEncipherment: true, critical: true },
+      { name: "extKeyUsage", serverAuth: true },
+      {
+        name: "subjectAltName",
+        altNames: [advertisedAltName, { type: 2, value: "localhost" }, { type: 7, ip: "127.0.0.1" }],
+      },
+    ],
+  });
+  const certTemporary = `${certPath}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
+  const keyTemporary = `${keyPath}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
+  await Promise.all([
+    writeFile(certTemporary, certificate.cert, { mode: 0o600, flag: "wx" }),
+    writeFile(keyTemporary, certificate.private, { mode: 0o600, flag: "wx" }),
+  ]);
+  if (process.platform !== "win32") await Promise.all([chmod(certTemporary, 0o600), chmod(keyTemporary, 0o600)]);
+  await Promise.all([rename(certTemporary, certPath), rename(keyTemporary, keyPath)]);
+  await ensureRegularFile(keyPath, true);
 
   const token = randomBytes(32).toString("base64url");
   const salt = randomBytes(16);
@@ -198,8 +254,8 @@ export const revokeDevice = async (configDir: string, config: HostConfig, device
 };
 
 export const assertRuntimeFiles = async (config: HostConfig) => {
-  await access(config.shell, fsConstants.X_OK);
-  await access(config.cwd, fsConstants.R_OK | fsConstants.X_OK);
+  await access(config.shell, executableAccessMode());
+  await access(config.cwd, fsConstants.R_OK);
   await Promise.all([ensureRegularFile(config.certPath), ensureRegularFile(config.keyPath, true)]);
   if (dirname(config.certPath) !== dirname(config.keyPath)) throw new Error("인증서와 키는 같은 설정 디렉터리에 있어야 합니다.");
 };

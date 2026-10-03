@@ -81,7 +81,10 @@ test("authenticated WSS client can create, drive, reattach and close a PTY", asy
     const sessionId = created.payload.sessionId as string;
     assert.match(sessionId, /^[0-9a-f-]{36}$/);
 
-    first.send(JSON.stringify({ version: 1, type: "terminal.input", requestId: "input-1", payload: { sessionId, data: "printf '__REMOTE_HOST_OK__\\n'\r" } }));
+    const terminalCommand = process.platform === "win32"
+      ? "Write-Output '__REMOTE_HOST_OK__'\r"
+      : "printf '__REMOTE_HOST_OK__\\n'\r";
+    first.send(JSON.stringify({ version: 1, type: "terminal.input", requestId: "input-1", payload: { sessionId, data: terminalCommand } }));
     const output = await firstMessages.take((message) => message.type === "terminal.output" && String(message.payload.data).includes("__REMOTE_HOST_OK__"));
     const lastSeq = output.payload.seq as number;
     first.close();
