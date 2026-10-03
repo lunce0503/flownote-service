@@ -16,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -23,6 +24,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -35,8 +37,11 @@ import org.json.JSONObject
 @Composable
 fun RemoteApp(model: RemoteViewModel) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
-            if (model.screenTerminal) TerminalScreen(model) else Registration(model)
+        BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
+            val compact = maxHeight < 280.dp
+            Column(Modifier.fillMaxSize()) {
+                if (model.screenTerminal) TerminalScreen(model, compact) else Registration(model)
+            }
         }
     }
     model.error?.let { message ->
@@ -102,7 +107,7 @@ private fun Registration(model: RemoteViewModel) {
 }
 
 @Composable
-private fun ColumnScope.TerminalScreen(model: RemoteViewModel) {
+private fun ColumnScope.TerminalScreen(model: RemoteViewModel, compact: Boolean) {
     val context = LocalContext.current
     var terminal by remember { mutableStateOf<TerminalView?>(null) }
     var closeDialog by remember { mutableStateOf(false) }
@@ -125,7 +130,11 @@ private fun ColumnScope.TerminalScreen(model: RemoteViewModel) {
             else model.error = "클립보드가 비어 있거나 붙여넣기 크기(256K자)를 초과했습니다."
         }
     }
-    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
+    if (compact) {
+        Text("${model.profile?.name ?: "터미널"} · ${model.state.detail}", maxLines = 1,
+            overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 8.dp, vertical = 4.dp).testTag("connection-status"))
+    } else Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
         Tool(Icons.AutoMirrored.Filled.ArrowBack, "PC 설정") { editDialog = true }
         Column(Modifier.weight(1f)) {
             Text(model.profile?.name ?: "터미널", maxLines = 1, style = MaterialTheme.typography.titleMedium)
@@ -136,7 +145,7 @@ private fun ColumnScope.TerminalScreen(model: RemoteViewModel) {
         Tool(Icons.Default.Settings, "터미널 설정") { settings = !settings }
         Tool(Icons.Default.Close, "세션 종료", connected || model.state.phase == Phase.RECOVERY) { closeDialog = true }
     }
-    if (settings) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    if (settings && !compact) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text("글자 크기", Modifier.padding(start = 16.dp))
         Slider(fontSize.toFloat(), { fontSize = it.toInt(); model.font(fontSize) }, valueRange = 10f..24f, steps = 13, modifier = Modifier.weight(1f))
         Text("$fontSize", Modifier.padding(end = 16.dp))
@@ -150,18 +159,19 @@ private fun ColumnScope.TerminalScreen(model: RemoteViewModel) {
     }
     if (remember { TerminalView.supported() }) {
         AndroidView(factory = { ctx -> TerminalView(ctx, model::onBridge).also { view -> terminal = view; model.renderer = view::deliver } },
-            modifier = Modifier.weight(1f).fillMaxWidth().testTag("terminal"))
+            modifier = Modifier.weight(1f).fillMaxWidth().clipToBounds().testTag("terminal"))
     } else {
         Text("Android System WebView를 업데이트한 뒤 앱을 다시 실행하세요.", Modifier.weight(1f).padding(24.dp))
     }
-    if (composeInput) Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        fun submit() { if (connected && inputText.isNotEmpty() && model.input(inputText + "\r")) inputText = "" }
-        OutlinedTextField(inputText, { inputText = it }, label = { Text("명령 입력") }, singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { submit() }),
-            modifier = Modifier.weight(1f).testTag("command-input"))
-        Tool(Icons.Default.Send, "명령 전송", connected) { submit() }
+    fun submit() { if (connected && inputText.isNotEmpty() && model.input(inputText + "\r")) inputText = "" }
+    if (composeInput && !compact) {
+        CommandInput(inputText, { inputText = it }, connected, ::submit, Modifier.fillMaxWidth().padding(horizontal = 8.dp))
     }
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+      if (composeInput && compact) {
+          CommandInput(inputText, { inputText = it }, connected, ::submit, Modifier.weight(1f).padding(start = 4.dp))
+      }
+      Row((if (composeInput && compact) Modifier.weight(1f) else Modifier.fillMaxWidth()).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = { model.input("\u001b") }, enabled = connected) { Text("Esc") }
         TextButton(onClick = { model.input("\t") }, enabled = connected) { Text("Tab") }
         TextButton(onClick = { model.modifier("ctrl") }, enabled = connected) { Text("Ctrl", color = if (model.ctrl) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary) }
@@ -175,7 +185,16 @@ private fun ColumnScope.TerminalScreen(model: RemoteViewModel) {
         Tool(Icons.Default.Edit, "명령 입력창", connected) { composeInput = !composeInput }
         Tool(Icons.Default.Keyboard, "키보드", connected) { model.command("focus") }
         Tool(Icons.Default.LinkOff, "연결 해제") { model.disconnect() }
+        if (compact) {
+            Tool(Icons.AutoMirrored.Filled.ArrowBack, "PC 설정") { editDialog = true }
+            Tool(Icons.Default.Settings, "터미널 설정") { settings = !settings }
+            Tool(Icons.Default.Close, "세션 종료", connected || model.state.phase == Phase.RECOVERY) { closeDialog = true }
+        }
+      }
     }
+    if (settings && compact) AlertDialog(onDismissRequest = { settings = false }, title = { Text("글자 크기 · $fontSize") },
+        text = { Slider(fontSize.toFloat(), { fontSize = it.toInt(); model.font(fontSize) }, valueRange = 10f..24f, steps = 13) },
+        confirmButton = { TextButton(onClick = { settings = false }) { Text("닫기") } })
     if (closeDialog) Confirm("세션 종료", "PC의 현재 터미널을 종료합니다.", "종료", { closeDialog = false }) { model.closeSession(); closeDialog = false }
     if (newDialog) Confirm("새 세션", "기존 터미널을 종료하고 새 터미널을 엽니다.", "시작", { newDialog = false }) { model.newSession(); newDialog = false }
     if (editDialog) Confirm("PC 설정으로 이동", "연결을 해제합니다. 돌아오면 새 터미널을 선택해야 합니다.", "이동", { editDialog = false }) { model.editProfile(); editDialog = false }
@@ -186,6 +205,16 @@ private fun ColumnScope.TerminalScreen(model: RemoteViewModel) {
             if (content.length > 8000) Text("미리보기 생략 · 전체 ${content.length}자")
         } }, dismissButton = { TextButton(onClick = { pasteText = null }) { Text("취소") } },
         confirmButton = { TextButton(onClick = { model.paste(content); pasteText = null }) { Text("붙여넣기") } }) }
+}
+
+@Composable
+private fun CommandInput(value: String, change: (String) -> Unit, enabled: Boolean, submit: () -> Unit, modifier: Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(value, change, placeholder = { Text("명령 입력") }, singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { submit() }),
+            modifier = Modifier.weight(1f).height(56.dp).testTag("command-input"))
+        Tool(Icons.Default.Send, "명령 전송", enabled) { submit() }
+    }
 }
 
 @Composable

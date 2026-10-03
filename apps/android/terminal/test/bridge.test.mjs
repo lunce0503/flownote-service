@@ -14,7 +14,8 @@ function page() {
     open() {}
     focus() {}
     onData(fn) { this.input = fn; }
-    onResize(fn) { this.resize = fn; }
+    onResize(fn) { this.resizeListener = fn; }
+    resize(cols, rows) { this.cols = cols; this.rows = rows; this.resizeListener?.({ cols, rows }); }
     attachCustomKeyEventHandler(fn) { this.key = fn; }
     write(data, done) { writes.push(() => { painted.push(data); done(); }); }
     reset() { painted.length = 0; }
@@ -25,7 +26,7 @@ function page() {
     addEventListener: (type, callback) => { listeners[type] = callback; },
   };
   vm.runInNewContext(script, {
-    window, Terminal, FitAddon: { FitAddon: class { fit() {} } },
+    window, Terminal, FitAddon: { FitAddon: class { proposeDimensions() { return { cols: 80, rows: 24 }; } } },
     document: { getElementById: () => ({}), addEventListener: (type, fn) => { listeners[type] = fn; } },
     ResizeObserver: class { observe() {} }, setTimeout, clearTimeout,
   });

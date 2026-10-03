@@ -17,6 +17,11 @@
   let alt = false;
   let enabled = false;
   let resizeTimer;
+  const fitTerminal = () => {
+    const size = fit.proposeDimensions();
+    // Insets and rotation can briefly collapse the Android view. Do not destroy its screen then.
+    if (size && size.cols >= 20 && size.rows >= 5) terminal.resize(Math.min(300, size.cols), Math.min(200, size.rows));
+  };
   terminal.onData(data => {
     if (!enabled) return;
     if (ctrl && /^[\x40-\x7f]$/.test(data)) data = String.fromCharCode(data.toUpperCase().charCodeAt(0) & 31);
@@ -36,7 +41,7 @@
   document.addEventListener('paste', event => { event.preventDefault(); send({ type: 'paste' }); }, true);
   new ResizeObserver(() => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => { fit.fit(); }, 120);
+    resizeTimer = setTimeout(fitTerminal, 120);
   }).observe(document.getElementById('terminal'));
   window.addEventListener('message', event => {
     if (event.origin !== 'https://appassets.androidplatform.net' && event.origin !== '') return;
@@ -62,7 +67,7 @@
         break;
       case 'focus': terminal.focus(); send({ type: 'keyboard' }); break;
       case 'enabled': enabled = !!message.value; terminal.options.disableStdin = !enabled; break;
-      case 'font': terminal.options.fontSize = Math.max(10, Math.min(24, message.size)); fit.fit(); break;
+      case 'font': terminal.options.fontSize = Math.max(10, Math.min(24, message.size)); fitTerminal(); break;
       case 'modifier':
         if (message.key === 'ctrl') ctrl = !ctrl;
         if (message.key === 'alt') alt = !alt;
@@ -70,6 +75,6 @@
       case 'paste': if (enabled) terminal.paste(message.data); break;
     }
   });
-  fit.fit();
+  fitTerminal();
   send({ type: 'ready', cols: terminal.cols, rows: terminal.rows });
 })();

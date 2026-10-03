@@ -134,6 +134,7 @@ class RemoteAppTest {
         assertEquals(session, store.rememberedSession())
         val device = UiDevice.getInstance(instrumentation)
         device.setOrientationLeft()
+        ui.waitUntil(10_000) { evaluate("innerWidth > innerHeight && innerHeight >= 80") == "true" }
         action { it.input("printf 'ROTATE_%s\\n' OK\r") }
         terminalContains("ROTATE_OK")
         screenshot("terminal-landscape")
