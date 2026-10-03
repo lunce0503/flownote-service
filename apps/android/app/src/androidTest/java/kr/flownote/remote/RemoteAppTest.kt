@@ -1,6 +1,9 @@
 package kr.flownote.remote
 
 import android.graphics.Bitmap
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -10,6 +13,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
+import androidx.lifecycle.Lifecycle
 import kr.flownote.remote.connection.*
 import kr.flownote.remote.security.*
 import okhttp3.*
@@ -95,12 +99,31 @@ class RemoteAppTest {
         terminalContains("한글입력")
         action { it.input("printf 'TAB_%s\\n' DONE"); it.input("\r"); it.input("\u001b[A"); it.input("\u0003") }
         terminalContains("TAB_DONE")
+        // Exercise actual toolbar keys, not only ViewModel input calls.
+        ui.onNodeWithText("Tab", useUnmergedTree = true).performScrollTo().performClick()
+        ui.onNodeWithContentDescription("Ctrl+C").performScrollTo().performClick()
+        ui.onNodeWithContentDescription("위쪽 방향키").performScrollTo().performClick()
+        ui.onNodeWithContentDescription("Ctrl+C").performScrollTo().performClick()
+        instrumentation.runOnMainSync {
+            val clipboard = ui.activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("test", "printf 'PASTE_%s\\n' OK\n"))
+        }
+        ui.onNodeWithContentDescription("붙여넣기").performScrollTo().performClick()
+        ui.onNodeWithText("붙여넣기 확인").assertIsDisplayed()
+        screenshot("paste-confirmation")
+        ui.onNodeWithText("취소").performClick()
+        assertFalse(evaluate("document.querySelector('.xterm-rows')?.innerText || ''").contains("PASTE_OK"))
         val session = store.rememberedSession()
         repeat(10) {
             action { it.disconnect() }; phase(Phase.DISCONNECTED)
             action { it.reconnect() }; phase(Phase.CONNECTED)
             assertEquals(session, store.rememberedSession())
         }
+        ui.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        phase(Phase.DISCONNECTED)
+        ui.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        phase(Phase.CONNECTED)
+        assertEquals(session, store.rememberedSession())
         val device = UiDevice.getInstance(instrumentation)
         device.setOrientationLeft()
         action { it.input("printf 'ROTATE_%s\\n' OK\r") }
@@ -112,6 +135,15 @@ class RemoteAppTest {
         screenshot("terminal-phone")
         // Rotation must preserve the same PTY and xterm screen.
         assertEquals(session, store.rememberedSession())
+        // Destroying the actual WebView cannot be treated as a complete ANSI recovery.
+        ui.activityRule.scenario.recreate()
+        phase(Phase.RECOVERY)
+        ui.onNodeWithText("새 세션").performClick()
+        ui.onNodeWithText("시작").performClick()
+        phase(Phase.CONNECTED)
+        assertNotEquals(session, store.rememberedSession())
+        action { it.input("printf 'NEW_SESSION_%s\\n' OK\r") }
+        terminalContains("NEW_SESSION_OK")
         action { it.closeSession() }; phase(Phase.ENDED)
         assertNull(store.rememberedSession())
         device.unfreezeRotation()

@@ -2,6 +2,7 @@ package kr.flownote.remote
 
 import kotlinx.coroutines.*
 import kr.flownote.remote.connection.*
+import kr.flownote.remote.connection.Protocol
 import okhttp3.*
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
