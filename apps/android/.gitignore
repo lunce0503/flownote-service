@@ -1,0 +1,11 @@
+.gradle/
+.kotlin/
+**/build/
+local.properties
+*.jks
+*.keystore
+terminal/node_modules/
+app/src/main/assets/terminal/vendor/
+app/src/androidTest/assets/host.json
+screenshots/
+release/
