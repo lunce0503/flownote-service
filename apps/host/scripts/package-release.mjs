@@ -20,7 +20,7 @@ const archivePath = join(outputDir, archiveName);
 
 const run = (command, args, cwd = packageRoot) => {
   const executable = process.platform === "win32"
-    ? ({ npm: "npm.cmd", tar: "tar.exe" }[command] || command)
+    ? ({ tar: "tar.exe" }[command] || command)
     : command;
   const result = spawnSync(executable, args, { cwd, stdio: "inherit", encoding: "utf8" });
   if (result.error) throw result.error;
@@ -28,7 +28,7 @@ const run = (command, args, cwd = packageRoot) => {
 };
 
 try {
-  run("npm", ["run", "build"]);
+  run(process.execPath, [join(packageRoot, "node_modules", "typescript", "bin", "tsc"), "-p", "tsconfig.json"]);
   await mkdir(bundleRoot, { recursive: true });
   for (const path of ["dist", "package.json", "package-lock.json", "README.md"]) {
     await cp(join(packageRoot, path), join(bundleRoot, basename(path)), { recursive: true });
