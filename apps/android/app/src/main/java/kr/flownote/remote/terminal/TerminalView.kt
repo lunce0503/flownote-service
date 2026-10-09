@@ -15,6 +15,7 @@ import java.io.ByteArrayInputStream
 
 @SuppressLint("SetJavaScriptEnabled")
 class TerminalView(context: Context, private val receive: (JSONObject) -> Unit) : WebView(context) {
+    val renderer: (JSONObject) -> Unit = ::deliver
     companion object {
         const val ORIGIN = "https://appassets.androidplatform.net"
         fun supported() = WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)

@@ -87,6 +87,7 @@ class RemoteAppTest {
         val host = profile
         rejected(host.copy(fingerprint = "00".repeat(32)))
         rejected(host.copy(token = "invalid-token-long-enough"))
+        screenshot("registration-empty")
         ui.onNodeWithTag("host-name").performTextReplacement(host.name)
         ui.onNodeWithTag("host-endpoint").performTextInput(host.endpoint)
         ui.onNodeWithTag("host-token").performTextInput(host.token)
@@ -105,7 +106,7 @@ class RemoteAppTest {
         ui.onNodeWithTag("command-input").performTextInput("printf '한글%s\\n' 입력")
         ui.onNodeWithContentDescription("명령 전송").performClick()
         terminalContains("한글입력")
-        action { it.input("printf 'TAB_%s\\n' DONE"); it.input("\r"); it.input("\u001b[A"); it.input("\u0003") }
+        action { it.input("printf 'TAB_%s\\n' DONE\r") }
         terminalContains("TAB_DONE")
         // Exercise actual toolbar keys, not only ViewModel input calls.
         ui.onNodeWithText("Tab", useUnmergedTree = true).performScrollTo().performClick()
@@ -134,6 +135,7 @@ class RemoteAppTest {
         assertEquals(session, store.rememberedSession())
         val device = UiDevice.getInstance(instrumentation)
         device.setOrientationLeft()
+        ui.onNodeWithTag("command-input").performClick()
         ui.waitUntil(10_000) { evaluate("innerWidth > innerHeight && innerHeight >= 80") == "true" }
         action { it.input("printf 'ROTATE_%s\\n' OK\r") }
         terminalContains("ROTATE_OK")

@@ -61,6 +61,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     }
     fun input(text: String): Boolean {
         val sent = connection.input(text)
+        if (sent) command("follow")
         if (!sent) error = "입력을 보내지 못했습니다. 연결 상태와 PC의 실행 결과를 확인하세요. 입력은 자동 재전송되지 않습니다."
         return sent
     }

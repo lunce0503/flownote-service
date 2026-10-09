@@ -66,6 +66,7 @@
         terminal.write('', () => terminal.reset());
         break;
       case 'focus': terminal.focus(); send({ type: 'keyboard' }); break;
+      case 'follow': terminal.scrollToBottom(); break;
       case 'enabled': enabled = !!message.value; terminal.options.disableStdin = !enabled; break;
       case 'font': terminal.options.fontSize = Math.max(10, Math.min(24, message.size)); fitTerminal(); break;
       case 'modifier':

@@ -2,6 +2,7 @@ package kr.flownote.remote.ui
 
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
@@ -37,11 +39,10 @@ import org.json.JSONObject
 @Composable
 fun RemoteApp(model: RemoteViewModel) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
-            val compact = maxHeight < 280.dp
-            Column(Modifier.fillMaxSize()) {
-                if (model.screenTerminal) TerminalScreen(model, compact) else Registration(model)
-            }
+        val configuration = LocalConfiguration.current
+        val compact = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE || configuration.screenHeightDp < 600
+        Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
+            if (model.screenTerminal) TerminalScreen(model, compact) else Registration(model)
         }
     }
     model.error?.let { message ->
@@ -109,7 +110,6 @@ private fun Registration(model: RemoteViewModel) {
 @Composable
 private fun ColumnScope.TerminalScreen(model: RemoteViewModel, compact: Boolean) {
     val context = LocalContext.current
-    var terminal by remember { mutableStateOf<TerminalView?>(null) }
     var closeDialog by remember { mutableStateOf(false) }
     var editDialog by remember { mutableStateOf(false) }
     var newDialog by remember { mutableStateOf(false) }
@@ -120,7 +120,6 @@ private fun ColumnScope.TerminalScreen(model: RemoteViewModel, compact: Boolean)
     var fontSize by remember { mutableIntStateOf(14) }
     val connected = model.state.phase == Phase.CONNECTED
     BackHandler { editDialog = true }
-    DisposableEffect(Unit) { onDispose { model.renderer = null; terminal?.release() } }
     LaunchedEffect(model.pasteRequested) {
         if (model.pasteRequested) {
             model.pasteRequested = false
@@ -158,7 +157,11 @@ private fun ColumnScope.TerminalScreen(model: RemoteViewModel, compact: Boolean)
         }
     }
     if (remember { TerminalView.supported() }) {
-        AndroidView(factory = { ctx -> TerminalView(ctx, model::onBridge).also { view -> terminal = view; model.renderer = view::deliver } },
+        AndroidView(factory = { ctx -> TerminalView(ctx, model::onBridge).also { view -> model.renderer = view.renderer } },
+            onRelease = { view ->
+                if (model.renderer === view.renderer) model.renderer = null
+                view.release()
+            },
             modifier = Modifier.weight(1f).fillMaxWidth().clipToBounds().testTag("terminal"))
     } else {
         Text("Android System WebView를 업데이트한 뒤 앱을 다시 실행하세요.", Modifier.weight(1f).padding(24.dp))

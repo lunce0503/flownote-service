@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const script = await readFile(new URL('../../app/src/main/assets/terminal/terminal.js', import.meta.url), 'utf8');
 
-function page() {
+function page(dimensions = { cols: 80, rows: 24 }) {
   const messages = [], writes = [], painted = [], listeners = {};
   let terminal;
   class Terminal {
@@ -13,6 +13,7 @@ function page() {
     loadAddon() {}
     open() {}
     focus() {}
+    scrollToBottom() { this.followed = true; }
     onData(fn) { this.input = fn; }
     onResize(fn) { this.resizeListener = fn; }
     resize(cols, rows) { this.cols = cols; this.rows = rows; this.resizeListener?.({ cols, rows }); }
@@ -26,7 +27,7 @@ function page() {
     addEventListener: (type, callback) => { listeners[type] = callback; },
   };
   vm.runInNewContext(script, {
-    window, Terminal, FitAddon: { FitAddon: class { proposeDimensions() { return { cols: 80, rows: 24 }; } } },
+    window, Terminal, FitAddon: { FitAddon: class { proposeDimensions() { return dimensions; } } },
     document: { getElementById: () => ({}), addEventListener: (type, fn) => { listeners[type] = fn; } },
     ResizeObserver: class { observe() {} }, setTimeout, clearTimeout,
   });
@@ -89,4 +90,26 @@ test('keyboard command asks the native layer to show the IME after focus', () =>
   const p = page();
   p.deliver({ type: 'focus' });
   assert.equal(p.messages.at(-1).type, 'keyboard');
+});
+
+test('collapsed view preserves the terminal screen and resizes stay within the Host contract', () => {
+  const dimensions = { cols: 80, rows: 24 };
+  const p = page(dimensions);
+  dimensions.rows = 1;
+  p.deliver({ type: 'font', size: 14 });
+  assert.equal(p.terminal.rows, 24);
+  dimensions.rows = 300; dimensions.cols = 500;
+  p.deliver({ type: 'font', size: 14 });
+  assert.equal(p.terminal.rows, 200);
+  assert.equal(p.terminal.cols, 300);
+});
+
+test('native input can follow the prompt without changing focus or replaying input', () => {
+  const p = page();
+  p.deliver({ type: 'output', seq: 1, data: 'history' });
+  p.flush();
+  assert.equal(p.terminal.followed, undefined);
+  p.deliver({ type: 'follow' });
+  assert.equal(p.terminal.followed, true);
+  assert.equal(p.messages.filter(m => m.type === 'input' || m.type === 'keyboard').length, 0);
 });
