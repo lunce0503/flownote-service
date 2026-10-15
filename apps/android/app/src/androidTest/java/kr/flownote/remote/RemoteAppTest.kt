@@ -164,7 +164,7 @@ class RemoteAppTest {
         device.setOrientationLeft()
         ui.onNodeWithTag("command-input").performClick()
         ui.waitUntil(10_000) { evaluate("innerWidth > innerHeight && innerHeight >= 80") == "true" }
-        action { it.input("printf 'ROTATE_%s\\n' OK\r") }
+        action { assertTrue(it.input("printf 'ROTATE_%s\\n' OK\r")) }
         terminalContains("ROTATE_OK")
         screenshot("terminal-landscape")
         device.setOrientationNatural()

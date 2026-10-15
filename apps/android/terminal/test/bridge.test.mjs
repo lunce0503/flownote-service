@@ -9,11 +9,11 @@ function page(dimensions = { cols: 80, rows: 24 }) {
   const messages = [], writes = [], painted = [], listeners = {};
   let terminal;
   class Terminal {
-    constructor(options) { terminal = this; this.options = options; this.cols = 80; this.rows = 24; this.parser = { registerOscHandler: (code, handler) => { this.osc = [code, handler]; } }; }
+    constructor(options) { terminal = this; this.options = options; this.cols = 80; this.rows = 24; this.buffer = { active: { viewportY: 0, baseY: 0 } }; this.parser = { registerOscHandler: (code, handler) => { this.osc = [code, handler]; } }; }
     loadAddon() {}
     open() {}
     focus() {}
-    scrollToBottom() { this.followed = true; }
+    scrollToBottom() { this.followed = true; this.buffer.active.viewportY = this.buffer.active.baseY; }
     onData(fn) { this.input = fn; }
     onResize(fn) { this.resizeListener = fn; }
     resize(cols, rows) { this.cols = cols; this.rows = rows; this.resizeListener?.({ cols, rows }); }
@@ -112,4 +112,21 @@ test('native input can follow the prompt without changing focus or replaying inp
   p.deliver({ type: 'follow' });
   assert.equal(p.terminal.followed, true);
   assert.equal(p.messages.filter(m => m.type === 'input' || m.type === 'keyboard').length, 0);
+});
+
+test('resizing keeps a following viewport at the prompt without forcing a user reading history', () => {
+  const dimensions = { cols: 80, rows: 24 };
+  const p = page(dimensions);
+  p.terminal.buffer.active.baseY = 100;
+  p.terminal.buffer.active.viewportY = 100;
+  dimensions.rows = 5;
+  p.deliver({ type: 'font', size: 14 });
+  assert.equal(p.terminal.followed, true);
+  assert.equal(p.terminal.buffer.active.viewportY, 100);
+  p.terminal.followed = false;
+  p.terminal.buffer.active.viewportY = 40;
+  dimensions.rows = 20;
+  p.deliver({ type: 'font', size: 14 });
+  assert.equal(p.terminal.followed, false);
+  assert.equal(p.terminal.buffer.active.viewportY, 40);
 });

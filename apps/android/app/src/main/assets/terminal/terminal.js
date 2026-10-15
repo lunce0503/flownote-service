@@ -20,7 +20,13 @@
   const fitTerminal = () => {
     const size = fit.proposeDimensions();
     // Insets and rotation can briefly collapse the Android view. Do not destroy its screen then.
-    if (size && size.cols >= 20 && size.rows >= 5) terminal.resize(Math.min(300, size.cols), Math.min(200, size.rows));
+    if (size && size.cols >= 20 && size.rows >= 5) {
+      const cols = Math.min(300, size.cols), rows = Math.min(200, size.rows);
+      if (cols === terminal.cols && rows === terminal.rows) return;
+      const following = terminal.buffer.active.viewportY === terminal.buffer.active.baseY;
+      terminal.resize(cols, rows);
+      if (following) terminal.scrollToBottom();
+    }
   };
   terminal.onData(data => {
     if (!enabled) return;
