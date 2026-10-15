@@ -1,5 +1,7 @@
 # Remote Host 제품 사양
 
+Host 0.3.0은 Android 0.2.0 이상에서 사용할 5분·1회용 QR 등록을 지원한다. `remote-host pair`의 사용자 전용 IPC로 발급하고 인증서 지문 확인 뒤 TLS `POST /v1/pair`로 신규 기기를 추가한다. 기존 WSS v1 및 기기 토큰은 유지한다. 상세 계약은 [QR pairing](../../protocol/remote-host/pairing.md)을 따른다. 아래 최초 릴리즈 범위에서 제외됐던 QR 등록은 이 버전에서 추가되었다.
+
 ## 목적과 범위
 
 Remote Host는 사용자가 소유한 Linux 또는 Windows PC에서 실행되고 Android 원격 터미널 클라이언트에 실제 PTY를 제공하는 로컬 Host Agent다. LAN 또는 사용자가 이미 구성한 VPN 안에서 직접 WSS 연결을 사용한다. Flownote 클라우드 중계, NAT 통과, 포트 자동 개방과 Android 앱은 이 릴리즈 범위가 아니다.

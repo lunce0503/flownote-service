@@ -24,20 +24,41 @@ class ProfileStore(context: Context) {
         }.generateKey()
     }
 
-    fun save(profile: HostProfile) {
+    private fun encrypt(value: String): String {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, key()) }
-        val encrypted = cipher.doFinal(profile.validated().json().toString().toByteArray(Charsets.UTF_8))
-        check(preferences.edit().putString("profile", Base64.encodeToString(cipher.iv + encrypted, Base64.NO_WRAP)).commit())
+        val encrypted = cipher.doFinal(value.toByteArray(Charsets.UTF_8))
+        return Base64.encodeToString(cipher.iv + encrypted, Base64.NO_WRAP)
     }
-    fun load(): HostProfile? {
-        val value = preferences.getString("profile", null) ?: return null
+    private fun decrypt(value: String): String {
         val bytes = Base64.decode(value, Base64.NO_WRAP)
+        require(bytes.size >= 28)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
             init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOfRange(0, 12)))
         }
-        return HostProfile.fromJson(JSONObject(String(cipher.doFinal(bytes.copyOfRange(12, bytes.size)), Charsets.UTF_8)))
+        return String(cipher.doFinal(bytes.copyOfRange(12, bytes.size)), Charsets.UTF_8)
     }
-    fun rememberedSession(): String? = preferences.getString("session", null)
-    fun rememberSession(id: String?) { check(preferences.edit().putString("session", id).commit()) }
+    fun catalog(): ProfileCatalog {
+        preferences.getString("catalog-v2", null)?.let { return ProfileCatalog.fromJson(JSONObject(decrypt(it))) }
+        val legacy = preferences.getString("profile", null) ?: return ProfileCatalog()
+        val migrated = ProfileCatalog.migrate(HostProfile.fromJson(JSONObject(decrypt(legacy))), preferences.getString("session", null))
+        write(migrated)
+        return migrated
+    }
+    private fun write(catalog: ProfileCatalog) {
+        val encrypted = encrypt(catalog.json().toString())
+        check(preferences.edit().putString("catalog-v2", encrypted).remove("profile").remove("session").commit())
+    }
+    fun save(profile: HostProfile, id: String? = null): SavedHost {
+        val next = catalog().upsert(profile, id)
+        write(next)
+        return next.selected()!!
+    }
+    fun load(): HostProfile? = catalog().selected()?.profile
+    fun select(id: String) { write(catalog().select(id)) }
+    fun remove(id: String) { write(catalog().remove(id)) }
+    fun rememberedSession(hostId: String? = catalog().selectedId): String? = catalog().sessions[hostId]
+    fun rememberSession(id: String?, hostId: String? = catalog().selectedId) {
+        if (hostId != null) write(catalog().rememberSession(hostId, id))
+    }
     fun clear() { check(preferences.edit().clear().commit()) }
 }

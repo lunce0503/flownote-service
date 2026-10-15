@@ -1,14 +1,25 @@
 # Flownote Remote Android
 
-Android 10 이상에서 Linux 또는 Windows의 `remote-host`에 직접 WSS로 연결하는 터미널 앱이다. 원격 데스크톱 화면 전송이 아닌 실제 PC 셸을 제공한다. Host 0.2.0의 프로토콜 v1을 사용하며 같은 LAN 또는 기존 VPN이 필요하다.
+Android 10 이상에서 Linux 또는 Windows의 `remote-host`에 직접 WSS로 연결하는 터미널 앱이다. 원격 데스크톱 화면 전송이 아닌 실제 PC 셸을 제공한다. 터미널은 기존 Host 0.2.0과 호환되며 QR 등록에는 Host 0.3.0 이상이 필요하다. 같은 LAN 또는 기존 VPN을 사용한다.
 
 ## 설치와 접속
 
-1. GitHub Release의 `flownote-remote-v0.1.0.apk`를 휴대폰에서 설치한다.
+1. GitHub Release의 `flownote-remote-v0.2.0.apk`를 휴대폰에서 설치한다. 기존 앱 위에 설치하면 이전 PC 설정을 목록으로 이전한다.
 2. PC에서 [Remote Host](../host/README.md)를 설치하고 `remote-host init --host <LAN_OR_VPN_IP> --bind <LAN_OR_VPN_IP>`를 실행한다.
 3. `remote-host serve`를 실행한다. Windows 방화벽은 사용자가 신뢰하는 사설 네트워크 범위에서만 허용한다.
 4. 앱에 PC 이름, `wss://<host>:7443/v1/connect`, 기기 토큰과 SHA-256 인증서 지문을 입력한다. `init --json` 출력은 JSON 가져오기로 등록할 수 있다.
 5. PC 화면의 지문과 앱에 입력한 값을 대조하고 확인란을 선택해 연결한다.
+
+컴퓨터 목록에서 추가·편집·삭제하거나 PC를 눌러 연결한다. 최대 32대의 설정을 암호화 저장하고 한 번에 한 PC의 터미널을 연다. PC 전환 시 기존 연결을 해제하며, 다시 열 때 이전 ANSI 화면이 없으면 새 세션 선택을 요구한다. PC 삭제는 다른 PC 설정을 지우지 않고 PC 서버의 토큰을 폐기하지도 않는다.
+
+QR 등록은 실행 중인 PC에서 다음 명령으로 생성한다.
+
+```bash
+remote-host pair --name "Work PC"
+remote-host pair --name "Work PC" --qr-file /private/path/pc-pairing.png
+```
+
+앱의 QR 아이콘으로 스캔하고 표시된 주소·지문을 대조한 뒤 저장 또는 저장하고 연결을 누른다. 카메라 권한 거절 시 수동/JSON 등록도 사용할 수 있다. 코드는 5분간 한 번만 유효하며 새 QR 생성 시 이전 QR이 무효화된다. QR에는 영구 토큰이 없고 지문 확인 후 서버에서 신규 토큰을 받는다. PNG는 비공개 위치에 저장하고 공유하지 않는다. [등록 계약](../../protocol/remote-host/pairing.md)을 따른다.
 
 터미널 도구줄에는 Esc, Tab, Ctrl, Alt, Ctrl+C, 방향키, 붙여넣기와 입력창이 있다. 입력창은 한글 조합이 끝난 명령을 전송 버튼으로 보낼 수 있다. 여러 줄 붙여넣기는 전송 전 내용을 확인한다. 설정에서 글자 크기를 바꿀 수 있다.
 

@@ -23,6 +23,7 @@ import {
 import { startControlServer } from "./control.js";
 import { clientMessageSchema, errorResponse, response, type ClientMessage, type ServerMessage } from "./protocol.js";
 import { SessionError, SessionManager } from "./session.js";
+import { PairingError, PairingManager } from "./pairing.js";
 
 type Logger = Pick<Console, "info" | "warn" | "error">;
 type AuthFailure = { failures: number[]; blockedUntil: number };
@@ -66,10 +67,13 @@ export class HostServer {
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private activeWriter: { socket: WebSocket; deviceId: string; lastPongAt: number } | null = null;
   private fingerprint = "";
+  private readonly pairing: PairingManager;
+  private configMutation: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly options: HostServerOptions) {
     this.sessions = new SessionManager(options.config.shell, options.config.cwd);
     this.logger = options.logger || console;
+    this.pairing = new PairingManager(options.configDir, options.config);
   }
 
   async start() {
@@ -82,6 +86,10 @@ export class HostServer {
     ]);
 
     this.httpsServer = createServer({ cert, key, minVersion: "TLSv1.2", maxHeaderSize: 16 * 1024 }, (request, reply) => {
+      if (request.method === "POST" && request.url === "/v1/pair") {
+        void this.handlePairing(request, reply);
+        return;
+      }
       if (request.method === "GET" && request.url === "/health") {
         reply.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
         reply.end(JSON.stringify({ status: "ok", protocolVersion: PROTOCOL_VERSION }));
@@ -109,7 +117,8 @@ export class HostServer {
     try {
       this.controlServer = await startControlServer(controlSocketPathFor(this.options.configDir), async (request) => {
         if (request.action === "status") return this.status();
-        const revoked = await revokeDevice(this.options.configDir, this.options.config, request.deviceId);
+        if (request.action === "pair") return this.pairing.issue(request.name, this.fingerprint, this.port);
+        const revoked = await this.mutateConfig(() => revokeDevice(this.options.configDir, this.options.config, request.deviceId));
         if (this.activeWriter?.deviceId === revoked.id) this.activeWriter.socket.close(4403, "Device revoked");
         this.sessions.revokeDevice(revoked.id);
         this.logger.info(JSON.stringify({ event: "device_revoked", deviceId: revoked.id }));
@@ -161,6 +170,39 @@ export class HostServer {
   get port() {
     const address = this.httpsServer?.address();
     return typeof address === "object" && address ? address.port : (this.options.port ?? this.options.config.port);
+  }
+
+  private mutateConfig<T>(action: () => Promise<T>): Promise<T> {
+    const next = this.configMutation.then(action);
+    this.configMutation = next.catch(() => undefined);
+    return next;
+  }
+
+  private async handlePairing(request: IncomingMessage, reply: import("node:http").ServerResponse) {
+    const respond = (status: number, body: object) => {
+      if (reply.destroyed) return;
+      reply.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      reply.end(JSON.stringify(body));
+    };
+    const address = request.socket.remoteAddress || "unknown";
+    if (this.isAuthBlocked(address)) { respond(429, { error: "등록 요청이 너무 많습니다." }); request.resume(); return; }
+    if (request.headers["content-type"]?.split(";")[0]?.trim() !== "application/json") { respond(415, { error: "JSON 요청이 필요합니다." }); request.resume(); return; }
+    const timer = setTimeout(() => request.destroy(), 10_000);
+    let body = "";
+    try {
+      for await (const chunk of request) {
+        body += chunk.toString("utf8");
+        if (Buffer.byteLength(body) > 2048) { respond(413, { error: "등록 요청이 너무 큽니다." }); request.destroy(); return; }
+      }
+      const data = JSON.parse(body) as { pairingCode?: unknown };
+      if (!data || Object.keys(data).length !== 1 || typeof data.pairingCode !== "string") { respond(400, { error: "등록 코드를 확인하세요." }); return; }
+      const result = await this.mutateConfig(() => this.pairing.redeem(data.pairingCode as string));
+      this.authFailures.delete(address);
+      respond(200, result);
+    } catch (error) {
+      if (error instanceof PairingError) { this.recordAuthFailure(address); respond(error.status, { error: error.message }); }
+      else respond(error instanceof SyntaxError ? 400 : 500, { error: "PC 등록을 완료할 수 없습니다." });
+    } finally { clearTimeout(timer); }
   }
 
   private async handleUpgrade(request: import("node:http").IncomingMessage, socket: Duplex, head: Buffer) {

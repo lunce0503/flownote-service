@@ -1,7 +1,7 @@
 import { createConnection, createServer, type Server, type Socket } from "node:net";
 import { chmod, lstat, unlink } from "node:fs/promises";
 
-type ControlRequest = { action: "status" } | { action: "revoke"; deviceId: string };
+type ControlRequest = { action: "status" } | { action: "revoke"; deviceId: string } | { action: "pair"; name: string };
 type ControlResponse = { ok: boolean; data?: unknown; error?: string };
 
 const MAX_CONTROL_REQUEST_BYTES = 4096;
@@ -60,7 +60,8 @@ export const startControlServer = async (
   const server = createServer((socket) => {
     void readJsonLine(socket).then(async (value) => {
       const request = value as Partial<ControlRequest>;
-      if (request.action !== "status" && request.action !== "revoke") throw new Error("지원하지 않는 제어 요청입니다.");
+        if (request.action !== "status" && request.action !== "revoke" && request.action !== "pair") throw new Error("지원하지 않는 제어 요청입니다.");
+        if (request.action === "pair" && (typeof request.name !== "string" || !request.name.trim() || request.name.length > 80 || /[\x00-\x1f\x7f]/.test(request.name))) throw new Error("PC 이름을 확인하세요.");
       if (request.action === "revoke" && (typeof request.deviceId !== "string" || !/^[A-Za-z0-9._-]{1,80}$/.test(request.deviceId))) {
         throw new Error("올바른 deviceId가 필요합니다.");
       }

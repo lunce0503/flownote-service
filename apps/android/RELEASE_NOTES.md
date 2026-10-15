@@ -1,6 +1,10 @@
-# Flownote Remote Android 0.1.0
+# Flownote Remote Android 0.2.0
 
 Android 10 이상에서 Remote Host 0.2.0을 실행 중인 Linux/Windows PC의 실제 터미널에 연결하는 앱입니다.
+
+- 여러 PC 설정의 암호화 저장·목록·추가·편집·삭제·선택 연결
+- 기존 단일 PC 설정 자동 이전과 PC별 세션 분리
+- 카메라 QR 등록, 지문 확인 뒤 1회용 코드 교환 (Host 0.3.0 이상)
 
 - PC 수동 등록 또는 Host 초기화 JSON 가져오기
 - SHA-256 인증서 지문 검증과 Keystore 암호화 토큰 저장
@@ -8,7 +12,7 @@ Android 10 이상에서 Remote Host 0.2.0을 실행 중인 Linux/Windows PC의 �
 - 화면 회전·키보드에 맞춘 PTY 크기 변경
 - 일시 단절 재접속, 출력 복원 한계 안내, 세션 종료
 
-`flownote-remote-v0.1.0.apk`를 설치한 뒤 PC의 WSS 주소, 기기 토큰과 인증서 지문을 등록하세요. Host와 Android가 같은 LAN 또는 기존 VPN에 있어야 합니다. Android는 명령을 전송하고 실제 실행은 PC 사용자 권한으로 이루어집니다.
+`flownote-remote-v0.2.0.apk`를 기존 앱 위에 설치하세요. PC에서 `remote-host pair --name "Work PC"`를 실행하고 앱의 QR 아이콘으로 등록할 수 있습니다. 코드는 5분간 한 번만 유효합니다. 수동/JSON 등록도 유지합니다. Host와 Android가 같은 LAN 또는 기존 VPN에 있어야 합니다. Android는 명령을 전송하고 실제 실행은 PC 사용자 권한으로 이루어집니다.
 
 앱은 원격 터미널을 제공합니다. 데스크톱 그래픽 화면·마우스 제어, 인터넷 릴레이와 지속적인 백그라운드 연결은 포함하지 않습니다.
 

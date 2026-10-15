@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-import { access } from "node:fs/promises";
+import { access, writeFile } from "node:fs/promises";
+import { hostname } from "node:os";
+import QRCode from "qrcode";
 import { parseArgs } from "node:util";
 import { constants as fsConstants } from "node:fs";
 import process from "node:process";
@@ -15,7 +17,7 @@ import { sendControlRequest } from "./control.js";
 import { DEFAULT_BIND, DEFAULT_PORT } from "./constants.js";
 import { HostServer } from "./server.js";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 const help = `Flownote Remote Host ${VERSION}
 
@@ -26,6 +28,7 @@ Usage:
   remote-host serve [--config PATH] [--bind ADDRESS] [--port PORT]
   remote-host status [--config PATH] [--json]
   remote-host revoke --device ID [--config PATH] [--json]
+  remote-host pair [--name NAME] [--qr-file PATH] [--config PATH] [--json]
 
 The host grants a remote client the full permissions of the local OS user running it.
 Use it only on a trusted LAN or an existing VPN. Do not expose port ${DEFAULT_PORT} directly to the internet.
@@ -61,6 +64,8 @@ const main = async () => {
       shell: { type: "string" },
       cwd: { type: "string" },
       force: { type: "boolean", default: false },
+      name: { type: "string" },
+      "qr-file": { type: "string" },
     },
   });
   const configDir = resolveConfigDir(values.config);
@@ -75,6 +80,22 @@ const main = async () => {
   }
 
   switch (command) {
+    case "pair": {
+      const invitation = await sendControlRequest(controlSocketPathFor(configDir), { action: "pair", name: values.name || hostname() });
+      const data = JSON.stringify(invitation);
+      if (values["qr-file"]) {
+        const png = await QRCode.toBuffer(data, { type: "png", width: 800, margin: 4, errorCorrectionLevel: "M" });
+        await writeFile(values["qr-file"], png, { mode: 0o600, flag: "wx" });
+      }
+      if (values.json) output(invitation, true);
+      else {
+        console.log(await QRCode.toString(data, { type: "terminal", small: true, errorCorrectionLevel: "M" }));
+        console.log("Android 앱에서 QR을 스캔하세요. 등록 코드는 5분간 한 번만 사용할 수 있습니다.");
+        const status = await sendControlRequest(controlSocketPathFor(configDir), { action: "status" }) as { fingerprint: string };
+        console.log(`인증서 SHA-256: ${status.fingerprint}`);
+      }
+      return;
+    }
     case "doctor": {
       const checks: Array<{ name: string; ok: boolean; detail: string }> = [];
       checks.push({ name: "platform", ok: process.platform === "linux" || process.platform === "win32", detail: `${process.platform} ${process.arch}` });

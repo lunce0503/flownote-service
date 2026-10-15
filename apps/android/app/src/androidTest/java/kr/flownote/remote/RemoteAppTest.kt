@@ -13,6 +13,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.core.graphics.writeToTestStorage
 import androidx.test.uiautomator.UiDevice
+import androidx.test.rule.GrantPermissionRule
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
+import kotlinx.coroutines.runBlocking
 import androidx.lifecycle.Lifecycle
 import kr.flownote.remote.connection.*
 import kr.flownote.remote.security.*
@@ -30,6 +34,7 @@ import java.util.concurrent.atomic.AtomicReference
 @RunWith(AndroidJUnit4::class)
 class RemoteAppTest {
     @get:Rule val ui = createAndroidComposeRule<MainActivity>()
+    @get:Rule val camera: GrantPermissionRule = GrantPermissionRule.grant(android.Manifest.permission.CAMERA)
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val profile get() = HostProfile.fromJson(JSONObject(instrumentation.context.assets.open("host.json").bufferedReader().readText()))
 
@@ -61,7 +66,9 @@ class RemoteAppTest {
     private fun phase(expected: Phase) { ui.waitUntil(25_000) { ui.activity.model.state.phase == expected } }
     private fun action(block: (RemoteViewModel) -> Unit) { instrumentation.runOnMainSync { block(ui.activity.model) } }
     private fun screenshot(name: String) {
-        instrumentation.runOnMainSync { ui.activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+        instrumentation.runOnMainSync {
+            ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).forEach { it.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+        }
         instrumentation.waitForIdleSync()
         Thread.sleep(250)
         val bitmap = instrumentation.uiAutomation.takeScreenshot()
@@ -85,6 +92,7 @@ class RemoteAppTest {
 
     @Test fun registrationTerminalSecurityAndReconnect() {
         val host = profile
+        legacyStorageMigration(host)
         rejected(host.copy(fingerprint = "00".repeat(32)))
         rejected(host.copy(token = "invalid-token-long-enough"))
         screenshot("registration-empty")
@@ -158,5 +166,98 @@ class RemoteAppTest {
         action { it.closeSession() }; phase(Phase.ENDED)
         assertNull(store.rememberedSession())
         device.unfreezeRotation()
+        computersAndQr(store)
+    }
+
+    private fun legacyStorageMigration(host: HostProfile) {
+        val context = instrumentation.targetContext
+        val store = ProfileStore(context)
+        store.save(host)
+        val key = java.security.KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.getKey("flownote-remote-profile-v1", null)
+        val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding").apply { init(javax.crypto.Cipher.ENCRYPT_MODE, key) }
+        val encrypted = cipher.doFinal(host.json().toString().toByteArray(Charsets.UTF_8))
+        val legacy = android.util.Base64.encodeToString(cipher.iv + encrypted, android.util.Base64.NO_WRAP)
+        val session = java.util.UUID.randomUUID().toString()
+        val preferences = context.getSharedPreferences("remote-host-private", Context.MODE_PRIVATE)
+        assertTrue(preferences.edit().clear().putString("profile", legacy).putString("session", session).commit())
+        val migrated = ProfileStore(context).catalog()
+        assertEquals(host, migrated.selected()?.profile)
+        assertEquals(session, migrated.sessions[migrated.selectedId])
+        assertFalse(preferences.contains("profile"))
+        assertFalse(preferences.contains("session"))
+        assertTrue(preferences.contains("catalog-v2"))
+        assertTrue(preferences.edit().clear().commit())
+    }
+
+    private fun computersAndQr(store: ProfileStore) {
+        val second = HostProfile.fromJson(JSONObject(instrumentation.context.assets.open("host-second.json").bufferedReader().readText()))
+        val first = store.catalog().hosts.single()
+        action { it.editProfile() }
+        ui.onNodeWithContentDescription("PC 추가").performClick()
+        ui.onNodeWithTag("host-name").performTextReplacement(second.name)
+        ui.onNodeWithTag("host-endpoint").performTextInput(second.endpoint)
+        ui.onNodeWithTag("host-token").performTextInput(second.token)
+        ui.onNodeWithTag("host-fingerprint").performTextInput(second.fingerprint)
+        ui.onNodeWithTag("trust-confirm").performScrollTo().performClick()
+        ui.onNodeWithTag("save-computer").performScrollTo().performClick()
+        val secondId = store.catalog().hosts.single { it.profile.endpoint == second.endpoint }.id
+        assertEquals(2, ProfileStore(instrumentation.targetContext).catalog().hosts.size)
+        ui.onNodeWithTag("computer-${first.id}").assertIsDisplayed()
+        screenshot("computer-list")
+        ui.onNodeWithTag("computer-$secondId").performClick()
+        phase(Phase.CONNECTED)
+        action { assertTrue(it.input("printf 'SECOND_%s\\n' OK\r")) }
+        terminalContains("SECOND_OK")
+        val secondSession = store.rememberedSession(secondId)
+        assertNotNull(secondSession)
+        assertNull(store.rememberedSession(first.id))
+        action { it.editProfile() }
+        ui.onNodeWithTag("computer-${first.id}").performClick()
+        phase(Phase.CONNECTED)
+        assertNotEquals(secondSession, store.rememberedSession(first.id))
+        assertEquals(secondSession, store.rememberedSession(secondId))
+        assertEquals(profile.token, ui.activity.model.profile?.token)
+        action { it.closeSession() }; phase(Phase.ENDED)
+        action { it.editProfile() }
+        ui.onNodeWithTag("computer-$secondId").performClick()
+        phase(Phase.RECOVERY)
+        ui.onNodeWithText("새 세션").performClick()
+        ui.onNodeWithText("시작").performClick()
+        phase(Phase.CONNECTED)
+        action { it.closeSession() }; phase(Phase.ENDED)
+        action { it.editProfile() }
+        ui.onNodeWithContentDescription("Second PC 편집").performClick()
+        ui.onNodeWithTag("host-name").performTextReplacement("Second renamed")
+        ui.onNodeWithTag("save-computer").performScrollTo().performClick()
+        assertEquals("Second renamed", store.catalog().hosts.single { it.id == secondId }.profile.name)
+        ui.onNodeWithContentDescription("Second renamed 삭제").performClick()
+        ui.onNodeWithText("삭제", useUnmergedTree = true).performClick()
+        assertEquals(listOf(first.id), store.catalog().hosts.map { it.id })
+        assertEquals(first.profile.token, store.catalog().hosts.single().profile.token)
+        ui.onNodeWithContentDescription("QR 등록").performClick()
+        try {
+            ui.waitUntil(45_000) { ui.onAllNodesWithTag("host-name").fetchSemanticsNodes().isNotEmpty() }
+        } catch (failure: Throwable) { screenshot("qr-camera-failure"); throw failure }
+        ui.onNodeWithTag("host-name").assertTextContains("QR PC")
+        ui.onNodeWithTag("trust-confirm").assertIsOff()
+        assertEquals(1, store.catalog().hosts.size)
+        screenshot("qr-confirmation")
+        ui.onNodeWithTag("trust-confirm").performScrollTo().performClick()
+        ui.onNodeWithTag("connect").performScrollTo().performClick()
+        phase(Phase.CONNECTED)
+        action { assertTrue(it.input("printf 'QR_PAIRED_%s\\n' OK\r")) }
+        terminalContains("QR_PAIRED_OK")
+        val qr = store.catalog().hosts.single { it.profile.name == "QR PC" }
+        assertEquals(second.endpoint, qr.profile.endpoint)
+        assertNotEquals(second.token, qr.profile.token)
+        val raw = File(instrumentation.targetContext.applicationInfo.dataDir, "shared_prefs/remote-host-private.xml").readText()
+        assertFalse(raw.contains(qr.profile.token))
+        val invitation = PairingInvitation.parse(instrumentation.context.assets.open("pairing.json").bufferedReader().readText())
+        runBlocking {
+            try { PairingClient().redeem(invitation, "reused"); fail("QR reused") } catch (_: IllegalArgumentException) {}
+        }
+        action { it.closeSession() }; phase(Phase.ENDED)
+        action { it.editProfile() }
+        screenshot("computer-list-qr")
     }
 }

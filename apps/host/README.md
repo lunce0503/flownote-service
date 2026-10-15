@@ -19,7 +19,7 @@
 - Linux x64/arm64, Windows 10/11 x64
 - Node.js 20 이상, npm과 지원 셸 필요
 - `node-pty` 설치에 사전 빌드 바이너리가 없으면 Python 3, `make`, C++ 컴파일러 필요
-- Android 앱, QR 등록, 인터넷 릴레이, systemd 상주 서비스는 이 릴리즈에 포함되지 않는다.
+- Android 앱은 별도 릴리즈다. Host 0.3.0은 앱 0.2.0 이상의 QR 등록을 지원한다. 인터넷 릴레이와 systemd 상주 서비스는 포함하지 않는다.
 
 ## Linux 설치
 
@@ -69,6 +69,15 @@ remote-host serve
 지문은 PC 화면과 휴대폰 화면에서 별도로 대조한다. 인증서가 바뀌면 자동으로 신뢰하지 말고 재등록한다.
 
 ## 관리
+
+Host가 실행 중일 때 5분 유효·1회용 등록 QR을 생성한다. 앱에서 스캔한 후 PC 지문과 일치함을 확인한다. 새 QR을 생성하면 이전 코드는 무효화된다. 기존 기기 토큰은 바뀌지 않는다.
+
+```bash
+remote-host pair --name "Work PC"
+remote-host pair --name "Work PC" --qr-file /private/path/pc-pairing.png
+```
+
+`--qr-file`은 새 PNG 파일만 생성하고 기존 파일은 덮어쓰지 않는다. `--json`으로 같은 등록 데이터를 받을 수 있다. QR에 영구 기기 토큰은 넣지 않으며 서버 메모리의 코드는 사용/만료/재시작 시 무효화된다. 새 기기는 TLS `POST /v1/pair`를 통해 발급되고 기존 사용자 전용 설정 파일에 해시로 저장된다. [계약](../../protocol/remote-host/pairing.md)을 참조한다.
 
 ```bash
 remote-host status
