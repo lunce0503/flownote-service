@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import { request } from "node:https";
 import test from "node:test";
 import { Workspace, WorkspaceError, MAX_FILE_BYTES } from "../src/workspace.js";
-import { initializeHost, revokeDevice } from "../src/config.js";
+import { initializeHost, revokeDevice, secureWindowsAcl } from "../src/config.js";
+import { execFileSync } from "node:child_process";
 import { HostServer } from "../src/server.js";
 
 test("workspace lists, reads UTF-8 and atomically saves with revision conflicts and mode preserved", async () => {
@@ -13,6 +14,11 @@ test("workspace lists, reads UTF-8 and atomically saves with revision conflicts 
   try {
     await mkdir(join(root, "src"));
     await writeFile(join(root, "src", "hello.ts"), "// 한글\r\nconst value = 1;\r\n", { mode: 0o640 });
+    let acl = "";
+    if (process.platform === "win32") {
+      secureWindowsAcl(join(root, "src", "hello.ts"), false);
+      acl = execFileSync("icacls", [join(root, "src", "hello.ts")], { encoding: "utf8" });
+    }
     await writeFile(join(root, ".env"), "not-for-listing");
     const workspace = new Workspace(root);
     const list = await workspace.execute("list", { path: "" }) as { entries: { name: string }[] };
@@ -24,6 +30,7 @@ test("workspace lists, reads UTF-8 and atomically saves with revision conflicts 
     assert.notEqual(saved.revision, file.revision);
     assert.equal(await readFile(join(root, "src/hello.ts"), "utf8"), changed);
     if (process.platform !== "win32") assert.equal((await stat(join(root, "src/hello.ts"))).mode & 0o777, 0o640);
+    else assert.equal(execFileSync("icacls", [join(root, "src", "hello.ts")], { encoding: "utf8" }), acl);
     await assert.rejects(workspace.execute("write", { path: "src/hello.ts", content: "stale", revision: file.revision }), (e: unknown) => e instanceof WorkspaceError && e.status === 409);
     const results = await Promise.allSettled([1, 2].map(i => workspace.execute("write", { path: "src/hello.ts", content: `concurrent ${i}`, revision: saved.revision })));
     assert.equal(results.filter(r => r.status === "fulfilled").length, 1);

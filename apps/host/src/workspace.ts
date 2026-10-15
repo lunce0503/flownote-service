@@ -21,7 +21,7 @@ const denied = new Set([".git", "node_modules", ".venv", ".next", "dist", "build
 function allowed(name: string) {
   const value = name.toLowerCase();
   return !denied.has(value) && !/[\x00-\x1f\x7f\\:]/.test(name) &&
-    !/^\.env(?:\.|$)|^\.flownote-|^\.npmrc$|^credentials(?:\.|$)|^secrets?(?:\.|$)|^id_(?:rsa|ed25519)(?:\.|$)|\.(?:pem|key|p12|pfx|jks|keystore|sqlite|db)$/i.test(value);
+    !/^\.env|^\.flownote-|^\.npmrc$|^credentials(?:\.|$)|^secrets?(?:\.|$)|^id_(?:rsa|ed25519)(?:\.|$)|\.(?:pem|key|p8|p12|pfx|jks|keystore|sqlite|db)$/i.test(value);
 }
 const digest = (data: Uint8Array) => createHash("sha256").update(data).digest("hex");
 
@@ -110,8 +110,11 @@ export class Workspace {
       try {
         if (process.platform === "win32") {
           // Literal paths travel through the environment, never interpolated PowerShell code.
+          const env: NodeJS.ProcessEnv = { ...process.env, FLOWNOTE_ACL_SOURCE: target, FLOWNOTE_ACL_TARGET: temporary };
+          for (const key of Object.keys(env)) if (key.toLowerCase() === "psmodulepath") delete env[key];
+          env.PSModulePath = join(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "Modules");
           await promisify(execFile)("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "$ErrorActionPreference='Stop'; Set-Acl -LiteralPath $env:FLOWNOTE_ACL_TARGET -AclObject (Get-Acl -LiteralPath $env:FLOWNOTE_ACL_SOURCE)"],
-            { env: { ...process.env, FLOWNOTE_ACL_SOURCE: target, FLOWNOTE_ACL_TARGET: temporary }, timeout: 10_000 });
+            { env, timeout: 10_000 });
         }
         await file.writeFile(data); await file.sync();
       }

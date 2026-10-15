@@ -62,7 +62,7 @@ class WorkspaceModel(private val scope: CoroutineScope, private val failure: (St
         val rows = (0 until values.length()).map { index -> values.getJSONObject(index).let {
             WorkspaceEntry(it.getString("name"), it.getString("path"), it.getString("kind") == "directory")
         } }
-        entries = if (more && path == folder) entries + rows else rows
+        entries = (if (more && path == folder) entries + rows else rows).distinctBy { it.path }
         folder = result.getString("path"); rootName = result.getString("rootName")
         nextOffset = if (result.isNull("nextOffset")) null else result.getInt("nextOffset"); loaded = true
     }
