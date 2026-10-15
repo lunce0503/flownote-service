@@ -88,8 +88,6 @@ remote-host revoke --device phone-01
 
 Linux 기본 설정 디렉터리는 `${XDG_CONFIG_HOME:-~/.config}/flownote-remote-host`, Windows는 `%LOCALAPPDATA%\Flownote\RemoteHost`다. 다른 위치는 모든 명령에 `--config PATH`로 지정한다.
 
-## 개발 검증
-
 ## 모바일 IDE 파일 API
 
 Host 0.4.0은 Android 0.3.0의 `코드` 탭을 지원한다. 프로젝트 루트는 초기화할 때 지정한 `--cwd`이며 기본값은 초기화한 폴더다. 기존 설정으로 업데이트하면 루트와 인증서/토큰을 유지한다. UTF-8 일반 파일 256 KiB 이하를 탐색·읽기·revision 충돌 보호 저장할 수 있다. 경로 이탈·symlink·hard link·일반 비밀 파일과 생성/삭제는 거부한다. 쓰기는 임시 파일을 sync 후 교체하고 Linux mode와 Windows ACL을 유지한다. 전체 셸 권한 자체를 프로젝트 sandbox로 제한하지는 않는다. [계약](../../protocol/remote-host/workspace.md)을 참고한다.

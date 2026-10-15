@@ -15,7 +15,7 @@ const schemas = {
 };
 export type WorkspaceOperation = keyof typeof schemas;
 export class WorkspaceError extends Error {
-  constructor(readonly status: number, readonly code: string, message: string) { super(message); }
+  constructor(readonly status: number, readonly code: string, message: string, options?: ErrorOptions) { super(message, options); }
 }
 const denied = new Set([".git", "node_modules", ".venv", ".next", "dist", "build", ".gradle", "__pycache__", ".ssh", ".aws", ".config", ".codex", ".gnupg", ".kube"]);
 function allowed(name: string) {
@@ -43,7 +43,7 @@ export class Workspace {
       if (error instanceof WorkspaceError) throw error;
       const code = (error as NodeJS.ErrnoException).code;
       throw new WorkspaceError(code === "ENOENT" ? 404 : ["EACCES", "EPERM", "ELOOP"].includes(code || "") ? 403 : 500,
-        "FILE_UNAVAILABLE", "파일에 접근할 수 없습니다.");
+        "FILE_UNAVAILABLE", "파일에 접근할 수 없습니다.", { cause: error });
     }
   }
   private async resolve(path: string, directory = false) {
