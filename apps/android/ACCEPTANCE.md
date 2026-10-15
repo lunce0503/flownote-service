@@ -12,6 +12,10 @@
 | 복구 불가·토큰 폐기·잘못된 응답 | `ConnectionTest.kt` | 상태 전환, 입력 차단, 명시적 새 세션 |
 | 출력 ACK·초기화 순서·출처 | `terminal/test/bridge.test.mjs` | JS 브리지 단위 테스트; 실제 렌더링은 기기 시험 |
 | PC 등록·암호화 저장 | `RemoteAppTest.kt` | Android 에뮬레이터와 실제 Linux Host, 평문 토큰 저장 여부 |
+| PC 목록·구형 설정 이전 | `ProfileCatalogTest.kt`, `RemoteAppTest.kt` | 실제 Keystore 구형 암호문 이전, 추가·선택·편집·삭제, 두 Host의 자격 증명/세션 분리 |
+| 목록의 프로세스 재실행 복원 | `scripts/run-device-tests.sh` | 기기 시험 뒤 앱 강제 종료·재시작, 저장된 두 PC의 목록 표시 |
+| QR 카메라·등록 연결 | `RemoteAppTest.kt` | 가상 장면 PNG를 실제 카메라로 스캔, 지문 확인 전 저장 없음, TLS 등록·신규 토큰·실제 PTY 출력·QR 재사용 거부 |
+| QR 계약·인증 거부 | `PairingTest.kt`, Host pairing 시험 | 만료·잘못된 URL/버전/지문, 잘못된 이름의 코드 소모 방지, 코드 교체·동시 사용·재사용 거부 |
 | 인증 실패·잘못된 지문 | `RemoteAppTest.kt` | 잘못된 자격 증명으로 WSS 연결 불가 |
 | 셸·ANSI·한글 문자열·도구줄 | `RemoteAppTest.kt` | 실제 PTY 출력, Compose 입력, Tab/방향키/Ctrl+C, 붙여넣기 취소 |
 | 10회 단절·복귀 | `RemoteAppTest.kt` | 같은 PTY sessionId 유지; LAN 무선 품질·30분 부하는 별도 |
@@ -38,5 +42,7 @@ CI 실행 링크와 실제 통과 결과는 `logs/report/` 릴리스 보고서�
 11. 다른 클라이언트로 접속해 기존 연결을 탈취할 수 없는지 확인한다. `remote-host revoke --device phone-01` 후 현재 연결이 끊기고 재접속도 거부되어야 한다. 폐기 시험은 마지막에 수행한다.
 12. PC에 설치·인증된 Codex를 실행한다. 실제 사용 버전과 입력·스크롤·resize·중단 결과를 기록한다. 모델 사용료는 PC의 인증 환경을 따른다.
 13. LAN에서 30분 사용하고 10회 이상 단절·복귀한다. 시작·종료 시 Host의 세션 수와 RSS, Android 메모리를 비교한다. 세션이나 메모리가 지속 증가하면 실패다.
+14. 기존 앱 위에 업데이트해 이전 PC 설정을 유지하는지 확인한다. 두 번째 PC를 추가하고 목록에서 전환·이름 편집·삭제한 뒤 첫 PC의 설정이 유지되는지 확인한다. 앱 강제 종료 뒤에도 목록이 남아야 한다.
+15. Host 0.3.0 이상에서 `remote-host pair --name "Work PC"`를 실행하고 앱의 QR 아이콘으로 스캔한다. PC의 지문을 대조·확인한 뒤 연결한다. 카메라 취소·권한 거부가 목록을 바꾸지 않는지, 사용한 코드와 5분 지난 코드가 거부되는지도 확인한다. 새 QR은 이전 미사용 QR을 대체한다.
 
 기록 형식: APK 버전 / Android·기기·IME / PC OS·Host·Codex 버전 / 항목별 통과·실패 / 오류 문구(비밀값 제거). 현재 실기기 결과는 대기 중이며, 이 확인표 완료 전에는 원본 보고서의 MVP 전체 수용 시험을 통과했다고 표시하지 않는다.

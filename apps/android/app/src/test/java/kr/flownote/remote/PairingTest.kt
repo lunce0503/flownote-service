@@ -36,6 +36,8 @@ class PairingTest {
         try {
             val fingerprint = MessageDigest.getInstance("SHA-256").digest(certificate.certificate.encoded).joinToString("") { "%02X".format(it) }
             val invitation = PairingInvitation.parse(payload(server.url("/v1/connect").toString().replaceFirst("https", "wss"), fingerprint).toString())
+            try { PairingClient().redeem(invitation, "x".repeat(81)); fail("Invalid name consumed a code") } catch (_: IllegalArgumentException) {}
+            assertEquals(0, server.requestCount)
             server.enqueue(MockResponse().setBody(JSONObject().put("version", 1).put("deviceId", "phone-test").put("token", "issued-token-long-enough").toString()))
             val profile = PairingClient().redeem(invitation, "My PC")
             assertEquals("My PC", profile.name)

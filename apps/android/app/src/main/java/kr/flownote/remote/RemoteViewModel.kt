@@ -74,7 +74,11 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
         if (pairing) return
         pairing = true
         pairingJob = viewModelScope.launch {
-            try { saveComputer(PairingClient().redeem(invitation, name), connect) }
+            try {
+                // Reject local validation/capacity errors before consuming the one-time code.
+                catalog.upsert(invitation.profile("pairing-validation-token", name), editingId)
+                saveComputer(PairingClient().redeem(invitation, name), connect)
+            }
             catch (error: CancellationException) { throw error }
             catch (failure: Exception) { error = failure.message ?: "PC QR 등록에 실패했습니다." }
             finally { pairing = false }

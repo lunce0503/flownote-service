@@ -17,7 +17,7 @@ import kotlin.coroutines.resumeWithException
 class PairingClient {
     suspend fun redeem(invitation: PairingInvitation, name: String): HostProfile = withContext(Dispatchers.IO) {
         invitation.checked()
-        val client = pinnedClient(invitation.profile("pairing-validation-token")).newBuilder()
+        val client = pinnedClient(invitation.profile("pairing-validation-token", name)).newBuilder()
             .readTimeout(10, TimeUnit.SECONDS).callTimeout(15, TimeUnit.SECONDS).build()
         val url = invitation.endpoint.replaceFirst("wss://", "https://").toHttpUrl().newBuilder().encodedPath("/v1/pair").build()
         val request = Request.Builder().url(url).post(JSONObject().put("pairingCode", invitation.code).toString().toRequestBody("application/json".toMediaType())).build()
