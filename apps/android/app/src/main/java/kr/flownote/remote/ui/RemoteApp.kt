@@ -207,6 +207,10 @@ internal fun Confirm(title: String, message: String, action: String, dismiss: ()
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 internal fun Tool(icon: ImageVector, label: String, enabled: Boolean = true, action: () -> Unit) {
-    IconButton(onClick = action, enabled = enabled, modifier = Modifier.size(48.dp)) { Icon(icon, contentDescription = label) }
+    TooltipBox(positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(label) } }, state = rememberTooltipState()) {
+        IconButton(onClick = action, enabled = enabled, modifier = Modifier.size(48.dp)) { Icon(icon, contentDescription = label) }
+    }
 }

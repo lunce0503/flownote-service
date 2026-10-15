@@ -1,6 +1,6 @@
 import { constants } from "node:fs";
 import { lstat, open, opendir, realpath, rename, unlink, chmod } from "node:fs/promises";
-import { basename, dirname, join, relative, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { execFile } from "node:child_process";
@@ -59,7 +59,7 @@ export class Workspace {
     }
     const resolved = await realpath(target);
     const inside = relative(root, resolved);
-    if (inside === ".." || inside.startsWith(`..${sep}`) || inside.startsWith(sep)) throw new WorkspaceError(403, "PATH_DENIED", "프로젝트 밖의 파일은 열 수 없습니다.");
+    if (inside === ".." || inside.startsWith(`..${sep}`) || isAbsolute(inside)) throw new WorkspaceError(403, "PATH_DENIED", "프로젝트 밖의 파일은 열 수 없습니다.");
     return resolved;
   }
   private async list({ path, offset }: z.infer<typeof schemas.list>) {

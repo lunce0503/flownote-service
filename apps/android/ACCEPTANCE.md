@@ -22,6 +22,9 @@
 | 백그라운드·회전·화면 손실 | `RemoteAppTest.kt` | Activity 생명주기, 새 WebView에서 복구 안내, 새 세션 |
 | 명시적 종료 | `RemoteAppTest.kt` | 세션 종료 응답과 저장된 sessionId 제거 |
 | Windows Host 설치·연결 | `Remote Host` workflow | Windows PTY/WSS/IPC/설치기; Android-to-Windows 실사용은 별도 |
+| 모바일 IDE 코드 엔진 | `terminal/test-editor-browser.mjs` | 실제 CodeMirror 입력·한글·CRLF·탭 undo·찾기/바꾸기·PC epoch/출처 격리, 4개 뷰포트 |
+| 모바일 IDE 통합 | `RemoteAppTest.kt` | 실제 Host 목록·파일·Android WebView 입력·snapshot 저장·PC 변경 충돌/초안 유지·버리기 확인·터미널/PTy 유지, 세로/가로/태블릿 크기 |
+| 파일 API/권한 | Host `workspace.test.ts`, JVM `WorkspaceTest.kt` | 인증/폐기/경로·링크·binary·한도·CAS/동시 저장·UTF-8·Linux mode/Windows ACL·TLS pin·저장 중 후속 입력 |
 
 CI 실행 링크와 실제 통과 결과는 `logs/report/` 릴리스 보고서에 기록한다. 표에 테스트가 있다는 사실만으로 통과를 주장하지 않는다.
 
@@ -44,5 +47,6 @@ CI 실행 링크와 실제 통과 결과는 `logs/report/` 릴리스 보고서�
 13. LAN에서 30분 사용하고 10회 이상 단절·복귀한다. 시작·종료 시 Host의 세션 수와 RSS, Android 메모리를 비교한다. 세션이나 메모리가 지속 증가하면 실패다.
 14. 기존 앱 위에 업데이트해 이전 PC 설정을 유지하는지 확인한다. 두 번째 PC를 추가하고 목록에서 전환·이름 편집·삭제한 뒤 첫 PC의 설정이 유지되는지 확인한다. 앱 강제 종료 뒤에도 목록이 남아야 한다.
 15. Host 0.3.0 이상에서 `remote-host pair --name "Work PC"`를 실행하고 앱의 QR 아이콘으로 스캔한다. PC의 지문을 대조·확인한 뒤 연결한다. 카메라 취소·권한 거부가 목록을 바꾸지 않는지, 사용한 코드와 5분 지난 코드가 거부되는지도 확인한다. 새 QR은 이전 미사용 QR을 대체한다.
+16. Host 0.4.0 이상으로 업데이트하고 코드 탭에서 프로젝트를 탐색한다. 휴대폰 IME의 한글 입력·선택·찾기/바꾸기·undo/redo·줄 이동을 확인한다. 여러 파일 초안을 유지하며 터미널과 전환한 뒤 저장하고 PC 내용과 비교한다. PC에서도 같은 파일을 수정하면 앱 저장이 거부되고 초안이 남아야 한다. 닫기/불러오기/PC 떠나기 확인에서 취소하면 변경이 남아야 한다. 작은 화면·가로 키보드·태블릿 분할 화면의 글자/버튼 겹침이 없어야 한다. 프로세스 강제 종료 전 저장한다(초안 디스크 복원 미지원).
 
 기록 형식: APK 버전 / Android·기기·IME / PC OS·Host·Codex 버전 / 항목별 통과·실패 / 오류 문구(비밀값 제거). 현재 실기기 결과는 대기 중이며, 이 확인표 완료 전에는 원본 보고서의 MVP 전체 수용 시험을 통과했다고 표시하지 않는다.

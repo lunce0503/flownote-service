@@ -55,10 +55,8 @@ test("workspace rejects traversal, secret files, links, binaries, oversized and 
     await assert.rejects(workspace.execute("read", { path: "missing.txt" }), (e: unknown) => e instanceof WorkspaceError && e.status === 404);
     await link(join(root, "plain.txt"), join(root, "hard.txt"));
     await assert.rejects(workspace.execute("read", { path: "hard.txt" }), (e: unknown) => e instanceof WorkspaceError && e.status === 403);
-    if (process.platform !== "win32") {
-      await symlink(tmpdir(), join(root, "outside"), "dir");
-      await assert.rejects(workspace.execute("list", { path: "outside" }), (e: unknown) => e instanceof WorkspaceError && e.status === 403);
-    }
+    await symlink(process.platform === "win32" ? process.env.SystemRoot || "C:\\Windows" : tmpdir(), join(root, "outside"), process.platform === "win32" ? "junction" : "dir");
+    await assert.rejects(workspace.execute("list", { path: "outside" }), (e: unknown) => e instanceof WorkspaceError && e.status === 403);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 

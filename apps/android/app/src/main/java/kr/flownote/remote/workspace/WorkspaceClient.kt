@@ -38,7 +38,7 @@ class WorkspaceClient(private val profile: HostProfile) {
                 JSONObject(source.buffer.readUtf8()).also { require(it.get("version") == 1) }
             }
         } catch (failure: WorkspaceFailure) { throw failure }
-        catch (failure: Exception) { throw IOException("PC 파일에 연결하지 못했습니다. 연결 상태를 확인하세요.", failure) }
+        catch (failure: Exception) { throw IOException(if (operation == "write") "저장 결과를 확인하지 못했습니다. PC 파일을 확인한 뒤 다시 시도하세요." else "PC 파일에 연결하지 못했습니다. 연결 상태를 확인하세요.", failure) }
         finally { client.connectionPool.evictAll(); client.dispatcher.executorService.shutdown() }
     }
 }

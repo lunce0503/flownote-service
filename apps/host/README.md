@@ -27,7 +27,7 @@ GitHub Release의 설치기를 확인한 뒤 실행한다.
 
 ```bash
 curl --proto '=https' --tlsv1.2 -fL \
-  https://github.com/lunce0503/flownote-service/releases/download/remote-host-v0.3.0/install-remote-host.sh \
+  https://github.com/lunce0503/flownote-service/releases/download/remote-host-v0.4.0/install-remote-host.sh \
   -o /tmp/install-remote-host.sh
 less /tmp/install-remote-host.sh
 sh /tmp/install-remote-host.sh
@@ -41,7 +41,7 @@ PowerShell에서 설치기를 내려받아 내용을 확인한 뒤 실행한다.
 
 ```powershell
 Invoke-WebRequest `
-  https://github.com/lunce0503/flownote-service/releases/download/remote-host-v0.3.0/install-remote-host.ps1 `
+  https://github.com/lunce0503/flownote-service/releases/download/remote-host-v0.4.0/install-remote-host.ps1 `
   -OutFile .\install-remote-host.ps1
 notepad .\install-remote-host.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-remote-host.ps1

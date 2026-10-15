@@ -84,7 +84,11 @@ internal fun ColumnScope.CodeScreen(model: RemoteViewModel, keyboardCompact: Boo
                 }
                 if (remember { TerminalView.supported() }) AndroidView(
                     factory = { ctx -> CodeEditorView(ctx, workspace::onBridge).also { workspace.renderer = it.renderer } },
-                    update = { it.visibility = if (model.codeOpen && (wide || !files)) View.VISIBLE else View.INVISIBLE },
+                    update = { view ->
+                        val visible = model.codeOpen && (wide || !files)
+                        view.visibility = if (visible) View.VISIBLE else View.INVISIBLE
+                        if (!visible) view.clearFocus()
+                    },
                     onRelease = { view -> if (workspace.renderer === view.renderer) workspace.editorReleased(); view.release() },
                     modifier = Modifier.weight(1f).fillMaxWidth().clipToBounds().testTag("code-editor"))
                 else Text("Android System WebView를 업데이트하세요.", Modifier.padding(16.dp))
