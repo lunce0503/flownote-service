@@ -6,7 +6,7 @@ node apps/android/scripts/aim-virtual-camera.mjs --watch &
 camera_guide_pid=$!
 trap 'kill "$camera_guide_pid" 2>/dev/null || true' EXIT
 cd "$(dirname "$0")/.."
-./gradlew connectedDebugAndroidTest --stacktrace
+./gradlew connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --stacktrace
 kill -USR1 "$camera_guide_pid" 2>/dev/null || true
 wait "$camera_guide_pid"
 adb shell am force-stop kr.flownote.remote
