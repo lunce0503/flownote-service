@@ -11,13 +11,17 @@
 - [x] 기존 앱·브리지·Host HTTPS/인증·릴리스 경로 확인, 보안/API 계약 검토.
 - [x] Host 파일 API와 경로/크기/인증/충돌 회귀 시험. Linux/Windows 10개 및 private ACL 보존 검증.
 - [x] CodeMirror 기반 번들 에디터와 출처 제한 브리지, 편집 명령/IME/탭 상태. 실제 브라우저 4개 뷰포트 검증.
-- [x] Android 파일 탐색·에디터·터미널 전환 및 미저장 변경 확인. CI `38693251202`에서 실제 입력·snapshot 저장·충돌·터미널 유지·세로/가로/태블릿 통과. 최신 보호/확인 UI 검증은 진행 중.
-- [ ] Host/브리지/JVM 검사와 Android 에뮬레이터 전체 검증.
-- [ ] 동일 검증 소스의 Host 설치기·서명 APK GitHub 릴리스, 서버 업데이트/무결성 확인.
-- [ ] 소유 문서와 릴리스 보고서, 최종 기능별 완료 감사.
+- [x] Android 파일 탐색·에디터·터미널 전환 및 미저장 변경 확인. 최종 CI에서 실제 입력·snapshot 저장·충돌·터미널 유지·세로/가로/태블릿·확인 취소·필터·재불러오기·커서 위치 통과.
+- [x] Host/브리지/JVM 검사와 Android 에뮬레이터 전체 검증. 최종 소스 `1d5d6f9` main CI `38708129934` 성공, 태그 CI에서도 재검증 성공.
+- [x] 동일 검증 소스의 Host 설치기·서명 APK GitHub 릴리스, 서버 업데이트/무결성 확인. Host CI `38708807671`과 Android CI `38708807101` 모두 성공. 공개 APK/아카이브 checksum·서명·번들 포함/시험 정보 부재 확인.
+- [x] 소유 문서와 릴리스 보고서, 최종 기능별 완료 감사.
 
 ## 검증
 
 Host Linux/Windows 검증, 기존 Android 터미널·다중 PC·QR 회귀를 유지한다. 새 시험은 실제 Host 파일을 탐색·편집·저장하고 충돌/권한/경로 거부, 터미널 전환 후 초안 유지, 가로/세로·IME를 확인한다. CodeMirror는 검증된 도메인 라이브러리를 사용하고 외부 CDN 없이 APK에 번들한다. 실제 휴대폰의 IME·성능은 자동화와 구분한다.
 
 배포 산출물은 독립 Android APK와 PC Host 설치기다. Flownote 웹/Expo/Railway API 목적지·DB는 변경하지 않는다. 기존 사용자 변경은 포함하지 않는다.
+
+## 완료
+
+두 태그 `remote-host-v0.4.0`, `remote-android-v0.3.0`은 동일 소스 `1d5d6f99a99cc87c833fd9b036a7920c976811bf`다. 현재 서버도 idle을 확인한 뒤 0.4.0으로 업데이트했고 config/cert/cwd를 보존했다. 기존 기기의 TLS/파일 목록/PTY/Codex smoke를 통과했다. 실제 사용자 파일은 쓰지 않았다. [릴리스 보고서](../../../logs/report/2026-10-15-0643-remote-mobile-ide-release.md)에 검증·배포·다운로드 기록을 남겼다. 새 앱의 실제 휴대폰 IME·긴 편집 세션은 [실기기 확인표](../../../apps/android/ACCEPTANCE.md)의 후속 확인이며 자동 시험과 혼동하지 않는다.
