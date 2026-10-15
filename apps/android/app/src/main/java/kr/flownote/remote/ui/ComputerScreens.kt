@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -101,45 +102,51 @@ private fun ComputerEditor(model: RemoteViewModel, invitation: PairingInvitation
     var importText by remember { mutableStateOf("") }
     var replacing by remember { mutableStateOf<Boolean?>(null) }
     val busy = model.pairing
+    val focus = LocalFocusManager.current
     BackHandler { if (!busy) back() }
     fun save(connect: Boolean) {
         if (invitation != null) model.pairComputer(invitation, name, connect)
         else model.saveComputer(HostProfile(name, endpoint.trim(), token.trim(), fingerprint), connect)
     }
     fun submit(connect: Boolean) {
+        focus.clearFocus()
         val normalized = runCatching { HostProfile(name, endpoint.trim(), if (invitation == null) token.trim() else "pairing-validation-token", fingerprint).validated().endpoint }.getOrNull()
         if (model.editingId == null && model.catalog.hosts.any { it.profile.endpoint == normalized }) replacing = connect else save(connect)
     }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Row(Modifier.fillMaxWidth().heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically) {
             Tool(Icons.AutoMirrored.Filled.ArrowBack, "컴퓨터 목록", !busy, back)
             Text("Flownote Remote", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Tool(Icons.Default.QrCodeScanner, "QR 등록", !busy, scan)
         }
-        Text(if (saved == null) "PC 추가" else "PC 편집", style = MaterialTheme.typography.titleMedium)
-        OutlinedTextField(name, { name = it }, label = { Text("PC 이름") }, enabled = !busy, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("host-name"))
-        OutlinedTextField(endpoint, { endpoint = it; verified = false }, label = { Text("WSS 주소") }, readOnly = invitation != null, enabled = !busy,
-            singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth().testTag("host-endpoint"))
-        if (invitation == null) OutlinedTextField(token, { token = it; verified = false }, label = { Text("기기 토큰") }, enabled = !busy, singleLine = true,
-            visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth().testTag("host-token"))
-        OutlinedTextField(fingerprint, { fingerprint = it; verified = false }, label = { Text("인증서 SHA-256 지문") }, readOnly = invitation != null, enabled = !busy,
-            minLines = 2, maxLines = 4, textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 13.sp), modifier = Modifier.fillMaxWidth().testTag("host-fingerprint"))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(verified, { verified = it }, enabled = !busy, modifier = Modifier.testTag("trust-confirm"))
-            Text("PC에 표시된 인증서 지문과 일치함", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(if (saved == null) "PC 추가" else "PC 편집", style = MaterialTheme.typography.titleMedium)
+            OutlinedTextField(name, { name = it }, label = { Text("PC 이름") }, enabled = !busy, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("host-name"))
+            OutlinedTextField(endpoint, { endpoint = it; verified = false }, label = { Text("WSS 주소") }, readOnly = invitation != null, enabled = !busy,
+                singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth().testTag("host-endpoint"))
+            if (invitation == null) OutlinedTextField(token, { token = it; verified = false }, label = { Text("기기 토큰") }, enabled = !busy, singleLine = true,
+                visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth().testTag("host-token"))
+            OutlinedTextField(fingerprint, { fingerprint = it; verified = false }, label = { Text("인증서 SHA-256 지문") }, readOnly = invitation != null, enabled = !busy,
+                minLines = 2, maxLines = 4, textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 13.sp), modifier = Modifier.fillMaxWidth().testTag("host-fingerprint"))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(verified, { verified = it; focus.clearFocus() }, enabled = !busy, modifier = Modifier.testTag("trust-confirm"))
+                Text("PC에 표시된 인증서 지문과 일치함", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            }
+            if (invitation == null) TextButton(onClick = { importOpen = true }, enabled = !busy, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Icon(Icons.Default.ContentPaste, null); Spacer(Modifier.width(8.dp)); Text("Host 등록 JSON 가져오기")
+            }
+            Spacer(Modifier.height(8.dp))
         }
+        Box(Modifier.fillMaxWidth().height(4.dp)) { if (busy) LinearProgressIndicator(Modifier.fillMaxWidth()) }
         val enabled = !busy && verified && name.isNotBlank() && endpoint.isNotBlank() && (invitation != null || token.isNotBlank())
-        Button(onClick = { submit(true) }, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("connect")) {
-            Icon(Icons.Default.Power, null); Spacer(Modifier.width(8.dp)); Text(if (busy) "등록 중" else "저장하고 연결")
+        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedIconButton(onClick = { submit(false) }, enabled = enabled, modifier = Modifier.size(48.dp).testTag("save-computer")) {
+                Icon(Icons.Default.Save, "저장")
+            }
+            Button(onClick = { submit(true) }, enabled = enabled, modifier = Modifier.weight(1f).height(48.dp).testTag("connect")) {
+                Icon(Icons.Default.Power, null); Spacer(Modifier.width(8.dp)); Text(if (busy) "등록 중" else "저장하고 연결")
+            }
         }
-        OutlinedButton(onClick = { submit(false) }, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("save-computer")) {
-            Icon(Icons.Default.Save, null); Spacer(Modifier.width(8.dp)); Text("저장")
-        }
-        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        if (invitation == null) TextButton(onClick = { importOpen = true }, enabled = !busy, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-            Icon(Icons.Default.ContentPaste, null); Spacer(Modifier.width(8.dp)); Text("Host 등록 JSON 가져오기")
-        }
-        Spacer(Modifier.height(16.dp))
     }
     if (importOpen) AlertDialog(onDismissRequest = { importOpen = false; importText = "" }, title = { Text("Host 등록 정보") },
         text = { OutlinedTextField(importText, { importText = it }, label = { Text("등록 JSON") }, minLines = 4, maxLines = 8, visualTransformation = PasswordVisualTransformation()) },

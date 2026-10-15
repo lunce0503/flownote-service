@@ -107,7 +107,7 @@ class RemoteAppTest {
         ui.onNodeWithTag("host-fingerprint").performTextInput(host.fingerprint)
         ui.onNodeWithTag("trust-confirm").performScrollTo().performClick()
         screenshot("registration-phone")
-        ui.onNodeWithTag("connect").performScrollTo().performClick()
+        ui.onNodeWithTag("connect").assertIsDisplayed().performClick()
         phase(Phase.CONNECTED)
         val store = ProfileStore(instrumentation.targetContext)
         assertEquals(host.token, store.load()?.token)
@@ -204,7 +204,7 @@ class RemoteAppTest {
         ui.onNodeWithTag("host-token").performTextInput(second.token)
         ui.onNodeWithTag("host-fingerprint").performTextInput(second.fingerprint)
         ui.onNodeWithTag("trust-confirm").performScrollTo().performClick()
-        ui.onNodeWithTag("save-computer").performScrollTo().performClick()
+        ui.onNodeWithTag("save-computer").assertIsDisplayed().performClick()
         ui.waitUntil(5_000) { store.catalog().hosts.size == 2 }
         val secondId = store.catalog().hosts.single { it.profile.endpoint == second.endpoint }.id
         assertEquals(2, ProfileStore(instrumentation.targetContext).catalog().hosts.size)
@@ -235,7 +235,8 @@ class RemoteAppTest {
         ui.onNodeWithContentDescription("Second PC 편집").performClick()
         ui.onNodeWithTag("host-name").performTextReplacement("Second renamed")
         ui.onNodeWithTag("host-name").assertTextContains("Second renamed")
-        ui.onNodeWithTag("save-computer").performScrollTo().assertIsEnabled().performClick()
+        screenshot("computer-edit-ime")
+        ui.onNodeWithTag("save-computer").assertIsDisplayed().assertIsEnabled().performClick()
         ui.waitUntil(5_000) { store.catalog().hosts.single { it.id == secondId }.profile.name == "Second renamed" }
         assertEquals("Second renamed", store.catalog().hosts.single { it.id == secondId }.profile.name)
         ui.onNodeWithContentDescription("Second renamed 삭제").performClick()
@@ -262,7 +263,7 @@ class RemoteAppTest {
         assertEquals(1, store.catalog().hosts.size)
         screenshot("qr-confirmation")
         ui.onNodeWithTag("trust-confirm").performScrollTo().performClick()
-        ui.onNodeWithTag("connect").performScrollTo().performClick()
+        ui.onNodeWithTag("connect").assertIsDisplayed().performClick()
         phase(Phase.CONNECTED)
         action { assertTrue(it.input("printf 'QR_PAIRED_%s\\n' OK\r")) }
         terminalContains("QR_PAIRED_OK")
