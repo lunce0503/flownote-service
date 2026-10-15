@@ -33,7 +33,12 @@ const palette = syntaxHighlighting(HighlightStyle.define([
 ]));
 function makeState(content) {
   return EditorState.create({ doc: content, extensions: [basicSetup, language(path), palette, wrapping.of(wrapped ? EditorView.lineWrapping : []),
-    EditorState.transactionFilter.of(transaction => transaction.docChanged && new TextEncoder().encode(transaction.newDoc.toString()).length > 256 * 1024 ? [] : transaction),
+    EditorState.transactionFilter.of(transaction => {
+      if (transaction.docChanged && new TextEncoder().encode(transaction.newDoc.toString()).length > 256 * 1024) {
+        post({ type: 'limit' }); return [];
+      }
+      return transaction;
+    }),
     EditorState.lineSeparator.of(content.includes('\r\n') ? '\r\n' : '\n'),
     EditorView.theme({ '&': { color: '#e6e8eb', backgroundColor: '#101214' }, '.cm-gutters': { backgroundColor: '#171a1d', color: '#89949e', border: 'none' },
       '.cm-activeLine,.cm-activeLineGutter': { backgroundColor: '#23292f' }, '.cm-cursor': { borderLeftColor: '#63d4b1' },

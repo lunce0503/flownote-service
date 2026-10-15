@@ -125,6 +125,7 @@ class WorkspaceModel(private val scope: CoroutineScope, private val failure: (St
                 if (type == "snapshot" && path == snapshotPath && message.optString("id") == snapshotId) snapshot?.complete(content)
             }
             "save" -> save()
+            "limit" -> failure("편집 내용은 256 KiB까지 지원합니다. 붙여넣을 내용을 줄이세요.")
             "cursor" -> if (path == activePath) { line = message.optInt("line", 1); column = message.optInt("column", 1) }
         }
     }

@@ -46,7 +46,7 @@ test("workspace rejects traversal, secret files, links, binaries, oversized and 
     await writeFile(join(root, "binary.bin"), Buffer.from([0, 255]));
     await writeFile(join(root, "large.txt"), "x".repeat(MAX_FILE_BYTES + 1));
     const workspace = new Workspace(root);
-    for (const path of ["../outside", "/etc/passwd", "C:/Windows/file", "src/../plain.txt", "src\\file", ".env.local", ".ssh/id_rsa", "plain.txt:stream"]) {
+    for (const path of ["../outside", "/etc/passwd", "C:/Windows/file", "src/../plain.txt", "src\\file", ".env.local", ".envrc", ".bashrc", ".git-credentials", ".ssh/id_rsa", "plain.txt:stream"]) {
       await assert.rejects(workspace.execute("read", { path }), (e: unknown) => e instanceof WorkspaceError && e.status === 403);
     }
     await assert.rejects(workspace.execute("read", { path: "binary.bin" }), (e: unknown) => e instanceof WorkspaceError && e.status === 415);

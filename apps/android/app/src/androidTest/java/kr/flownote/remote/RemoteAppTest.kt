@@ -195,6 +195,11 @@ class RemoteAppTest {
         ui.waitUntil(15_000) { ui.activity.model.workspace.loaded }
         ui.onNodeWithTag("file-src").performClick()
         ui.waitUntil(10_000) { ui.activity.model.workspace.folder == "src" }
+        ui.onNodeWithTag("file-filter").performTextInput("hello")
+        ui.onNodeWithTag("file-src/other.py").assertDoesNotExist()
+        ui.onNodeWithTag("file-filter").performTextClearance()
+        ui.onNodeWithTag("file-src/other.py").assertIsDisplayed()
+        hideKeyboard()
         ui.onNodeWithTag("file-src/hello.ts").performClick()
         ui.waitUntil(15_000) { evaluate("!!document.querySelector('.cm-content')", true) == "true" }
         evaluate("document.querySelector('.cm-content').focus(); document.execCommand('selectAll'); document.getSelection().collapseToEnd();", true)
@@ -246,12 +251,24 @@ class RemoteAppTest {
         assertTrue(ui.activity.model.workspace.active!!.dirty)
         runBlocking { assertEquals("// PC_CHANGED\n", api.call("read", JSONObject().put("path", "src/hello.ts")).getString("content")) }
         ui.onNodeWithText("닫기").performClick()
+        ui.onNodeWithContentDescription("파일 다시 불러오기").performScrollTo().performClick()
+        ui.onNodeWithText("취소").performClick()
+        assertTrue(ui.activity.model.workspace.active!!.dirty)
+        ui.onNodeWithContentDescription("컴퓨터 목록").performClick()
+        ui.onNodeWithText("취소").performClick()
+        assertTrue(ui.activity.model.screenTerminal && ui.activity.model.codeOpen && ui.activity.model.workspace.dirty)
         ui.onNodeWithContentDescription("hello.ts 닫기").performClick()
         ui.onNodeWithText("취소").performClick()
         assertTrue(ui.activity.model.workspace.active!!.dirty)
         ui.onNodeWithContentDescription("hello.ts 닫기").performClick()
         ui.onNodeWithText("버리기").performClick()
         ui.waitUntil(5_000) { ui.activity.model.workspace.documents.size == 1 }
+        runBlocking {
+            val previous = api.call("read", JSONObject().put("path", "README.md"))
+            api.call("write", JSONObject().put("path", "README.md").put("revision", previous.getString("revision")).put("content", "# Updated on PC\n"))
+        }
+        ui.onNodeWithContentDescription("파일 다시 불러오기").performScrollTo().performClick()
+        ui.waitUntil(15_000) { ui.activity.model.workspace.active?.content == "# Updated on PC\n" }
         screenshot("ide-conflict-preserved")
         ui.onNodeWithTag("mode-terminal").performClick()
         phase(Phase.CONNECTED)

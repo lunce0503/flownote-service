@@ -41,6 +41,10 @@ try {
   assert.equal(await snapshot(), content);
   await deliver({ type: 'load', epoch: 1, path: 'native.txt', content: 'native-message' }, '');
   assert.equal(await snapshot(), 'native-message', 'Android native messages may have an empty source origin');
+  await page.locator('.cm-content').click();
+  await page.keyboard.insertText('x'.repeat(256 * 1024 + 1));
+  assert.equal(await snapshot(), 'native-message');
+  assert.ok(await page.evaluate(() => messages.some(m => m.type === 'limit')), 'oversized edits must show an error and preserve the current document');
   await deliver({ type: 'load', epoch: 1, path: 'src/main.ts', content });
   await deliver({ type: 'search', epoch: 1 });
   await page.locator('input[name=search]').fill('value');

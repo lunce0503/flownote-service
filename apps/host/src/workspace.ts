@@ -17,7 +17,8 @@ export type WorkspaceOperation = keyof typeof schemas;
 export class WorkspaceError extends Error {
   constructor(readonly status: number, readonly code: string, message: string, options?: ErrorOptions) { super(message, options); }
 }
-const denied = new Set([".git", "node_modules", ".venv", ".next", "dist", "build", ".gradle", "__pycache__", ".ssh", ".aws", ".config", ".codex", ".gnupg", ".kube"]);
+const denied = new Set([".git", "node_modules", ".venv", ".next", "dist", "build", ".gradle", "__pycache__", ".ssh", ".aws", ".config", ".codex", ".gnupg", ".kube",
+  ".bashrc", ".bash_profile", ".profile", ".zshrc", ".zprofile", ".bash_history", ".zsh_history", ".python_history", ".netrc", ".git-credentials", ".pypirc", ".yarnrc.yml"]);
 function allowed(name: string) {
   const value = name.toLowerCase();
   return !denied.has(value) && !/[\x00-\x1f\x7f\\:]/.test(name) &&

@@ -8,6 +8,7 @@ const configDir = await mkdtemp(join(tmpdir(), 'android-host-test-'));
 const project = await mkdtemp(join(tmpdir(), 'android-ide-project-'));
 await mkdir(join(project, 'src'));
 await writeFile(join(project, 'src', 'hello.ts'), '// 한글 코드\nexport const value = 42;\n');
+await writeFile(join(project, 'src', 'other.py'), 'print("Hello from Python")\n');
 await writeFile(join(project, 'README.md'), '# Remote IDE\n');
 await writeFile(join(project, '.env'), 'TEST_ONLY_PRIVATE=true\n');
 const fixture = await initializeHost({ configDir, bind: '0.0.0.0', advertisedHost: '10.0.2.2', port: 17443, shell: '/bin/bash', cwd: project });
