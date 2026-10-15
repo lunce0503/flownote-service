@@ -21,6 +21,7 @@ test("pairing invitations expire, replace old invitations and redeem once withou
     const fingerprint = await readCertificateFingerprint(initialized.config.certPath);
     const first = manager.issue("PC", fingerprint, 7443);
     assert.equal("token" in first, false);
+    assert.equal(first.certificateFingerprint, fingerprint.replaceAll(":", ""));
     const current = manager.issue("PC", fingerprint, 7443);
     await assert.rejects(manager.redeem(first.pairingCode));
     await assert.rejects(manager.redeem("x".repeat(43)));

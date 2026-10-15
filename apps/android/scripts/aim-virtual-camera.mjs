@@ -14,8 +14,8 @@ const set = (target, data) => new Promise((resolve, reject) => {
 });
 try {
   // Back away and rise above the table so the wall QR is not clipped/occluded.
-  await set('POSITION', [-2.717, 1.320, 0.879]);
-  await set('ROTATION', [15, -150, 0]);
+  await set('POSITION', [-1.767, 1.120, 2.524]);
+  await set('ROTATION', [8, -150, 0]);
   console.log('Virtual camera aimed at the enrollment QR wall poster.');
   if (process.argv.includes('--watch')) {
     const run = promisify(execFile);
@@ -30,7 +30,7 @@ try {
     }
     // Small changes simulate aiming a phone; the real camera/decoder returns the result.
     if (!completed) console.log('Scanner Activity observed; aiming the virtual camera.');
-    for (const pitch of [15, 10, 20, 5, 0]) {
+    for (const pitch of [8, 3, 13, 0]) {
       for (const yaw of [-150, -155, -145]) {
         if (completed) break;
         if (!await visible()) { console.log('QR scanner returned to the application.'); process.exitCode = 0; break; }
@@ -39,6 +39,6 @@ try {
       }
       if (completed || !await visible()) break;
     }
-    if (!completed && await visible()) await set('ROTATION', [15, -150, 0]);
+    if (!completed && await visible()) await set('ROTATION', [8, -150, 0]);
   }
 } finally { client.close(); }

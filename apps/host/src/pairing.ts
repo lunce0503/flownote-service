@@ -19,7 +19,7 @@ export class PairingManager {
     const expiresAt = this.now() + PAIRING_TTL_MS;
     this.pending = { hash: this.hash(pairingCode), expiresAt };
     const host = this.config.advertisedHost.includes(":") ? `[${this.config.advertisedHost}]` : this.config.advertisedHost;
-    return { type: "flownote-remote-pairing", version: 1, name: name.trim(), endpoint: `wss://${host}:${port}/v1/connect`, certificateFingerprint: fingerprint, pairingCode, expiresAt: new Date(expiresAt).toISOString() };
+    return { type: "flownote-remote-pairing", version: 1, name: name.trim(), endpoint: `wss://${host}:${port}/v1/connect`, certificateFingerprint: fingerprint.replaceAll(":", ""), pairingCode, expiresAt: new Date(expiresAt).toISOString() };
   }
 
   async redeem(code: string) {
