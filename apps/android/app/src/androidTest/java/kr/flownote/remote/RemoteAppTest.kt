@@ -68,7 +68,12 @@ class RemoteAppTest {
             throw AssertionError("Missing $value, state=${ui.activity.model.state}; rows=${evaluate("document.querySelector('.xterm-rows')?.innerText || document.body.innerText")}; layout=$layout", failure)
         }
     }
-    private fun phase(expected: Phase) { ui.waitUntil(25_000) { ui.activity.model.state.phase == expected } }
+    private fun phase(expected: Phase) {
+        try { ui.waitUntil(25_000) { ui.activity.model.state.phase == expected } }
+        catch (failure: Throwable) {
+            throw AssertionError("Expected $expected, state=${ui.activity.model.state}; error=${ui.activity.model.error}", failure)
+        }
+    }
     private fun action(block: (RemoteViewModel) -> Unit) { instrumentation.runOnMainSync { block(ui.activity.model) } }
     private fun screenshot(name: String) {
         instrumentation.runOnMainSync {

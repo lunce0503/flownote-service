@@ -1,6 +1,8 @@
 package kr.flownote.remote.connection
 
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kr.flownote.remote.security.pinnedClient
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -13,14 +15,14 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 class PairingClient {
-    suspend fun redeem(invitation: PairingInvitation, name: String): HostProfile {
+    suspend fun redeem(invitation: PairingInvitation, name: String): HostProfile = withContext(Dispatchers.IO) {
         invitation.checked()
         val client = pinnedClient(invitation.profile("pairing-validation-token")).newBuilder()
             .readTimeout(10, TimeUnit.SECONDS).callTimeout(15, TimeUnit.SECONDS).build()
         val url = invitation.endpoint.replaceFirst("wss://", "https://").toHttpUrl().newBuilder().encodedPath("/v1/pair").build()
         val request = Request.Builder().url(url).post(JSONObject().put("pairingCode", invitation.code).toString().toRequestBody("application/json".toMediaType())).build()
         try {
-            return suspendCancellableCoroutine { continuation ->
+            suspendCancellableCoroutine<HostProfile> { continuation ->
                 val call = client.newCall(request)
                 continuation.invokeOnCancellation { call.cancel() }
                 call.enqueue(object : Callback {
@@ -44,6 +46,9 @@ class PairingClient {
                     }
                 })
             }
-        } finally { client.connectionPool.evictAll(); client.dispatcher.executorService.shutdown() }
+        } finally {
+            // Closing a pooled TLS socket can send close_notify and must stay off the UI thread.
+            client.connectionPool.evictAll(); client.dispatcher.executorService.shutdown()
+        }
     }
 }
