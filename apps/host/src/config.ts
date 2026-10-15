@@ -66,7 +66,7 @@ const validateHost = (value: string) => {
   return value;
 };
 
-const secureWindowsAcl = (path: string, directory: boolean) => {
+export const secureWindowsAcl = (path: string, directory: boolean) => {
   const sid = execFileSync("powershell.exe", [
     "-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
     "[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value",

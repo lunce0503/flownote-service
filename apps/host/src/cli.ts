@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { access, writeFile } from "node:fs/promises";
+import { access, open } from "node:fs/promises";
 import { hostname } from "node:os";
 import QRCode from "qrcode";
 import { parseArgs } from "node:util";
@@ -12,6 +12,7 @@ import {
   loadConfig,
   readCertificateFingerprint,
   resolveConfigDir,
+  secureWindowsAcl,
 } from "./config.js";
 import { sendControlRequest } from "./control.js";
 import { DEFAULT_BIND, DEFAULT_PORT } from "./constants.js";
@@ -85,7 +86,11 @@ const main = async () => {
       const data = JSON.stringify(invitation);
       if (values["qr-file"]) {
         const png = await QRCode.toBuffer(data, { type: "png", width: 800, margin: 4, errorCorrectionLevel: "M" });
-        await writeFile(values["qr-file"], png, { mode: 0o600, flag: "wx" });
+        const file = await open(values["qr-file"], "wx", 0o600);
+        try {
+          if (process.platform === "win32") secureWindowsAcl(values["qr-file"], false);
+          await file.writeFile(png);
+        } finally { await file.close(); }
       }
       if (values.json) output(invitation, true);
       else {

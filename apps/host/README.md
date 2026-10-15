@@ -27,7 +27,7 @@ GitHub Release의 설치기를 확인한 뒤 실행한다.
 
 ```bash
 curl --proto '=https' --tlsv1.2 -fL \
-  https://github.com/lunce0503/flownote-service/releases/download/remote-host-v0.2.0/install-remote-host.sh \
+  https://github.com/lunce0503/flownote-service/releases/download/remote-host-v0.3.0/install-remote-host.sh \
   -o /tmp/install-remote-host.sh
 less /tmp/install-remote-host.sh
 sh /tmp/install-remote-host.sh
@@ -41,7 +41,7 @@ PowerShell에서 설치기를 내려받아 내용을 확인한 뒤 실행한다.
 
 ```powershell
 Invoke-WebRequest `
-  https://github.com/lunce0503/flownote-service/releases/download/remote-host-v0.2.0/install-remote-host.ps1 `
+  https://github.com/lunce0503/flownote-service/releases/download/remote-host-v0.3.0/install-remote-host.ps1 `
   -OutFile .\install-remote-host.ps1
 notepad .\install-remote-host.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-remote-host.ps1
@@ -77,7 +77,7 @@ remote-host pair --name "Work PC"
 remote-host pair --name "Work PC" --qr-file /private/path/pc-pairing.png
 ```
 
-`--qr-file`은 새 PNG 파일만 생성하고 기존 파일은 덮어쓰지 않는다. `--json`으로 같은 등록 데이터를 받을 수 있다. QR에 영구 기기 토큰은 넣지 않으며 서버 메모리의 코드는 사용/만료/재시작 시 무효화된다. 새 기기는 TLS `POST /v1/pair`를 통해 발급되고 기존 사용자 전용 설정 파일에 해시로 저장된다. [계약](../../protocol/remote-host/pairing.md)을 참조한다.
+`--qr-file`은 새 PNG 파일만 생성하고 기존 파일은 덮어쓰지 않는다. Linux는 0600, Windows는 현재 사용자/SYSTEM만 접근하는 ACL을 적용한 뒤 QR 내용을 쓴다. `--json`으로 같은 등록 데이터를 받을 수 있다. QR에 영구 기기 토큰은 넣지 않으며 서버 메모리의 코드는 사용/만료/재시작 시 무효화된다. 새 기기는 TLS `POST /v1/pair`를 통해 발급되고 기존 사용자 전용 설정 파일에 해시로 저장된다. [계약](../../protocol/remote-host/pairing.md)을 참조한다.
 
 ```bash
 remote-host status

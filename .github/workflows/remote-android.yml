@@ -106,7 +106,7 @@ jobs:
           cd apps/android
           ./gradlew assembleRelease
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
-          if unzip -l app/build/outputs/apk/release/app-release.apk | grep -Eq 'assets/(host(-second|-control)?|pairing)\.json'; then
+          if unzip -l app/build/outputs/apk/release/app-release.apk | grep -Eq 'assets/(host(-second|-control)?\.json|pairing\.(json|png))'; then
             echo 'Test credentials must never be packaged in a release APK.'
             exit 1
           fi
