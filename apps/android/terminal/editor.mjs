@@ -38,7 +38,7 @@ const palette = syntaxHighlighting(HighlightStyle.define([
 function makeState(content) {
   return EditorState.create({ doc: content, extensions: [basicSetup, language(path), palette, wrapping.of(wrapped ? EditorView.lineWrapping : []),
     EditorState.transactionFilter.of(transaction => {
-      if (transaction.docChanged && new TextEncoder().encode(transaction.newDoc.toString()).length > 256 * 1024) {
+      if (transaction.docChanged && new TextEncoder().encode(transaction.newDoc.sliceString(0, undefined, transaction.startState.lineBreak)).length > 256 * 1024) {
         post({ type: 'limit' }); return [];
       }
       return transaction;

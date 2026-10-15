@@ -46,6 +46,10 @@ try {
   await page.keyboard.insertText('x'.repeat(256 * 1024 + 1));
   assert.equal(await snapshot(), 'native-message');
   assert.ok(await page.evaluate(() => messages.some(m => m.type === 'limit')), 'oversized edits must show an error and preserve the current document');
+  await deliver({ type: 'load', epoch: 1, path: 'windows.txt', content: 'seed\r\n' });
+  await page.locator('.cm-content').click();
+  await page.keyboard.insertText('x\n'.repeat(100000));
+  assert.equal(await snapshot(), 'seed\r\n', 'size limits must count the CRLF bytes that will actually be saved');
   await deliver({ type: 'load', epoch: 1, path: 'src/main.ts', content });
   await deliver({ type: 'search', epoch: 1 });
   await page.locator('input[name=search]').fill('value');
