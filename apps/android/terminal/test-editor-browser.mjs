@@ -35,6 +35,7 @@ try {
   await deliver({ type: 'undo', epoch: 1 }); assert.equal(await snapshot(), content);
   await deliver({ type: 'redo', epoch: 1 }); assert.equal(await snapshot(), changed);
   await deliver({ type: 'load', epoch: 1, path: 'README.md', content: '# File two\n' });
+  assert.deepEqual(await page.evaluate(() => { const m = messages.filter(x => x.type === 'cursor').at(-1); return [m.path, m.line, m.column]; }), ['README.md', 1, 1]);
   await deliver({ type: 'load', epoch: 1, path: 'src/main.ts', content: changed });
   await deliver({ type: 'undo', epoch: 1 }); assert.equal(await snapshot(), content, 'tab switch must preserve undo history');
   await deliver({ type: 'load', epoch: 1, path: 'src/main.ts', content: 'injected' }, 'https://foreign.invalid');

@@ -20,6 +20,10 @@ let epoch = -1, path = '', view, savedStates = new Map(), suppress = false;
 let wrapped = false;
 const wrapping = new Compartment();
 const post = value => globalThis.NativeEditor?.postMessage(JSON.stringify({ ...value, path, epoch }));
+function cursor(state) {
+  const position = state.selection.main.head, line = state.doc.lineAt(position);
+  post({ type: 'cursor', line: line.number, column: position - line.from + 1 });
+}
 function language(name) {
   const extension = name.split('.').pop().toLowerCase();
   if (['ts','tsx','js','jsx','mjs','cjs'].includes(extension)) return javascript({ typescript: extension.startsWith('ts'), jsx: extension.endsWith('x') });
@@ -49,10 +53,7 @@ function makeState(content) {
     EditorView.updateListener.of(update => {
       if (suppress) return;
       if (update.docChanged) post({ type: 'change', content: update.state.sliceDoc() });
-      if (update.selectionSet || update.docChanged) {
-        const pos = update.state.selection.main.head, line = update.state.doc.lineAt(pos);
-        post({ type: 'cursor', line: line.number, column: pos - line.from + 1 });
-      }
+      if (update.selectionSet || update.docChanged) cursor(update.state);
     }),
   ] });
 }
@@ -69,6 +70,7 @@ function receive(message) {
     if (view) view.setState(state); else view = new EditorView({ state, parent: document.getElementById('editor') });
     view.dispatch({ effects: wrapping.reconfigure(wrapped ? EditorView.lineWrapping : []) });
     suppress = false;
+    cursor(view.state);
     return;
   }
   if (!view || message.epoch !== epoch) return;

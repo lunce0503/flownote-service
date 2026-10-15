@@ -269,6 +269,7 @@ class RemoteAppTest {
         }
         ui.onNodeWithContentDescription("파일 다시 불러오기").performScrollTo().performClick()
         ui.waitUntil(15_000) { ui.activity.model.workspace.active?.content == "# Updated on PC\n" }
+        ui.waitUntil(5_000) { ui.activity.model.workspace.line == 1 && ui.activity.model.workspace.column == 1 }
         screenshot("ide-conflict-preserved")
         ui.onNodeWithTag("mode-terminal").performClick()
         phase(Phase.CONNECTED)
