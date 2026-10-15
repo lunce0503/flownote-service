@@ -18,7 +18,7 @@ import { sendControlRequest } from "./control.js";
 import { DEFAULT_BIND, DEFAULT_PORT } from "./constants.js";
 import { HostServer } from "./server.js";
 
-const VERSION = "0.3.0";
+const VERSION = "0.4.0";
 
 const help = `Flownote Remote Host ${VERSION}
 

@@ -30,6 +30,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import kr.flownote.remote.RemoteViewModel
 import kr.flownote.remote.connection.HostProfile
 import kr.flownote.remote.connection.Phase
@@ -42,12 +48,37 @@ fun RemoteApp(model: RemoteViewModel) {
         val configuration = LocalConfiguration.current
         val compact = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE || configuration.screenHeightDp < 600
         Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
-            if (model.screenTerminal) TerminalScreen(model, compact) else ComputerHome(model)
+            if (model.screenTerminal) RemoteSessionScreen(model, compact) else ComputerHome(model)
         }
     }
     model.error?.let { message ->
         AlertDialog(onDismissRequest = { model.error = null }, title = { Text("확인") }, text = { Text(message) },
             confirmButton = { TextButton(onClick = { model.error = null }) { Text("닫기") } })
+    }
+}
+
+@Composable
+private fun ColumnScope.RemoteSessionScreen(model: RemoteViewModel, compact: Boolean) {
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    if (!(compact && imeVisible)) TabRow(selectedTabIndex = if (model.codeOpen) 1 else 0) {
+        listOf("터미널", "코드").forEachIndexed { index, label ->
+            Tab(selected = model.codeOpen == (index == 1), onClick = {
+                focus.clearFocus(); keyboard?.hide(); model.codeOpen = index == 1
+            }, modifier = Modifier.height(44.dp).testTag(if (index == 0) "mode-terminal" else "mode-code")) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(if (index == 0) Icons.Default.Terminal else Icons.Default.Code, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp)); Text(label)
+                }
+            }
+        }
+    }
+    Box(Modifier.weight(1f).fillMaxWidth()) {
+        val terminal = if (model.codeOpen) Modifier.alpha(0f).clearAndSetSemantics {} else Modifier
+        Column(Modifier.fillMaxSize().then(terminal).zIndex(if (model.codeOpen) 0f else 1f)) { TerminalScreen(model, compact) }
+        val code = if (!model.codeOpen) Modifier.alpha(0f).clearAndSetSemantics {} else Modifier
+        Column(Modifier.fillMaxSize().then(code).zIndex(if (model.codeOpen) 1f else 0f)) { CodeScreen(model, compact && imeVisible) }
     }
 }
 
@@ -63,7 +94,7 @@ private fun ColumnScope.TerminalScreen(model: RemoteViewModel, compact: Boolean)
     var settings by remember { mutableStateOf(false) }
     var fontSize by remember { mutableIntStateOf(14) }
     val connected = model.state.phase == Phase.CONNECTED
-    BackHandler { editDialog = true }
+    BackHandler(enabled = !model.codeOpen) { editDialog = true }
     LaunchedEffect(model.pasteRequested) {
         if (model.pasteRequested) {
             model.pasteRequested = false
@@ -102,6 +133,10 @@ private fun ColumnScope.TerminalScreen(model: RemoteViewModel, compact: Boolean)
     }
     if (remember { TerminalView.supported() }) {
         AndroidView(factory = { ctx -> TerminalView(ctx, model::onBridge).also { view -> model.renderer = view.renderer } },
+            update = { view ->
+                view.visibility = if (model.codeOpen) android.view.View.INVISIBLE else android.view.View.VISIBLE
+                if (model.codeOpen) view.clearFocus()
+            },
             onRelease = { view ->
                 if (model.renderer === view.renderer) model.renderer = null
                 view.release()
@@ -144,7 +179,7 @@ private fun ColumnScope.TerminalScreen(model: RemoteViewModel, compact: Boolean)
         confirmButton = { TextButton(onClick = { settings = false }) { Text("닫기") } })
     if (closeDialog) Confirm("세션 종료", "PC의 현재 터미널을 종료합니다.", "종료", { closeDialog = false }) { model.closeSession(); closeDialog = false }
     if (newDialog) Confirm("새 세션", "기존 터미널을 종료하고 새 터미널을 엽니다.", "시작", { newDialog = false }) { model.newSession(); newDialog = false }
-    if (editDialog) Confirm("컴퓨터 목록으로 이동", "연결을 해제합니다. 돌아오면 새 터미널을 선택해야 합니다.", "이동", { editDialog = false }) { model.editProfile(); editDialog = false }
+    if (editDialog) Confirm("컴퓨터 목록으로 이동", if (model.workspace.dirty) "저장하지 않은 코드 변경을 버리고 연결을 해제합니다." else "연결을 해제합니다. 돌아오면 새 터미널을 선택해야 합니다.", "이동", { editDialog = false }) { model.editProfile(); editDialog = false }
     pasteText?.let { content -> AlertDialog(onDismissRequest = { pasteText = null }, title = { Text("붙여넣기 확인") },
         text = { Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
             if (content.contains('\n') || content.contains('\r')) Text("여러 줄 입력은 명령을 즉시 실행할 수 있습니다.", color = MaterialTheme.colorScheme.secondary)

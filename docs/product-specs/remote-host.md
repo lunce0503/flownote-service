@@ -4,6 +4,8 @@ Host 0.3.0은 Android 0.2.0 이상에서 사용할 5분·1회용 QR 등록을 �
 
 ## 목적과 범위
 
+Host 0.4.0은 Android 0.3.0의 모바일 IDE를 위한 인증된 HTTPS Workspace API를 추가한다. `cwd` 프로젝트 루트의 기존 파일만 탐색·읽기·revision 기반 저장하고 경로/링크/비밀 파일/크기를 제한한다. 터미널 WSS·QR·토큰·PTY 정책은 유지한다. 세부 계약은 [workspace](../../protocol/remote-host/workspace.md), 구현은 `apps/host/src/workspace.ts`다. Host 내 쓰기는 직렬화하고 충돌은 409로 거부한다. OS의 다른 프로세스에 대한 완전한 파일 sandbox/원자 CAS는 보장하지 않는다.
+
 Remote Host는 사용자가 소유한 Linux 또는 Windows PC에서 실행되고 Android 원격 터미널 클라이언트에 실제 PTY를 제공하는 로컬 Host Agent다. LAN 또는 사용자가 이미 구성한 VPN 안에서 직접 WSS 연결을 사용한다. Flownote 클라우드 중계, NAT 통과, 포트 자동 개방과 Android 앱은 이 릴리즈 범위가 아니다.
 
 원격 클라이언트는 Host 프로세스를 실행한 OS 사용자와 같은 권한을 가진다. 프로젝트 디렉터리에 한정된 파일 접근 도구가 아니라 완전한 원격 셸이므로 인터넷에 직접 공개하지 않는다.

@@ -4,7 +4,7 @@ Android 10 이상에서 Linux 또는 Windows의 `remote-host`에 직접 WSS로 �
 
 ## 설치와 접속
 
-1. GitHub Release의 `flownote-remote-v0.2.0.apk`를 휴대폰에서 설치한다. 기존 앱 위에 설치하면 이전 PC 설정을 목록으로 이전한다.
+1. GitHub Release의 `flownote-remote-v0.3.0.apk`를 휴대폰에서 설치한다. 기존 앱 위에 설치하면 이전 PC 설정을 목록으로 이전한다.
 2. PC에서 [Remote Host](../host/README.md)를 설치하고 `remote-host init --host <LAN_OR_VPN_IP> --bind <LAN_OR_VPN_IP>`를 실행한다.
 3. `remote-host serve`를 실행한다. Windows 방화벽은 사용자가 신뢰하는 사설 네트워크 범위에서만 허용한다.
 4. 앱에 PC 이름, `wss://<host>:7443/v1/connect`, 기기 토큰과 SHA-256 인증서 지문을 입력한다. `init --json` 출력은 JSON 가져오기로 등록할 수 있다.
@@ -24,6 +24,12 @@ remote-host pair --name "Work PC" --qr-file /private/path/pc-pairing.png
 터미널 도구줄에는 Esc, Tab, Ctrl, Alt, Ctrl+C, 방향키, 붙여넣기와 입력창이 있다. 입력창은 한글 조합이 끝난 명령을 전송 버튼으로 보낼 수 있다. 여러 줄 붙여넣기는 전송 전 내용을 확인한다. 설정에서 글자 크기를 바꿀 수 있다.
 
 연결 해제는 PC PTY를 최대 5분간 유지한다. 앱이 같은 터미널 화면을 유지하는 동안에만 증분 출력을 복원한다. 앱 프로세스가 종료됐거나 재생 버퍼를 벗어난 경우 새 세션을 명시적으로 시작한다. 입력은 재접속 후 재전송하지 않는다. 앱을 백그라운드로 보내면 연결을 해제하고 복귀 시 재연결한다.
+
+## 모바일 IDE
+
+Host 0.4.0 이상에서는 연결 후 `코드` 탭에서 PC의 프로젝트 폴더를 탐색한다. Host 설정의 `cwd`가 루트다. 폴더와 파일 이름 필터, 최대 8개 파일 탭, CodeMirror 6 기반 구문 강조·줄 번호·접기·자동 들여쓰기, 찾기/바꾸기·줄 이동·undo/redo·줄바꿈과 저장을 지원한다. JS/TS/JSX/TSX, Python, Java, Kotlin, JSON, Markdown, HTML, CSS, shell을 강조하고 그 외에는 일반 텍스트로 연다.
+
+터미널/코드 전환 시 WebView를 파괴하지 않아 PTY·초안·undo를 유지한다. 미저장 탭 닫기/다시 불러오기/PC 떠나기는 확인이 필요하다. 저장 시 읽은 revision과 다르면 덮어쓰지 않고 초안을 유지한다. 프로젝트의 기존 UTF-8 텍스트 파일(256 KiB 이하)만 수정하고 비밀 파일·링크·생성/삭제·LSP/디버거는 제공하지 않는다. 프로세스 종료 시 초안은 복원되지 않으므로 저장 후 앱을 종료한다. [파일 API 계약](../../protocol/remote-host/workspace.md)을 참고한다.
 
 ## 보안과 수명
 
@@ -54,6 +60,8 @@ cd ..
 | --- | --- |
 | `app/.../MainActivity.kt`, `RemoteViewModel.kt` | 앱 생명주기, 등록 상태와 터미널 화면 연결 |
 | `app/.../ui/RemoteApp.kt` | 등록·상태·터미널·붙여넣기 화면 |
+| `app/.../ui/CodeScreen.kt`, `workspace/` | 파일 탐색·탭·충돌 보호·TLS 파일 API·제한된 에디터 브리지 |
+| `terminal/editor.mjs`, `app/src/main/assets/editor/` | CodeMirror 번들·구문 강조·검색·undo·고정 출처 명령 |
 | `app/.../connection/` | 프로토콜, 세션, 재접속과 입력 제한 |
 | `app/.../security/` | 인증서 지문 검증, Keystore 암호화 저장 |
 | `app/.../terminal/TerminalView.kt` | 제한된 WebView와 출처 검증 브리지 |

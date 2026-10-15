@@ -20,6 +20,8 @@ import kotlinx.coroutines.runBlocking
 import androidx.lifecycle.Lifecycle
 import kr.flownote.remote.connection.*
 import kr.flownote.remote.security.*
+import kr.flownote.remote.workspace.WorkspaceClient
+import kr.flownote.remote.workspace.WorkspaceFailure
 import okhttp3.*
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -43,18 +45,18 @@ class RemoteAppTest {
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val profile get() = HostProfile.fromJson(JSONObject(instrumentation.context.assets.open("host.json").bufferedReader().readText()))
 
-    private fun evaluate(script: String): String {
+    private fun evaluate(script: String, editor: Boolean = false): String {
         val latch = CountDownLatch(1)
         val result = AtomicReference("")
         instrumentation.runOnMainSync {
             fun find(view: View): WebView? {
-                if (view is WebView) return view
+                if (view is WebView && (view.url?.contains("/editor/") == editor)) return view
                 if (view is ViewGroup) for (i in 0 until view.childCount) find(view.getChildAt(i))?.let { return it }
                 return null
             }
             val web = find(ui.activity.window.decorView)
             if (web == null) latch.countDown()
-            else web.evaluateJavascript(script) { result.set(it); latch.countDown() }
+            else { if (editor) web.requestFocus(); web.evaluateJavascript(script) { result.set(it); latch.countDown() } }
         }
         assertTrue(latch.await(5, TimeUnit.SECONDS))
         return result.get()
@@ -75,6 +77,13 @@ class RemoteAppTest {
         }
     }
     private fun action(block: (RemoteViewModel) -> Unit) { instrumentation.runOnMainSync { block(ui.activity.model) } }
+    private fun hideKeyboard() {
+        instrumentation.runOnMainSync {
+            (ui.activity.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
+                .hideSoftInputFromWindow(ui.activity.window.decorView.windowToken, 0)
+        }
+        ui.waitUntil(5_000) { ui.onAllNodesWithTag("mode-terminal").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
+    }
     private fun screenshot(name: String) {
         instrumentation.runOnMainSync {
             ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).forEach { it.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
@@ -173,10 +182,73 @@ class RemoteAppTest {
         assertNotEquals(session, store.rememberedSession())
         action { it.input("printf 'NEW_SESSION_%s\\n' OK\r") }
         terminalContains("NEW_SESSION_OK")
+        mobileIde()
         action { it.closeSession() }; phase(Phase.ENDED)
         assertNull(store.rememberedSession())
         device.unfreezeRotation()
         computersAndQr(store)
+    }
+
+    private fun mobileIde() {
+        val session = ProfileStore(instrumentation.targetContext).rememberedSession()
+        ui.onNodeWithTag("mode-code").performClick()
+        ui.waitUntil(15_000) { ui.activity.model.workspace.loaded }
+        ui.onNodeWithTag("file-src").performClick()
+        ui.waitUntil(10_000) { ui.activity.model.workspace.folder == "src" }
+        ui.onNodeWithTag("file-src/hello.ts").performClick()
+        ui.waitUntil(15_000) { evaluate("!!document.querySelector('.cm-content')", true) == "true" }
+        evaluate("document.querySelector('.cm-content').focus(); document.execCommand('selectAll'); document.getSelection().collapseToEnd();", true)
+        instrumentation.sendStringSync("// MOBILE_IDE_EDIT")
+        ui.waitUntil(10_000) { ui.activity.model.workspace.active?.content?.contains("MOBILE_IDE_EDIT") == true }
+        val draft = ui.activity.model.workspace.active!!.content
+        hideKeyboard()
+        ui.onNodeWithTag("mode-terminal").performClick()
+        phase(Phase.CONNECTED)
+        terminalContains("NEW_SESSION_OK")
+        assertEquals(session, ProfileStore(instrumentation.targetContext).rememberedSession())
+        ui.onNodeWithTag("mode-code").performClick()
+        assertEquals(draft, ui.activity.model.workspace.active?.content)
+        ui.onNodeWithContentDescription("코드 저장").performClick()
+        ui.waitUntil(15_000) { !ui.activity.model.workspace.busy && ui.activity.model.workspace.active?.dirty == false }
+        val api = WorkspaceClient(profile)
+        runBlocking { assertEquals(draft, api.call("read", JSONObject().put("path", "src/hello.ts")).getString("content")) }
+        screenshot("ide-phone")
+        val device = UiDevice.getInstance(instrumentation)
+        device.setOrientationLeft()
+        ui.waitUntil(10_000) { evaluate("innerWidth > innerHeight && innerHeight >= 80", true) == "true" }
+        screenshot("ide-landscape")
+        device.setOrientationNatural()
+        ui.onNodeWithContentDescription("파일 탐색").performClick()
+        ui.onNodeWithContentDescription("프로젝트 루트").performClick()
+        ui.waitUntil(10_000) { ui.activity.model.workspace.folder.isEmpty() }
+        assertFalse(ui.activity.model.workspace.entries.any { it.name == ".env" })
+        ui.onNodeWithTag("file-README.md").performClick()
+        ui.waitUntil(10_000) { ui.activity.model.workspace.documents.size == 2 }
+        ui.onNodeWithTag("tab-src/hello.ts").performClick()
+        evaluate("document.querySelector('.cm-content').focus(); document.execCommand('selectAll'); document.getSelection().collapseToEnd();", true)
+        instrumentation.sendStringSync(" MORE")
+        ui.waitUntil(10_000) { ui.activity.model.workspace.active?.dirty == true }
+        runBlocking {
+            val original = api.call("read", JSONObject().put("path", "src/hello.ts"))
+            api.call("write", JSONObject().put("path", "src/hello.ts").put("revision", original.getString("revision")).put("content", "// PC_CHANGED\n"))
+            try { api.call("read", JSONObject().put("path", "../outside")); fail("Traversal accepted") } catch (error: WorkspaceFailure) { assertEquals(403, error.status) }
+        }
+        hideKeyboard()
+        ui.onNodeWithContentDescription("코드 저장").performClick()
+        ui.waitUntil(15_000) { ui.activity.model.error?.contains("PC에서 파일이 변경") == true }
+        assertTrue(ui.activity.model.workspace.active!!.dirty)
+        runBlocking { assertEquals("// PC_CHANGED\n", api.call("read", JSONObject().put("path", "src/hello.ts")).getString("content")) }
+        ui.onNodeWithText("닫기").performClick()
+        ui.onNodeWithContentDescription("hello.ts 닫기").performClick()
+        ui.onNodeWithText("취소").performClick()
+        assertTrue(ui.activity.model.workspace.active!!.dirty)
+        ui.onNodeWithContentDescription("hello.ts 닫기").performClick()
+        ui.onNodeWithText("버리기").performClick()
+        ui.waitUntil(5_000) { ui.activity.model.workspace.documents.size == 1 }
+        screenshot("ide-conflict-preserved")
+        ui.onNodeWithTag("mode-terminal").performClick()
+        phase(Phase.CONNECTED)
+        println("REMOTE_ACCEPTANCE: MOBILE_IDE_OK")
     }
 
     private fun legacyStorageMigration(host: HostProfile) {

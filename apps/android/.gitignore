@@ -6,6 +6,7 @@ local.properties
 *.keystore
 terminal/node_modules/
 app/src/main/assets/terminal/vendor/
+app/src/main/assets/editor/vendor/
 app/src/androidTest/assets/host*.json
 app/src/androidTest/assets/pairing.json
 app/src/androidTest/assets/pairing.png

@@ -13,6 +13,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
+import kr.flownote.remote.workspace.WorkspaceModel
 
 class RemoteViewModel(application: Application) : AndroidViewModel(application) {
     private val store = ProfileStore(application)
@@ -32,6 +33,8 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     var alt by mutableStateOf(false); private set
     var pasteRequested by mutableStateOf(false)
     var renderer: ((JSONObject) -> Unit)? = null
+    val workspace = WorkspaceModel(viewModelScope) { error = it }
+    var codeOpen by mutableStateOf(false)
     private var ready = false
     private var wasConnected = false
     private var connection = makeConnection()
@@ -67,6 +70,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
         runCatching {
             connection.dispose(); renderer = null; ready = false; wasConnected = false
             store.select(id); reload(); activeHostId = id
+            workspace.attach(profile); codeOpen = false
             connection = makeConnection(); screenTerminal = true; error = null
         }.onFailure { error = "PC 연결 설정을 읽지 못했습니다." }
     }
@@ -123,6 +127,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     fun editProfile() {
         connection.dispose(); renderer = null; ready = false; wasConnected = false
         connection = makeConnection(); screenTerminal = false; editorOpen = false
+        workspace.attach(null); codeOpen = false
     }
     fun forget() { activeHostId?.let { editProfile(); deleteComputer(it) } }
     override fun onCleared() { connection.dispose() }

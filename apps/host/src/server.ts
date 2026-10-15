@@ -24,6 +24,7 @@ import { startControlServer } from "./control.js";
 import { clientMessageSchema, errorResponse, response, type ClientMessage, type ServerMessage } from "./protocol.js";
 import { SessionError, SessionManager } from "./session.js";
 import { PairingError, PairingManager } from "./pairing.js";
+import { Workspace, WorkspaceError, type WorkspaceOperation } from "./workspace.js";
 
 type Logger = Pick<Console, "info" | "warn" | "error">;
 type AuthFailure = { failures: number[]; blockedUntil: number };
@@ -69,11 +70,13 @@ export class HostServer {
   private fingerprint = "";
   private readonly pairing: PairingManager;
   private configMutation: Promise<unknown> = Promise.resolve();
+  private readonly workspace: Workspace;
 
   constructor(private readonly options: HostServerOptions) {
     this.sessions = new SessionManager(options.config.shell, options.config.cwd);
     this.logger = options.logger || console;
     this.pairing = new PairingManager(options.configDir, options.config);
+    this.workspace = new Workspace(options.config.cwd);
   }
 
   async start() {
@@ -86,6 +89,10 @@ export class HostServer {
     ]);
 
     this.httpsServer = createServer({ cert, key, minVersion: "TLSv1.2", maxHeaderSize: 16 * 1024 }, (request, reply) => {
+      if (request.method === "POST" && ["/v1/workspace/list", "/v1/workspace/read", "/v1/workspace/write"].includes(request.url || "")) {
+        void this.handleWorkspace(request, reply);
+        return;
+      }
       if (request.method === "POST" && request.url === "/v1/pair") {
         void this.handlePairing(request, reply);
         return;
@@ -202,6 +209,40 @@ export class HostServer {
     } catch (error) {
       if (error instanceof PairingError) { this.recordAuthFailure(address); respond(error.status, { error: error.message }); }
       else respond(error instanceof SyntaxError ? 400 : 500, { error: "PC 등록을 완료할 수 없습니다." });
+    } finally { clearTimeout(timer); }
+  }
+
+  private async handleWorkspace(request: IncomingMessage, reply: import("node:http").ServerResponse) {
+    const respond = (status: number, data: object) => {
+      if (reply.destroyed || reply.writableEnded) return;
+      reply.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+      reply.end(JSON.stringify(data));
+    };
+    const address = request.socket.remoteAddress || "unknown";
+    const timer = setTimeout(() => request.destroy(), 15_000);
+    try {
+      if (this.isAuthBlocked(address)) { respond(429, { error: "요청이 너무 많습니다." }); request.resume(); return; }
+      const token = authHeaderToken(request.headers.authorization);
+      if (!token || !await authenticateToken(this.options.config, token)) {
+        this.recordAuthFailure(address); respond(401, { error: "기기 인증에 실패했습니다." }); request.resume(); return;
+      }
+      if (request.headers.origin || request.headers["content-type"]?.split(";")[0]?.trim() !== "application/json") {
+        respond(403, { error: "허용되지 않은 파일 요청입니다." }); request.resume(); return;
+      }
+      this.authFailures.delete(address);
+      const chunks: Buffer[] = [];
+      let size = 0;
+      for await (const chunk of request) {
+        size += chunk.length;
+        if (size > 2 * 1024 * 1024) { respond(413, { error: "파일 요청이 너무 큽니다." }); request.destroy(); return; }
+        chunks.push(chunk);
+      }
+      const input: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      const operation = request.url!.split("/").at(-1) as WorkspaceOperation;
+      respond(200, await this.workspace.execute(operation, input));
+    } catch (error) {
+      if (error instanceof WorkspaceError) respond(error.status, { error: error.message, code: error.code });
+      else respond(error instanceof SyntaxError ? 400 : 500, { error: "파일 요청을 완료할 수 없습니다." });
     } finally { clearTimeout(timer); }
   }
 

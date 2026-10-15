@@ -1,6 +1,8 @@
-# Flownote Remote Android 0.2.0
+# Flownote Remote Android 0.3.0
 
 Android 10 이상에서 Remote Host 0.2.0을 실행 중인 Linux/Windows PC의 실제 터미널에 연결하는 앱입니다.
+
+새 기능: `코드` 탭의 모바일 IDE (Host 0.4.0 이상). 프로젝트 파일 탐색·필터, 8개 파일 탭, CodeMirror 구문 강조·줄 번호·접기·들여쓰기, 찾기/바꾸기·줄 이동·undo/redo·줄바꿈과 저장을 지원합니다. PC에서 파일이 변경되면 저장을 거부하고 초안을 유지합니다. 터미널 전환 시 연결과 초안을 유지합니다. UTF-8 256 KiB 이하의 기존 프로젝트 파일만 편집하며, 초안은 앱 프로세스 종료 후 복원되지 않습니다.
 
 - 여러 PC 설정의 암호화 저장·목록·추가·편집·삭제·선택 연결
 - 기존 단일 PC 설정 자동 이전과 PC별 세션 분리
@@ -12,7 +14,7 @@ Android 10 이상에서 Remote Host 0.2.0을 실행 중인 Linux/Windows PC의 �
 - 화면 회전·키보드에 맞춘 PTY 크기 변경
 - 일시 단절 재접속, 출력 복원 한계 안내, 세션 종료
 
-`flownote-remote-v0.2.0.apk`를 기존 앱 위에 설치하세요. PC에서 `remote-host pair --name "Work PC"`를 실행하고 앱의 QR 아이콘으로 등록할 수 있습니다. 코드는 5분간 한 번만 유효합니다. 수동/JSON 등록도 유지합니다. Host와 Android가 같은 LAN 또는 기존 VPN에 있어야 합니다. Android는 명령을 전송하고 실제 실행은 PC 사용자 권한으로 이루어집니다.
+`flownote-remote-v0.3.0.apk`를 기존 앱 위에 설치하세요. PC에서 `remote-host pair --name "Work PC"`를 실행하고 앱의 QR 아이콘으로 등록할 수 있습니다. 코드는 5분간 한 번만 유효합니다. 수동/JSON 등록도 유지합니다. Host와 Android가 같은 LAN 또는 기존 VPN에 있어야 합니다. Android는 명령을 전송하고 실제 실행은 PC 사용자 권한으로 이루어집니다.
 
 앱은 원격 터미널을 제공합니다. 데스크톱 그래픽 화면·마우스 제어, 인터넷 릴레이와 지속적인 백그라운드 연결은 포함하지 않습니다.
 
