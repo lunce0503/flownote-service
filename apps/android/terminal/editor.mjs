@@ -80,7 +80,8 @@ function receive(message) {
   if (message.type === 'close') { savedStates.delete(message.path); if (message.path === path) path = ''; }
 }
 globalThis.addEventListener('message', event => {
-  if (event.origin !== ORIGIN || typeof event.data !== 'string') return;
+  // Android's destination-scoped native postWebMessage uses an empty source origin.
+  if ((event.origin !== ORIGIN && !(event.origin === '' && globalThis.NativeEditor)) || typeof event.data !== 'string') return;
   try { receive(JSON.parse(event.data)); } catch { /* Ignore malformed bridge messages. */ }
 });
 globalThis.addEventListener('pagehide', () => { view?.destroy(); savedStates.clear(); });

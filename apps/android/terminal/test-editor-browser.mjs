@@ -39,6 +39,9 @@ try {
   await deliver({ type: 'undo', epoch: 1 }); assert.equal(await snapshot(), content, 'tab switch must preserve undo history');
   await deliver({ type: 'load', epoch: 1, path: 'src/main.ts', content: 'injected' }, 'https://foreign.invalid');
   assert.equal(await snapshot(), content);
+  await deliver({ type: 'load', epoch: 1, path: 'native.txt', content: 'native-message' }, '');
+  assert.equal(await snapshot(), 'native-message', 'Android native messages may have an empty source origin');
+  await deliver({ type: 'load', epoch: 1, path: 'src/main.ts', content });
   await deliver({ type: 'search', epoch: 1 });
   await page.locator('input[name=search]').fill('value');
   await page.locator('input[name=replace]').fill('result');
@@ -51,6 +54,7 @@ try {
   assert.equal(await page.evaluate(() => messages.filter(m => m.id === 'new-host').at(-1).content), content, 'new PC must not inherit undo state');
   await deliver({ type: 'load', epoch: 1, path: 'safe.html', content: '<script>globalThis.executed=true</script>\n' });
   assert.equal(await page.evaluate(() => globalThis.executed), undefined, 'source code must never execute');
+  await deliver({ type: 'load', epoch: 1, path: 'src/project.ts', content: 'interface Task {\n  id: number;\n  title: string;\n  completed: boolean;\n}\n\n// 모바일에서 편집 중인 프로젝트\nexport function pending(tasks: Task[]) {\n  return tasks\n    .filter(task => !task.completed)\n    .map(task => ({\n      ...task,\n      title: task.title.trim(),\n    }));\n}\n\nconst tasks: Task[] = [];\nconsole.log(pending(tasks));\n' });
   await mkdir(new URL('../build/editor-screenshots/', import.meta.url), { recursive: true });
   for (const [width, height] of [[390,844],[844,390],[800,1280],[1280,800]]) {
     await page.setViewportSize({ width, height });

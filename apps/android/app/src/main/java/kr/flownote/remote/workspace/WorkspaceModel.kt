@@ -113,6 +113,7 @@ class WorkspaceModel(private val scope: CoroutineScope, private val failure: (St
     fun editorReleased() { renderer = null; ready = false }
     fun onBridge(message: JSONObject) {
         val type = message.optString("type")
+        if (type == "failed") { ready = false; failure("코드 편집기를 불러오지 못했습니다. 앱과 Android System WebView를 업데이트하세요."); return }
         if (type == "ready") { ready = true; render(); return }
         if (message.optInt("epoch", -1) != epoch) return
         val path = message.optString("path")

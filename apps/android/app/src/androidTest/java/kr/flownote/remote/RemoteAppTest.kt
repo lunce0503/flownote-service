@@ -214,6 +214,13 @@ class RemoteAppTest {
         runBlocking { assertEquals(draft, api.call("read", JSONObject().put("path", "src/hello.ts")).getString("content")) }
         screenshot("ide-phone")
         val device = UiDevice.getInstance(instrumentation)
+        try {
+            device.executeShellCommand("wm size 2400x3200")
+            ui.waitUntil(10_000) { ui.activity.resources.configuration.screenWidthDp >= 720 }
+            ui.onNodeWithTag("file-browser").assertIsDisplayed()
+            ui.onNodeWithTag("code-editor").assertIsDisplayed()
+            screenshot("ide-tablet")
+        } finally { device.executeShellCommand("wm size reset") }
         device.setOrientationLeft()
         ui.waitUntil(10_000) { evaluate("innerWidth > innerHeight && innerHeight >= 80", true) == "true" }
         screenshot("ide-landscape")
