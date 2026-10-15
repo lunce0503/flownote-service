@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 node apps/android/scripts/prepare-pairing-fixture.mjs
-adb emu virtualscene-image wall "$RUNNER_TEMP/remote-pairing-qr.png"
+adb emu virtualscene-image wall "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/remote-pairing-qr.png"
 cd "$(dirname "$0")/.."
 ./gradlew connectedDebugAndroidTest --stacktrace
 adb shell am force-stop kr.flownote.remote

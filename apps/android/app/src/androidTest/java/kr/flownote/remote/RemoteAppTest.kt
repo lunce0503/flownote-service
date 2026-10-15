@@ -234,6 +234,14 @@ class RemoteAppTest {
         ui.onNodeWithText("삭제", useUnmergedTree = true).performClick()
         assertEquals(listOf(first.id), store.catalog().hosts.map { it.id })
         assertEquals(first.profile.token, store.catalog().hosts.single().profile.token)
+        val bitmap = android.graphics.BitmapFactory.decodeStream(instrumentation.context.assets.open("pairing.png"))
+        val pixels = IntArray(bitmap.width * bitmap.height)
+        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        val decoded = com.google.zxing.qrcode.QRCodeReader().decode(com.google.zxing.BinaryBitmap(
+            com.google.zxing.common.HybridBinarizer(com.google.zxing.RGBLuminanceSource(bitmap.width, bitmap.height, pixels)))).text
+        bitmap.recycle()
+        val invitation = PairingInvitation.parse(decoded)
+        assertEquals(second.endpoint, invitation.endpoint)
         ui.onNodeWithContentDescription("QR 등록").performClick()
         try {
             ui.waitUntil(45_000) { ui.onAllNodesWithTag("host-name").fetchSemanticsNodes().isNotEmpty() }
@@ -252,12 +260,15 @@ class RemoteAppTest {
         assertNotEquals(second.token, qr.profile.token)
         val raw = File(instrumentation.targetContext.applicationInfo.dataDir, "shared_prefs/remote-host-private.xml").readText()
         assertFalse(raw.contains(qr.profile.token))
-        val invitation = PairingInvitation.parse(instrumentation.context.assets.open("pairing.json").bufferedReader().readText())
         runBlocking {
             try { PairingClient().redeem(invitation, "reused"); fail("QR reused") } catch (_: IllegalArgumentException) {}
         }
         action { it.closeSession() }; phase(Phase.ENDED)
         action { it.editProfile() }
         screenshot("computer-list-qr")
+        ui.onNodeWithContentDescription("CI Linux PC 편집").performClick()
+        ui.onNodeWithTag("host-name").assertTextContains("CI Linux PC")
+        ui.onNodeWithTag("host-token").assertExists()
+        ui.onNodeWithContentDescription("컴퓨터 목록").performClick()
     }
 }

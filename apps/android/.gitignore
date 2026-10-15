@@ -8,5 +8,6 @@ terminal/node_modules/
 app/src/main/assets/terminal/vendor/
 app/src/androidTest/assets/host*.json
 app/src/androidTest/assets/pairing.json
+app/src/androidTest/assets/pairing.png
 screenshots/
 release/

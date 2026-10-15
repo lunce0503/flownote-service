@@ -11,4 +11,5 @@ const invitation = await sendControlRequest(controlSocketPathFor(configDir), { a
 await writeFile(join(assets, 'pairing.json'), JSON.stringify(invitation), { mode: 0o600 });
 const png = await QRCode.toBuffer(JSON.stringify(invitation), { width: 1000, margin: 4, errorCorrectionLevel: 'M' });
 await writeFile(join(process.env.RUNNER_TEMP || tmpdir(), 'remote-pairing-qr.png'), png, { mode: 0o600 });
+await writeFile(join(assets, 'pairing.png'), png, { mode: 0o600 });
 console.log('One-time pairing fixture ready; payload is not logged.');

@@ -78,7 +78,7 @@ private fun ColumnScope.TerminalScreen(model: RemoteViewModel, compact: Boolean)
             overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 8.dp, vertical = 4.dp).testTag("connection-status"))
     } else Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
-        Tool(Icons.AutoMirrored.Filled.ArrowBack, "PC 설정") { editDialog = true }
+        Tool(Icons.AutoMirrored.Filled.ArrowBack, "컴퓨터 목록") { editDialog = true }
         Column(Modifier.weight(1f)) {
             Text(model.profile?.name ?: "터미널", maxLines = 1, style = MaterialTheme.typography.titleMedium)
             Text(model.state.detail, style = MaterialTheme.typography.labelSmall,
@@ -133,7 +133,7 @@ private fun ColumnScope.TerminalScreen(model: RemoteViewModel, compact: Boolean)
         Tool(Icons.Default.Keyboard, "키보드", connected) { model.command("focus") }
         Tool(Icons.Default.LinkOff, "연결 해제") { model.disconnect() }
         if (compact) {
-            Tool(Icons.AutoMirrored.Filled.ArrowBack, "PC 설정") { editDialog = true }
+            Tool(Icons.AutoMirrored.Filled.ArrowBack, "컴퓨터 목록") { editDialog = true }
             Tool(Icons.Default.Settings, "터미널 설정") { settings = !settings }
             Tool(Icons.Default.Close, "세션 종료", connected || model.state.phase == Phase.RECOVERY) { closeDialog = true }
         }
@@ -144,7 +144,7 @@ private fun ColumnScope.TerminalScreen(model: RemoteViewModel, compact: Boolean)
         confirmButton = { TextButton(onClick = { settings = false }) { Text("닫기") } })
     if (closeDialog) Confirm("세션 종료", "PC의 현재 터미널을 종료합니다.", "종료", { closeDialog = false }) { model.closeSession(); closeDialog = false }
     if (newDialog) Confirm("새 세션", "기존 터미널을 종료하고 새 터미널을 엽니다.", "시작", { newDialog = false }) { model.newSession(); newDialog = false }
-    if (editDialog) Confirm("PC 설정으로 이동", "연결을 해제합니다. 돌아오면 새 터미널을 선택해야 합니다.", "이동", { editDialog = false }) { model.editProfile(); editDialog = false }
+    if (editDialog) Confirm("컴퓨터 목록으로 이동", "연결을 해제합니다. 돌아오면 새 터미널을 선택해야 합니다.", "이동", { editDialog = false }) { model.editProfile(); editDialog = false }
     pasteText?.let { content -> AlertDialog(onDismissRequest = { pasteText = null }, title = { Text("붙여넣기 확인") },
         text = { Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
             if (content.contains('\n') || content.contains('\r')) Text("여러 줄 입력은 명령을 즉시 실행할 수 있습니다.", color = MaterialTheme.colorScheme.secondary)

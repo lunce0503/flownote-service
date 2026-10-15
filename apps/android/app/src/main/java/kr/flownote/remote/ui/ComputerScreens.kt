@@ -36,10 +36,12 @@ import org.json.JSONObject
 @Composable
 fun ComputerHome(model: RemoteViewModel) {
     var invitation by remember { mutableStateOf<PairingInvitation?>(null) }
+    var invitationVersion by remember { mutableStateOf(-1) }
+    LaunchedEffect(model.editorOpen) { if (!model.editorOpen) invitation = null }
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
         if (result.contents != null) {
             runCatching { PairingInvitation.parse(result.contents) }.onSuccess {
-                model.addComputer(); invitation = it
+                model.addComputer(); invitation = it; invitationVersion = model.editorVersion
             }.onFailure { model.error = "등록 QR이 잘못되었거나 만료되었습니다. PC에서 새 QR을 생성하세요." }
         } else if (result.originalIntent?.getBooleanExtra(Intents.Scan.MISSING_CAMERA_PERMISSION, false) == true) {
             model.error = "카메라 권한이 필요합니다. 앱 설정에서 카메라 권한을 허용하세요."
@@ -48,7 +50,7 @@ fun ComputerHome(model: RemoteViewModel) {
     fun scan() { scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setCaptureActivity(QrCaptureActivity::class.java)
         .setPrompt("").setBeepEnabled(false).setBarcodeImageEnabled(false).setOrientationLocked(false)) }
     if (model.editorOpen) key(model.editorVersion) {
-        ComputerEditor(model, invitation, ::scan) { invitation = null; model.showComputers() }
+        ComputerEditor(model, invitation.takeIf { invitationVersion == model.editorVersion }, ::scan) { invitation = null; model.showComputers() }
     } else ComputerList(model, { invitation = null; model.addComputer() }, ::scan)
 }
 
