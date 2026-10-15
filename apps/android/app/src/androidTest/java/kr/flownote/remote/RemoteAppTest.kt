@@ -26,6 +26,8 @@ import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.rules.TestWatcher
+import org.junit.runner.Description
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -35,6 +37,9 @@ import java.util.concurrent.atomic.AtomicReference
 class RemoteAppTest {
     @get:Rule val ui = createAndroidComposeRule<MainActivity>()
     @get:Rule val camera: GrantPermissionRule = GrantPermissionRule.grant(android.Manifest.permission.CAMERA)
+    @get:Rule(order = 10) val failureEvidence = object : TestWatcher() {
+        override fun failed(error: Throwable, description: Description) { runCatching { screenshot("acceptance-failure") } }
+    }
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val profile get() = HostProfile.fromJson(JSONObject(instrumentation.context.assets.open("host.json").bufferedReader().readText()))
 
@@ -200,6 +205,7 @@ class RemoteAppTest {
         ui.onNodeWithTag("host-fingerprint").performTextInput(second.fingerprint)
         ui.onNodeWithTag("trust-confirm").performScrollTo().performClick()
         ui.onNodeWithTag("save-computer").performScrollTo().performClick()
+        ui.waitUntil(5_000) { store.catalog().hosts.size == 2 }
         val secondId = store.catalog().hosts.single { it.profile.endpoint == second.endpoint }.id
         assertEquals(2, ProfileStore(instrumentation.targetContext).catalog().hosts.size)
         ui.onNodeWithTag("computer-${first.id}").assertIsDisplayed()
@@ -228,10 +234,13 @@ class RemoteAppTest {
         action { it.editProfile() }
         ui.onNodeWithContentDescription("Second PC 편집").performClick()
         ui.onNodeWithTag("host-name").performTextReplacement("Second renamed")
-        ui.onNodeWithTag("save-computer").performScrollTo().performClick()
+        ui.onNodeWithTag("host-name").assertTextContains("Second renamed")
+        ui.onNodeWithTag("save-computer").performScrollTo().assertIsEnabled().performClick()
+        ui.waitUntil(5_000) { store.catalog().hosts.single { it.id == secondId }.profile.name == "Second renamed" }
         assertEquals("Second renamed", store.catalog().hosts.single { it.id == secondId }.profile.name)
         ui.onNodeWithContentDescription("Second renamed 삭제").performClick()
         ui.onNodeWithText("삭제", useUnmergedTree = true).performClick()
+        ui.waitUntil(5_000) { store.catalog().hosts.size == 1 }
         assertEquals(listOf(first.id), store.catalog().hosts.map { it.id })
         assertEquals(first.profile.token, store.catalog().hosts.single().profile.token)
         val bitmap = android.graphics.BitmapFactory.decodeStream(instrumentation.context.assets.open("pairing.png"))
@@ -242,11 +251,13 @@ class RemoteAppTest {
         bitmap.recycle()
         val invitation = PairingInvitation.parse(decoded)
         assertEquals(second.endpoint, invitation.endpoint)
+        println("REMOTE_ACCEPTANCE: MULTI_PC_OK")
         ui.onNodeWithContentDescription("QR 등록").performClick()
         try {
             ui.waitUntil(45_000) { ui.onAllNodesWithTag("host-name").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
         } catch (failure: Throwable) { screenshot("qr-camera-failure"); throw failure }
         ui.onNodeWithTag("host-name").assertTextContains("QR PC")
+        println("REMOTE_ACCEPTANCE: QR_CAMERA_OK")
         ui.onNodeWithTag("trust-confirm").assertIsOff()
         assertEquals(1, store.catalog().hosts.size)
         screenshot("qr-confirmation")
@@ -258,6 +269,7 @@ class RemoteAppTest {
         val qr = store.catalog().hosts.single { it.profile.name == "QR PC" }
         assertEquals(second.endpoint, qr.profile.endpoint)
         assertNotEquals(second.token, qr.profile.token)
+        println("REMOTE_ACCEPTANCE: QR_PAIR_OK")
         val raw = File(instrumentation.targetContext.applicationInfo.dataDir, "shared_prefs/remote-host-private.xml").readText()
         assertFalse(raw.contains(qr.profile.token))
         runBlocking {
