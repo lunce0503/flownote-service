@@ -8,6 +8,7 @@ camera_guide_pid=$!
 trap 'kill "$camera_guide_pid" 2>/dev/null || true' EXIT
 cd "$(dirname "$0")/.."
 ./gradlew connectedDebugAndroidTest --stacktrace
+kill -USR1 "$camera_guide_pid" 2>/dev/null || true
 wait "$camera_guide_pid"
 adb shell am force-stop kr.flownote.remote
 adb shell am start -W -n kr.flownote.remote/.MainActivity
