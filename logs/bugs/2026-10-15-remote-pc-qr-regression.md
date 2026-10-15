@@ -9,4 +9,6 @@
 
 ## 검증 경계
 
+- CI `38660383695`: 목록·PC 전환·편집·삭제 및 기존 터미널 흐름 이후 scanner Activity로 진입했다. 이때 Compose root가 없는 정상 전환 구간에서 테스트의 `fetchSemanticsNodes()`가 즉시 예외를 던졌다. `atLeastOneRootRequired=false`로 돌아올 Compose 화면을 기다리며 실제 QR 결과 확인은 유지한다. 카메라 인식 실패를 성공으로 처리하지 않는다.
+
 Host의 만료/재사용/교체 코드 거부 및 TLS 등록 시험과 Android의 카메라·저장·전환 시험을 분리한다. QR 문자열만 해석하는 시험으로 카메라 경로가 통과했다고 표시하지 않는다. 새 카메라 시험은 에뮬레이터 virtual scene에 발급 QR PNG를 넣고 실제 scanner Activity의 결과로 이어진다. 발급 QR/토큰은 테스트 로그에 출력하지 않는다.

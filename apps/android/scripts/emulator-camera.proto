@@ -1,0 +1,15 @@
+// Test-only subset of Android Emulator's public controller protocol:
+// https://android.googlesource.com/platform/tools/base/+/studio-main/emulator/proto/emulator_controller.proto
+syntax = "proto3";
+package android.emulation.control;
+message Empty {}
+message ParameterValue { repeated float data = 1 [packed = true]; }
+message PhysicalModelValue {
+  enum PhysicalType { POSITION = 0; ROTATION = 1; }
+  PhysicalType target = 1;
+  int32 status = 2;
+  ParameterValue value = 3;
+}
+service EmulatorController {
+  rpc setPhysicalModel(PhysicalModelValue) returns (Empty) {}
+}

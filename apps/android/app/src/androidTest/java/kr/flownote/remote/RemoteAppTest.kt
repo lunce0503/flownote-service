@@ -244,7 +244,7 @@ class RemoteAppTest {
         assertEquals(second.endpoint, invitation.endpoint)
         ui.onNodeWithContentDescription("QR 등록").performClick()
         try {
-            ui.waitUntil(45_000) { ui.onAllNodesWithTag("host-name").fetchSemanticsNodes().isNotEmpty() }
+            ui.waitUntil(45_000) { ui.onAllNodesWithTag("host-name").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
         } catch (failure: Throwable) { screenshot("qr-camera-failure"); throw failure }
         ui.onNodeWithTag("host-name").assertTextContains("QR PC")
         ui.onNodeWithTag("trust-confirm").assertIsOff()

@@ -2,6 +2,8 @@
 set -euo pipefail
 node apps/android/scripts/prepare-pairing-fixture.mjs
 adb emu virtualscene-image wall "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/remote-pairing-qr.png"
+adb emu virtualscene-image table "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/remote-pairing-qr.png"
+node apps/android/scripts/aim-virtual-camera.mjs
 cd "$(dirname "$0")/.."
 ./gradlew connectedDebugAndroidTest --stacktrace
 adb shell am force-stop kr.flownote.remote
