@@ -4,6 +4,8 @@
 
 ## 기존 사양
 
+- [Windows 설치 앱](windows-app.md): 웹 기능 공유, 아이보리·검정 앱 UI, Windows 설치형/portable 배포와 실행 검증.
+
 - [Android 설치 앱](android-app.md): 웹 전체 기능 공유, 아이보리·검정 앱 UI, 헤더 제거, APK 설치·배포.
 
 - `mobile-was-architecture.md`: Expo 네이티브 앱과 Railway 웹 테스트 클라이언트의 gateway 통신, 캔버스 저장, 실행 방식.

@@ -16,6 +16,8 @@
 
 ## 배포 순서
 
+Windows 앱은 `flownote-desktop/`와 `.github/workflows/windows-app.yml`이 소유한다. Windows runner에서 NSIS 설치 및 portable 실행을 staging에서 검증하고 `windows-v*` 태그의 검증된 artifact를 GitHub Release로 공개한다. 웹 앱 외관과 `/windows.html` 안내는 `release web`으로 배포한다. 최초 릴리즈는 Windows 게시자 인증서 없이 배포하며 SHA-256을 제공한다.
+
 Android 설치 APK는 `flownote-android/`에서 서명 빌드하고 `flownote/public/downloads/`에 배치한 뒤 `release web`의 staging 검증과 production 배포로 전달한다. `/android.html`이 설치 안내다. Debug는 staging, release는 production HTTPS 웹에 연결하며 빌드·키 관리 기준은 `flownote-android/README.md`를 따른다.
 
 Node.js 24 이상, 인증된 Railway/Vercel CLI, 프로젝트 의존성이 필요하다.

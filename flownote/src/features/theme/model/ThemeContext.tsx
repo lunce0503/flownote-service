@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ThemeContext, type ThemeMode } from "./themeContext";
-import { isAndroidApp } from '@/shared/lib/androidApp';
+import { isInstalledApp } from '@/shared/lib/androidApp';
 
 const THEME_STORAGE_KEY = "flownote_theme";
 const readInitialTheme = (): ThemeMode => {
-  if (isAndroidApp) return 'light';
+  if (isInstalledApp) return 'light';
   if (typeof window === "undefined") return "dark";
   const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
   return storedTheme === "light" || storedTheme === "dark" ? storedTheme : "dark";
@@ -14,7 +14,7 @@ const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [theme, setThemeState] = useState<ThemeMode>(readInitialTheme);
 
   const setTheme = (nextTheme: ThemeMode) => {
-    if (isAndroidApp) return;
+    if (isInstalledApp) return;
     setThemeState(nextTheme);
     window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
   };

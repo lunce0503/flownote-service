@@ -1,0 +1,100 @@
+import { _electron as electron } from 'playwright';
+import { strict as assert } from 'node:assert';
+import { randomUUID } from 'node:crypto';
+import { readFile, mkdir } from 'node:fs/promises';
+import path from 'node:path';
+
+const executablePath = process.argv[2];
+if (!executablePath) throw new Error('Usage: npm run smoke -- <installed-or-portable-Flownote.exe>');
+const api = 'https://flownote-api-staging.up.railway.app';
+const email = `windows-${randomUUID()}@example.com`, password = randomUUID();
+async function request(route, method, body, token) {
+  const response = await fetch(`${api}${route}`, { method,
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(30000) });
+  assert(response.ok, `${method} ${route}: ${response.status}`);
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+}
+await request('/api/users', 'POST', { email, password, username: `windows-${randomUUID().slice(0, 8)}`, nickname: 'Windows verification' });
+const application = await electron.launch({ executablePath, args: ['--staging'], timeout: 60000 });
+let canvasId, token;
+try {
+  const page = await application.firstWindow();
+  page.setDefaultTimeout(30000);
+  await page.waitForURL('https://flownote-react-staging.vercel.app/**');
+  // The installer and portable smoke share a dedicated staging profile; reset only this test session.
+  await page.evaluate(() => {
+    localStorage.removeItem('flownote_auth_token'); localStorage.removeItem('flownote_auth_user');
+  });
+  await page.goto('https://flownote-react-staging.vercel.app/');
+  await page.waitForURL('**/login');
+  await page.getByLabel('이메일').fill(email);
+  await page.getByLabel('비밀번호', { exact: true }).fill(password);
+  await page.getByRole('button', { name: '계속하기', exact: true }).click();
+  await page.getByRole('heading', { name: '작업을 선택하세요' }).waitFor();
+  assert.equal(await page.locator('header').count(), 0);
+  assert.equal(await page.locator('html').getAttribute('data-desktop-app'), 'true');
+  assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');
+  assert.equal(await page.evaluate(() => typeof window.require), 'undefined');
+  assert.equal(await page.evaluate(() => typeof window.process), 'undefined');
+  const preferences = await application.evaluate(({ BrowserWindow }) => {
+    const preferences = BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();
+    return { sandbox: preferences.sandbox, contextIsolation: preferences.contextIsolation, nodeIntegration: preferences.nodeIntegration };
+  });
+  assert.deepEqual(preferences, { sandbox: true, contextIsolation: true, nodeIntegration: false });
+  const nav = page.getByRole('navigation', { name: '앱 기능' });
+  const box = await nav.boundingBox();
+  assert(box.width <= 100 && box.height > 600, 'Desktop navigation must be a vertical rail.');
+  await page.reload();
+  await page.getByRole('heading', { name: '작업을 선택하세요' }).waitFor();
+  await page.getByRole('button', { name: '전체 기능', exact: true }).click();
+  const menu = page.getByRole('dialog', { name: '전체 기능' });
+  for (const href of ['/blog', '/canvas', '/planner', '/social', '/agent', '/settings']) assert.equal(await menu.locator(`a[href="${href}"]`).count(), 1);
+  await page.keyboard.press('Escape');
+  await menu.waitFor({ state: 'hidden' });
+  token = await page.evaluate(() => localStorage.getItem('flownote_auth_token'));
+  const canvas = await request('/api/canvas/documents', 'POST', { title: 'Windows installed app verification' }, token);
+  canvasId = canvas.id;
+  await page.goto(`https://flownote-react-staging.vercel.app/canvas/${canvasId}`);
+  await page.waitForFunction(() => document.querySelector('[data-testid="canvas-input-surface"]')?.getAttribute('data-ready') === 'true');
+  const surface = page.getByTestId('canvas-input-surface');
+  const rect = await surface.boundingBox();
+  await page.mouse.move(rect.x + 250, rect.y + 220);
+  await page.mouse.down();
+  await page.mouse.move(rect.x + 400, rect.y + 280, { steps: 12 });
+  await page.mouse.up();
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const loaded = await request(`/api/canvas/load?canvasId=${canvasId}`, 'GET', null, token);
+    if (loaded.lines?.length > 0) break;
+    assert(attempt < 29, 'Drawing did not reach cloud staging.');
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  await page.reload();
+  await page.waitForFunction(() => Number(document.querySelector('[data-testid="canvas-render-surface"]')?.getAttribute('data-visible-line-count')) > 0);
+
+  const directory = path.resolve('test-output');
+  await mkdir(directory, { recursive: true });
+  const downloadPath = path.join(directory, 'windows-smoke.ics');
+  await application.evaluate(({ session }, savePath) => {
+    session.defaultSession.once('will-download', (_event, item) => item.setSavePath(savePath));
+  }, downloadPath);
+  await page.evaluate(() => {
+    const anchor = document.createElement('a');
+    anchor.href = URL.createObjectURL(new Blob(['BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n'], { type: 'text/calendar' }));
+    anchor.download = 'windows-smoke.ics'; document.body.append(anchor); anchor.click(); anchor.remove();
+  });
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const file = await readFile(downloadPath, 'utf8').catch(() => '');
+    if (file.includes('BEGIN:VCALENDAR')) break;
+    assert(attempt < 29, 'Native download did not save the calendar file.');
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  await page.goto('https://flownote-react-staging.vercel.app/');
+  await page.getByRole('heading', { name: '작업을 선택하세요' }).waitFor();
+  await page.screenshot({ path: path.join(directory, 'windows-home.png') });
+  console.log('PASS Windows packaged app: sandbox, login, session restore, navigation, canvas cloud save/reload and native download.');
+} finally {
+  if (canvasId && token) await request(`/api/canvas/documents/${canvasId}`, 'DELETE', null, token);
+  await application.close();
+}

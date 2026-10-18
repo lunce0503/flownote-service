@@ -25,6 +25,8 @@
 
 ## 모바일
 
+Windows 앱도 `FlownoteDesktop/<version>` UA로 같은 설치 앱 UI를 사용한다. 넓은 창의 왼쪽 탐색 및 1000px 미만의 하단 탐색, 아이보리·검정 테마, 웹 헤더 제거 기준은 `docs/product-specs/windows-app.md`를 따른다. 설치 앱 공통 판별은 기존 `androidApp.ts`의 `isInstalledApp`이 소유한다.
+
 - Android 설치 APK(`flownote-android/`)는 시스템 WebView로 웹 제품을 실행한다. UA marker가 있는 경우 기존 헤더를 제거하고 아이보리·검정 UI와 하단 탐색을 적용한다. 세부 기준은 `docs/product-specs/android-app.md`를 따른다. 아래 React Native 기준은 Expo 클라이언트에 적용한다.
 
 - 모바일 앱은 `EXPO_PUBLIC_WAS_URL`의 FastAPI 게이트웨이를 호출하고 React Native 화면을 직접 렌더링한다.

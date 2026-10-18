@@ -1,5 +1,5 @@
 /* App-only palette: artwork, status colours, and imported content keep their colours. */
-html[data-android-app="true"] {
+html[data-installed-app="true"] {
   color-scheme: light;
   --color-amber-50: #f7f3e8;
   --color-amber-100: #eee7d7;
@@ -13,10 +13,10 @@ html[data-android-app="true"] {
   --color-stone-200: #ded9cc;
   background: #f7f3e8;
 }
-html[data-android-app="true"] body { background: #f7f3e8; color: #171714; }
-html[data-android-app="true"] h1 { font-size: clamp(1.6rem, 5vw, 2rem); line-height: 1.25; letter-spacing: -.03em; word-break: keep-all; }
-html[data-android-app="true"][data-app-navigation="visible"] .App { padding-bottom: 76px; }
-html[data-android-app="true"] :focus-visible { outline: 2px solid #171714; outline-offset: 3px; }
+html[data-installed-app="true"] body { background: #f7f3e8; color: #171714; }
+html[data-installed-app="true"] h1 { font-size: clamp(1.6rem, 5vw, 2rem); line-height: 1.25; letter-spacing: -.03em; word-break: keep-all; }
+html[data-installed-app="true"][data-app-navigation="visible"] .App { padding-bottom: 76px; }
+html[data-installed-app="true"] :focus-visible { outline: 2px solid #171714; outline-offset: 3px; }
 .android-navigation { position: fixed; inset: auto 0 0; z-index: 900; display: grid; grid-template-columns: repeat(5, 1fr); height: 70px; padding: 4px 8px; background: #f7f3e8; border-top: 1px solid #ded9cc; }
 .android-navigation a, .android-navigation button { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px; min-width: 44px; min-height: 48px; border-radius: 14px; color: #706b60; font-size: 11px; text-decoration: none; }
 .android-navigation [aria-current="page"] { color: #f7f3e8; background: #171714; }
@@ -31,3 +31,10 @@ html[data-android-app="true"] :focus-visible { outline: 2px solid #171714; outli
 .android-logout { width: 100%; margin-top: 20px; min-height: 48px; border-radius: 12px; background: #171714; color: #f7f3e8; }
 .android-editor-library { position: fixed; top: 8px; right: 8px; z-index: 800; display: grid; place-items: center; width: 44px; height: 44px; background: #171714; color: #f7f3e8; border-radius: 12px; }
 @media (min-width: 720px) { .android-menu { max-width: 640px; margin-inline: auto; } .android-menu-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1000px) {
+  html[data-desktop-app="true"][data-app-navigation="visible"] .App { padding-bottom: 0; padding-left: 96px; }
+  html[data-desktop-app="true"] .android-navigation { inset: 0 auto 0 0; width: 88px; height: auto; display: flex; flex-direction: column; gap: 10px; padding: 18px 8px; border-top: 0; border-right: 1px solid #ded9cc; }
+  html[data-desktop-app="true"] .android-navigation a, html[data-desktop-app="true"] .android-navigation button { flex-shrink: 0; min-height: 64px; }
+  html[data-desktop-app="true"] .android-menu-backdrop { align-items: center; }
+  html[data-desktop-app="true"] .android-menu { border-radius: 24px; }
+}

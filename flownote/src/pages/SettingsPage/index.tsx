@@ -16,7 +16,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { useTheme, type ThemeMode } from "@/features/theme";
-import { isAndroidApp } from '@/shared/lib/androidApp';
+import { isInstalledApp } from '@/shared/lib/androidApp';
 import { useAuth } from "@/features/auth";
 import { postFeedback, listMyFeedback, FEEDBACK_CATEGORIES, type FeedbackItem } from "@/entities/feedback";
 
@@ -241,7 +241,7 @@ const SettingsPage = () => {
                 <Settings size={20} className="text-emerald-700" />
                 <h2 className="text-lg font-black text-stone-950">화면 모드</h2>
               </div>
-              {isAndroidApp ? <p className="text-sm text-stone-600">아이보리와 검정 색상의 앱 테마를 사용합니다.</p> : <div className="grid gap-2 sm:grid-cols-2">
+              {isInstalledApp ? <p className="text-sm text-stone-600">아이보리와 검정 색상의 앱 테마를 사용합니다.</p> : <div className="grid gap-2 sm:grid-cols-2">
                 <OptionButton active={theme === "light"} onClick={() => setTheme("light" as ThemeMode)}>
                   <Sun size={18} />
                   라이트 모드
