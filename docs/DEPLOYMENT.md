@@ -1,125 +1,70 @@
-# 배포 운영 기준
+# 클라우드 배포 운영 기준
 
-## 목적
+## 환경
 
-이 문서는 Flownote의 검증, production 배포, 헬스체크와 롤백 절차의 기준이다. 동적으로 바뀌는 deployment id와 장애 조사 결과는 `logs/report/`에 남기고, 이 문서에는 반복 가능한 절차만 유지한다.
+2026-09-09부터 PC 내부망, loopback API, Compose 통합 실행을 폐기한다. 클라이언트는 공개 HTTPS gateway만 호출한다. Railway 안의 서비스·DB·Redis 간 private DNS 통신은 외부 공개하지 않고 유지한다.
 
-## 배포 대상
+| 구분 | 스테이징 | 프로덕션 |
+| --- | --- | --- |
+| 웹 | https://flownote-react-staging.vercel.app | https://flownote-react.vercel.app |
+| Gateway | https://flownote-api-staging.up.railway.app | https://flownote-api-production.up.railway.app |
+| 모바일 웹 | https://flownote-mobile-staging.up.railway.app | https://flownote-mobile-production-production.up.railway.app |
+| Railway environment | staging | production |
+| Vercel project | flownote-react-staging | flownote-react |
 
-| target | 소스 | cloud 대상 | 사전 검증 | healthcheck |
-| --- | --- | --- | --- | --- |
-| `web` | `flownote/` | Vercel `flownote-react` | `yarn verify`, `yarn e2e` | `/` |
-| `api` | `flownote-API/` | Railway `flownote-api` | `uv run pytest -q` | `/` |
-| `main` | `flownote-server/` | Railway `flownote-main` | `./gradlew test` | `/actuator/health` |
-| `canvas` | `flownote-canvas/` | Railway `flownote-canvas` | `go test ./...` | `/` |
-| `serve` | `flownote-serve/` | Railway `flownote-serve` | `go test ./...` | `/` |
-| `ai` | `flownote-ai/` | Railway `flownote-ai` | `uv run pytest -q` | `/`, `/api/capabilities` |
-| `mobile` | `flownote-mobile/` | Railway `flownote-mobile-production` 웹 테스트 | `yarn verify` | `/health` |
-| `mobile-expo-go` | `flownote-mobile/` | Railway `flownote-expo-go` Metro | `npm run verify` | `/` Expo manifest |
+정확한 project/environment ID는 `scripts/cloud-environments.json`이 소유한다. 별도 Vercel 프로젝트이므로 스테이징 프로젝트에서도 `--prod`는 스테이징 도메인에만 배포한다. 두 환경의 PostgreSQL·Redis는 환경 단위로 격리하며 객체 저장소 bucket도 분리한다. 데이터 복제나 초기화는 이 배포 절차에 포함하지 않는다.
 
-웹과 모바일의 공개 API 기준 URL은 `https://flownote-api-production.up.railway.app`이다. Railway의 Spring·Go·AI 서비스 URL은 클라이언트에 노출하지 않는다.
+## 배포 순서
 
-Expo Go용 `flownote-expo-go`는 `Dockerfile.expo-go`를 사용하고 `EXPO_PUBLIC_WAS_URL`을 공개 gateway로 설정한다. `RAILWAY_PUBLIC_DOMAIN`은 Railway가 주입하며 시작 스크립트가 이를 `EXPO_PACKAGER_PROXY_URL=https://<domain>`으로 변환한다. Safari용 `flownote-mobile-production` 정적 서비스와 배포·롤백을 분리한다.
+Android 설치 APK는 `flownote-android/`에서 서명 빌드하고 `flownote/public/downloads/`에 배치한 뒤 `release web`의 staging 검증과 production 배포로 전달한다. `/android.html`이 설치 안내다. Debug는 staging, release는 production HTTPS 웹에 연결하며 빌드·키 관리 기준은 `flownote-android/README.md`를 따른다.
 
-## 로컬 검증
-
-의존성을 설치한 뒤 대상별 표준 스크립트를 실행한다.
+Node.js 24 이상, 인증된 Railway/Vercel CLI, 프로젝트 의존성이 필요하다.
 
 ```bash
-./scripts/verify-services.sh web
-./scripts/verify-services.sh api
-./scripts/verify-services.sh all
+scripts/verify-services.sh all
+node scripts/deploy-cloud.mjs release all
 ```
 
-`all`은 웹, gateway, Spring, 두 Go 서비스, AI, 모바일을 검증하고 마지막에 Compose 구문을 확인한다. 전체 작업 종료 전 통합 런타임은 별도로 실행한다.
+대상은 `all|feedback|main|canvas|serve|ai|api|mobile|expo|web`이다. `feedback`은 프로필·캔버스 피드백 반영에 필요한 main과 web을 함께 스테이징 검증한 뒤 같은 소스로 배포한다. `all`은 production에서 가동 중인 main, canvas, serve, api, web만 배포한다. production에서 중지된 AI, 모바일 정적 웹, Expo Go는 staging에서도 기본적으로 중지하며 필요할 때만 명시적인 단일 대상을 배포한다. 기존 `scripts/deploy-production.sh <target>`도 같은 staging-first release를 실행한다.
+
+피드백 신뢰 컨트롤러는 `feedback-auto` 대상과 고정 정책이 계산한 `FLOWNOTE_RELEASE_TARGETS`를 사용한다. `FLOWNOTE_RELEASE_SOURCE_ROOT`의 격리 snapshot을 배포하되 cloud profile·설정·배포 스크립트는 관리 저장소의 신뢰된 파일을 사용한다. `FLOWNOTE_RELEASE_GUARD_ROOT/FINGERPRINT`는 staging 검증 중 원래 개발 소스가 바뀌었을 때 production을 차단한다. 모델 자체에는 이 배포 환경이나 credential을 전달하지 않는다. 일반 수동 release의 기본 root와 순서는 바뀌지 않는다.
+
+1. 정적 분석·빌드·인메모리 단위 테스트를 실행한다. 로컬 앱/DB 네트워크는 실행하지 않는다.
+2. 모든 배포에서 `configure-cloud.mjs`로 해당 환경의 공개·서비스 URL, Spring 메모리/연결 풀, 환경별 Serverless 정책을 설정한다. 비밀값과 DB/스토리지 설정은 덮어쓰지 않는다.
+3. Railway에 Dockerfile 소스를 배포하고 반환된 정확한 deployment ID의 SUCCESS를 기다린다.
+4. Vercel에는 해당 환경의 gateway URL을 명시한 번들을 배포한다.
+5. 실제 스테이징 웹과 API에서 로그인, 캔버스 저장/재조회, 큰 저장·중복 mutation, 모바일 설정, 반응형 화면을 검증한다.
+6. `.release/staging-<target>.json`에 소스 SHA-256, 배포 ID, 검증 시각을 기록한다. 이 파일은 인증값을 포함하지 않으며 git에서 제외한다.
+7. 같은 소스의 24시간 이내 통과 기록이 있어야 production을 배포한다. 소스 변경 또는 테스트 실패 시 중단한다.
+
+단계를 나누어 실행할 수도 있다.
 
 ```bash
-docker compose up -d --build
-docker compose ps
+node scripts/deploy-cloud.mjs staging all
+node scripts/deploy-cloud.mjs production all
 ```
 
-## 수동 production 배포
+관측 타임아웃은 배포 실패를 의미하지 않는다. 출력된 ID의 Railway 상태를 먼저 확인하고 진행 중이면 같은 배포를 계속 관찰한다. 다시 업로드해서 중복 배포하지 않는다.
 
-Railway와 Vercel CLI 로그인을 확인한 뒤 영향받는 target만 배포한다.
+## 테스트
 
-```bash
-railway whoami --json
-vercel whoami
+`flownote/yarn e2e`는 공개 staging만 사용하며 로컬 webServer를 띄우지 않는다. CLI에서는 Playwright 공식 컨테이너를 브라우저 실행 도구로 사용할 수 있다. 이것은 앱 서버를 실행하는 Compose가 아니다. 테스트 계정은 staging에만 생성하며, 테스트가 만든 캔버스는 종료 시 삭제한다. 테스트 계정 행은 전용 staging 데이터로 남는다. 인증값이 포함될 수 있어 trace는 수집하지 않는다.
 
-./scripts/deploy-production.sh web
-./scripts/deploy-production.sh serve
-./scripts/deploy-production.sh all
-```
+이전 `flownote/e2e` mock 기반 회귀 시나리오는 이력/이전 테스트 참고용이며 현재 cloud gate가 아니다. 실제 게이트는 `flownote/e2e-cloud`다.
 
-스크립트는 검증을 먼저 실행하고, Railway의 새 deployment가 `SUCCESS` 또는 `SLEEPING`이 될 때까지 기다린다. 이미 같은 검증을 완료한 CI에서만 `SKIP_VERIFY=true`를 사용할 수 있다.
+## 설정과 기능
 
-```bash
-SKIP_VERIFY=true RELEASE_MESSAGE="Deploy planner fixes" \
-  ./scripts/deploy-production.sh api
-```
+- `.env.example`은 공개 staging 기본값만 포함한다. 비밀값은 Railway/Vercel 변수에서 관리한다.
+- 웹·모바일은 LAN/loopback URL을 다른 주소로 치환하지 않고 거부한다. EAS development/preview는 staging, production은 production API를 사용한다.
+- Expo Go는 Railway `flownote-expo-go`의 HTTPS manifest/bundle을 사용한다. PC의 Metro 주소나 LAN QR를 사용하지 않는다. 이 서비스는 `all`에서 제외하고 Serverless를 켜며, 필요할 때 `node scripts/deploy-cloud.mjs staging expo`처럼 환경과 단일 대상을 명시해 배포한다. 사용 후에는 다시 중지한다.
+- Expo Go staging은 `flownote-expo-go-staging` 서비스와 `https://flownote-expo-go-staging-staging.up.railway.app`을 사용한다. 기본 worker는 1개이고 Node old-space는 최초 번들 생성에 필요한 384MiB로 제한한다.
+- staging의 모든 앱 서비스에는 Serverless를 기본 적용한다. production에서 중지된 `flownote-ai`, 모바일 정적 웹, Expo Go는 staging에서도 중지한다. PostgreSQL과 Redis는 데이터 계층이므로 계속 가동한다. production에서 가동 중인 앱 서비스는 콜드 스타트를 피하기 위해 always-on으로 운영한다. `flownote-sub`의 소스 디렉터리와 Go 모듈명은 `flownote-serve`로 유지한다.
+- Vercel Git 직접 자동 배포는 `git.deploymentEnabled: false`로 차단한다. [공식 설정 기준](https://vercel.com/docs/project-configuration/git-configuration)을 따르며 release 스크립트의 CLI 배포만 사용한다.
+- 로컬 Ollama 전용 agent-note는 제거됐다. AI 서비스가 중지돼도 게이트웨이가 capability의 disabled/removed 상태와 기존 기능 경로의 410을 직접 반환한다. Gemini agent 소스는 명시적인 AI 단일 배포를 위해 유지한다.
+- 폐기한 로컬 컨테이너와 Docker 네트워크는 제거했지만 기존 DB·업로드·모델 볼륨은 삭제하지 않는다.
 
-`all`의 순서는 `main -> canvas -> serve -> ai -> api -> mobile -> web`이다. 스키마·내부 서비스를 먼저 준비하고 공개 gateway와 클라이언트를 나중에 교체한다.
+## 운영 확인과 롤백
 
-## GitHub Actions
+Gateway `/`는 200/UP, `/api/users/me` 비인증 요청은 401이어야 한다. `/api/mobile/config`의 API와 웹 주소는 선택한 환경과 일치해야 한다. 웹 `/`, 모바일 `/health`를 확인한다. 운영 DB에는 스모크 테스트 데이터를 쓰지 않는다.
 
-- `.github/workflows/mobile-was.yml`: 모든 하위 프로젝트의 lint, typecheck, build, test gate를 병렬 실행한다. web job은 Chromium Playwright 스모크까지 실행한다.
-- `.github/workflows/deploy-production.yml`: `workflow_dispatch`로 target을 선택하는 production 배포다. GitHub `production` environment에 승인 규칙을 걸 수 있다.
-
-Repository secrets:
-
-- `RAILWAY_TOKEN`
-- `VERCEL_TOKEN`
-
-Repository variables:
-
-- `RAILWAY_PROJECT_ID`
-- `VERCEL_ORG_ID`
-- `VERCEL_PROJECT_ID`
-
-토큰과 실제 환경 변수 값은 문서나 workflow 파일에 직접 기록하지 않는다.
-
-## 환경 변수 기준
-
-- Vite의 `VITE_*`와 Expo의 `EXPO_PUBLIC_*`은 번들에 노출되므로 비밀값을 넣지 않는다.
-- 외부 클라이언트용 API URL은 gateway를 가리킨다.
-- Railway 서비스 간 호출은 private networking URL을 사용한다.
-- 세션·DB·Redis·S3·Gemini 비밀값은 Railway service variables 또는 Vercel environment variables에서 관리한다.
-- 로컬 기본값과 변수 이름은 `.env.example`, 서비스 연결은 `docker-compose.yml`을 기준으로 한다.
-- `AGENT_NOTE_ENABLED=true`는 Ollama가 있는 Compose/내부망에서만 설정한다. Railway AI에서는 설정하지 않아 capability를 비활성으로 유지한다.
-
-## 가용성과 sleep 정책
-
-Railway sleep은 비용을 줄이지만 upstream 초기화 중 첫 gateway 요청이 502가 될 수 있다. Flownote production의 5개 백엔드는 `railway.json`의 `sleepApplication: false`를 사용해 always-on으로 운영한다. 모바일 정적 웹 테스트 서비스만 sleep을 허용한다. 비용 절감을 위해 백엔드 sleep을 다시 켤 경우 다음 조건을 함께 충족해야 한다.
-
-- gateway가 연결 수립 실패를 재시도한다.
-- 클라이언트는 GET의 502·503·504와 네트워크 실패만 제한적으로 재시도한다.
-- POST·PATCH 등 변경 요청은 중복 처리 위험 때문에 자동 재시도하지 않는다.
-- 배포 직후 공개 API를 호출해 upstream 준비 상태까지 확인한다.
-
-## Railway 리전 기준
-
-production의 요청 경로에 있는 `flownote-api`, `flownote-main`, `flownote-canvas`, PostgreSQL, Redis는 `asia-southeast1-eqsg3a`(Singapore)에 함께 둔다. 앱과 데이터 저장소가 다른 리전에 있으면 단순 인증·목록 조회도 DB 왕복마다 수백 ms가 추가되므로, 서비스 생성·복제·복구 후 리전 정합성을 확인한다.
-
-```bash
-railway status --json | jq '[.environments.edges[].node | select(.name=="production") | .serviceInstances.edges[].node | select(.serviceName=="flownote-api" or .serviceName=="flownote-main" or .serviceName=="flownote-canvas" or .serviceName=="Postgres" or .serviceName=="Redis") | {service:.serviceName, region:.latestDeployment.meta.serviceManifest.deploy.multiRegionConfig}]'
-```
-
-## 배포 후 확인
-
-```bash
-curl -fsS https://flownote-react.vercel.app/ >/dev/null
-curl -fsS https://flownote-api-production.up.railway.app/
-curl -fsS https://flownote-api-production.up.railway.app/api/mobile/config
-curl -fsS https://flownote-mobile-production-production.up.railway.app/health
-```
-
-인증 API는 401 자체가 정상일 수 있으므로 공개 health와 보호 경로의 기대 status를 구분한다. 502가 발생하면 응답의 `X-Request-ID`와 Railway gateway/upstream 로그를 함께 조회한다.
-
-## 롤백
-
-- Vercel: 이전 Ready deployment를 production alias로 promote한다.
-- Railway: 실패 서비스의 이전 성공 deployment를 redeploy한다.
-- DB: 이미 적용된 Flyway migration은 임의 삭제하거나 버전을 되돌리지 않는다. 호환 가능한 새 migration으로 수정한다.
-- 롤백 후에도 공개 URL, `/api/mobile/config`, 변경된 주요 사용자 흐름을 다시 확인한다.
-
-배포 실패 보고에는 target, commit SHA, deployment id, 실패 단계, 핵심 로그, 롤백 여부와 남은 위험을 포함한다.
+오류는 Railway deployment/build/runtime 로그 및 gateway request ID로 조사한다. 이전 Vercel Ready 배포와 Railway 성공 배포를 함께 복구하며 DB migration을 임의로 되돌리지 않는다. 상세 결과와 실제 배포 ID는 `logs/report/`에 기록한다.

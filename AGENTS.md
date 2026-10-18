@@ -3,10 +3,9 @@
 ## 프로젝트 구성
 
 - `flownote/`: Vite React 앱. React 19, BlockNote, Mantine, Tailwind, PDF 렌더링, Markdown/수식 렌더링을 사용한다.
-- `flownote-next/`: Next.js 16 앱. React 19, Prisma, PostgreSQL, Tailwind, app-router API를 사용한다.
 - `flownote-API/`: Python FastAPI 서비스. `uv`, SQLModel, asyncpg, Google GenAI, MCP 서버, 환경 변수 기반 설정을 사용한다.
 - `flownote-server/`: Java 17 Spring Boot 서비스. Gradle, JDBC, Flyway, validation, actuator, PostgreSQL을 사용한다.
-- `docker-compose.yml`: 로컬 통합 실행 기준이다.
+- 클라우드 환경 기준: `scripts/cloud-environments.json`, 운영 절차: `docs/DEPLOYMENT.md`.
 - `logs/report/`: 리뷰와 분석 산출물이다. 소스 코드와 충돌하면 소스 코드를 기준으로 판단한다.
 - `logs/`: 버그 재현, 실행 로그 요약, 운영 증상, 원인 분석 기록을 둔다. 비밀값과 원본 업로드 파일은 넣지 않는다.
 
@@ -31,22 +30,21 @@
 - 사용자가 설계, 리뷰, 분석만 요청하면 파일을 수정하지 않는다.
 - 의미 있는 수정을 하기 전에는 주변 코드와 의존성 스크립트를 확인한다.
 - 수정 후에는 가능하면 해당 하위 프로젝트에 맞는 가장 작은 유효성 검증 명령을 실행한다.
-- 모든 작업이 끝나면 저장소 루트에서 `docker compose up -d --build`를 실행해 통합 Docker 빌드와 백그라운드 실행을 검증한다.
-- 파일을 수정한 작업은 Docker 검증 뒤 항상 클라우드 배포까지 진행한다. `flownote/` 변경은 Vercel production 배포를, `flownote-API/` 변경은 Railway `flownote-api` 배포를, `flownote-server/` 변경은 Railway `flownote-main` 배포를 실행한다. 여러 하위 프로젝트가 바뀌면 해당 배포를 모두 수행한다.
+- LAN/loopback 주소를 통한 앱 통신과 로컬 Compose 실행은 폐기했다. PC 서버를 실행하거나 로컬 URL fallback을 추가하지 않는다. Railway 서비스 간 private networking은 클라우드 전용 통신이므로 유지한다.
+- 변경은 스테이징 배포와 클라우드 기능 검증 후 같은 소스를 production에 배포한다. `node scripts/deploy-cloud.mjs release <target>`을 사용한다. 직접 production으로 건너뛰지 않는다.
 - 단, `logs/report/` 아래 보고서만 작성하거나 수정하는 작업은 Docker 빌드와 클라우드 배포를 진행하지 않는다. 이 경우 파일 존재, 주요 내용 확인 같은 문서 검증만 수행하고 배포 생략 사유를 최종 응답에 남긴다.
 - `logs/report/` 외 문서만 수정한 경우에는 Vercel production 배포와 영향받는 Railway 서비스 배포 여부를 확인한다. 클라우드에 반영할 실행 산출물이 없는 문서 전용 변경이면 Vercel production 배포를 기본으로 수행하고, 백엔드 배포 생략 사유를 기록한다.
 - 검증 실패는 실행한 명령, 핵심 실패 이유, 다음 조치를 함께 보고한다.
-- Docker 빌드를 실행하지 못한 경우에도 실행하지 못한 이유와 다음 조치를 최종 응답에 남긴다.
+- Dockerfile은 Railway 클라우드 빌드에 사용한다. 로컬 Compose 빌드/실행은 검증 조건이 아니다.
 - 클라우드 배포를 실행하지 못한 경우에도 실행하지 못한 이유, 필요한 배포 명령, 다음 조치를 최종 응답에 남긴다.
 - 사용자의 기존 변경이나 관련 없는 로컬 작업을 되돌리지 않는다.
 
 ## 하위 프로젝트 명령
 
 - `flownote/`: 프로덕션 빌드 검증은 `yarn build`를 사용한다. 브라우저나 개발 서버 확인이 필요할 때만 `yarn dev`를 사용한다.
-- `flownote-next/`: 린트는 `yarn lint`, 프로덕션 검증은 `yarn build`를 사용한다.
 - `flownote-API/`: `flownote-API/` 내부에서 `uv run ...` 명령을 사용한다. 프로젝트 로컬 가상환경과 `uv.lock`을 우선한다.
 - `flownote-server/`: `flownote-server/` 내부에서 `./gradlew test`를 사용한다.
-- 통합 작업: 포트, 환경 변수, 볼륨, DB 가정을 바꾸기 전 `docker-compose.yml`을 확인하고 서비스 경계를 검증한다.
+- 통합 작업: 환경·URL·DB·스토리지 격리를 `docs/DEPLOYMENT.md`와 Railway 실제 설정으로 확인한다.
 
 ## 하네스 자산
 
@@ -82,9 +80,9 @@ Flownote의 컨텍스트는 채팅이나 개인의 기억이 아니라 저장소
 4. 검증: 변경에 맞는 lint, build, test, targeted check를 실행한다.
 5. 리뷰: 회귀, 보안, API 계약, UI 동작을 확인한다.
 6. 기록: 버그와 실행 로그는 `logs/`, 분석 산출물과 작업 결과는 `logs/report/`, 재사용 가능한 프로젝트 컨벤션은 `.codex/memories/`에 남긴다. 제품 행동·아키텍처·검증 기준이 바뀌면 `docs/`의 소유 문서(System of Record)를 같은 변경에서 갱신하고 교차 링크를 확인한다.
-7. Docker 빌드 및 실행: 작업 종료 전 저장소 루트에서 `docker compose up -d --build`를 실행해 통합 빌드와 백그라운드 실행을 확인한다.
-8. 클라우드 배포: 파일을 수정한 작업은 Docker 검증 뒤 Vercel production 및 영향받는 Railway 서비스를 배포하고 URL, deployment id, 헬스체크 결과를 확인한다. `logs/report/` 전용 보고서 작성/수정은 Docker와 클라우드 배포를 생략한다.
-9. 보고: 최종 응답에는 하위 프로젝트 검증 결과, `docker compose up -d --build` 결과, 클라우드 배포 결과를 함께 포함한다.
+7. 스테이징: 영향받는 서비스를 먼저 배포하고 실제 클라우드 E2E를 실행한다. 로컬 앱 서버나 production 데이터로 테스트하지 않는다.
+8. 프로덕션: 같은 소스의 스테이징 통과 기록을 확인한 뒤 배포하고 URL, deployment id, 헬스체크 결과를 확인한다. 보고서만 변경하면 배포를 생략한다.
+9. 보고: 정적/단위 검증, 스테이징 E2E, production 배포 결과를 포함한다.
 
 ## 리뷰 관점
 

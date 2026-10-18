@@ -138,12 +138,17 @@ const PlannerTimetableCanvas = ({
     }
     for (let col = 0; col <= cols; col += 1) {
       const x = Math.round(GUTTER_W + col * cellW) + 0.5;
-      ctx.strokeStyle = col === 0 ? "#d4d4d4" : "#f0f0f0";
+      const minuteAtBoundary = col * (minutesPerRow / cols);
+      const isTenMinuteBoundary = Math.abs(minuteAtBoundary % 10) < 0.001;
+      const isHourBoundary = col === 0 || col === cols;
+      ctx.strokeStyle = isHourBoundary ? "#737373" : isTenMinuteBoundary ? "#a3a3a3" : "#eeeeee";
+      ctx.lineWidth = isHourBoundary ? 1.5 : 1;
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, height);
       ctx.stroke();
     }
+    ctx.lineWidth = 1;
 
     // 4) 그림판 필기(정규화 좌표 → 화면 좌표)
     const renderStroke = (stroke: { color: string; width: number; points: Array<{ x: number; y: number }> }) => {
@@ -227,6 +232,7 @@ const PlannerTimetableCanvas = ({
   return (
     <div ref={containerRef} className="w-full select-none">
       <canvas
+        data-testid="planner-timetable-canvas"
         ref={canvasRef}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

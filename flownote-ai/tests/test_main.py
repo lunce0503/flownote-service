@@ -1,9 +1,15 @@
+import sys
+
 from fastapi.testclient import TestClient
 
 from app.main import app
 
 
 def test_health_imports_without_ai_secrets():
+    assert "yfinance" not in sys.modules
+    assert "google.genai" not in sys.modules
+    assert "mcpServers.registry" not in sys.modules
+
     response = TestClient(app).get("/")
 
     assert response.status_code == 200
@@ -22,7 +28,7 @@ def test_capabilities_report_disabled_secret_backed_services(monkeypatch):
     assert body["agent_note"] == {
         "enabled": False,
         "provider": "ollama",
-        "scope": "disabled",
+        "scope": "removed",
     }
 
 
@@ -35,11 +41,11 @@ def test_agent_note_health_is_explicitly_disabled(monkeypatch):
     assert response.json() == {
         "enabled": False,
         "ollama": "disabled",
-        "scope": "internal",
+        "scope": "removed",
     }
 
 
-def test_agent_note_requires_authentication_when_enabled(monkeypatch):
+def test_agent_note_cannot_be_reenabled_by_legacy_configuration(monkeypatch):
     monkeypatch.setenv("AGENT_NOTE_ENABLED", "true")
 
     response = TestClient(app).post(
@@ -47,5 +53,4 @@ def test_agent_note_requires_authentication_when_enabled(monkeypatch):
         json={"roomId": "canvas-1", "text": "red circle"},
     )
 
-    assert response.status_code == 401
-    assert response.json()["detail"] == "로그인이 필요합니다."
+    assert response.status_code == 410

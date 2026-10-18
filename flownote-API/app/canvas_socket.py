@@ -20,7 +20,7 @@ from app.core_api import CORE_API_BASE_URL, forward_request
 # 캔버스 부하 분리: 설정 시 캔버스 중계만 전용 Spring 인스턴스로 보낸다. 미설정이면 기존 Core API 그대로.
 import os
 
-CANVAS_API_BASE_URL = (os.getenv("CANVAS_API_BASE_URL") or CORE_API_BASE_URL).rstrip("/")
+CANVAS_API_BASE_URL = (os.getenv("CANVAS_API_BASE_URL") or "http://flownote-canvas.railway.internal:8080").rstrip("/")
 
 # 대형 필기 백로그(수천 요소)가 한 mutation으로 들어오면 백엔드 저장이 기본 35초를
 # 넘길 수 있다. 저장 요청만 별도 타임아웃을 준다. 프론트 소켓 타임아웃(30s)보다 길어도
@@ -31,6 +31,8 @@ CANVAS_SAVE_FORWARD_TIMEOUT_SECONDS = float(os.getenv("CANVAS_SAVE_FORWARD_TIMEO
 # 리로드 없이 델타만 적용하게 한다. 임계 초과 대형 mutation은 생략 → 클라이언트가
 # 기존 전체 리로드로 폴백한다(하위 호환: 구 클라이언트는 changes를 무시).
 CANVAS_CHANGED_MAX_INLINE_BYTES = int(os.getenv("CANVAS_CHANGED_MAX_INLINE_BYTES", str(256 * 1024)))
+CANVAS_SOCKET_MAX_BYTES = 1_000_000
+CANVAS_SAVE_MAX_BYTES = 32 * 1024 * 1024
 
 
 DATA_URL_PATTERN = re.compile(r"^data:(?P<content_type>[^;,]+)?(?:;charset=[^;,]+)?;base64,(?P<data>.+)$", re.DOTALL)
@@ -300,6 +302,75 @@ async def _upload_canvas_asset(authorization: str | None, file_data: dict[str, A
     )
 
 
+async def save_canvas(sio: socketio.AsyncServer, data: dict[str, Any], sid: str | None = None) -> dict[str, Any]:
+    started_at = time.perf_counter()
+    canvas_id = data.get("canvasId")
+    mutation_id: str | None = None
+    try:
+        if _json_size_bytes(data) > CANVAS_SAVE_MAX_BYTES:
+            raise HTTPException(status_code=413, detail="저장 데이터가 32MB 제한을 초과했습니다.")
+        trigger = data.get("trigger") if isinstance(data.get("trigger"), str) else "automatic"
+        canvas_query = _canvas_query(canvas_id if isinstance(canvas_id, str) else None)
+        payload = data.get("payload") or {}
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="저장 payload 형식이 올바르지 않습니다.")
+        mutation_id = _normalize_mutation_id(data.get("mutationId") or payload.get("mutationId"))
+        request_payload = {
+            **payload,
+            "mutationId": mutation_id,
+            "trigger": trigger,
+            "operationId": data.get("operationId") or str(uuid.uuid4()),
+            "clientCreatedAt": data.get("clientCreatedAt"),
+        }
+        logger.info(
+            "canvas_save_started canvas_id=%s mutation_id=%s payload_bytes=%s added_lines=%s modified_lines=%s deleted_lines=%s added_images=%s modified_images=%s deleted_images=%s added_text_boxes=%s modified_text_boxes=%s deleted_text_boxes=%s",
+            canvas_id,
+            mutation_id,
+            _json_size_bytes(request_payload),
+            _array_count(payload, "addedLines"),
+            _array_count(payload, "modifiedLines"),
+            _array_count(payload, "deletedLines"),
+            _array_count(payload, "addedImages"),
+            _array_count(payload, "modifiedImages"),
+            _array_count(payload, "deletedImages"),
+            _array_count(payload, "addedTextBoxes"),
+            _array_count(payload, "modifiedTextBoxes"),
+            _array_count(payload, "deletedTextBoxes"),
+        )
+        response, save_ms = await _forward_json_timed(
+            "canvas_save",
+            "POST",
+            f"/api/canvas/elements/save{canvas_query}",
+            _authorization(data),
+            request_payload,
+            timeout_seconds=CANVAS_SAVE_FORWARD_TIMEOUT_SECONDS,
+        )
+        if isinstance(canvas_id, str) and canvas_id:
+            inline_changes = payload if _json_size_bytes(payload) <= CANVAS_CHANGED_MAX_INLINE_BYTES else None
+            try:
+                await sio.emit(
+                    "canvas:changed",
+                    {
+                        "canvasId": canvas_id,
+                        "sourceSid": sid,
+                        "mutationId": mutation_id,
+                        "revision": (response or {}).get("revision") if isinstance(response, dict) else None,
+                        "changes": inline_changes,
+                    },
+                    room=_canvas_room(canvas_id),
+                    skip_sid=sid,
+                )
+            except Exception:
+                logger.exception("canvas_broadcast_failed canvas_id=%s mutation_id=%s", canvas_id, mutation_id)
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        logger.info("canvas_save_completed canvas_id=%s mutation_id=%s elapsed_ms=%s core_ms=%s", canvas_id, mutation_id, elapsed_ms, save_ms)
+        return {"ok": True, "data": response}
+    except Exception as error:
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        logger.exception("canvas_save_failed canvas_id=%s mutation_id=%s elapsed_ms=%s", canvas_id, mutation_id, elapsed_ms)
+        return _error_response(error)
+
+
 def create_canvas_socket_server(cors_allowed_origins: list[str]) -> socketio.AsyncServer:
     # REDIS_URL이 있으면 Redis 매니저로 방 브로드캐스트를 공유한다(게이트웨이 replica 확장 대비).
     # 미설정이면 단일 인스턴스 인메모리 매니저 그대로.
@@ -318,6 +389,7 @@ def create_canvas_socket_server(cors_allowed_origins: list[str]) -> socketio.Asy
         client_manager=client_manager,
         logger=False,
         engineio_logger=False,
+        max_http_buffer_size=CANVAS_SOCKET_MAX_BYTES,
     )
     load_tasks = CanvasLoadTaskRegistry()
 
@@ -326,7 +398,8 @@ def create_canvas_socket_server(cors_allowed_origins: list[str]) -> socketio.Asy
         return True
 
     @sio.event
-    async def disconnect(sid: str) -> None:
+    async def disconnect(sid: str, reason: str = "unknown") -> None:
+        logger.info("canvas_socket_disconnected sid=%s reason=%s", sid, reason)
         load_tasks.cancel_all(sid)
 
     async def canvas_join(sid: str, data: dict[str, Any]) -> dict[str, Any]:
@@ -407,67 +480,7 @@ def create_canvas_socket_server(cors_allowed_origins: list[str]) -> socketio.Asy
         return {"ok": True, "data": {"requestId": request_id, "cancelled": cancelled}}
 
     async def canvas_save(sid: str, data: dict[str, Any]) -> dict[str, Any]:
-        started_at = time.perf_counter()
-        canvas_id = data.get("canvasId")
-        mutation_id: str | None = None
-        try:
-            trigger = data.get("trigger") if isinstance(data.get("trigger"), str) else "automatic"
-            canvas_query = _canvas_query(canvas_id if isinstance(canvas_id, str) else None)
-            payload = data.get("payload") or {}
-            if not isinstance(payload, dict):
-                raise HTTPException(status_code=400, detail="저장 payload 형식이 올바르지 않습니다.")
-            mutation_id = _normalize_mutation_id(data.get("mutationId") or payload.get("mutationId"))
-            request_payload = {
-                **payload,
-                "mutationId": mutation_id,
-                "trigger": trigger,
-                "operationId": data.get("operationId") or str(uuid.uuid4()),
-                "clientCreatedAt": data.get("clientCreatedAt"),
-            }
-            logger.info(
-                "canvas_save_started canvas_id=%s mutation_id=%s payload_bytes=%s added_lines=%s modified_lines=%s deleted_lines=%s added_images=%s modified_images=%s deleted_images=%s added_text_boxes=%s modified_text_boxes=%s deleted_text_boxes=%s",
-                canvas_id,
-                mutation_id,
-                _json_size_bytes(request_payload),
-                _array_count(payload, "addedLines"),
-                _array_count(payload, "modifiedLines"),
-                _array_count(payload, "deletedLines"),
-                _array_count(payload, "addedImages"),
-                _array_count(payload, "modifiedImages"),
-                _array_count(payload, "deletedImages"),
-                _array_count(payload, "addedTextBoxes"),
-                _array_count(payload, "modifiedTextBoxes"),
-                _array_count(payload, "deletedTextBoxes"),
-            )
-            response, save_ms = await _forward_json_timed(
-                "canvas_save",
-                "POST",
-                f"/api/canvas/elements/save{canvas_query}",
-                _authorization(data),
-                request_payload,
-                timeout_seconds=CANVAS_SAVE_FORWARD_TIMEOUT_SECONDS,
-            )
-            if isinstance(canvas_id, str) and canvas_id:
-                inline_changes = payload if _json_size_bytes(payload) <= CANVAS_CHANGED_MAX_INLINE_BYTES else None
-                await sio.emit(
-                    "canvas:changed",
-                    {
-                        "canvasId": canvas_id,
-                        "sourceSid": sid,
-                        "mutationId": mutation_id,
-                        "revision": (response or {}).get("revision") if isinstance(response, dict) else None,
-                        "changes": inline_changes,
-                    },
-                    room=_canvas_room(canvas_id),
-                    skip_sid=sid,
-                )
-            elapsed_ms = int((time.perf_counter() - started_at) * 1000)
-            logger.info("canvas_save_completed canvas_id=%s mutation_id=%s elapsed_ms=%s core_ms=%s", canvas_id, mutation_id, elapsed_ms, save_ms)
-            return {"ok": True, "data": response}
-        except Exception as error:
-            elapsed_ms = int((time.perf_counter() - started_at) * 1000)
-            logger.exception("canvas_save_failed canvas_id=%s mutation_id=%s elapsed_ms=%s", canvas_id, mutation_id, elapsed_ms)
-            return _error_response(error)
+        return await save_canvas(sio, data, sid)
 
     async def canvas_line_start(sid: str, data: dict[str, Any]) -> dict[str, Any]:
         try:

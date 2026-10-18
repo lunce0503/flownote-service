@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import Konva from "konva";
-import RBush from "rbush";
 import type { Point, LineElement, ImageElement, TextBoxElement } from "@/entities/canvas";
+import {
+  CANVAS_RENDER_WINDOW_SCALE,
+  containsBounds,
+  expandBounds,
+  getCanvasViewportBounds,
+  interpolateLinePointsForRendering,
+  type Bounds,
+} from "./canvasGeometry";
+import { CanvasSpatialIndex } from "./canvasSpatialIndex";
 
 type CurrentLineStyle = {
   color: string;
@@ -14,14 +22,6 @@ type RendererSize = {
   height: number;
 };
 
-type IndexedNode = {
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
-  id: string;
-};
-
 type RenderQueue = {
   lines: LineElement[];
   images: ImageElement[];
@@ -29,29 +29,17 @@ type RenderQueue = {
   activeOnly?: boolean;
 };
 
-// 손그림 획은 이미 촘촘히 보간(≤8px)되고 smoothLinePoints로 평활화된다.
-// Konva tension(Catmull-Rom)을 주면 끝점에서 오버슈트하거나(획이 조금 더 그려짐),
-// 빠른 획처럼 점이 적을 때 곡선이 되말려 양끝이 연결되어 보인다. tension 0으로 폴리라인 렌더.
+// Konva tension은 끝점 오버슈트와 짧은 획의 되말림이 있어 사용하지 않는다.
+// 렌더링 좌표를 Chaikin 방식으로 보간해 원래 점의 경계와 끝점을 유지하면서 모서리만 완화한다.
 const LINE_TENSION = 0;
-const VIEWPORT_OVERSCAN_PX = 160;
 const pointsToFlatArray = (points: Point[]) => points.flatMap((point) => [point.x, point.y]);
-
-const getLineBounds = (line: LineElement): IndexedNode => {
-  const first = line.points[0] ?? { x: 0, y: 0 };
-  const bounds = line.points.reduce((result, point) => ({
-    minX: Math.min(result.minX, point.x),
-    minY: Math.min(result.minY, point.y),
-    maxX: Math.max(result.maxX, point.x),
-    maxY: Math.max(result.maxY, point.y),
-  }), { minX: first.x, minY: first.y, maxX: first.x, maxY: first.y });
-  const padding = (line.strokeWidth ?? 2) / 2;
-  return {
-    id: line.id,
-    minX: bounds.minX - padding,
-    minY: bounds.minY - padding,
-    maxX: bounds.maxX + padding,
-    maxY: bounds.maxY + padding,
-  };
+const interpolatedLineCache = new WeakMap<Point[], number[]>();
+const getInterpolatedFlatPoints = (points: Point[]) => {
+  const cached = interpolatedLineCache.get(points);
+  if (cached) return cached;
+  const interpolated = pointsToFlatArray(interpolateLinePointsForRendering(points));
+  interpolatedLineCache.set(points, interpolated);
+  return interpolated;
 };
 
 // zIndex 오름차순(뒤→앞) 정렬. 미지정(undefined)은 0으로 보고, 동률은 배열 순서를 유지한다.
@@ -116,8 +104,11 @@ export const useCanvasRendering = (
   const imageSourcesRef = useRef(new Map<string, ImageElement>());
   const textNodesRef = useRef(new Map<string, Konva.Group>());
   const textSourcesRef = useRef(new Map<string, TextBoxElement>());
-  const lineIndexRef = useRef(new RBush<IndexedNode>());
-  const lineBoundsRef = useRef(new Map<string, IndexedNode>());
+  const renderSourcesRef = useRef<RenderQueue | null>(null);
+  const spatialIndexRef = useRef<CanvasSpatialIndex | null>(null);
+  const renderWindowRef = useRef<Bounds | null>(null);
+  const renderWindowScaleRef = useRef<number | null>(null);
+  const renderWindowSizeRef = useRef<RendererSize | null>(null);
   const currentLineShapeRef = useRef<Konva.Line | null>(null);
   const queuedRenderStateRef = useRef<RenderQueue | null>(null);
   const renderFrameRef = useRef<number | null>(null);
@@ -157,9 +148,6 @@ export const useCanvasRendering = (
     const imageSources = imageSourcesRef.current;
     const textNodes = textNodesRef.current;
     const textSources = textSourcesRef.current;
-    const lineIndex = lineIndexRef.current;
-    const lineBounds = lineBoundsRef.current;
-
     return () => {
       if (renderFrameRef.current !== null) window.cancelAnimationFrame(renderFrameRef.current);
       lineNodes.clear();
@@ -168,8 +156,11 @@ export const useCanvasRendering = (
       imageSources.clear();
       textNodes.clear();
       textSources.clear();
-      lineIndex.clear();
-      lineBounds.clear();
+      renderSourcesRef.current = null;
+      spatialIndexRef.current = null;
+      renderWindowRef.current = null;
+      renderWindowScaleRef.current = null;
+      renderWindowSizeRef.current = null;
       stage.destroy();
       stageRef.current = null;
       staticLayerRef.current = null;
@@ -214,15 +205,10 @@ export const useCanvasRendering = (
       }
       if (sourceChanged) {
         node.setAttrs({
-          points: pointsToFlatArray(line.points),
+          points: getInterpolatedFlatPoints(line.points),
           stroke: line.color ?? "#000000",
           strokeWidth: line.strokeWidth ?? 2,
         });
-        const previousBounds = lineBoundsRef.current.get(line.id);
-        if (previousBounds) lineIndexRef.current.remove(previousBounds);
-        const bounds = getLineBounds(line);
-        lineBoundsRef.current.set(line.id, bounds);
-        lineIndexRef.current.insert(bounds);
         lineSourcesRef.current.set(line.id, line);
       }
     });
@@ -232,9 +218,6 @@ export const useCanvasRendering = (
       node.destroy();
       lineNodesRef.current.delete(id);
       lineSourcesRef.current.delete(id);
-      const bounds = lineBoundsRef.current.get(id);
-      if (bounds) lineIndexRef.current.remove(bounds);
-      lineBoundsRef.current.delete(id);
     });
 
     const orderedIds = sortByZIndex(lines.filter((line) => nextIds.has(line.id))).map((line) => line.id);
@@ -314,28 +297,52 @@ export const useCanvasRendering = (
     applyLayerOrder(orderedIds, textNodesRef.current, textOrderRef);
   }, []);
 
-  const updateTransformsAndVisibility = useCallback(() => {
+  const updateTransforms = useCallback(() => {
     const transform = { x: offset.x, y: offset.y, scaleX: scale, scaleY: scale };
     staticGroupRef.current?.setAttrs(transform);
     overlayGroupRef.current?.setAttrs(transform);
-
-    const overscan = VIEWPORT_OVERSCAN_PX / scale;
-    const viewportBounds = {
-      minX: -offset.x / scale - overscan,
-      minY: -offset.y / scale - overscan,
-      maxX: (size.width - offset.x) / scale + overscan,
-      maxY: (size.height - offset.y) / scale + overscan,
-    };
-    const visibleLineIds = new Set(lineIndexRef.current.search(viewportBounds).map((item) => item.id));
-    lineNodesRef.current.forEach((node, id) => node.visible(visibleLineIds.has(id)));
-  }, [offset.x, offset.y, scale, size.height, size.width]);
+  }, [offset.x, offset.y, scale]);
 
   const renderQueuedState = useCallback((queue: RenderQueue) => {
     if (!queue.activeOnly) {
-      reconcileImages(queue.images);
-      reconcileLines(queue.lines);
-      reconcileTexts(queue.texts);
-      updateTransformsAndVisibility();
+      updateTransforms();
+
+      const previousSources = renderSourcesRef.current;
+      const sourcesChanged = previousSources?.lines !== queue.lines
+        || previousSources?.images !== queue.images
+        || previousSources?.texts !== queue.texts;
+      if (sourcesChanged) {
+        renderSourcesRef.current = queue;
+        spatialIndexRef.current = new CanvasSpatialIndex(queue.lines, queue.images, queue.texts);
+      }
+
+      const viewportBounds = getCanvasViewportBounds({ offset, scale, width: size.width, height: size.height });
+      const previousSize = renderWindowSizeRef.current;
+      const viewportShapeChanged = renderWindowScaleRef.current !== scale
+        || previousSize?.width !== size.width
+        || previousSize?.height !== size.height;
+      const renderWindowChanged = !renderWindowRef.current
+        || viewportShapeChanged
+        || !containsBounds(renderWindowRef.current, viewportBounds);
+
+      if (renderWindowChanged) {
+        renderWindowRef.current = expandBounds(viewportBounds, CANVAS_RENDER_WINDOW_SCALE);
+        renderWindowScaleRef.current = scale;
+        renderWindowSizeRef.current = size;
+      }
+
+      if (sourcesChanged || renderWindowChanged) {
+        const spatialIndex = spatialIndexRef.current;
+        const renderWindow = renderWindowRef.current;
+        if (spatialIndex && renderWindow) {
+          const lineIds = spatialIndex.search(renderWindow, "line");
+          const imageIds = spatialIndex.search(renderWindow, "image");
+          const textIds = spatialIndex.search(renderWindow, "text");
+          reconcileImages(queue.images.filter((image) => imageIds.has(image.id)));
+          reconcileLines(queue.lines.filter((line) => lineIds.has(line.id)));
+          reconcileTexts(queue.texts.filter((text) => textIds.has(text.id)));
+        }
+      }
     }
 
     const activeLayer = activeStrokeLayerRef.current;
@@ -349,7 +356,7 @@ export const useCanvasRendering = (
         activeLayer.add(currentLineShapeRef.current);
       }
       currentLineShapeRef.current.setAttrs({
-        points: pointsToFlatArray(currentDrawingLine), stroke: currentLineStyle.color,
+        points: pointsToFlatArray(interpolateLinePointsForRendering(currentDrawingLine)), stroke: currentLineStyle.color,
         strokeWidth: currentLineStyle.strokeWidth, x: offset.x, y: offset.y, scaleX: scale, scaleY: scale,
       });
     } else if (currentLineShapeRef.current) {
@@ -360,7 +367,7 @@ export const useCanvasRendering = (
     staticLayerRef.current?.batchDraw();
     activeStrokeLayerRef.current?.batchDraw();
     overlayLayerRef.current?.batchDraw();
-  }, [currentDrawingLineRef, currentLineStyle.color, currentLineStyle.strokeWidth, offset.x, offset.y, reconcileImages, reconcileLines, reconcileTexts, scale, updateTransformsAndVisibility]);
+  }, [currentDrawingLineRef, currentLineStyle.color, currentLineStyle.strokeWidth, offset, reconcileImages, reconcileLines, reconcileTexts, scale, size, updateTransforms]);
 
   const redrawWith = useCallback((lines: LineElement[], images: ImageElement[], texts: TextBoxElement[]) => {
     queuedRenderStateRef.current = { lines, images, texts };

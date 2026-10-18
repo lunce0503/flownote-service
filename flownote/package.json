@@ -4,9 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "vite",
     "build": "yarn typecheck && vite build",
-    "preview": "vite preview",
     "lint": "eslint src",
     "typecheck": "tsc -b --pretty false",
     "verify": "yarn lint && yarn build",

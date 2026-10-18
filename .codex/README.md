@@ -12,6 +12,7 @@
 - `memories/`: 장기 프로젝트 컨텍스트 후보.
 - `mcp/`: MCP 설정 메모와 예시.
 - `harness/`: 워크플로우, 라우팅, 검증 매트릭스.
+- `../automation/codex/`: 격리된 Codex CLI 실행기와 systemd user 자동화.
 - `../logs/`: 버그 재현, 운영 증상, 실행 로그 요약.
 - `../logs/report/`: 리뷰, 감사, 배포 결과, 큰 작업 요약.
 

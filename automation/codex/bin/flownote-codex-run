@@ -1,0 +1,374 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+# Repository commands and model-invoked subprocesses must not inherit cloud credentials.
+unset \
+  FACTCHAT_API_KEY \
+  OPENAI_API_KEY \
+  CODEX_API_KEY \
+  CODEX_ACCESS_TOKEN \
+  RAILWAY_TOKEN \
+  VERCEL_TOKEN \
+  GH_TOKEN \
+  GITHUB_TOKEN \
+  AWS_ACCESS_KEY_ID \
+  AWS_SECRET_ACCESS_KEY \
+  AWS_SESSION_TOKEN \
+  DATABASE_URL \
+  REDIS_URL || true
+export GIT_TERMINAL_PROMPT=0
+
+readonly SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+readonly AUTOMATION_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)"
+readonly TASK="${1:-}"
+readonly INPUT_FILE="${2:-}"
+
+usage() {
+  cat >&2 <<'USAGE'
+Usage: flownote-codex-run <weekly-review|ci-fix|staging-triage|feedback-triage|feedback-implement|feedback-release-review> [input-file]
+
+  weekly-review     Read-only repository review. No input file is accepted.
+  ci-fix            Create a candidate patch from a CI failure log.
+  staging-triage    Analyze a staging deployment log without changing files.
+  feedback-triage   Analyze one sanitized user feedback event without changing files.
+  feedback-implement Create a feedback patch; never deploy directly.
+  feedback-release-review Independently review a candidate before trusted release.
+USAGE
+}
+
+case "$TASK" in
+  weekly-review)
+    readonly PERMISSION_BASE=":read-only"
+    readonly WORKSPACE_WRITABLE=0
+    readonly PROMPT_FILE="$AUTOMATION_ROOT/prompts/weekly-review.md"
+    ;;
+  ci-fix)
+    readonly PERMISSION_BASE=":workspace"
+    readonly WORKSPACE_WRITABLE=1
+    readonly PROMPT_FILE="$AUTOMATION_ROOT/prompts/ci-fix.md"
+    ;;
+  staging-triage)
+    readonly PERMISSION_BASE=":read-only"
+    readonly WORKSPACE_WRITABLE=0
+    readonly PROMPT_FILE="$AUTOMATION_ROOT/prompts/staging-triage.md"
+    ;;
+  feedback-triage)
+    readonly PERMISSION_BASE=":read-only"
+    readonly WORKSPACE_WRITABLE=0
+    readonly PROMPT_FILE="$AUTOMATION_ROOT/prompts/feedback-triage.md"
+    ;;
+  feedback-implement)
+    readonly PERMISSION_BASE=":workspace"
+    readonly WORKSPACE_WRITABLE=1
+    readonly PROMPT_FILE="$AUTOMATION_ROOT/prompts/feedback-implement.md"
+    ;;
+  feedback-release-review)
+    readonly PERMISSION_BASE=":read-only"
+    readonly WORKSPACE_WRITABLE=0
+    readonly PROMPT_FILE="$AUTOMATION_ROOT/prompts/feedback-release-review.md"
+    ;;
+  *)
+    usage
+    exit 64
+    ;;
+esac
+
+if [[ "$TASK" == "weekly-review" ]]; then
+  if [[ -n "$INPUT_FILE" ]]; then
+    echo "weekly-review does not accept an input file." >&2
+    exit 64
+  fi
+elif [[ -z "$INPUT_FILE" || ! -f "$INPUT_FILE" || -L "$INPUT_FILE" ]]; then
+  echo "$TASK requires a regular, non-symlink input file." >&2
+  exit 66
+fi
+
+readonly USER_DATA_HOME="${XDG_DATA_HOME:-${HOME:?HOME is required}/.local/share}"
+readonly USER_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
+readonly REPOSITORY="${FLOWNOTE_AUTOMATION_REPOSITORY:-$USER_DATA_HOME/flownote-codex/repo}"
+readonly STATE_DIR="${FLOWNOTE_AUTOMATION_STATE_DIR:-$USER_STATE_HOME/flownote-codex}"
+readonly CODEX_BIN="${FLOWNOTE_AUTOMATION_CODEX_BIN:-codex}"
+readonly CODEX_MODEL="gpt-6.1-sol"
+readonly NOTIFIER="${FLOWNOTE_AUTOMATION_NOTIFIER:-$(cd "$(dirname "$SCRIPT_PATH")" && pwd)/flownote-codex-notify}"
+readonly CODEX_HOME_DIR="${CODEX_HOME:-$HOME/.codex}"
+readonly CODEX_RUNTIME="${FLOWNOTE_AUTOMATION_RUNTIME:-container}"
+readonly CONTAINER_IMAGE="${FLOWNOTE_AUTOMATION_CONTAINER_IMAGE:-flownote-codex-automation:0.160.0}"
+readonly CONTAINER_ROOT="$AUTOMATION_ROOT/container"
+readonly BASE_REF="${FLOWNOTE_AUTOMATION_BASE_REF:-origin/main}"
+readonly OUTPUT_SCHEMA="$AUTOMATION_ROOT/schema/result.schema.json"
+readonly MAX_INPUT_BYTES="${FLOWNOTE_AUTOMATION_MAX_INPUT_BYTES:-5242880}"
+readonly USER_CONFIG_FILE="$CODEX_HOME_DIR/config.toml"
+readonly AUTH_FILE="$CODEX_HOME_DIR/auth.json"
+
+if [[ "$CODEX_HOME_DIR" != /* || "$CODEX_HOME_DIR" == *['"\']* ]]; then
+  echo "CODEX_HOME must be an absolute path without quote or backslash characters." >&2
+  exit 64
+fi
+
+if [[ ! "$BASE_REF" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]]; then
+  echo "Invalid FLOWNOTE_AUTOMATION_BASE_REF: $BASE_REF" >&2
+  exit 64
+fi
+
+if [[ ! "$MAX_INPUT_BYTES" =~ ^[1-9][0-9]*$ ]]; then
+  echo "FLOWNOTE_AUTOMATION_MAX_INPUT_BYTES must be a positive integer." >&2
+  exit 64
+fi
+
+if [[ "$CODEX_RUNTIME" != "container" && "$CODEX_RUNTIME" != "host" ]]; then
+  echo "FLOWNOTE_AUTOMATION_RUNTIME must be container or host." >&2
+  exit 64
+fi
+
+if [[ -n "$INPUT_FILE" ]]; then
+  readonly INPUT_BYTES="$(stat -c '%s' -- "$INPUT_FILE")"
+  if ((INPUT_BYTES > MAX_INPUT_BYTES)); then
+    echo "Input exceeds the $MAX_INPUT_BYTES byte limit." >&2
+    exit 65
+  fi
+fi
+
+required_files=("$PROMPT_FILE" "$OUTPUT_SCHEMA" "$USER_CONFIG_FILE")
+if [[ "$CODEX_RUNTIME" == "container" ]]; then
+  required_files+=("$AUTH_FILE")
+fi
+for required_file in "${required_files[@]}"; do
+  if [[ ! -f "$required_file" || -L "$required_file" ]]; then
+    echo "Required automation file is missing: $required_file" >&2
+    exit 78
+  fi
+done
+
+MODEL_CATALOG_MOUNT=()
+MODEL_CATALOG_OVERRIDE=()
+if [[ "$CODEX_RUNTIME" == "container" ]] && \
+  grep -Eq '^[[:space:]]*model_catalog_json[[:space:]]*=' "$USER_CONFIG_FILE"; then
+  model_catalog_path="$(sed -nE 's/^[[:space:]]*model_catalog_json[[:space:]]*=[[:space:]]*"([^"]+)"[[:space:]]*(#.*)?$/\1/p' "$USER_CONFIG_FILE")"
+  if [[ -z "$model_catalog_path" ]]; then
+    echo "Container automation requires model_catalog_json to use a plain double-quoted path." >&2
+    exit 78
+  fi
+  if [[ "$model_catalog_path" != /* ]]; then
+    model_catalog_path="$CODEX_HOME_DIR/$model_catalog_path"
+  fi
+  if [[ ! -f "$model_catalog_path" || -L "$model_catalog_path" ]]; then
+    echo "Configured model catalog is missing or is a symlink: $model_catalog_path" >&2
+    exit 78
+  fi
+  MODEL_CATALOG_MOUNT=(--volume "$model_catalog_path:/codex-home/model-catalog.json:ro")
+  MODEL_CATALOG_OVERRIDE=(--config 'model_catalog_json="/codex-home/model-catalog.json"')
+fi
+
+if ! command -v "$CODEX_BIN" >/dev/null 2>&1; then
+  echo "Codex executable not found: $CODEX_BIN" >&2
+  exit 69
+fi
+readonly CODEX_BIN_PATH="$(readlink -f "$(command -v "$CODEX_BIN")")"
+readonly CODEX_BIN_DIR="$(dirname "$CODEX_BIN_PATH")"
+
+if [[ "$CODEX_RUNTIME" == "container" ]]; then
+  command -v docker >/dev/null 2>&1 || {
+    echo "Docker is required for the isolated Codex runtime." >&2
+    exit 69
+  }
+  docker image inspect "$CONTAINER_IMAGE" >/dev/null 2>&1 || {
+    echo "Codex automation image is missing: $CONTAINER_IMAGE" >&2
+    echo "Build it with: docker build --tag $CONTAINER_IMAGE $CONTAINER_ROOT" >&2
+    exit 69
+  }
+  [[ -x "$CODEX_BIN_DIR/codex-code-mode-host" ]] || {
+    echo "Codex code-mode host is missing beside $CODEX_BIN_PATH" >&2
+    exit 69
+  }
+fi
+
+if ! git -C "$REPOSITORY" rev-parse --git-dir >/dev/null 2>&1; then
+  echo "Automation repository is not initialized: $REPOSITORY" >&2
+  echo "Run automation/codex/install.sh first." >&2
+  exit 69
+fi
+
+install -d -m 700 "$STATE_DIR" "$STATE_DIR/runs" "$STATE_DIR/worktrees"
+
+exec 9>"$STATE_DIR/runner.lock"
+if ! flock -n 9; then
+  echo "Another Flownote Codex automation run is active." >&2
+  exit 75
+fi
+
+if [[ "${FLOWNOTE_AUTOMATION_SKIP_FETCH:-0}" != "1" ]]; then
+  git -C "$REPOSITORY" fetch --prune origin
+fi
+
+readonly GENERATED_RUN_ID="$(date -u '+%Y%m%dT%H%M%SZ')-$TASK-$$"
+readonly RUN_ID="${FLOWNOTE_AUTOMATION_RUN_ID:-$GENERATED_RUN_ID}"
+
+if [[ ! "$RUN_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+  echo "Invalid FLOWNOTE_AUTOMATION_RUN_ID: $RUN_ID" >&2
+  exit 64
+fi
+
+readonly RUN_DIR="$STATE_DIR/runs/$RUN_ID"
+readonly WORKTREE="$STATE_DIR/worktrees/$RUN_ID"
+
+if [[ -e "$RUN_DIR" || -e "$WORKTREE" ]]; then
+  echo "Run id already exists: $RUN_ID" >&2
+  exit 73
+fi
+
+install -d -m 700 "$RUN_DIR"
+git -C "$REPOSITORY" worktree add --detach "$WORKTREE" "$BASE_REF" >/dev/null
+
+cleanup() {
+  if [[ -e "$WORKTREE" ]]; then
+    git -C "$REPOSITORY" worktree remove --force "$WORKTREE" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+readonly BASE_COMMIT="$(git -C "$WORKTREE" rev-parse HEAD)"
+readonly PROMPT="$(<"$PROMPT_FILE")"
+
+if [[ "$CODEX_RUNTIME" == "container" ]]; then
+  readonly SANDBOX_DENY_PATH="/codex-home"
+else
+  readonly SANDBOX_DENY_PATH="$CODEX_HOME_DIR"
+fi
+readonly PERMISSION_CONFIG="permissions.flownote-automation={ extends=\"$PERMISSION_BASE\", filesystem={ \"$SANDBOX_DENY_PATH\"=\"deny\" } }"
+
+CODEX_ARGS=(
+  exec
+  --model "$CODEX_MODEL"
+  --ephemeral
+  --disable plugins
+  --disable apps
+  --config 'mcp_servers={}'
+  --config 'default_permissions="flownote-automation"'
+  --config "$PERMISSION_CONFIG"
+  --config 'shell_environment_policy.inherit="core"'
+  --config 'shell_environment_policy.ignore_default_excludes=false'
+  --json
+  "${MODEL_CATALOG_OVERRIDE[@]}"
+)
+
+if [[ "$CODEX_RUNTIME" == "container" ]]; then
+  readonly WORKTREE_MOUNT_MODE="$(((WORKSPACE_WRITABLE == 1)) && printf 'rw' || printf 'ro')"
+  CODEX_COMMAND=(
+    docker run --rm --interactive
+    --read-only
+    --tmpfs /tmp:rw,nosuid,nodev,size=128m
+    --tmpfs /root:rw,nosuid,nodev,size=16m
+    --tmpfs /codex-home:rw,nosuid,nodev,size=64m
+    --pids-limit 256
+    --memory 2g
+    --cpus 2
+    --cap-add SYS_ADMIN
+    --security-opt seccomp=unconfined
+    --security-opt apparmor=unconfined
+    --env HOME=/tmp
+    --volume "$CODEX_BIN_DIR:/usr/local/bin:ro"
+    --volume "$USER_CONFIG_FILE:/codex-home/config.toml:ro"
+    --volume "$AUTH_FILE:/codex-home/auth.json:rw"
+    "${MODEL_CATALOG_MOUNT[@]}"
+    --volume "$REPOSITORY:$REPOSITORY:ro"
+    --volume "$WORKTREE:$WORKTREE:$WORKTREE_MOUNT_MODE"
+    --volume "$RUN_DIR:/output:rw"
+    --volume "$OUTPUT_SCHEMA:/schema/result.schema.json:ro"
+    --workdir "$WORKTREE"
+    "$CONTAINER_IMAGE"
+    "${CODEX_ARGS[@]}"
+    -C "$WORKTREE"
+    --skip-git-repo-check
+    --output-schema /schema/result.schema.json
+    --output-last-message /output/final.json
+    "$PROMPT"
+  )
+else
+  CODEX_COMMAND=(
+    "$CODEX_BIN_PATH"
+    "${CODEX_ARGS[@]}"
+    -C "$WORKTREE"
+    --output-schema "$OUTPUT_SCHEMA"
+    --output-last-message "$RUN_DIR/final.json"
+    "$PROMPT"
+  )
+fi
+
+if [[ "$CODEX_RUNTIME" == "container" ]]; then
+  chmod -R a+rX "$REPOSITORY"
+  if ((WORKSPACE_WRITABLE == 1)); then
+    chmod -R a+rwX "$WORKTREE"
+  else
+    chmod -R a+rX "$WORKTREE"
+  fi
+  chmod 777 "$RUN_DIR"
+fi
+
+set +e
+if [[ -n "$INPUT_FILE" ]]; then
+  "${CODEX_COMMAND[@]}" \
+    < "$INPUT_FILE" \
+    > "$RUN_DIR/trace.jsonl" \
+    2> "$RUN_DIR/progress.log"
+else
+  "${CODEX_COMMAND[@]}" \
+    > "$RUN_DIR/trace.jsonl" \
+    2> "$RUN_DIR/progress.log"
+fi
+CODEX_STATUS=$?
+set -e
+
+if [[ "$CODEX_RUNTIME" == "container" ]]; then
+  docker run --rm \
+    --network none \
+    --volume "$WORKTREE:/workspace:rw" \
+    --volume "$RUN_DIR:/output:rw" \
+    --entrypoint /bin/chown \
+    "$CONTAINER_IMAGE" \
+    -R "$(id -u):$(id -g)" /workspace /output
+  if [[ -f "$RUN_DIR/final.json" ]]; then
+    chmod 600 "$RUN_DIR/final.json"
+  fi
+  chmod 700 "$RUN_DIR"
+fi
+
+git -C "$WORKTREE" status --short --untracked-files=all > "$RUN_DIR/git-status.txt"
+git -C "$WORKTREE" add -N -- .
+git -C "$WORKTREE" diff --binary "$BASE_COMMIT" -- . > "$RUN_DIR/change.patch"
+
+readonly FINAL_COMMIT="$(git -C "$WORKTREE" rev-parse HEAD)"
+readonly FINISHED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+
+{
+  printf 'task=%s\n' "$TASK"
+  printf 'run_id=%s\n' "$RUN_ID"
+  printf 'base_ref=%s\n' "$BASE_REF"
+  printf 'base_commit=%s\n' "$BASE_COMMIT"
+  printf 'final_commit=%s\n' "$FINAL_COMMIT"
+  printf 'model=%s\n' "$CODEX_MODEL"
+  printf 'runtime=%s\n' "$CODEX_RUNTIME"
+  printf 'codex_exit_code=%s\n' "$CODEX_STATUS"
+  printf 'finished_at=%s\n' "$FINISHED_AT"
+} > "$RUN_DIR/metadata.txt"
+
+if [[ "$FINAL_COMMIT" != "$BASE_COMMIT" ]]; then
+  echo "Codex changed Git HEAD; the run is rejected. Inspect $RUN_DIR/change.patch." >&2
+  exit 70
+fi
+
+printf 'task=%s\nrun_id=%s\nexit_code=%s\nrun_dir=%s\n' \
+  "$TASK" "$RUN_ID" "$CODEX_STATUS" "$RUN_DIR"
+
+if [[ "$CODEX_STATUS" -eq 0 && "${FLOWNOTE_AUTOMATION_NOTIFY:-0}" == "1" ]]; then
+  if [[ ! -x "$NOTIFIER" ]]; then
+    echo "Automation notifier is not executable: $NOTIFIER" >&2
+    exit 69
+  fi
+  "$NOTIFIER" "$RUN_DIR/final.json"
+fi
+
+exit "$CODEX_STATUS"

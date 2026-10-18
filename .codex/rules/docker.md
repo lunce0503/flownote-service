@@ -1,10 +1,8 @@
-# Docker 및 로컬 런타임 규칙
+# 클라우드 컨테이너 규칙
 
-- 포트, 서비스 이름, 볼륨, 환경 변수를 바꾸기 전에 `docker-compose.yml`을 확인한다.
-- Dockerfile은 각 하위 프로젝트의 패키지 매니저와 런타임에 맞춘다.
-- 이미지에 비밀값을 포함하지 않는다.
-- 서비스 간 호출에는 명시적인 health check와 안정적인 서비스 이름을 우선한다.
-- 볼륨 변경은 데이터 손실 가능성이 있는 변경으로 취급한다.
-- 로컬 오케스트레이션에 영향을 주는 변경은 예상 시작 명령과 영향받는 서비스를 설명한다.
-- 작업 종료 전 통합 검증은 저장소 루트에서 `docker compose up -d --build`로 수행한다.
-- `docker compose up -d --build` 실패 시 실패 서비스, 핵심 로그, 다음 조치를 최종 응답에 포함한다.
+- Dockerfile은 Railway 빌드에 사용한다. 로컬 Compose 실행과 LAN 주소 fallback은 폐기됐다.
+- 환경/서비스 경계는 `scripts/cloud-environments.json`과 Railway 실제 설정으로 확인한다.
+- 클라이언트는 공개 HTTPS gateway, 백엔드 간 통신은 Railway private DNS를 사용한다.
+- 이미지에 비밀값을 넣지 않는다. DB/볼륨을 초기화하거나 삭제하지 않는다.
+- 스테이징 배포와 cloud E2E를 먼저 통과한 같은 소스만 production으로 배포한다.
+- 상세 명령과 실패/롤백 절차는 `docs/DEPLOYMENT.md`를 따른다.

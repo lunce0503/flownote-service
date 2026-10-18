@@ -30,7 +30,7 @@ Flownote의 하네스는 `.codex/`의 규칙, 프롬프트, 체크리스트, 메
 2. `.codex/harness/routing.md`로 관련 규칙과 검증 명령을 고른다.
 3. 기존 패턴을 읽고 최소 변경 경로를 정한다.
 4. 구현 후 가장 좁은 검증을 먼저 실행한다.
-5. 저장소 루트에서 `docker compose up -d --build`로 통합 실행을 확인한다.
+5. `node scripts/deploy-cloud.mjs staging <target>`으로 배포와 cloud E2E를 확인한 뒤 같은 소스를 production에 배포한다. 로컬 Compose는 폐기됐다.
 6. 파일을 수정한 작업은 항상 클라우드 배포를 진행한다. `flownote/`는 Vercel production, `flownote-API/`는 Railway `flownote-api`, `flownote-server/`는 Railway `flownote-main`을 배포한다.
 7. `logs/report/` 아래 보고서만 작성하거나 수정하는 작업은 Docker와 클라우드 배포를 생략하고, 파일 확인으로 검증을 끝낸다.
 8. `logs/report/` 외 문서 전용 변경은 Vercel production 배포를 기본으로 수행하고, 백엔드 실행 산출물이 바뀌지 않았으면 Railway 배포 생략 사유를 기록한다.

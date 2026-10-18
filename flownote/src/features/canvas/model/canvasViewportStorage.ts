@@ -1,4 +1,4 @@
-import { CANVAS_VIEWPORT_STORAGE_KEY, type StoredCanvasViewport } from "./canvasConstants";
+import { CANVAS_VIEWPORT_STORAGE_KEY, MAX_CANVAS_SCALE, MIN_CANVAS_SCALE, type StoredCanvasViewport } from "./canvasConstants";
 
 const getCanvasViewportStorageKey = (canvasId: string) => `${CANVAS_VIEWPORT_STORAGE_KEY}.${canvasId}`;
 
@@ -11,7 +11,7 @@ export const parseStoredViewport = (raw: string | null): StoredCanvasViewport | 
         }
         return {
             offset: { x: value.offset.x, y: value.offset.y },
-            scale: Math.min(5, Math.max(0.2, value.scale)),
+            scale: Math.min(MAX_CANVAS_SCALE, Math.max(MIN_CANVAS_SCALE, value.scale)),
         };
     } catch {
         return null;

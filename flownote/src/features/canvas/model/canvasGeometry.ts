@@ -7,6 +7,74 @@ export type Bounds = {
     maxY: number;
 };
 
+export type CanvasViewport = {
+    offset: Point;
+    scale: number;
+    width: number;
+    height: number;
+};
+
+export const CANVAS_RENDER_WINDOW_SCALE = 1.5;
+export const CANVAS_RENDER_MAX_INTERPOLATED_POINTS = 12_000;
+
+export const getCanvasViewportBounds = ({ offset, scale, width, height }: CanvasViewport): Bounds => ({
+    minX: -offset.x / scale,
+    minY: -offset.y / scale,
+    maxX: (width - offset.x) / scale,
+    maxY: (height - offset.y) / scale,
+});
+
+export const expandBounds = (bounds: Bounds, scale: number): Bounds => {
+    const extraWidth = (bounds.maxX - bounds.minX) * (scale - 1) / 2;
+    const extraHeight = (bounds.maxY - bounds.minY) * (scale - 1) / 2;
+    return {
+        minX: bounds.minX - extraWidth,
+        minY: bounds.minY - extraHeight,
+        maxX: bounds.maxX + extraWidth,
+        maxY: bounds.maxY + extraHeight,
+    };
+};
+
+export const containsBounds = (container: Bounds, target: Bounds) => (
+    container.minX <= target.minX
+    && container.minY <= target.minY
+    && container.maxX >= target.maxX
+    && container.maxY >= target.maxY
+);
+
+export const interpolateLinePointsForRendering = (
+    points: Point[],
+    maxPointCount = CANVAS_RENDER_MAX_INTERPOLATED_POINTS,
+): Point[] => {
+    if (points.length <= 2) return points;
+
+    const sourceLimit = Math.max(2, Math.floor(maxPointCount / 2));
+    const sourcePoints = points.length <= sourceLimit
+        ? points
+        : Array.from({ length: sourceLimit }, (_, index) => (
+            points[Math.round(index * (points.length - 1) / (sourceLimit - 1))]
+        ));
+    const interpolated: Point[] = [sourcePoints[0]];
+
+    for (let index = 0; index < sourcePoints.length - 1; index += 1) {
+        const current = sourcePoints[index];
+        const next = sourcePoints[index + 1];
+        interpolated.push(
+            {
+                x: current.x * 0.75 + next.x * 0.25,
+                y: current.y * 0.75 + next.y * 0.25,
+            },
+            {
+                x: current.x * 0.25 + next.x * 0.75,
+                y: current.y * 0.25 + next.y * 0.75,
+            },
+        );
+    }
+
+    interpolated.push(sourcePoints[sourcePoints.length - 1]);
+    return interpolated;
+};
+
 export const markModified = <T extends { status?: CanvasElementStatus }>(item: T): T => ({
     ...item,
     status: item.status === "new" ? "new" : "modified",

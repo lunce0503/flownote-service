@@ -13,9 +13,26 @@ import type {
     LassoSelection,
     MovingCanvasObject,
 } from "@/features/canvas";
-import { buildLassoSelection, isPointInsideBounds } from "@/features/canvas";
+import { buildLassoSelection, isPointInsideBounds, MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from "@/features/canvas";
 
 type EraserTargets = EraserElementTargets & { lines: boolean };
+type PanAxis = "x" | "y";
+
+type SingleTouchPan = {
+    pointerId: number;
+    origin: Point;
+    previous: Point;
+    axis: PanAxis | null;
+};
+
+const SINGLE_TOUCH_AXIS_LOCK_THRESHOLD = 6;
+
+const resolvePanAxis = (origin: Point, current: Point): PanAxis | null => {
+    const deltaX = current.x - origin.x;
+    const deltaY = current.y - origin.y;
+    if (Math.hypot(deltaX, deltaY) < SINGLE_TOUCH_AXIS_LOCK_THRESHOLD) return null;
+    return Math.abs(deltaX) >= Math.abs(deltaY) ? "x" : "y";
+};
 
 type UseCanvasPointerInputOptions = {
     tool: ToolType;
@@ -132,13 +149,20 @@ export const useCanvasPointerInput = ({
     strokeWidth,
 }: UseCanvasPointerInputOptions) => {
     const pointersRef = useRef<Map<number, Point>>(new Map());
+    const isDrawingRef = useRef(isDrawing);
     const lastTouchDistanceRef = useRef<number | null>(null);
     const lastTouchCenterRef = useRef<Point | null>(null);
     const touchGestureActiveRef = useRef(false);
+    const singleTouchPanRef = useRef<SingleTouchPan | null>(null);
     const middleDragStartRef = useRef<Point | null>(null);
     const lassoDragStartRef = useRef<Point | null>(null);
     const [isMiddleDragging, setIsMiddleDragging] = useState(false);
     const [isLassoDragging, setIsLassoDragging] = useState(false);
+
+    const setDrawingActive = (active: boolean) => {
+        isDrawingRef.current = active;
+        setIsDrawing(active);
+    };
 
     const blocksTouchDrawing = (event: React.PointerEvent<HTMLCanvasElement>) => (
         pencilOnlyMode
@@ -149,9 +173,10 @@ export const useCanvasPointerInput = ({
     const resetActiveAction = () => {
         currentLineRef.current = [];
         resetLocalLine();
-        setIsDrawing(false);
+        setDrawingActive(false);
         setIsLassoDragging(false);
         lassoDragStartRef.current = null;
+        singleTouchPanRef.current = null;
         setMovingObject(null);
     };
 
@@ -182,7 +207,7 @@ export const useCanvasPointerInput = ({
 
         if (lastTouchDistanceRef.current && previousCenter) {
             const previousScale = scaleRef.current;
-            const nextScale = Math.min(5, Math.max(0.2, previousScale * (newDistance / lastTouchDistanceRef.current)));
+            const nextScale = Math.min(MAX_CANVAS_SCALE, Math.max(MIN_CANVAS_SCALE, previousScale * (newDistance / lastTouchDistanceRef.current)));
             const zoomRatio = nextScale / previousScale;
             const previousOffset = offsetRef.current;
             const nextOffset = {
@@ -198,6 +223,28 @@ export const useCanvasPointerInput = ({
 
         lastTouchDistanceRef.current = newDistance;
         lastTouchCenterRef.current = newCenter;
+    };
+
+    const moveViewportWithSingleTouch = (pointerId: number, position: Point) => {
+        const gesture = singleTouchPanRef.current;
+        if (!gesture || gesture.pointerId !== pointerId) return false;
+
+        if (!gesture.axis) {
+            gesture.axis = resolvePanAxis(gesture.origin, position);
+            if (!gesture.axis) return true;
+        }
+
+        const deltaX = position.x - gesture.previous.x;
+        const deltaY = position.y - gesture.previous.y;
+        const previousOffset = offsetRef.current;
+        const nextOffset = gesture.axis === "x"
+            ? { x: previousOffset.x + deltaX, y: previousOffset.y }
+            : { x: previousOffset.x, y: previousOffset.y + deltaY };
+
+        gesture.previous = position;
+        offsetRef.current = nextOffset;
+        setOffset(nextOffset);
+        return true;
     };
 
     const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -228,7 +275,17 @@ export const useCanvasPointerInput = ({
             return;
         }
 
-        if (touchGestureActiveRef.current || blocksTouchDrawing(event)) return;
+        if (touchGestureActiveRef.current) return;
+
+        if (blocksTouchDrawing(event)) {
+            singleTouchPanRef.current = {
+                pointerId: event.pointerId,
+                origin: position,
+                previous: position,
+                axis: null,
+            };
+            return;
+        }
 
         if (tool === "eraser") {
             if (editingTextBoxId) commitTextBoxEdit();
@@ -252,7 +309,7 @@ export const useCanvasPointerInput = ({
                 color: penColor,
                 strokeWidth,
             }, streamLineStart);
-            setIsDrawing(true);
+            setDrawingActive(true);
         } else if (tool === "lasso") {
             if (editingTextBoxId) commitTextBoxEdit();
             const point = getCanvasCoords(event);
@@ -265,7 +322,7 @@ export const useCanvasPointerInput = ({
             recordHistory();
             currentLineRef.current = [];
             appendPointerToCurrentLine(event);
-            setIsDrawing(true);
+            setDrawingActive(true);
         } else if (tool === "handle") {
             setLassoSelection(null);
             setMovingObject(null);
@@ -345,6 +402,7 @@ export const useCanvasPointerInput = ({
             return;
         }
         if (touchGestureActiveRef.current) return;
+        if (moveViewportWithSingleTouch(event.pointerId, position)) return;
 
         if (isLassoDragging && lassoDragStartRef.current) {
             const current = getCanvasCoords(event);
@@ -361,7 +419,7 @@ export const useCanvasPointerInput = ({
                 images: eraserTargets.images,
                 textBoxes: eraserTargets.textBoxes,
             });
-        } else if ((tool === "pen" || tool === "lasso") && isDrawing) {
+        } else if ((tool === "pen" || tool === "lasso") && isDrawingRef.current) {
             const previousPointCount = currentLineRef.current.length;
             appendPointerToCurrentLine(event);
             if (tool === "pen") {
@@ -385,6 +443,12 @@ export const useCanvasPointerInput = ({
             middleDragStartRef.current = null;
         }
 
+        if (singleTouchPanRef.current?.pointerId === event.pointerId) {
+            singleTouchPanRef.current = null;
+            setMovingObject(null);
+            return;
+        }
+
         if (touchGestureActiveRef.current) {
             if (pointersRef.current.size >= 2) updateTouchGestureBaseline();
             else {
@@ -398,7 +462,8 @@ export const useCanvasPointerInput = ({
         if (isLassoDragging) {
             setIsLassoDragging(false);
             lassoDragStartRef.current = null;
-        } else if ((tool === "pen" || tool === "lasso") && isDrawing) {
+        } else if ((tool === "pen" || tool === "lasso") && isDrawingRef.current) {
+            isDrawingRef.current = false;
             const previousPointCount = currentLineRef.current.length;
             appendPointerToCurrentLine(event);
             if (tool === "pen") {
@@ -425,7 +490,7 @@ export const useCanvasPointerInput = ({
         event.preventDefault();
         const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
         const previousScale = scaleRef.current;
-        const nextScale = Math.min(5, Math.max(0.2, previousScale * factor));
+        const nextScale = Math.min(MAX_CANVAS_SCALE, Math.max(MIN_CANVAS_SCALE, previousScale * factor));
         const zoomRatio = nextScale / previousScale;
         if (zoomRatio === 1) return;
 

@@ -6,6 +6,8 @@ import { useFullscreen } from '@/shared/lib/useFullscreen';
 import { getRouteDocumentTitle, useDocumentTitle } from '@/shared/lib/useDocumentTitle';
 import { AuthProvider, ProtectedRoute } from '@/features/auth';
 import { ThemeProvider } from '@/features/theme';
+import { isAndroidApp } from '@/shared/lib/androidApp';
+import AndroidNavigation from './AndroidNavigation';
 import {
   capabilityManifest,
   isCapabilityVisibleInNavigation,
@@ -33,7 +35,7 @@ const AppRoutes = () => {
   const [titleFeature, titleDetail] = getRouteDocumentTitle(location.pathname);
   useDocumentTitle(titleFeature, titleDetail, 0);
   // 전체 화면(전체로 보기) 중에는 브라우저 UI와 함께 Flownote 헤더도 숨긴다.
-  const shouldShowHeader = !isFullscreen && !["/login", "/signup"].includes(location.pathname);
+  const shouldShowHeader = !isAndroidApp && !isFullscreen && !["/login", "/signup"].includes(location.pathname);
 
   return (
     <>
@@ -47,6 +49,7 @@ const AppRoutes = () => {
             ),
           )}
       </Routes>
+      {isAndroidApp && <AndroidNavigation key={location.pathname} />}
     </>
   );
 };

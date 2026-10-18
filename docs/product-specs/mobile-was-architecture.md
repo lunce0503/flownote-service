@@ -1,6 +1,6 @@
 # 모바일 클라이언트 아키텍처
 
-Flownote 모바일은 Expo Router 기반 React Native 클라이언트다. WebView로 기존 웹 앱을 감싸지 않고 계정, 작업, 노트, 에이전트, 캔버스를 네이티브 컴포넌트로 직접 렌더링한다.
+이 문서는 `flownote-mobile/`의 Expo Router 기반 React Native 클라이언트를 다룬다. 계정, 작업, 노트, 에이전트, 캔버스를 네이티브 컴포넌트로 직접 렌더링한다. 2026-10-17 추가된 웹 전체 기능 제공용 Android 설치 APK는 별도 `flownote-android/`의 시스템 WebView 앱이며 [Android 앱 사양](android-app.md)이 소유한다.
 
 ## 내비게이션 구조
 
@@ -60,18 +60,7 @@ https://flownote-api-production.up.railway.app
 
 무료 Apple 계정으로 iPad 실기기에서 네이티브 컴포넌트 동작을 확인한다.
 
-```bash
-cd flownote-mobile
-EXPO_PUBLIC_WAS_URL=https://flownote-api-production.up.railway.app npm run start -- --tunnel
-```
-
-### 로컬 Docker
-
-루트 Compose는 `flownote-mobile/Dockerfile`의 `development` 단계를 사용해 Expo 개발 서버를 `8081`에 실행한다.
-
-```bash
-HOST_LAN_IP=192.168.0.10 docker compose up --build mobile-app
-```
+Expo Go에서 staging URL `exps://flownote-expo-go-staging-staging.up.railway.app`을 사용한다. 로컬 Metro·Compose 및 PC LAN API는 폐기됐다. 검증 후 production URL로 배포한다.
 
 ### Railway 웹 테스트
 
@@ -87,7 +76,7 @@ production의 `flownote-expo-go` 서비스는 Expo Go용 Metro manifest와 bundl
 
 ## 운영 설정
 
-Spring 모바일 설정에는 localhost가 아닌 공개 HTTPS 주소를 지정한다.
+Spring 모바일 설정에는 환경별 공개 HTTPS 주소를 지정한다.
 
 ```text
 MOBILE_CORE_API_URL=https://flownote-api-production.up.railway.app
@@ -107,7 +96,7 @@ npm ci
 npm run verify
 
 cd ..
-docker compose up -d --build
+node scripts/deploy-cloud.mjs release all
 ```
 
 배포 후 `/health`, `/api/mobile/config`, 인증이 필요한 `/api/canvas/documents`의 CORS와 상태 코드를 확인한다.

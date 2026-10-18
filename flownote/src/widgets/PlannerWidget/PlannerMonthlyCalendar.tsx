@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, CalendarDays, Download } from "lucide-react";
+import { isAndroidApp } from '@/shared/lib/androidApp';
 import type { ScheduleItem } from "@/entities/schedule";
 import {
   type PlannerTaskSummary,
@@ -79,7 +80,9 @@ const PlannerMonthlyCalendar = ({ selectedDate, scheduleItems, tasks, diaryDates
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    // Android receives the blob download asynchronously through WebView's listener.
+    if (isAndroidApp) window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    else URL.revokeObjectURL(url);
   };
 
   return (

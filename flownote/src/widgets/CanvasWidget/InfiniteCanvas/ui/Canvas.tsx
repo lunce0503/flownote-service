@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { useCanvasState } from "@/features/canvas";
 import { useDrawing } from "@/features/canvas";
@@ -29,14 +29,16 @@ import {
     type LassoSelection,
 } from "@/features/canvas";
 import { getAutoTextBoxSize } from "@/features/canvas";
+import { isPdfFile, renderPdfPagesToImageFiles } from "@/features/canvas";
 import type { CanvasDocumentSummary, Point, TextBoxElement } from "@/entities/canvas";
-import { getCanvasDocuments } from "@/entities/canvas";
+import { getCanvasDocuments, updateCanvasDocument } from "@/entities/canvas";
 import { useLocalStorageBoolean } from "@/shared/lib/useLocalStorageBoolean";
 import { useDocumentTitle } from "@/shared/lib/useDocumentTitle";
 import { subscribeSyncEvents } from "@/shared/lib/sync";
 import { useCanvasPointerInput } from "../model/useCanvasPointerInput";
 import { useLassoActions } from "../model/useLassoActions";
 import { Toolbar } from "./Toolbar";
+import { CanvasPlannerSuggestions } from "./CanvasPlannerSuggestions";
 import "../index.css";
 
 const isEditableKeyboardTarget = (target: EventTarget | null) => {
@@ -63,6 +65,11 @@ const getClipboardImageFile = (clipboardData: DataTransfer | null) => {
     }
 
     return null;
+};
+
+type AssetImportState = {
+    status: "idle" | "importing" | "complete" | "failed";
+    message: string;
 };
 
 const Canvas = () => {
@@ -124,7 +131,6 @@ const Canvas = () => {
         requestSave,
         handleLoad,
         cancelCanvasLoad,
-        handleImageUpload,
         addImageFile,
         handleFlushSave,
         retryPendingSaves,
@@ -153,6 +159,11 @@ const Canvas = () => {
     const editingTextBoxSnapshotRef = useRef<TextBoxElement | null>(null);
     const skipTextBlurCommitRef = useRef(false);
     const [isCanvasSettingsVisible, setIsCanvasSettingsVisible] = useState(false);
+    const [isPlannerSuggestionsVisible, setIsPlannerSuggestionsVisible] = useState(false);
+    const [assetImportState, setAssetImportState] = useState<AssetImportState>({
+        status: "idle",
+        message: "이미지 또는 PDF 추가",
+    });
     const [canEraseLines, setCanEraseLines] = useLocalStorageBoolean(CANVAS_ERASER_LINES_STORAGE_KEY, true);
     const [canEraseImages, setCanEraseImages] = useLocalStorageBoolean(CANVAS_ERASER_IMAGES_STORAGE_KEY, true);
     const [canEraseTextBoxes, setCanEraseTextBoxes] = useLocalStorageBoolean(CANVAS_ERASER_TEXT_BOXES_STORAGE_KEY, true);
@@ -166,6 +177,10 @@ const Canvas = () => {
         images: canEraseImages,
         textBoxes: canEraseTextBoxes,
     }), [canEraseImages, canEraseLines, canEraseTextBoxes]);
+    const renderLines = useMemo(
+        () => [...drawnLines, ...remoteStreamingLines],
+        [drawnLines, remoteStreamingLines],
+    );
     const { redrawWith, redrawActiveStroke } = useCanvasRendering(konvaRendererRef, offset, scale, currentLineRef, currentLineStyle, viewport);
     const { offsetRef, scaleRef } = useStoredCanvasViewport({
         selectedCanvasId,
@@ -189,8 +204,8 @@ const Canvas = () => {
     }, []);
 
     useEffect(() => {
-        redrawWith([...drawnLines, ...remoteStreamingLines], images, textBoxes);
-    }, [offset, scale, drawnLines, images, remoteStreamingLines, textBoxes, redrawWith]);
+        redrawWith(renderLines, images, textBoxes);
+    }, [images, redrawWith, renderLines, textBoxes]);
 
     useEffect(() => {
         selectedCanvasIdRef.current = selectedCanvasId;
@@ -328,6 +343,70 @@ const Canvas = () => {
         getCanvasTitle(canvasDocuments, selectedCanvasId)
     ), [canvasDocuments, selectedCanvasId]);
     useDocumentTitle("그림판", selectedCanvasTitle || selectedCanvasId || "캔버스");
+
+    const handleRenameCanvas = useCallback(async (title: string) => {
+        if (!selectedCanvasId) throw new Error("선택된 캔버스가 없습니다.");
+        const updated = await updateCanvasDocument(selectedCanvasId, title);
+        setCanvasDocuments((current) => current.some((document) => document.id === updated.id)
+            ? current.map((document) => document.id === updated.id ? updated : document)
+            : [updated, ...current]);
+    }, [selectedCanvasId]);
+
+    const handleAssetUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const selectedFiles = Array.from(event.target.files ?? []);
+        event.target.value = "";
+        if (selectedFiles.length === 0) return;
+
+        recordHistory();
+        setAssetImportState({ status: "importing", message: "파일을 캔버스로 가져오는 중" });
+        const placementCenter = getDisplayedViewportCenter();
+        let placementIndex = 0;
+        let importedCount = 0;
+        let failedCount = 0;
+
+        for (const file of selectedFiles) {
+            try {
+                setAssetImportState({
+                    status: "importing",
+                    message: isPdfFile(file) ? `${file.name} 페이지를 변환하는 중` : `${file.name} 가져오는 중`,
+                });
+                const imageFiles = isPdfFile(file) ? await renderPdfPagesToImageFiles(file) : [file];
+                for (const imageFile of imageFiles) {
+                    const added = await addImageFile(imageFile, {
+                        x: placementCenter.x,
+                        y: placementCenter.y + placementIndex * 840,
+                    });
+                    placementIndex += 1;
+                    if (added) importedCount += 1;
+                    else failedCount += 1;
+                }
+            } catch (importError) {
+                console.error("Failed to import a canvas asset:", importError);
+                failedCount += 1;
+            }
+        }
+
+        if (importedCount > 0) {
+            setTool("lasso");
+            setAssetImportState({
+                status: failedCount > 0 ? "failed" : "complete",
+                message: failedCount > 0
+                    ? `${importedCount}개를 가져왔고 ${failedCount}개는 실패했습니다.`
+                    : `${importedCount}개를 가져왔습니다. 올가미로 이동하거나 크기를 바꿀 수 있습니다.`,
+            });
+        } else {
+            setAssetImportState({ status: "failed", message: "파일을 가져오지 못했습니다." });
+        }
+    }, [addImageFile, getDisplayedViewportCenter, recordHistory, setTool]);
+
+    useEffect(() => {
+        if (assetImportState.status !== "complete") return;
+        const timer = window.setTimeout(() => setAssetImportState({
+            status: "idle",
+            message: "이미지 또는 PDF 추가",
+        }), 5_000);
+        return () => window.clearTimeout(timer);
+    }, [assetImportState.status]);
 
     const lassoBounds = useMemo(() => (
         getLassoSelectionBounds(lassoSelection, drawnLines, images, textBoxes)
@@ -559,12 +638,12 @@ const Canvas = () => {
                 <Toolbar
                     canvasTitle={selectedCanvasTitle}
                     onNavigateToCanvasList={() => navigate("/canvas")}
+                    onRenameCanvas={handleRenameCanvas}
                     tool={tool}
                     setTool={setTool}
-                    handleImageUpload={async (event) => {
-                        if (event.target.files?.[0]) recordHistory();
-                        await handleImageUpload(event, getDisplayedViewportCenter());
-                    }}
+                    handleAssetUpload={handleAssetUpload}
+                    isImportingAssets={assetImportState.status === "importing"}
+                    assetImportMessage={assetImportState.message}
                     handleSave={handleSave}
                     handleLoad={handleLoad}
                     cancelCanvasLoad={cancelCanvasLoad}
@@ -587,9 +666,24 @@ const Canvas = () => {
                     onPenColorChange={handlePenColorChange}
                     isCanvasSettingsVisible={isCanvasSettingsVisible}
                     onToggleCanvasSettingsVisible={() => setIsCanvasSettingsVisible((current) => !current)}
+                    onOpenPlannerSuggestions={() => { setIsCanvasSettingsVisible(false); setIsPlannerSuggestionsVisible(true); }}
                     zoomPercent={Math.round(scale * 100)}
                     viewportCenter={viewportCenter}
                 />
+                {isPlannerSuggestionsVisible && <CanvasPlannerSuggestions key={selectedCanvasId} textBoxes={textBoxes} onClose={() => setIsPlannerSuggestionsVisible(false)} />}
+                {assetImportState.status !== "idle" && (
+                    <div
+                        data-canvas-touch-allow="true"
+                        className={`fixed bottom-3 right-3 z-50 max-w-[min(24rem,calc(100vw-1.5rem))] rounded-md px-3 py-2 text-sm font-semibold shadow-lg ring-1 ${assetImportState.status === "failed" ? "bg-red-50 text-red-800 ring-red-200" : "bg-white text-stone-800 ring-stone-200"}`}
+                        role="status"
+                        aria-live="polite"
+                    >
+                        <span className="inline-flex items-center gap-2">
+                            {assetImportState.status === "importing" && <Loader2 size={16} className="animate-spin" />}
+                            {assetImportState.message}
+                        </span>
+                    </div>
+                )}
                 {isCanvasSettingsVisible && (
                     <div
                         data-canvas-touch-allow="true"
@@ -657,6 +751,7 @@ const Canvas = () => {
 
                 <canvas
                     data-testid="canvas-input-surface"
+                    data-ready={saveState.status !== "loading"}
                     ref={canvasRef}
                     width={viewport.width}
                     height={viewport.height}
@@ -668,8 +763,10 @@ const Canvas = () => {
                         userSelect: "none",
                         WebkitUserSelect: "none",
                         WebkitTouchCallout: "none",
+                        pointerEvents: saveState.status === "loading" ? "none" : "auto",
                         cursor: isMiddleDragging ? "grabbing" : isDrawing ? "crosshair" : tool === "eraser" ? "cell" : tool === "lasso" ? "copy" : tool === "handle" ? "move" : "default",
                     }}
+                    aria-disabled={saveState.status === "loading"}
                     onWheel={handleWheel}
                     onPointerDown={handlePointerDown}
                     onPointerMove={handlePointerMove}

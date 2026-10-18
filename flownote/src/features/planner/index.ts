@@ -1,4 +1,6 @@
 export { usePlanner } from "./model/usePlanner";
+export { suggestCanvasPlans, addSuggestedSchedule } from "./model/canvasPlannerSuggestions";
+export type { CanvasPlanSuggestion } from "./model/canvasPlannerSuggestions";
 export type { PlannerView, PlannerTaskSummary, UsePlannerResult } from "./model/usePlanner";
 export { useDiary, toDateKey } from "./model/useDiary";
 export type { UseDiaryResult, DiaryTool, DiaryLoadStatus, DiarySaveStatus } from "./model/useDiary";

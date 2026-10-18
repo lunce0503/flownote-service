@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+automation_root="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+feedback_state="${FLOWNOTE_AUTOMATION_STATE_DIR:-${XDG_STATE_HOME:-${HOME:?HOME is required}/.local/state}/flownote-codex}"
+install -d -m 700 "$feedback_state"
+exec 8>"$feedback_state/feedback-release.lock"
+flock -n 8 || { echo 'Another feedback release is active.' >&2; exit 75; }
+exec node "$automation_root/lib/feedback-release.mjs" "${1:-}"

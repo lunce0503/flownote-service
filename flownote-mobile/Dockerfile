@@ -5,24 +5,14 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM dependencies AS development
-
-ENV EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
-
-COPY . .
-
-EXPOSE 8081 19000 19001 19002
-
-CMD ["npx", "expo", "start", "--host", "lan", "--port", "8081"]
-
 FROM dependencies AS builder
 
-ARG EXPO_PUBLIC_WAS_URL=https://flownote-api-production.up.railway.app
+ARG EXPO_PUBLIC_WAS_URL
 ENV EXPO_PUBLIC_WAS_URL=${EXPO_PUBLIC_WAS_URL}
 ENV EXPO_NO_TELEMETRY=1
 
 COPY . .
-RUN npm run build:web
+RUN test -n "$EXPO_PUBLIC_WAS_URL" && npm run build:web
 
 FROM node:22-bookworm-slim AS production
 

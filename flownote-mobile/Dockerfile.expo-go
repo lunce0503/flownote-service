@@ -8,7 +8,8 @@ RUN npm ci && npm cache clean --force
 COPY . .
 
 ENV EXPO_NO_TELEMETRY=1
-ENV EXPO_MAX_WORKERS=2
+ENV EXPO_MAX_WORKERS=1
+ENV NODE_OPTIONS=--max-old-space-size=384
 
 EXPOSE 8080
 

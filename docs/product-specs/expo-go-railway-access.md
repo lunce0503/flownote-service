@@ -9,7 +9,7 @@
 - `flownote-mobile-production`: Safari/브라우저용 Expo Web 정적 클라이언트다.
 - `flownote-expo-go`: Expo Go가 manifest와 JavaScript bundle을 받는 production Metro 서비스다.
 - `flownote-api`: 모바일 앱이 호출하는 단일 공개 API gateway다.
-- `flownote-main`, `flownote-canvas`, `flownote-serve`, `flownote-ai`: gateway 뒤의 production 서비스다.
+- `flownote-main`, `flownote-canvas`, `flownote-sub`, `flownote-ai`: gateway 뒤의 production 서비스다. `flownote-sub`의 소스 디렉터리는 `flownote-serve/`다.
 
 Expo Go 서비스는 production 환경에 있지만 개발 서버 프로토콜을 제공한다. 앱 코드는 `--no-dev --minify`로 번들하고, API 비밀값은 포함하지 않는다. QR 주소를 아는 사용자는 JavaScript bundle을 내려받을 수 있으므로 서버 API는 항상 로그인과 사용자 소유권을 검증해야 한다.
 

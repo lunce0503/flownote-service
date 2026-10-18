@@ -32,7 +32,9 @@ import {
   CANVAS_SOCKET_LOAD_TIMEOUT_MS,
   getCanvasSocket,
   emitCanvasSocket,
+  emitCanvasStream,
   isCanvasMutationConflict,
+  isCanvasPermanentSaveError,
   saveCanvasPayload,
   type CanvasChangedEvent,
   type CanvasStreamCallbacks,
@@ -48,7 +50,6 @@ import {
   removeCanvasRetryQueueItem,
   clearCanvasRetryQueue,
   updateCanvasRetryQueueItem,
-  resetCanvasRetryBackoff,
   serializeCanvasDraft,
   readCanvasLocalDraftPersisted,
   writeCanvasLocalDraft,
@@ -81,11 +82,13 @@ export const usePersistence = (
   const dirtyImageIdsRef = useRef(new Set<string>());
   const dirtyTextBoxIdsRef = useRef(new Set<string>());
   const canvasIdRef = useRef(canvasId);
+  const initializedCanvasIdRef = useRef<string | null | undefined>(undefined);
+  const queueHydrationRef = useRef<Promise<void> | null>(null);
   const localRevisionRef = useRef(0);
   const serverRevisionRef = useRef(0);
   const saveInFlightRef = useRef(false);
   const saveAgainRequestedRef = useRef(false);
-  const handleSaveRef = useRef<(() => Promise<void>) | null>(null);
+  const handleSaveRef = useRef<((trigger?: CanvasSaveTrigger) => Promise<void>) | null>(null);
   const handleLoadRef = useRef<((trigger?: CanvasLoadTrigger) => Promise<void>) | null>(null);
   const loadInFlightRef = useRef<Promise<void> | null>(null);
   const loadAgainRequestedRef = useRef(false);
@@ -115,7 +118,7 @@ export const usePersistence = (
 
   useEffect(() => {
     let active = true;
-    void readCanvasOperationQueue<CanvasRetryQueueItem>().then((queue) => {
+    queueHydrationRef.current = readCanvasOperationQueue<CanvasRetryQueueItem>().then((queue) => {
       if (!active) return;
       hydrateCanvasRetryQueue(queue.map((item) => ({
         ...item,
@@ -135,6 +138,7 @@ export const usePersistence = (
   }, []);
 
   useEffect(() => {
+    initializedCanvasIdRef.current = undefined;
     remoteChangeQueueRef.current = [];
     pendingSaveTriggersRef.current = [];
     pendingLoadTriggersRef.current = ["selection"];
@@ -153,6 +157,7 @@ export const usePersistence = (
     dirtyTextBoxIdsRef.current = new Set(textBoxes.filter((textBox) => textBox.status && textBox.status !== "unchanged").map((textBox) => textBox.id));
     canvasIdRef.current = canvasId;
     localRevisionRef.current += 1;
+    if (initializedCanvasIdRef.current !== (canvasId ?? null)) return;
     scheduleCanvasLocalDraft(canvasId, drawnLines, images, textBoxes, serverRevisionRef.current);
 
     const hasDirtyElements = dirtyLineIdsRef.current.size + dirtyImageIdsRef.current.size + dirtyTextBoxIdsRef.current.size > 0;
@@ -211,6 +216,7 @@ export const usePersistence = (
     signal?: AbortSignal,
   ) => {
     if (signal?.aborted || canvasIdRef.current !== targetCanvasId) return false;
+    initializedCanvasIdRef.current = targetCanvasId;
     const imagePlaceholders = draft.images.map((image) => ({ ...image, image: new Image() }));
     setDrawnLines(draft.lines);
     setTextBoxes(draft.textBoxes);
@@ -345,6 +351,7 @@ export const usePersistence = (
 
   const retryPendingSaves = useCallback(async (options?: { skipInFlightGuard?: boolean }) => {
     if (!CANVAS_SOCKET_URL) return;
+    if (initializedCanvasIdRef.current !== (canvasIdRef.current ?? null)) return;
 
     if (!options?.skipInFlightGuard) {
       pendingSaveTriggersRef.current = enqueueUniqueByPriority(
@@ -364,16 +371,17 @@ export const usePersistence = (
       const targetCanvasId = canvasIdRef.current ?? null;
       const now = Date.now();
       const queue = readCanvasRetryQueue()
-        .filter((item) => item.canvasId === targetCanvasId && item.nextAttemptAt <= now)
+        .filter((item) => item.canvasId === targetCanvasId && !item.blocked && item.nextAttemptAt <= now)
         .sort((left, right) => right.priority - left.priority || left.createdAt - right.createdAt)
         .slice(0, 1);
       if (queue.length === 0) {
         const pendingRetries = getCanvasRetryCount(targetCanvasId);
+        const blocked = readCanvasRetryQueue().find((item) => item.canvasId === targetCanvasId && item.blocked);
         setSaveState((current) => ({
           ...current,
           pendingRetries,
           status: pendingRetries > 0 ? "failed" : current.status === "failed" ? "idle" : "saved",
-          message: pendingRetries > 0 ? "재시도 대기" : current.status === "failed" ? "저장 대기" : "저장 완료",
+          message: blocked ? "자동 재시도 중단 · 초안 보존됨" : pendingRetries > 0 ? "재시도 대기" : current.status === "failed" ? "저장 대기" : "저장 완료",
           lastSavedAt: pendingRetries > 0 || current.status === "failed" ? current.lastSavedAt : Date.now(),
         }));
         return;
@@ -406,6 +414,7 @@ export const usePersistence = (
 
         if (hasChangesAfterQueuedMutation) {
           updateCanvasRetryQueueItem(item.id, {
+            blocked: false,
             mutationId: mutationIdToSave,
             payload: payloadToSave,
             priority: Math.max(item.priority ?? 40, SAVE_TRIGGER_PRIORITY.retry),
@@ -426,6 +435,7 @@ export const usePersistence = (
           // 백오프 없이 즉시 다시 시도한다. 서버 반영은 upsert/삭제 모두 멱등이라 중복 적용도 안전하다.
           const conflicted = isCanvasMutationConflict(error);
           updateCanvasRetryQueueItem(item.id, {
+            blocked: isCanvasPermanentSaveError(error),
             attempts: conflicted ? item.attempts : item.attempts + 1,
             lastError: error instanceof Error ? error.message : String(error),
             ...(conflicted
@@ -450,7 +460,8 @@ export const usePersistence = (
         setSaveState((current) => ({
           ...current,
           status: "failed",
-          message: "저장 실패",
+          message: readCanvasRetryQueue().some((item) => item.canvasId === targetCanvasId && item.blocked)
+            ? "자동 재시도 중단 · 초안 보존됨" : "저장 실패",
           pendingRetries: remainingRetries,
           lastErrorAt: Date.now(),
         }));
@@ -486,7 +497,7 @@ export const usePersistence = (
         if (saveAgainRequestedRef.current && !retryCancelRequestedRef.current) {
           saveAgainRequestedRef.current = false;
           window.setTimeout(() => {
-            void handleSaveRef.current?.();
+            void handleSaveRef.current?.("auto");
           }, 0);
         }
       }
@@ -497,7 +508,7 @@ export const usePersistence = (
     const timer = window.setInterval(() => {
       if (!navigator.onLine || saveInFlightRef.current) return;
       const hasDueRetry = readCanvasRetryQueue().some((item) => (
-        item.canvasId === (canvasIdRef.current ?? null) && item.nextAttemptAt <= Date.now()
+        item.canvasId === (canvasIdRef.current ?? null) && !item.blocked && item.nextAttemptAt <= Date.now()
       ));
       if (hasDueRetry) void retryPendingSaves();
     }, 5_000);
@@ -505,6 +516,7 @@ export const usePersistence = (
   }, [retryPendingSaves]);
 
   const handleSave = useCallback(async (trigger: CanvasSaveTrigger = "manual") => {
+    if (initializedCanvasIdRef.current !== (canvasIdRef.current ?? null)) return;
     if (!CANVAS_SOCKET_URL) {
       console.warn("캔버스 소켓 URL이 설정되지 않아 저장을 건너뜁니다.");
       return;
@@ -538,6 +550,10 @@ export const usePersistence = (
         attemptCanvasId = canvasIdRef.current ?? null;
 
         if (getCanvasRetryCount(attemptCanvasId) > 0) {
+          const queued = addCanvasRetryQueueItem(attemptCanvasId, buildCurrentSavePayload());
+          if (currentTrigger === "manual") {
+            updateCanvasRetryQueueItem(queued.id, { blocked: false, nextAttemptAt: Date.now() });
+          }
           await retryPendingSaves({ skipInFlightGuard: true });
           if (getCanvasRetryCount(attemptCanvasId) > 0) return;
           if (saveAgainRequestedRef.current) continue;
@@ -588,7 +604,7 @@ export const usePersistence = (
       const payload = activeMutation?.payload
         ?? (canvasIdRef.current === attemptCanvasId ? buildCurrentSavePayload() : null);
       if (payload && hasCanvasSavePayloadChanges(payload)) {
-        addCanvasRetryQueueItem(
+        const queued = addCanvasRetryQueueItem(
           attemptCanvasId,
           payload,
           err instanceof Error ? err.message : String(err),
@@ -597,11 +613,21 @@ export const usePersistence = (
           isCanvasMutationConflict(err) ? uuidv4() : activeMutation?.mutationId,
           SAVE_TRIGGER_PRIORITY[trigger],
         );
+        updateCanvasRetryQueueItem(queued.id, {
+          blocked: isCanvasPermanentSaveError(err),
+          attempts: queued.attempts + 1,
+          nextAttemptAt: Date.now() + 2_000,
+        });
+        if (canvasIdRef.current === attemptCanvasId) {
+          writeCanvasLocalDraft(attemptCanvasId, serializeCanvasDraft(
+            drawnLinesRef.current, imagesRef.current, textBoxesRef.current, serverRevisionRef.current,
+          ), { immediate: true });
+        }
       }
       setSaveState((current) => ({
         ...current,
         status: "failed",
-        message: "저장 실패",
+        message: isCanvasPermanentSaveError(err) ? "자동 재시도 중단 · 초안 보존됨" : "저장 실패",
         pendingRetries: getCanvasRetryCount(canvasIdRef.current),
         lastErrorAt: Date.now(),
       }));
@@ -617,6 +643,7 @@ export const usePersistence = (
 
   const requestSave = useCallback(() => {
     if (!CANVAS_SOCKET_URL) return;
+    if (initializedCanvasIdRef.current !== (canvasIdRef.current ?? null)) return;
 
     const payload = buildCurrentSavePayload();
     if (!hasCanvasSavePayloadChanges(payload) && getCanvasRetryCount(canvasIdRef.current) === 0) return;
@@ -651,6 +678,8 @@ export const usePersistence = (
 
   const handleFlushSave = useCallback(() => {
     if (!CANVAS_SOCKET_URL) return;
+    // Initial/StrictMode cleanup must not replace a persisted draft with empty state.
+    if (initializedCanvasIdRef.current !== (canvasIdRef.current ?? null)) return;
     if (autoSaveTimerRef.current !== null) {
       window.clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = null;
@@ -680,6 +709,7 @@ export const usePersistence = (
     trigger: CanvasLoadTrigger,
     signal: AbortSignal,
   ) => {
+    await queueHydrationRef.current;
     const localDraft = await readCanvasLocalDraftPersisted(targetCanvasId);
     try {
       if (canvasIdRef.current !== targetCanvasId) return;
@@ -703,6 +733,7 @@ export const usePersistence = (
           }));
           return;
         }
+        initializedCanvasIdRef.current = targetCanvasId;
         setDrawnLines([]);
         setImages([]);
         setTextBoxes([]);
@@ -789,6 +820,7 @@ export const usePersistence = (
         }));
         return;
       }
+      initializedCanvasIdRef.current = targetCanvasId;
       setDrawnLines([]);
       setImages([]);
       setTextBoxes([]);
@@ -923,9 +955,7 @@ export const usePersistence = (
       joinRoom();
       if (hasJoinedOnce) {
         if (getCanvasRetryCount(canvasIdRef.current) > 0) {
-          // 재연결 직후: 소켓 단절로 실패한 저장은 원인이 사라졌으므로 백오프를 리셋하고
-          // 즉시 재시도한다(5초 폴링·최대 5분 백오프 대기 제거). 큐가 비면 원격 변경을 캐치업한다.
-          resetCanvasRetryBackoff(canvasIdRef.current);
+          // Reconnection alone does not prove that a failed payload can be saved.
           void retryPendingSaves().then(() => {
             if (!saveInFlightRef.current && !hasPendingLocalChanges()) {
               void handleLoadRef.current?.("remote");
@@ -961,7 +991,7 @@ export const usePersistence = (
 
   const streamLineStart = useCallback((line: Omit<LineElement, "status">) => {
     if (!CANVAS_SOCKET_URL || !canvasIdRef.current) return;
-    getCanvasSocket(CANVAS_SOCKET_URL).emit("canvas:line-start", {
+    emitCanvasStream(CANVAS_SOCKET_URL, "canvas:line-start", {
       authorization: authHeaders().Authorization,
       canvasId: canvasIdRef.current,
       line,
@@ -976,7 +1006,7 @@ export const usePersistence = (
     entries.forEach(([targetLineId, points]) => {
       if (points.length === 0) return;
       streamedPointsByLineRef.current.delete(targetLineId);
-      getCanvasSocket(CANVAS_SOCKET_URL).emit("canvas:line-points", {
+      emitCanvasStream(CANVAS_SOCKET_URL, "canvas:line-points", {
         authorization: authHeaders().Authorization,
         canvasId: canvasIdRef.current,
         lineId: targetLineId,
@@ -999,7 +1029,7 @@ export const usePersistence = (
   const streamLineEnd = useCallback((line: Omit<LineElement, "status">) => {
     if (!CANVAS_SOCKET_URL || !canvasIdRef.current) return;
     flushStreamLinePoints(line.id);
-    getCanvasSocket(CANVAS_SOCKET_URL).emit("canvas:line-end", {
+    emitCanvasStream(CANVAS_SOCKET_URL, "canvas:line-end", {
       authorization: authHeaders().Authorization,
       canvasId: canvasIdRef.current,
       lineId: line.id,
@@ -1051,9 +1081,10 @@ export const usePersistence = (
       imgElement.x = center.x - imgElement.width / 2;
       imgElement.y = center.y - imgElement.height / 2;
       setImages(prev => [...prev, imgElement]);
+      return imgElement;
     } catch (err) {
       console.error("업로드 실패:", err);
-      // alert("이미지 업로드 실패");
+      return null;
     }
   }, [CANVAS_API_URL, CANVAS_SOCKET_URL, setImages]);
 
@@ -1075,7 +1106,7 @@ export const usePersistence = (
     handleImageUpload,
     addImageFile,
     handleFlushSave,
-    retryPendingSaves,
+    retryPendingSaves: () => handleSave("manual"),
     cancelPendingSaves,
     saveState,
     streamLineStart,

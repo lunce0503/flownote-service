@@ -1,4 +1,4 @@
-name: Deploy Production
+name: Deploy Staging Then Production
 
 on:
   workflow_dispatch:
@@ -17,6 +17,7 @@ on:
           - serve
           - ai
           - mobile
+          - expo
       release_message:
         description: Release summary
         required: true
@@ -39,7 +40,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20.19.0"
+          node-version: "24"
 
       - uses: actions/setup-python@v5
         with:
@@ -67,7 +68,7 @@ jobs:
             all|web) (cd flownote && yarn install --frozen-lockfile --non-interactive) ;;
           esac
           case "$TARGET" in
-            all|mobile) (cd flownote-mobile && yarn install --frozen-lockfile --non-interactive) ;;
+            all|mobile|expo) (cd flownote-mobile && yarn install --frozen-lockfile --non-interactive) ;;
           esac
           case "$TARGET" in
             all|api) (cd flownote-API && uv sync --locked --group dev) ;;
@@ -76,11 +77,11 @@ jobs:
             all|ai) (cd flownote-ai && uv sync --locked --group dev) ;;
           esac
 
-      - name: Prepare Compose validation files
-        if: inputs.target == 'all'
+      - name: Install cloud browser gate
         run: |
-          cp .env.example .env
-          touch flownote/.env flownote-API/.env
+          cd flownote
+          yarn install --frozen-lockfile --non-interactive
+          yarn playwright install --with-deps chromium
 
       - name: Verify and deploy selected target
         env:
@@ -90,4 +91,6 @@ jobs:
           VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
           RELEASE_MESSAGE: ${{ inputs.release_message }}
-        run: ./scripts/deploy-production.sh "${{ inputs.target }}"
+        run: |
+          ./scripts/verify-services.sh "${{ inputs.target }}"
+          node scripts/deploy-cloud.mjs release "${{ inputs.target }}"

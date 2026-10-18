@@ -10,6 +10,8 @@ export const CANVAS_ERASER_IMAGES_STORAGE_KEY = "flownote.canvas.eraser.images";
 export const CANVAS_ERASER_TEXT_BOXES_STORAGE_KEY = "flownote.canvas.eraser.textBoxes";
 export const DEFAULT_PEN_COLOR = "#000000";
 export const DEFAULT_STROKE_WIDTH = 2;
+export const MIN_CANVAS_SCALE = 0.1;
+export const MAX_CANVAS_SCALE = 5;
 export const DEFAULT_TEXT_BOX_WIDTH = 180;
 export const DEFAULT_TEXT_BOX_HEIGHT = 72;
 

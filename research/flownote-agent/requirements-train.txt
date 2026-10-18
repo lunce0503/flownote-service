@@ -1,0 +1,11 @@
+# CUDA-enabled torch/torchvision come from the GPU image; bootstrap constrains
+# their versions so pip cannot replace them while resolving these dependencies.
+transformers>=5.5.2,<6
+peft>=0.19.0,<0.21
+accelerate>=1.5.0,<2
+bitsandbytes>=0.45.0,<1
+sentencepiece>=0.2.0,<1
+timm>=1.0.15,<2
+jsonschema>=4.23.0,<5
+pyyaml>=6.0.2,<7
+pytest>=8.3.0,<10

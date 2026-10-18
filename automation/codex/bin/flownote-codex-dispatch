@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+readonly USER_STATE_HOME="${XDG_STATE_HOME:-${HOME:?HOME is required}/.local/state}"
+readonly STATE_DIR="${FLOWNOTE_AUTOMATION_STATE_DIR:-$USER_STATE_HOME/flownote-codex}"
+readonly RUNNER="${FLOWNOTE_AUTOMATION_RUNNER:-$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)/flownote-codex-run}"
+readonly NOTIFIER="${FLOWNOTE_AUTOMATION_NOTIFIER:-$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)/flownote-codex-notify}"
+readonly FEEDBACK_RELEASER="${FLOWNOTE_AUTOMATION_FEEDBACK_RELEASER:-$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)/flownote-codex-feedback-release}"
+readonly MAX_JOBS="${FLOWNOTE_AUTOMATION_MAX_DISPATCH_JOBS:-10}"
+readonly INBOX="$STATE_DIR/inbox"
+readonly PROCESSING="$STATE_DIR/processing"
+readonly DONE="$STATE_DIR/done"
+readonly FAILED="$STATE_DIR/failed"
+
+if [[ ! "$MAX_JOBS" =~ ^[1-9][0-9]*$ ]] || ((MAX_JOBS > 100)); then
+  echo "FLOWNOTE_AUTOMATION_MAX_DISPATCH_JOBS must be between 1 and 100." >&2
+  exit 64
+fi
+
+if [[ ! -x "$RUNNER" ]]; then
+  echo "Automation runner is not executable: $RUNNER" >&2
+  exit 69
+fi
+
+install -d -m 700 "$STATE_DIR" "$INBOX" "$PROCESSING" "$DONE" "$FAILED"
+
+exec 9>"$STATE_DIR/dispatcher.lock"
+flock -n 9 || exit 0
+
+archive_path() {
+  local directory="$1"
+  local name="$2"
+  local candidate="$directory/$name"
+
+  if [[ -e "$candidate" ]]; then
+    candidate="$directory/${name%.log}-$(date -u '+%Y%m%dT%H%M%SZ')-$$.log"
+  fi
+
+  printf '%s\n' "$candidate"
+}
+
+shopt -s nullglob
+jobs=("$INBOX"/*.log)
+processed=0
+
+for job_file in "${jobs[@]}"; do
+  ((processed < MAX_JOBS)) || break
+
+  if [[ ! -f "$job_file" || -L "$job_file" ]]; then
+    continue
+  fi
+
+  name="$(basename "$job_file")"
+  processing_file="$PROCESSING/$name"
+
+  if [[ -e "$processing_file" ]]; then
+    processing_file="$PROCESSING/${name%.log}-$(date -u '+%Y%m%dT%H%M%SZ')-$$.log"
+  fi
+
+  mv -- "$job_file" "$processing_file"
+
+  case "$name" in
+    ci-fix-*.log)
+      task="ci-fix"
+      ;;
+    staging-triage-*.log)
+      task="staging-triage"
+      ;;
+    feedback-triage-*.log)
+      task="feedback-triage"
+      ;;
+    *)
+      destination="$(archive_path "$FAILED" "$name")"
+      mv -- "$processing_file" "$destination"
+      printf 'Unsupported queue filename. Use ci-fix-*.log, staging-triage-*.log, or feedback-triage-*.log.\n' \
+        > "$destination.reason"
+      processed=$((processed + 1))
+      continue
+      ;;
+  esac
+
+  set +e
+  if [[ "$task" == 'feedback-triage' && "${FLOWNOTE_AUTOMATION_FEEDBACK_RELEASE:-0}" == '1' ]]; then
+    runner_output="$("$FEEDBACK_RELEASER" "$processing_file")"
+  else
+    runner_output="$("$RUNNER" "$task" "$processing_file")"
+  fi
+  status=$?
+  set -e
+  printf '%s\n' "$runner_output"
+
+  # A stopped release must also notify the operator, without being archived as success.
+  if [[ "$status" -eq 0 || "$task" == 'feedback-triage' && "${FLOWNOTE_AUTOMATION_FEEDBACK_RELEASE:-0}" == '1' ]]; then
+    run_dir="$(printf '%s\n' "$runner_output" | awk -F= '$1 == "run_dir" { print $2; exit }')"
+    if [[ -z "$run_dir" || ! -f "$run_dir/final.json" || -L "$run_dir/final.json" ]]; then
+      status=70
+    else
+      set +e
+      "$NOTIFIER" "$run_dir/final.json"
+      notify_status=$?
+      set -e
+      if [[ "$notify_status" -ne 0 ]]; then
+        if [[ "$status" -eq 0 ]]; then status=$notify_status; fi
+      fi
+    fi
+  fi
+
+  if [[ "$status" -eq 0 ]]; then
+    destination="$(archive_path "$DONE" "$name")"
+    mv -- "$processing_file" "$destination"
+  else
+    destination="$(archive_path "$FAILED" "$name")"
+    mv -- "$processing_file" "$destination"
+    printf 'Runner exited with status %s.\n' "$status" > "$destination.reason"
+  fi
+
+  processed=$((processed + 1))
+done
+
+printf 'processed=%s\n' "$processed"

@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
-CORE_API_BASE_URL = os.getenv("CORE_API_BASE_URL") or os.getenv("SPRING_API_URL") or "http://spring-server:8080"
+CORE_API_BASE_URL = os.getenv("CORE_API_BASE_URL") or "http://flownote-api.railway.internal:8080"
 
 
 def forward_request(

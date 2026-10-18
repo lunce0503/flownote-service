@@ -24,6 +24,7 @@
 | `product-specs/` | 제품 기능별 사양과 사용자 흐름 |
 | `exec-plan/` | 실행 계획 아티팩트: `active/`(진행 중), `completed/`(완료+의사결정 로그), `tech-debt-tracker.md`. 작성 요령은 `exec-plan/README.md` |
 | `references/` | 외부 문서/docs 자료 보관 |
+| `operations/` | 서버 자동화, 운영 도구와 실행 경계 |
 | `DESIGN.md` | 시스템 맵과 서비스 경계 |
 | `DEPLOYMENT.md` | 서비스별 검증, 배포 대상, 운영 변수, 헬스체크와 롤백 절차 |
 | `FRONTEND.md` | 웹/모바일 UI 작업 기준 |
@@ -33,7 +34,12 @@
 | `RELIABILITY.md` | 로컬/통합 실행, 관측, 복구 기준 |
 | `SECURITY.md` | 인증, 비밀값, 업로드, 외부 API 보안 기준 |
 
+Codex CLI 기반 서버 자동화의 기준은 `operations/codex-automation.md`, 설치와 명령 예시는 `../automation/codex/README.md`에서 확인한다.
 Android에서 사용자 PC의 실제 터미널에 접속하는 Host Agent의 기준은 `product-specs/remote-host.md`, 실행·설치 방법은 `../apps/host/README.md`에서 확인한다.
+
+IDLE에서 편입한 개발 작업 공간의 목표 동작은 [제품 사양](product-specs/development-workspace.md), 단계와 진행 상태는 [실행 계획](exec-plan/active/2026-10-14-idle-integration.md)에서 확인한다. 현재는 계획 편입 단계이며 실행 코드 이전은 아직 수행하지 않았다.
+
+`AI/flownote-agent`에서 편입한 학습·평가·도구 호출 코드는 [연구 모듈](../research/flownote-agent/README.md)에 있다. 서비스 목표는 [노트·작업 에이전트 사양](product-specs/note-task-agent.md), 학습·연결·선정 단계는 [실행 계획](exec-plan/active/2026-10-14-flownote-agent-integration.md)에서 확인한다. 연구 코드 편입은 운영 제공자 활성화를 뜻하지 않는다.
 
 ## 관리 규칙
 

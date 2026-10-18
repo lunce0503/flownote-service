@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+readonly USER_STATE_HOME="${XDG_STATE_HOME:-${HOME:?HOME is required}/.local/state}"
+readonly STATE_DIR="${FLOWNOTE_AUTOMATION_STATE_DIR:-$USER_STATE_HOME/flownote-codex}"
+readonly INBOX="$STATE_DIR/inbox"
+readonly CURSOR_FILE="$STATE_DIR/feedback-cursor"
+readonly API_URL="${FLOWNOTE_FEEDBACK_API_URL:-https://flownote-api-production.up.railway.app/api/feedback/automation}"
+readonly TOKEN_FILE="${FLOWNOTE_FEEDBACK_TOKEN_FILE:-${CREDENTIALS_DIRECTORY:-}/feedback-token}"
+readonly DISPATCHER="${FLOWNOTE_AUTOMATION_DISPATCHER:-$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)/flownote-codex-dispatch}"
+
+if [[ ! "$API_URL" =~ ^https://[A-Za-z0-9.-]+/api/feedback/automation$ ]]; then
+  echo "FLOWNOTE_FEEDBACK_API_URL must be an HTTPS feedback automation endpoint." >&2
+  exit 64
+fi
+if [[ -z "$TOKEN_FILE" || ! -f "$TOKEN_FILE" || -L "$TOKEN_FILE" ]]; then
+  echo "Feedback automation credential is missing." >&2
+  exit 78
+fi
+if [[ ! -x "$DISPATCHER" ]]; then
+  echo "Automation dispatcher is not executable: $DISPATCHER" >&2
+  exit 69
+fi
+for command_name in curl jq; do
+  command -v "$command_name" >/dev/null 2>&1 || {
+    echo "Required command is missing: $command_name" >&2
+    exit 69
+  }
+done
+
+IFS= read -r token < "$TOKEN_FILE" || true
+if [[ ! "$token" =~ ^[A-Za-z0-9._~-]{10,256}$ ]]; then
+  echo "Feedback automation credential has an invalid format." >&2
+  exit 78
+fi
+
+install -d -m 700 "$STATE_DIR" "$INBOX"
+exec 9>"$STATE_DIR/feedback-collector.lock"
+flock -n 9 || exit 0
+
+cursor=''
+if [[ -f "$CURSOR_FILE" && ! -L "$CURSOR_FILE" ]]; then
+  IFS= read -r cursor < "$CURSOR_FILE" || true
+  [[ "$cursor" =~ ^[0-9]+$ ]] || {
+    echo "Stored feedback cursor is invalid." >&2
+    exit 65
+  }
+fi
+
+response_file="$(mktemp "$STATE_DIR/.feedback-response-XXXXXX")"
+header_file="$(mktemp "$STATE_DIR/.feedback-header-XXXXXX")"
+cursor_temp=''
+cleanup() {
+  rm -f -- "$response_file" "$header_file"
+  if [[ -n "$cursor_temp" ]]; then
+    rm -f -- "$cursor_temp"
+  fi
+}
+trap cleanup EXIT
+printf 'Authorization: Bearer %s\n' "$token" > "$header_file"
+
+request_url="$API_URL"
+if [[ -n "$cursor" ]]; then
+  request_url="$API_URL?after=$cursor"
+fi
+curl --fail --silent --show-error \
+  --proto '=https' --max-time 30 --max-filesize 1048576 \
+  --header "@$header_file" \
+  --output "$response_file" \
+  "$request_url"
+
+jq -e '
+  (.next_cursor | type == "number" and floor == . and . >= 0) and
+  (.items | type == "array") and
+  (all(.items[];
+    (.sequence | type == "number" and floor == . and . > 0) and
+    (.id | type == "string" and test("^[0-9a-fA-F-]{36}$")) and
+    (.category | type == "string" and length <= 40) and
+    (.message | type == "string" and length > 0 and length <= 4000) and
+    (.created_at | type == "string")
+  ))
+' "$response_file" >/dev/null || {
+  echo "Feedback automation API returned an invalid response." >&2
+  exit 65
+}
+
+next_cursor="$(jq -r '.next_cursor' "$response_file")"
+queued=0
+if [[ -n "$cursor" ]]; then
+  while IFS= read -r item; do
+    id="$(jq -r '.id' <<<"$item")"
+    destination="$INBOX/feedback-triage-$id.log"
+    if [[ -e "$destination" ]]; then
+      continue
+    fi
+    temporary="$(mktemp "$INBOX/.feedback-triage-XXXXXX.tmp")"
+    jq -c '{
+      event_type: "flownote.user_feedback.created",
+      feedback: {
+        id: .id,
+        category: .category,
+        message: .message,
+        created_at: .created_at
+      }
+    }' <<<"$item" > "$temporary"
+    mv -- "$temporary" "$destination"
+    queued=$((queued + 1))
+  done < <(jq -c '.items[]' "$response_file")
+fi
+
+cursor_temp="$(mktemp "$STATE_DIR/.feedback-cursor-XXXXXX")"
+printf '%s\n' "$next_cursor" > "$cursor_temp"
+mv -- "$cursor_temp" "$CURSOR_FILE"
+cursor_temp=''
+
+if ((queued > 0)) || compgen -G "$INBOX/feedback-triage-*.log" >/dev/null; then
+  "$DISPATCHER"
+fi
+printf 'queued=%s next_cursor=%s\n' "$queued" "$next_cursor"

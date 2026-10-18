@@ -8,9 +8,9 @@
 4. 검증: 가장 좁고 의미 있는 검사를 실행한다.
 5. 리뷰: 회귀, 보안, 계약, UX를 점검한다.
 6. 기록: 버그 재현과 실행 로그 요약은 `logs/`, 리뷰와 감사 산출물은 `logs/report/`, 안정적인 학습 내용은 `.codex/memories/` 후보로 남긴다.
-7. Docker 빌드 및 실행: 작업 종료 전 저장소 루트에서 `docker compose up -d --build`를 실행한다.
-8. 클라우드 배포: 파일을 수정한 작업은 항상 클라우드 배포를 진행한다. `flownote/`는 Vercel production, `flownote-API/`는 Railway `flownote-api`, `flownote-server/`는 Railway `flownote-main`을 배포한다. `logs/report/` 전용 보고서 작업은 Docker와 클라우드 배포를 생략한다. `logs/report/` 외 문서 전용 변경은 Vercel production 배포를 기본으로 하고 백엔드 배포 생략 사유를 기록한다.
-9. 보고: 최종 응답에 개별 검증, Docker 빌드 및 백그라운드 실행 결과, 클라우드 배포 결과를 함께 남긴다.
+7. 스테이징 배포 및 검증: `node scripts/deploy-cloud.mjs staging <target>`으로 cloud E2E까지 확인한다.
+8. 프로덕션 배포: 같은 소스의 staging 통과 기록이 있을 때만 `node scripts/deploy-cloud.mjs production <target>`을 실행한다. 보고서 전용 변경은 배포하지 않는다.
+9. 보고: 개별 검증, staging E2E와 production 배포 결과를 남긴다. LAN/loopback 앱 서버 및 Compose는 실행하지 않는다.
 
 ## 중단 조건
 
@@ -18,7 +18,6 @@
 - 필요한 비밀값이나 환경 값이 없다.
 - 로컬 변경과 요청한 수정이 충돌하며 의도가 불명확하다.
 - 검증에 네트워크나 외부 서비스가 필요하지만 사용할 수 없다.
-- Docker 빌드를 실행할 수 없는 환경이면 실행하지 못한 이유와 다음 조치를 기록하고 중단 또는 보고한다.
 - 클라우드 배포를 실행할 수 없는 환경이면 실행하지 못한 이유, 필요한 배포 명령, 다음 조치를 기록하고 보고한다.
 
 ## 기록 위치

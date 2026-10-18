@@ -1,7 +1,10 @@
-const defaultApiBaseUrl = 'http://localhost:8080';
+import { cloudApiUrl } from './cloud-url';
 
-const apiBaseUrl = () =>
-  (process.env.EXPO_PUBLIC_WAS_URL || defaultApiBaseUrl).replace(/\/$/, '');
+const apiBaseUrl = () => {
+  const configuredUrl = process.env.EXPO_PUBLIC_WAS_URL;
+  if (!configuredUrl) throw new Error('EXPO_PUBLIC_WAS_URL must be configured.');
+  return cloudApiUrl(configuredUrl);
+};
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
@@ -234,7 +237,7 @@ const request = async <T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   const method = options.method ?? 'GET';
-  const response = await fetchRequest(`${(options.baseUrl ?? apiBaseUrl()).replace(/\/$/, '')}${path}`, {
+  const response = await fetchRequest(`${cloudApiUrl(options.baseUrl ?? apiBaseUrl())}${path}`, {
     method,
     headers,
     body,
@@ -586,10 +589,13 @@ export const flownoteApi = {
       canvasId?: string | null;
     }
   ) => {
-    const canvas = await request<CanvasResponse>(`/api/canvas/save${canvasQuery(input.canvasId)}`, {
+    await request('/api/canvas/save', {
       method: 'POST',
       token,
       body: {
+        canvasId: input.canvasId,
+        mutationId: makeUuid(),
+        payload: {
         addedLines: input.lines,
         modifiedLines: [],
         deletedLines: (input.deletedLineIds ?? []).map((id) => ({ id })),
@@ -599,9 +605,10 @@ export const flownoteApi = {
         addedTextBoxes: input.textBoxes,
         modifiedTextBoxes: [],
         deletedTextBoxes: (input.deletedTextBoxIds ?? []).map((id) => ({ id })),
+        },
       },
     });
-    return normalizeCanvas(canvas);
+    return flownoteApi.loadCanvas(token, input.canvasId);
   },
   saveCanvasTextBoxes: async (token: string, textBoxes: CanvasTextBox[], deletedTextBoxIds: string[] = []) =>
     flownoteApi.saveCanvasElements(token, {

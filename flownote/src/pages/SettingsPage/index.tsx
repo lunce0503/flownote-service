@@ -13,8 +13,10 @@ import {
   ShieldCheck,
   Sun,
   Type,
+  UserRound,
 } from "lucide-react";
 import { useTheme, type ThemeMode } from "@/features/theme";
+import { isAndroidApp } from '@/shared/lib/androidApp';
 import { useAuth } from "@/features/auth";
 import { postFeedback, listMyFeedback, FEEDBACK_CATEGORIES, type FeedbackItem } from "@/entities/feedback";
 
@@ -104,7 +106,11 @@ const ToggleRow = ({
 
 const SettingsPage = () => {
   const { theme, setTheme } = useTheme();
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
+  const [profileDraft, setProfileDraft] = useState<{ username: string; email: string; nickname: string; currentPassword: string } | null>(null);
+  const [profileStatus, setProfileStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [profileError, setProfileError] = useState("");
+  const profile = profileDraft ?? { username: user?.username ?? "", email: user?.email ?? "", nickname: user?.nickname ?? "", currentPassword: "" };
   const [preferences, setPreferences] = useState<UserPreferences>(readPreferences);
   const [language, setLanguage] = useState<Language>(() => (
     window.localStorage.getItem("flownote_language") === "en" ? "en" : "ko"
@@ -188,10 +194,54 @@ const SettingsPage = () => {
           <div className="space-y-4">
             <section className="rounded-2xl border border-stone-200 bg-white p-4">
               <div className="mb-4 flex items-center gap-2">
+                <UserRound size={20} className="text-emerald-700" />
+                <h2 className="text-lg font-black text-stone-950">내 프로필</h2>
+              </div>
+              <form className="grid gap-3" onSubmit={async (event) => {
+                event.preventDefault();
+                if (profileStatus === "saving") return;
+                setProfileStatus("saving");
+                setProfileError("");
+                try {
+                  await updateProfile({ ...profile, username: profile.username.trim(), nickname: profile.nickname.trim(), email: profile.email.trim() });
+                  setProfileDraft(null);
+                  setProfileStatus("saved");
+                } catch (error) {
+                  const failure = error as { response?: { status?: number } };
+                  setProfileError(failure.response?.status === 409 ? "이미 사용 중인 이메일입니다." : failure.response?.status === 403 ? "이메일을 변경하려면 현재 비밀번호를 확인해주세요." : "프로필을 저장하지 못했습니다. 다시 시도해주세요.");
+                  setProfileStatus("error");
+                }
+              }}>
+                {([['username', '사용자 이름'], ['nickname', '표시 이름'], ['email', '이메일']] as const).map(([key, label]) => (
+                  <label key={key} className="grid gap-1 text-sm font-bold">
+                    {label}
+                    <input required type={key === 'email' ? 'email' : 'text'} maxLength={key === 'email' ? 254 : 80}
+                      value={profile[key]} disabled={profileStatus === "saving"}
+                      onChange={(event) => { setProfileDraft({ ...profile, [key]: event.target.value }); setProfileStatus("idle"); }}
+                      className="min-h-11 min-w-0 rounded-lg border border-stone-300 bg-white px-3 font-normal focus:ring-2 focus:ring-emerald-600" />
+                  </label>
+                ))}
+                {profile.email.trim() !== user?.email && (
+                  <label className="grid gap-1 text-sm font-bold">현재 비밀번호 (이메일 변경 확인)
+                    <input required type="password" autoComplete="current-password" maxLength={200} value={profile.currentPassword}
+                      onChange={(event) => setProfileDraft({ ...profile, currentPassword: event.target.value })}
+                      className="min-h-11 rounded-lg border border-stone-300 px-3 font-normal" />
+                  </label>
+                )}
+                <button type="submit" disabled={!user || profileStatus === "saving" || !profile.username.trim() || !profile.nickname.trim()}
+                  className="min-h-11 rounded-lg bg-emerald-600 px-4 font-bold text-white disabled:opacity-50">
+                  {profileStatus === "saving" ? "저장 중…" : "프로필 저장"}
+                </button>
+                {profileStatus === "saved" && <p role="status" className="text-sm text-emerald-700">프로필이 저장되었습니다.</p>}
+                {profileStatus === "error" && <p role="alert" className="text-sm text-red-700">{profileError}</p>}
+              </form>
+            </section>
+            <section className="rounded-2xl border border-stone-200 bg-white p-4">
+              <div className="mb-4 flex items-center gap-2">
                 <Settings size={20} className="text-emerald-700" />
                 <h2 className="text-lg font-black text-stone-950">화면 모드</h2>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2">
+              {isAndroidApp ? <p className="text-sm text-stone-600">아이보리와 검정 색상의 앱 테마를 사용합니다.</p> : <div className="grid gap-2 sm:grid-cols-2">
                 <OptionButton active={theme === "light"} onClick={() => setTheme("light" as ThemeMode)}>
                   <Sun size={18} />
                   라이트 모드
@@ -200,7 +250,7 @@ const SettingsPage = () => {
                   <Moon size={18} />
                   다크 모드
                 </OptionButton>
-              </div>
+              </div>}
             </section>
 
             <section className="rounded-2xl border border-stone-200 bg-white p-4">
@@ -342,10 +392,10 @@ const SettingsPage = () => {
                 <h2 className="text-lg font-black text-stone-950">고객센터</h2>
               </div>
               <div className="space-y-3 text-sm text-stone-600">
-                <a className="flex items-center gap-3 rounded-xl border border-stone-200 p-3 hover:bg-stone-50" href="mailto:support@flownote.local">
+                <div className="flex items-center gap-3 rounded-xl border border-stone-200 p-3">
                   <Mail size={18} />
-                  support@flownote.local
-                </a>
+                  위 피드백 양식 이용
+                </div>
                 <div className="flex items-center gap-3 rounded-xl border border-stone-200 p-3">
                   <Phone size={18} />
                   평일 10:00 - 18:00

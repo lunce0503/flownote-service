@@ -40,6 +40,13 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(nextUser);
   };
 
+  const updateProfile = async (input: { username: string; email: string; nickname: string; currentPassword?: string }) => {
+    const { currentPassword, ...profile } = input;
+    const response = await axios.patch<AuthUser>(`${API_CORE_BASE_URL}/api/users/me`, { ...profile, current_password: currentPassword }, { headers: authHeaders() });
+    setAuthUser(response.data);
+    setUser(response.data);
+  };
+
   // 스테이징: 로그인 없이 접근할 수 있도록 게스트 계정으로 자동 로그인한다.
   // 콜드스타트(잠든 인증 서버)로 첫 요청이 5xx일 수 있어 몇 차례 재시도한다.
   useEffect(() => {
@@ -124,6 +131,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
       isAuthenticated: Boolean(token && user),
       login,
       logout,
+      updateProfile,
     }),
     [token, user],
   );

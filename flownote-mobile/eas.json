@@ -7,12 +7,15 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_WAS_URL": "https://flownote-api-staging.up.railway.app"
+      }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_WAS_URL": "https://flownote-api-production.up.railway.app"
+        "EXPO_PUBLIC_WAS_URL": "https://flownote-api-staging.up.railway.app"
       }
     },
     "production": {

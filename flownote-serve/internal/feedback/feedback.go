@@ -2,8 +2,11 @@ package feedback
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -57,6 +60,10 @@ func EnsureSchema(ctx context.Context, pool *pgxpool.Pool) error {
 		);
 		CREATE INDEX IF NOT EXISTS idx_user_feedback_user_created
 			ON user_feedback (user_id, created_at DESC);
+		ALTER TABLE user_feedback
+			ADD COLUMN IF NOT EXISTS automation_seq BIGSERIAL;
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_user_feedback_automation_seq
+			ON user_feedback (automation_seq);
 	`)
 	return err
 }
@@ -146,15 +153,64 @@ func (r *Repo) ListAll(ctx context.Context, limit int) ([]Feedback, error) {
 	return items, rows.Err()
 }
 
+// AutomationFeedback는 자동화 호스트에 전달하는 최소 피드백 이벤트다.
+// 사용자 ID와 연락처는 의도적으로 포함하지 않는다.
+type AutomationFeedback struct {
+	Sequence  int64     `json:"sequence"`
+	ID        string    `json:"id"`
+	Category  string    `json:"category"`
+	Message   string    `json:"message"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (r *Repo) AutomationCursor(ctx context.Context) (int64, error) {
+	var cursor int64
+	err := r.pool.QueryRow(ctx, `SELECT COALESCE(MAX(automation_seq), 0) FROM user_feedback`).Scan(&cursor)
+	return cursor, err
+}
+
+func (r *Repo) ListForAutomation(ctx context.Context, after int64, limit int) ([]AutomationFeedback, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT automation_seq, id::text, category, message, created_at
+		FROM user_feedback
+		WHERE automation_seq > $1
+		ORDER BY automation_seq ASC
+		LIMIT $2
+	`, after, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]AutomationFeedback, 0)
+	for rows.Next() {
+		var item AutomationFeedback
+		if err := rows.Scan(&item.Sequence, &item.ID, &item.Category, &item.Message, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 // ---- handler ----
 
 type Handler struct {
-	repo *Repo
-	auth *auth.Authenticator
+	repo             *Repo
+	auth             *auth.Authenticator
+	automationToken  string
+	automationCursor func(context.Context) (int64, error)
+	automationList   func(context.Context, int64, int) ([]AutomationFeedback, error)
 }
 
-func NewHandler(repo *Repo, authenticator *auth.Authenticator) *Handler {
-	return &Handler{repo: repo, auth: authenticator}
+func NewHandler(repo *Repo, authenticator *auth.Authenticator, automationToken string) *Handler {
+	return &Handler{
+		repo:             repo,
+		auth:             authenticator,
+		automationToken:  strings.TrimSpace(automationToken),
+		automationCursor: repo.AutomationCursor,
+		automationList:   repo.ListForAutomation,
+	}
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
@@ -163,6 +219,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.Handle("GET /api/feedback", p(h.listMine))
 	// 전체 조회는 관리자만.
 	mux.Handle("GET /api/feedback/all", h.auth.AdminMiddleware(http.HandlerFunc(h.listAll)))
+	// 자동화 feed는 별도 서비스 토큰을 사용하고 개인정보 필드를 반환하지 않는다.
+	mux.HandleFunc("GET /api/feedback/automation", h.listAutomation)
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
@@ -195,4 +253,56 @@ func (h *Handler) listAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpjson.Write(w, http.StatusOK, items)
+}
+
+func secureTokenEqual(provided, expected string) bool {
+	if provided == "" || expected == "" {
+		return false
+	}
+	providedHash := sha256.Sum256([]byte(provided))
+	expectedHash := sha256.Sum256([]byte(expected))
+	return subtle.ConstantTimeCompare(providedHash[:], expectedHash[:]) == 1
+}
+
+func (h *Handler) listAutomation(w http.ResponseWriter, r *http.Request) {
+	provided := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+	if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") || !secureTokenEqual(provided, h.automationToken) {
+		httpjson.WriteError(w, httpjson.Errorf(http.StatusUnauthorized, "자동화 인증이 필요합니다."))
+		return
+	}
+
+	afterValue := strings.TrimSpace(r.URL.Query().Get("after"))
+	if afterValue == "" {
+		cursor, err := h.automationCursor(r.Context())
+		if err != nil {
+			httpjson.WriteError(w, err)
+			return
+		}
+		httpjson.Write(w, http.StatusOK, map[string]any{
+			"items":       []AutomationFeedback{},
+			"next_cursor": cursor,
+		})
+		return
+	}
+
+	after, err := strconv.ParseInt(afterValue, 10, 64)
+	if err != nil || after < 0 {
+		httpjson.WriteError(w, httpjson.Errorf(http.StatusBadRequest, "after cursor가 올바르지 않습니다."))
+		return
+	}
+	items, err := h.automationList(r.Context(), after, 50)
+	if err != nil {
+		httpjson.WriteError(w, err)
+		return
+	}
+	nextCursor := after
+	for _, item := range items {
+		if item.Sequence > nextCursor {
+			nextCursor = item.Sequence
+		}
+	}
+	httpjson.Write(w, http.StatusOK, map[string]any{
+		"items":       items,
+		"next_cursor": nextCursor,
+	})
 }

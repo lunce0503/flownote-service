@@ -15,6 +15,7 @@ import com.flownote.user.UserDtos.LoginResponse;
 import com.flownote.user.UserDtos.RegisterRequest;
 import com.flownote.user.UserDtos.UserResponse;
 import com.flownote.user.UserDtos.UserSearchResponse;
+import com.flownote.user.UserDtos.UpdateProfileRequest;
 
 @Service
 public class UserService {
@@ -124,5 +125,23 @@ public class UserService {
     }
 
     private record UserWithPassword(UUID id, String username, String email, String nickname, String passwordHash, String role) {
+    }
+
+    public UserResponse updateProfile(UUID userId, UpdateProfileRequest request) {
+        UserResponse existing = current(userId);
+        String email = request.email().trim();
+        if (!email.equals(existing.email())) {
+            String hash = jdbcTemplate.queryForObject("SELECT password_hash FROM users WHERE id = ?", String.class, userId);
+            if (request.currentPassword() == null || hash == null || !passwordEncoder.matches(request.currentPassword(), hash)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "이메일 변경에는 현재 비밀번호 확인이 필요합니다.");
+            }
+        }
+        int updated = jdbcTemplate.update("""
+                UPDATE users SET username = ?, email = ?, nickname = ? WHERE id = ?
+                """, request.username().trim(), email, request.nickname().trim(), userId);
+        if (updated == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다.");
+        }
+        return current(userId);
     }
 }

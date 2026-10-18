@@ -16,6 +16,12 @@ import { subscribeSyncEvents } from "@/shared/lib/sync";
 
 type FolderForm = { category: string; name: string };
 const EMPTY_FOLDER_FORM: FolderForm = { category: "", name: "" };
+const OPTIMISTIC_CANVAS_PREFIX = "optimistic-canvas-";
+const OPTIMISTIC_FOLDER_PREFIX = "optimistic-folder-";
+
+const createOptimisticId = (prefix: string) => `${prefix}${crypto.randomUUID()}`;
+const isOptimisticCanvas = (canvasId: string) => canvasId.startsWith(OPTIMISTIC_CANVAS_PREFIX);
+const isOptimisticFolder = (folderId: string) => folderId.startsWith(OPTIMISTIC_FOLDER_PREFIX);
 
 const formatDate = (value?: string) => {
     if (!value) return "방금";
@@ -37,14 +43,29 @@ export default function CanvasList() {
     const [collapsedFolderIds, setCollapsedFolderIds] = useLocalStorageStringSet(CANVAS_COLLAPSED_FOLDER_IDS_STORAGE_KEY);
     const [isLoading, setIsLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
+    const [isCreatingFolder, setIsCreatingFolder] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const loadLibrary = useCallback(async () => {
         setError(null);
         try {
             const [loadedDocuments, loadedFolders] = await Promise.all([getCanvasDocuments(), getCanvasFolders()]);
-            setDocuments(loadedDocuments);
-            setFolders(loadedFolders);
+            setDocuments((current) => [
+                ...current.filter((document) => isOptimisticCanvas(document.id)),
+                ...loadedDocuments,
+            ]);
+            setFolders((current) => {
+                const optimisticFolders = current.filter((folder) => isOptimisticFolder(folder.id));
+                const loadedWithPendingDocuments = loadedFolders.map((folder) => {
+                    const currentFolder = current.find((candidate) => candidate.id === folder.id);
+                    const pendingCanvasIds = currentFolder?.canvasIds.filter(isOptimisticCanvas) ?? [];
+                    return {
+                        ...folder,
+                        canvasIds: [...pendingCanvasIds, ...folder.canvasIds],
+                    };
+                });
+                return [...optimisticFolders, ...loadedWithPendingDocuments];
+            });
         } catch (loadError) {
             console.error("Failed to load canvas library:", loadError);
             setError("캔버스 목록을 불러오지 못했습니다.");
@@ -75,20 +96,60 @@ export default function CanvasList() {
     };
 
     const handleCreateCanvas = async (folderId?: string) => {
+        if (folderId && isOptimisticFolder(folderId)) return;
+        const temporaryId = createOptimisticId(OPTIMISTIC_CANVAS_PREFIX);
+        const now = new Date().toISOString();
+        const optimisticDocument: CanvasDocumentSummary = {
+            id: temporaryId,
+            title: "새 캔버스",
+            created_at: now,
+            updated_at: now,
+        };
+
         setIsCreating(true);
         setError(null);
+        setDocuments((current) => [optimisticDocument, ...current]);
+        if (folderId) {
+            setFolders((current) => current.map((folder) => (
+                folder.id === folderId
+                    ? { ...folder, canvasIds: [temporaryId, ...folder.canvasIds] }
+                    : folder
+            )));
+        }
+
         try {
             const created = await createCanvasDocument("새 캔버스");
-            setDocuments((current) => [created, ...current]);
+            setDocuments((current) => [
+                created,
+                ...current.filter((document) => document.id !== temporaryId && document.id !== created.id),
+            ]);
+            setFolders((current) => current.map((folder) => ({
+                ...folder,
+                canvasIds: folder.canvasIds.map((canvasId) => canvasId === temporaryId ? created.id : canvasId),
+            })));
             if (folderId) {
-                const updated = await addCanvasToFolder(folderId, created.id);
-                setFolders((current) => current.map((folder) => (folder.id === updated.id ? updated : {
-                    ...folder, canvasIds: folder.canvasIds.filter((id) => id !== created.id),
-                })));
+                try {
+                    const updated = await addCanvasToFolder(folderId, created.id);
+                    setFolders((current) => current.map((folder) => (folder.id === updated.id ? updated : {
+                        ...folder, canvasIds: folder.canvasIds.filter((id) => id !== created.id),
+                    })));
+                } catch (folderError) {
+                    console.error("Failed to add the new canvas to its folder:", folderError);
+                    setFolders((current) => current.map((folder) => ({
+                        ...folder,
+                        canvasIds: folder.canvasIds.filter((id) => id !== created.id),
+                    })));
+                    setError("캔버스는 만들었지만 폴더에 넣지 못했습니다.");
+                }
             }
             navigate(`/canvas/${created.id}`);
         } catch (createError) {
             console.error("Failed to create canvas:", createError);
+            setDocuments((current) => current.filter((document) => document.id !== temporaryId));
+            setFolders((current) => current.map((folder) => ({
+                ...folder,
+                canvasIds: folder.canvasIds.filter((canvasId) => canvasId !== temporaryId),
+            })));
             setError("캔버스를 만들지 못했습니다.");
         } finally {
             setIsCreating(false);
@@ -97,13 +158,38 @@ export default function CanvasList() {
 
     const handleCreateFolder = async () => {
         if (!folderForm.name.trim()) return;
+        const submittedForm = {
+            category: folderForm.category.trim(),
+            name: folderForm.name.trim(),
+        };
+        const temporaryId = createOptimisticId(OPTIMISTIC_FOLDER_PREFIX);
+        const now = new Date().toISOString();
+        const optimisticFolder: CanvasFolder = {
+            id: temporaryId,
+            category: submittedForm.category || "기타",
+            name: submittedForm.name,
+            canvasIds: [],
+            created_at: now,
+            updated_at: now,
+        };
+
+        setIsCreatingFolder(true);
+        setError(null);
+        setFolders((current) => [optimisticFolder, ...current]);
+        setFolderForm(EMPTY_FOLDER_FORM);
         try {
-            const created = await createCanvasFolder(folderForm);
-            setFolders((current) => [created, ...current]);
-            setFolderForm(EMPTY_FOLDER_FORM);
+            const created = await createCanvasFolder(submittedForm);
+            setFolders((current) => [
+                created,
+                ...current.filter((folder) => folder.id !== temporaryId && folder.id !== created.id),
+            ]);
         } catch (createError) {
             console.error("Failed to create canvas folder:", createError);
+            setFolders((current) => current.filter((folder) => folder.id !== temporaryId));
+            setFolderForm((current) => current.name || current.category ? current : submittedForm);
             setError("캔버스 폴더를 만들지 못했습니다.");
+        } finally {
+            setIsCreatingFolder(false);
         }
     };
 
@@ -189,10 +275,17 @@ export default function CanvasList() {
         return next;
     });
 
-    const canvasCard = (document: CanvasDocumentSummary) => (
-        <article key={document.id} draggable onDragStart={(event) => event.dataTransfer.setData("text/plain", document.id)} className="flex min-h-28 flex-col rounded-md border border-stone-200 bg-white shadow-sm transition hover:border-amber-400 hover:shadow-md">
+    const canvasCard = (document: CanvasDocumentSummary) => {
+        const isPending = isOptimisticCanvas(document.id);
+        return (
+        <article key={document.id} data-pending={isPending ? "true" : "false"} draggable={!isPending} onDragStart={(event) => event.dataTransfer.setData("text/plain", document.id)} className={`flex min-h-28 flex-col rounded-md border bg-white shadow-sm transition ${isPending ? "border-amber-300" : "border-stone-200 hover:border-amber-400 hover:shadow-md"}`}>
             <div className="flex flex-1 items-start gap-2 p-3">
-                {editingCanvasId === document.id ? (
+                {isPending ? (
+                    <div className="flex min-w-0 flex-1 items-center gap-2" role="status">
+                        <Loader2 size={16} className="shrink-0 animate-spin text-amber-700" />
+                        <div className="min-w-0"><h3 className="truncate text-sm font-black text-stone-900">{document.title}</h3><p className="mt-1 text-xs text-amber-700">서버에 만드는 중</p></div>
+                    </div>
+                ) : editingCanvasId === document.id ? (
                     <input className="min-w-0 flex-1 rounded-md border border-stone-300 px-2 py-1 text-sm font-bold" value={editingCanvasTitle} onChange={(event) => setEditingCanvasTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void handleUpdateCanvas(document.id); if (event.key === "Escape") setEditingCanvasId(null); }} autoFocus />
                 ) : (
                     <button type="button" onClick={() => navigate(`/canvas/${document.id}`)} className="min-w-0 flex-1 text-left">
@@ -210,7 +303,8 @@ export default function CanvasList() {
             </div>
             {confirmingDeleteId === document.id && <div className="flex items-center justify-end gap-2 border-t border-stone-100 px-3 py-2 text-xs"><span className="mr-auto text-stone-500">삭제할까요?</span><button type="button" className="font-bold text-red-600" onClick={() => void handleDeleteCanvas(document.id)}>삭제</button><button type="button" className="font-bold text-stone-500" onClick={() => setConfirmingDeleteId(null)}>취소</button></div>}
         </article>
-    );
+        );
+    };
 
     return (
         <div className="min-h-[calc(100vh-56px)] bg-stone-50 px-4 py-6 text-stone-900">
@@ -223,7 +317,7 @@ export default function CanvasList() {
                 <div className="mb-4 grid gap-2 rounded-lg border border-stone-200 p-3 md:grid-cols-[1fr_1fr_auto]">
                     <input className="rounded-md border border-stone-300 px-3 py-2 text-sm" value={folderForm.category} onChange={(event) => setFolderForm((current) => ({ ...current, category: event.target.value }))} placeholder="카테고리" />
                     <input className="rounded-md border border-stone-300 px-3 py-2 text-sm" value={folderForm.name} onChange={(event) => setFolderForm((current) => ({ ...current, name: event.target.value }))} placeholder="폴더 이름" />
-                    <button type="button" className="inline-flex min-h-10 items-center justify-center rounded-md bg-stone-900 px-3 text-white disabled:bg-stone-300" onClick={() => void handleCreateFolder()} disabled={!folderForm.name.trim()} title="폴더 추가"><Plus size={18} /></button>
+                    <button type="button" className="inline-flex min-h-10 items-center justify-center rounded-md bg-stone-900 px-3 text-white disabled:bg-stone-300" onClick={() => void handleCreateFolder()} disabled={!folderForm.name.trim() || isCreatingFolder} title="폴더 추가">{isCreatingFolder ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}</button>
                 </div>
 
                 {error && <p className="mb-4 rounded-md bg-red-50 p-3 text-sm font-semibold text-red-700" role="alert">{error}</p>}
@@ -242,11 +336,12 @@ export default function CanvasList() {
                                             const folderCanvases = sortLibraryItemsByRecent(documents.filter((document) => folderCanvasIds.has(document.id)), (document) => document.title);
                                             const isEditing = editingFolderId === folder.id;
                                             const isCollapsed = collapsedFolderIds.has(folder.id);
+                                            const isPending = isOptimisticFolder(folder.id);
                                             return (
-                                                <div key={folder.id} className="border-l-2 border-amber-400 pl-3" onDragOver={(event) => event.preventDefault()} onDrop={(event) => void handleDropOnFolder(event, folder.id)}>
+                                                <div key={folder.id} data-pending={isPending ? "true" : "false"} className="border-l-2 border-amber-400 pl-3" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { if (!isPending) void handleDropOnFolder(event, folder.id); }}>
                                                     <div className="mb-3 flex items-center gap-2">
-                                                        {isEditing ? <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2"><input className="rounded-md border border-stone-300 px-2 py-1 text-sm" value={editingFolderForm.category} onChange={(event) => setEditingFolderForm((current) => ({ ...current, category: event.target.value }))} placeholder="카테고리" /><input className="rounded-md border border-stone-300 px-2 py-1 text-sm" value={editingFolderForm.name} onChange={(event) => setEditingFolderForm((current) => ({ ...current, name: event.target.value }))} placeholder="폴더 이름" /></div> : <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => toggleFolder(folder.id)} title={isCollapsed ? "폴더 펼치기" : "폴더 접기"}><Folder size={17} className="text-amber-600" /><span className="truncate text-sm font-bold">{folder.name}</span><span className="text-xs text-stone-400">{folderCanvases.length}</span></button>}
-                                                        {isEditing ? <><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => void handleUpdateFolder(folder.id)} title="폴더 저장"><Check size={15} /></button><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => setEditingFolderId(null)} title="폴더 수정 취소"><X size={15} /></button></> : <><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => void handleCreateCanvas(folder.id)} title="폴더에 캔버스 추가"><Plus size={15} /></button><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => { setEditingFolderId(folder.id); setEditingFolderForm({ category: folder.category, name: folder.name }); }} title="폴더 수정"><Pencil size={15} /></button><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-stone-500 hover:bg-red-50 hover:text-red-600" onClick={() => void handleDeleteFolder(folder.id)} title="폴더 삭제"><Trash2 size={15} /></button></>}
+                                                        {isEditing ? <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2"><input className="rounded-md border border-stone-300 px-2 py-1 text-sm" value={editingFolderForm.category} onChange={(event) => setEditingFolderForm((current) => ({ ...current, category: event.target.value }))} placeholder="카테고리" /><input className="rounded-md border border-stone-300 px-2 py-1 text-sm" value={editingFolderForm.name} onChange={(event) => setEditingFolderForm((current) => ({ ...current, name: event.target.value }))} placeholder="폴더 이름" /></div> : <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => toggleFolder(folder.id)} title={isCollapsed ? "폴더 펼치기" : "폴더 접기"}><Folder size={17} className="text-amber-600" /><span className="truncate text-sm font-bold">{folder.name}</span>{isPending ? <Loader2 size={14} className="animate-spin text-amber-700" aria-label="폴더 만드는 중" /> : <span className="text-xs text-stone-400">{folderCanvases.length}</span>}</button>}
+                                                        {!isPending && (isEditing ? <><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => void handleUpdateFolder(folder.id)} title="폴더 저장"><Check size={15} /></button><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => setEditingFolderId(null)} title="폴더 수정 취소"><X size={15} /></button></> : <><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => void handleCreateCanvas(folder.id)} title="폴더에 캔버스 추가"><Plus size={15} /></button><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => { setEditingFolderId(folder.id); setEditingFolderForm({ category: folder.category, name: folder.name }); }} title="폴더 수정"><Pencil size={15} /></button><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-stone-500 hover:bg-red-50 hover:text-red-600" onClick={() => void handleDeleteFolder(folder.id)} title="폴더 삭제"><Trash2 size={15} /></button></>)}
                                                     </div>
                                                     {!isCollapsed && <div className="grid min-h-20 gap-2 rounded-md border border-dashed border-stone-300 p-2 sm:grid-cols-2 xl:grid-cols-3">{folderCanvases.length > 0 ? folderCanvases.map(canvasCard) : <p className="py-6 text-center text-xs text-stone-500 sm:col-span-2 xl:col-span-3">캔버스를 드래그해서 넣으세요</p>}</div>}
                                                 </div>

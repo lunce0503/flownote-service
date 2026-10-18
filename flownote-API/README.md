@@ -5,8 +5,9 @@ FastAPI 기반 단일 공개 API 진입점이다. 자체 도메인 데이터를 
 | 경로 | upstream |
 | --- | --- |
 | `/api/canvas`, `/api/notes`, `/api/note-folders`, `/uploads` | `flownote-canvas` |
-| `/api/diary`, `/api/schedule-items`, `/api/tasks`, `/api/stocks`, `/api/social`, `/api/chat`, `/api/feedback` | `flownote-serve` |
-| `/api/aiclient`, `/api/agent-note`, `/api/market` | `flownote-ai` |
+| `/api/diary`, `/api/schedule-items`, `/api/tasks`, `/api/stocks`, `/api/social`, `/api/chat`, `/api/feedback` | `flownote-sub` (`flownote-serve/` 소스) |
+| `/api/aiclient`, `/api/market` | `flownote-ai` (서비스 가동 시) |
+| `/api/capabilities`, `/api/agent-note` | 게이트웨이의 중지/제거 호환 응답 |
 | 나머지 `/api/**` | `flownote-server` |
 
 ## 검증

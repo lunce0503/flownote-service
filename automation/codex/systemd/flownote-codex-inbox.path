@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch for queued Flownote Codex automation logs
+Documentation=file:%h/Flownote/service/automation/codex/README.md
+
+[Path]
+PathExistsGlob=%h/.local/state/flownote-codex/inbox/*.log
+Unit=flownote-codex-dispatch.service
+
+[Install]
+WantedBy=default.target

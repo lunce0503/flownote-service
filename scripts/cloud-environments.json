@@ -1,0 +1,24 @@
+{
+  "projectId": "07ae56ef-08be-432d-948b-8f3b6ecb6cd5",
+  "vercelOrgId": "team_6vZLSWolmlzyExd2LDuZvm41",
+  "staging": {
+    "environmentId": "7e60dd1e-4183-42b2-a88f-19be7cdd6373",
+    "apiUrl": "https://flownote-api-staging.up.railway.app",
+    "webUrl": "https://flownote-react-staging.vercel.app",
+    "vercelProjectId": "prj_kAeoOrpeKDO5LKartBrAmhwUw940",
+    "mobileService": "flownote-mobile",
+    "mobileUrl": "https://flownote-mobile-staging.up.railway.app",
+    "expoService": "flownote-expo-go-staging",
+    "expoUrl": "https://flownote-expo-go-staging-staging.up.railway.app"
+  },
+  "production": {
+    "environmentId": "ae55fc37-9251-48d1-bdbe-87a2ea3462fa",
+    "apiUrl": "https://flownote-api-production.up.railway.app",
+    "webUrl": "https://flownote-react.vercel.app",
+    "vercelProjectId": "prj_ynJyEYWwtAOezeLD6qJQQP4Bqpld",
+    "mobileService": "flownote-mobile-production",
+    "mobileUrl": "https://flownote-mobile-production-production.up.railway.app",
+    "expoService": "flownote-expo-go",
+    "expoUrl": "https://flownote-expo-go-production.up.railway.app"
+  }
+}

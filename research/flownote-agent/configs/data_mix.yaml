@@ -1,0 +1,79 @@
+# Target mix for the SFT set. `weight` is the share of the final dataset;
+# the builder samples/truncates each source to hit these ratios and reports
+# what it actually achieved.
+#
+# LICENSE NOTE - read before you ship anything:
+#   xlam-function-calling-60k is CC-BY-NC-4.0 (non-commercial) AND gated.
+#   glaive-function-calling-v2 is Apache-2.0.
+#   Outputs from a commercial teacher API may be restricted from training a
+#   competing model by that vendor's terms.
+# For a personal FlowNote agent this is all fine. For a released product,
+# recheck each line.
+
+total_examples: 24000
+
+sources:
+  # ---- 45% agent / tool calling -----------------------------------------
+  - name: xlam
+    kind: hf
+    repo: Salesforce/xlam-function-calling-60k
+    split: train
+    converter: xlam
+    weight: 0.20
+    gated: true
+
+  - name: glaive
+    kind: hf
+    repo: glaiveai/glaive-function-calling-v2
+    split: train
+    converter: glaive
+    weight: 0.15
+
+  - name: flownote_synth
+    kind: local
+    path: data/processed/synth.jsonl
+    converter: passthrough
+    weight: 0.10
+    notes: >
+      Korean + KO/EN-mixed requests against the real FlowNote tool schemas,
+      including multi-step loops and error-recovery turns. This is the slice
+      that actually decides whether the agent works, so generate it last and
+      generate it well.
+
+  # ---- 30% general instruction / knowledge ------------------------------
+  - name: openhermes
+    kind: hf
+    repo: teknium/OpenHermes-2.5
+    split: train
+    converter: sharegpt
+    weight: 0.15
+
+  - name: ko_instruct
+    kind: hf
+    repo: nlpai-lab/kullm-v2
+    split: train
+    converter: alpaca
+    weight: 0.15
+    notes: Swap for AI Hub corpora once your application is approved.
+
+  # ---- 25% code / structured output -------------------------------------
+  - name: magicoder
+    kind: hf
+    repo: ise-uiuc/Magicoder-OSS-Instruct-75K
+    split: train
+    converter: magicoder
+    weight: 0.15
+
+  - name: json_mode
+    kind: local
+    path: data/processed/json_drills.jsonl
+    converter: passthrough
+    weight: 0.10
+    notes: Synthetic "emit exactly this JSON shape" drills. Cheap to make, and
+           the single highest-leverage thing for tool-call parse rates.
+
+# Language balance enforced across the whole mix after sampling.
+language_targets:
+  ko: 0.40
+  en: 0.45
+  mixed: 0.15

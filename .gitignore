@@ -33,3 +33,4 @@ flownote-server/.gradle/
 /architecture-diagram.html
 .claude/settings.local.json
 __pycache__/
+/.release/

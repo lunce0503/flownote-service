@@ -11,7 +11,7 @@
 | FastAPI | `cd flownote-API && uv run pytest` | `[dependency-groups] dev`에 pytest 구성됨(`uv sync --group dev` 후 실행). 변경한 모듈에 맞는 compile/test 실행 |
 | Go services | `cd flownote-canvas && go test ./...`, `cd flownote-serve && go test ./...` | 인증·JSON 오류 계약 테스트 포함. 로컬 Go가 없으면 Go 1.23 컨테이너로 실행 |
 | Expo mobile | `cd flownote-mobile && yarn verify` | lint, typecheck, 정적 서버 테스트, Expo web export 확인 |
-| Docker | `docker compose up -d --build` | 작업 종료 전 통합 빌드와 백그라운드 실행 확인 |
+| Cloud release | `node scripts/deploy-cloud.mjs release all` | staging 배포·실제 E2E 후 같은 소스의 production 배포 |
 | Cloud deploy | Vercel production deploy, Railway deploy/healthcheck | 파일 수정 작업마다 배포 URL, deployment id, 헬스체크 결과를 최종 응답과 필요한 경우 `logs/report/`에 기록 |
 | Report-only | 파일 존재 및 핵심 내용 확인 | `logs/report/` 아래 보고서만 작성/수정한 경우 Docker와 클라우드 배포를 생략 |
 

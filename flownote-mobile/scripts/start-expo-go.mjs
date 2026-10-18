@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const DEFAULT_PORT = '8080';
-const DEFAULT_MAX_WORKERS = '2';
+const DEFAULT_MAX_WORKERS = '1';
 
 const requireHttpsUrl = (name, value) => {
   const trimmed = value?.trim();
@@ -12,7 +12,7 @@ const requireHttpsUrl = (name, value) => {
   }
 
   const url = new URL(trimmed);
-  if (url.protocol !== 'https:') {
+  if (url.protocol !== 'https:' || !url.hostname.endsWith('.up.railway.app') || url.username || url.password || url.port) {
     throw new Error(`${name} must use HTTPS.`);
   }
 
@@ -34,7 +34,7 @@ export const resolveExpoGoRailwayConfig = (env = process.env) => {
     apiUrl: requireHttpsUrl('EXPO_PUBLIC_WAS_URL', env.EXPO_PUBLIC_WAS_URL),
     maxWorkers: env.EXPO_MAX_WORKERS?.trim() || DEFAULT_MAX_WORKERS,
     port,
-    proxyUrl: `https://${publicDomain.replace(/^https?:\/\//, '').replace(/\/$/, '')}`,
+    proxyUrl: requireHttpsUrl('RAILWAY_PUBLIC_DOMAIN', `https://${publicDomain}`),
   };
 };
 

@@ -64,10 +64,10 @@ run_target() {
     canvas) run_canvas ;;
     serve) run_serve ;;
     ai) run_ai ;;
-    mobile) run_mobile ;;
+    mobile|expo) run_mobile ;;
     *)
       echo "Unknown target: $1" >&2
-      echo "Usage: $0 [all|web|api|main|canvas|serve|ai|mobile]" >&2
+      echo "Usage: $0 [all|web|api|main|canvas|serve|ai|mobile|expo]" >&2
       exit 2
       ;;
   esac
@@ -77,8 +77,8 @@ if [[ "$TARGET" == "all" ]]; then
   for target in web api main canvas serve ai mobile; do
     run_target "$target"
   done
-  echo "== Verify Compose configuration =="
-  (cd "$ROOT_DIR" && docker compose config --quiet)
+  echo "== Verify cloud configuration =="
+  node "$ROOT_DIR/scripts/check-cloud-config.mjs"
 else
   run_target "$TARGET"
 fi

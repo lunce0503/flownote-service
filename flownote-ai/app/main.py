@@ -14,14 +14,14 @@ from app.capabilities import capabilities
 
 # flownote-ai: flownote-API에서 분리된 AI/데이터 백엔드 전담 서비스.
 # - /api/aiclient   : 메인 에이전트(Gemini) 스트리밍
-# - /api/agent-note : 내부망 Ollama 이미지 캡션/검색 (Ollama가 있는 내부망에서만 동작)
+# - /api/agent-note : 종료된 로컬 기능의 호환 응답 (410)
 # - /api/market     : 주식 시세 (Spring이 STOCK_MARKET_DATA_URL로 소비)
 # - /api/chat       : 채팅
 # - /api/social     : 소셜
 # 클라이언트는 게이트웨이(flownote-API)를 거쳐 이 서비스로 라우팅된다.
 app = FastAPI(title="flownote-ai")
 
-default_origins = "http://localhost:3000,http://localhost:5173,http://localhost:5174"
+default_origins = ""
 origins = [
     origin.strip()
     for origin in os.getenv("CORS_ORIGINS", default_origins).split(",")

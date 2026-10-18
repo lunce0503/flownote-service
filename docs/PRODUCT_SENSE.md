@@ -17,6 +17,8 @@ Flownote는 작업, 노트, 캔버스, 에이전트, 소셜, 주식 관리를 �
 
 ## 기능 공개 단계
 
+- `AI/flownote-agent`의 학습·평가·도구 호출 코드를 [연구 모듈](../research/flownote-agent/README.md)로 편입했다. 노트·작업 에이전트는 [제품 사양](product-specs/note-task-agent.md)과 [실행 계획](exec-plan/active/2026-10-14-flownote-agent-integration.md)에서 추적하며 실제 API·품질 검증 전에는 제공자를 활성화하지 않는다.
+- IDLE의 개발 환경 계획은 Flownote의 개발 작업 공간으로 편입한다. 프로젝트·에이전트 실행·변경 검토·데스크톱 편집·모바일 제어를 기존 노트·작업·Remote와 연결한다. 현재는 계획 단계이며 [제품 사양](product-specs/development-workspace.md)과 [실행 계획](exec-plan/active/2026-10-14-idle-integration.md)에서 추적한다.
 - `Magic`, 나사 퍼즐, 밴픽, 주식은 개발 중 기능이다. 라우트는 개발 확인을 위해 유지하지만 일반 탐색 메뉴에는 노출하지 않는다.
 - 개발 중 기능은 검증이 완료된 뒤 `capabilityManifest.tsx`의 `stage`와 `nav`를 변경해 공개한다.
 

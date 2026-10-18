@@ -1,0 +1,13 @@
+[Unit]
+Description=Run the weekly read-only Flownote Codex review
+Documentation=file:%h/Flownote/service/automation/codex/README.md
+
+[Timer]
+OnCalendar=Sun *-*-* 03:30:00
+RandomizedDelaySec=15min
+AccuracySec=5min
+Persistent=true
+Unit=flownote-codex@weekly-review.service
+
+[Install]
+WantedBy=timers.target

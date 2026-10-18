@@ -3,7 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "expo start",
+    "start": "node scripts/start-expo-go.mjs",
     "start:expo-go": "node scripts/start-expo-go.mjs",
     "build:web": "expo export --platform web --output-dir dist",
     "start:web": "node scripts/serve-static.mjs",
@@ -11,9 +11,6 @@
     "test": "node --test scripts/*.test.mjs",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build:web",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
     "lint": "expo lint"
   },
   "dependencies": {

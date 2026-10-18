@@ -17,20 +17,9 @@ Expo Router 기반 iOS/Android/Web 클라이언트다. 계정, 작업, 노트, A
 
 노트·작업·Canvas의 상위 라우트는 생성과 목록 탐색을 담당하고, 항목 선택 후 하위 라우트에서 편집과 삭제를 수행한다.
 
-## iPad 개발 실행
+## iPad 클라우드 테스트
 
-Expo Go를 설치한 iPad에서 QR 코드를 열어 테스트한다. 운영 Railway API를 사용할 때는 다음과 같이 실행한다.
-
-```bash
-cd flownote-mobile
-EXPO_PUBLIC_WAS_URL=https://flownote-api-production.up.railway.app npm run start -- --tunnel
-```
-
-로컬 통합 백엔드를 사용할 때 `localhost`는 iPad 자신을 가리키므로 개발 PC의 LAN 주소와 FastAPI 게이트웨이 포트 `8000`을 사용한다.
-
-```bash
-EXPO_PUBLIC_WAS_URL=http://192.168.0.10:8000 npm run start
-```
+Expo Go에서 `exps://flownote-expo-go-staging-staging.up.railway.app`을 열어 staging을 테스트한다. Safari 테스트 주소는 `https://flownote-mobile-staging.up.railway.app`이다. 개발 PC의 Metro/LAN 주소는 사용하지 않는다.
 
 ## Railway 웹 테스트 배포
 
@@ -38,19 +27,7 @@ EXPO_PUBLIC_WAS_URL=http://192.168.0.10:8000 npm run start
 
 Railway 배포본은 iPad Safari에서 열 수 있고 웹 매니페스트를 사용해 홈 화면에 추가할 수 있다. 이는 무료 Apple 계정으로 필기 UX를 검증하기 위한 웹 테스트 클라이언트이며 TestFlight/App Store 네이티브 배포를 대체하지 않는다.
 
-```bash
-npm run build:web
-npm run start:web
-```
-
-## 로컬 Docker
-
-루트 Compose의 `mobile-app`은 Dockerfile의 `development` 단계를 사용해 Expo 개발 서버를 실행한다.
-
-```bash
-HOST_LAN_IP=192.168.0.10 docker compose up --build mobile-app
-docker compose logs -f mobile-app
-```
+배포는 루트의 `node scripts/deploy-cloud.mjs release all`로 staging 검증 후 production 순서로 진행한다. `Dockerfile`은 Railway 빌드 전용이며 로컬 Compose는 폐기됐다.
 
 ## 검증
 
@@ -62,4 +39,4 @@ npm run verify
 
 ## 네이티브 배포
 
-`eas.json`의 preview/production 프로필은 Railway 운영 게이트웨이를 사용한다. 실제 iOS 기기용 development build, TestFlight, App Store 배포에는 Apple Developer Program 권한이 필요하다.
+`eas.json`의 development/preview는 staging, production은 운영 게이트웨이를 사용한다. Apple 서명·배포 조건은 사용하는 EAS 배포 방식에서 확인한다. 표준 절차는 [배포 기준](../docs/DEPLOYMENT.md)을 따른다.

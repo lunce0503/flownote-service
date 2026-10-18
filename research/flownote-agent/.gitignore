@@ -1,0 +1,21 @@
+.venv/
+.venv-gpu/
+__pycache__/
+*.py[cod]
+.env
+.pytest_cache/
+*.egg-info/
+
+# data & artifacts (keep the seed set, ignore everything generated)
+data/raw/**
+data/processed/**
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+outputs/
+checkpoints/
+runs/
+wandb/
+hf_cache/
+*.gguf
+*.safetensors

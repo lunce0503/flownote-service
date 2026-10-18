@@ -11,12 +11,19 @@ type SpatialItem = Bounds & {
 
 export const getLineBounds = (line: LineElement): Bounds => {
   const first = line.points[0] ?? { x: 0, y: 0 };
-  return line.points.reduce<Bounds>((bounds, point) => ({
-    minX: Math.min(bounds.minX, point.x),
-    minY: Math.min(bounds.minY, point.y),
-    maxX: Math.max(bounds.maxX, point.x),
-    maxY: Math.max(bounds.maxY, point.y),
+  const bounds = line.points.reduce<Bounds>((result, point) => ({
+    minX: Math.min(result.minX, point.x),
+    minY: Math.min(result.minY, point.y),
+    maxX: Math.max(result.maxX, point.x),
+    maxY: Math.max(result.maxY, point.y),
   }), { minX: first.x, minY: first.y, maxX: first.x, maxY: first.y });
+  const padding = (line.strokeWidth ?? 2) / 2;
+  return {
+    minX: bounds.minX - padding,
+    minY: bounds.minY - padding,
+    maxX: bounds.maxX + padding,
+    maxY: bounds.maxY + padding,
+  };
 };
 
 export const getPointsBounds = (points: Point[]): Bounds | null => {

@@ -33,7 +33,7 @@ test('starts Expo Go in production bundle mode on the Railway port', () => {
     '--no-dev',
     '--minify',
     '--max-workers',
-    '2',
+    '1',
   ]);
   assert.equal(
     processConfig.env.EXPO_PACKAGER_PROXY_URL,

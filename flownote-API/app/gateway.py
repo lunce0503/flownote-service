@@ -6,8 +6,9 @@ flownote-API는 클라이언트의 모든 `/api/**` 요청을 받아 경로에 �
 라우팅:
 - `/api/{canvas,notes,note-folders,upload,admin}/**` → flownote-canvas(Go) : CANVAS_API_BASE_URL
 - `/uploads/**`(정적 파일)                            → flownote-canvas(Go) : CANVAS_API_BASE_URL
-- `/api/{schedule-items,tasks,stocks,social,chat}/**` → flownote-serve(Go)  : SERVE_API_BASE_URL
-- `/api/{aiclient,agent-note,market,capabilities}/**` → flownote-ai         : AI_API_BASE_URL
+- `/api/{schedule-items,tasks,stocks,social,chat}/**` → flownote-sub(Go)    : SERVE_API_BASE_URL
+- `/api/{aiclient,market}/**`                        → flownote-ai         : AI_API_BASE_URL
+- `/api/{agent-note,capabilities}/**`                → gateway compatibility responses
 - 그 외 코어(인증 `/api/users`, `/api/mobile`)         → flownote-server(Spring): CORE_API_BASE_URL
 
 게이트웨이 기능(완전성):
@@ -26,19 +27,19 @@ import time
 import uuid
 
 import httpx
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 logger = logging.getLogger("flownote.gateway")
 
-CORE_API_BASE_URL = (os.getenv("CORE_API_BASE_URL") or os.getenv("SPRING_API_URL") or "http://spring-server:8080").rstrip("/")
-CANVAS_API_BASE_URL = (os.getenv("CANVAS_API_BASE_URL") or CORE_API_BASE_URL).rstrip("/")
-AI_API_BASE_URL = (os.getenv("AI_API_BASE_URL") or "http://ai-server:8000").rstrip("/")
-SERVE_API_BASE_URL = (os.getenv("SERVE_API_BASE_URL") or "http://serve-server:8095").rstrip("/")
+CORE_API_BASE_URL = (os.getenv("CORE_API_BASE_URL") or "http://flownote.railway.internal:8080").rstrip("/")
+CANVAS_API_BASE_URL = (os.getenv("CANVAS_API_BASE_URL") or "http://flownote-canvas.railway.internal:8080").rstrip("/")
+AI_API_BASE_URL = (os.getenv("AI_API_BASE_URL") or "http://flownote-ai.railway.internal:8000").rstrip("/")
+SERVE_API_BASE_URL = (os.getenv("SERVE_API_BASE_URL") or "http://flownote-sub.railway.internal:8095").rstrip("/")
 
-# flownote-ai(AI 백엔드)가 소유하는 경로 접두어.
-_AI_PREFIXES = ("aiclient", "agent-note", "market", "capabilities")
-# flownote-serve(부가기능 백엔드: 일정·작업·주식·소셜·채팅)가 소유하는 접두어 — Spring에서 이관.
+# flownote-ai(AI 백엔드)가 가동될 때 소유하는 경로 접두어.
+_AI_PREFIXES = ("aiclient", "market")
+# flownote-sub(소스: flownote-serve/, 부가기능 백엔드)가 소유하는 접두어 — Spring에서 이관.
 _SERVE_PREFIXES = ("schedule-items", "tasks", "stocks", "social", "chat", "diary", "feedback")
 # flownote-canvas(Go)가 소유하는 접두어: 캔버스 + 이관된 노트 도메인(노트·폴더·업로드) + 관리자 진단.
 _CANVAS_PREFIXES = ("canvas", "notes", "note-folders", "upload", "admin")
@@ -61,6 +62,30 @@ _RETRY_BACKOFF_S = (0.3, 0.8)
 _TIMEOUT = httpx.Timeout(connect=5.0, read=300.0, write=60.0, pool=5.0)
 
 router = APIRouter()
+
+
+@router.get("/api/capabilities")
+async def capabilities():
+    """중지된 AI 서비스의 상태를 상류 연결 없이 명시한다."""
+    return {
+        "service": "flownote-api-gateway",
+        "capabilities": {
+            "agent": {"enabled": False, "provider": "gemini", "scope": "stopped"},
+            "agent_note": {"enabled": False, "provider": "ollama", "scope": "removed"},
+            "market": {"enabled": False, "provider": "public-market-data", "scope": "stopped"},
+        },
+    }
+
+
+@router.get("/api/agent-note/health")
+async def agent_note_health():
+    return {"enabled": False, "ollama": "disabled", "scope": "removed"}
+
+
+@router.api_route("/api/agent-note", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+@router.api_route("/api/agent-note/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def removed_agent_note(path: str = ""):
+    raise HTTPException(status_code=410, detail="The local agent-note integration has been removed.")
 
 
 def _target(path: str) -> tuple[str, str]:

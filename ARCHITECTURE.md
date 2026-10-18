@@ -1,6 +1,6 @@
 # 개요
 
-Flownote는 캔버스와 텍스트 노트를 중심으로 일정, 작업, 주식, 소셜, 채팅, AI 기능을 결합한 멀티 서비스 노트 애플리케이션이다. 이 문서는 저장소를 탐색할 때 사용하는 코드맵이며, 서비스 경계는 `docker-compose.yml`, HTTP 라우팅은 `flownote-API/app/gateway.py`, DB 스키마는 `flownote-server/src/main/resources/db/migration/`을 우선 기준으로 삼는다.
+Flownote는 캔버스와 텍스트 노트를 중심으로 일정, 작업, 주식, 소셜, 채팅, AI 기능을 결합한 멀티 서비스 노트 애플리케이션이다. 이 문서는 저장소를 탐색할 때 사용하는 코드맵이며, 클라우드 환경은 `scripts/cloud-environments.json`, HTTP 라우팅은 `flownote-API/app/gateway.py`, DB 스키마는 `flownote-server/src/main/resources/db/migration/`을 우선 기준으로 삼는다.
 
 현재 구조는 소스 코드와 배포 구성 파일을 기준으로 유지한다. 런타임 상태나 배포 ID처럼 자주 변하는 정보는 `logs/report/`에 기록하고, 이 문서에는 코드와 함께 유지되는 구조만 기록한다.
 
@@ -17,12 +17,10 @@ Browser (flownote/)              Mobile (flownote-mobile/)
           |                        |      auth, users, mobile config, Flyway
           |                        +--> flownote-canvas (Go, :8090)
           +----------------------->|      canvas, notes, uploads
-                                   +--> flownote-serve (Go, :8095)
+                                   +--> flownote-sub (Go, :8095; source: flownote-serve/)
                                    |      diary, schedules, tasks, stocks, social, chat
-                                   +--> flownote-ai (FastAPI, internal :8000 / host :8010)
-                                          agent, agent-note, market
-                                             |
-                                             +--> Ollama (:11434, internal only)
+                                   +--> flownote-ai (FastAPI, internal :8000 / host :8010; 기본 중지)
+                                          agent, market
 
 Backends --> PostgreSQL (system of record)
 Backends --> Redis (session/socket/market cache)
@@ -44,15 +42,16 @@ Flownote는 기획한 내용을 바탕으로 관련 필기를 텍스트와 그�
 | 경로 | 실행 단위 | 시작점 | 책임 |
 | --- | --- | --- | --- |
 | `flownote/` | Vite React SPA | `src/main.tsx`, `src/app/App.tsx`, `src/app/capabilityManifest.tsx` | 웹 화면, FSD 상태/기능 조합, REST/SSE/Socket.IO 클라이언트 |
+| `flownote-android/` | Android 설치 APK | `app/src/main/java/com/flownote/mobile/MainActivity.java` | HTTPS WebView로 웹 전체 기능 공유, 앱용 헤더 제거·아이보리/검정 탐색, 시스템 파일 선택·저장 |
 | `flownote-mobile/` | Expo React Native | `app/_layout.tsx`, `app/canvas.tsx` | iOS/Android 네이티브 화면, 캔버스, Railway 정적 웹 테스트 배포 |
 | `flownote-API/` | FastAPI + Socket.IO | `app/main.py` | 공개 API 게이트웨이, 캔버스 실시간 허브, 요청 추적/콜드스타트 연결 재시도 |
 | `flownote-server/` | Spring Boot | `FlownoteServerApplication.java` | 인증·사용자·모바일 설정, 전체 PostgreSQL Flyway 스키마 소유 |
 | `flownote-canvas/` | Go HTTP 서버 | `main.go` | 캔버스, 노트, 폴더, 업로드, 캔버스 관리자 진단 |
-| `flownote-serve/` | Go HTTP 서버 | `main.go` | 일기, 일정, 작업, 주식, 소셜, 채팅 |
+| `flownote-serve/` | Go HTTP 서버 (`flownote-sub`) | `main.go` | 일기, 일정, 작업, 주식, 소셜, 채팅 |
 | `flownote-ai/` | FastAPI | `app/main.py` | AI 스트림, 에이전트 노트 검색, 시장 데이터, Ollama 연동 |
 | `apps/host/` | Node.js CLI/Host Agent | `src/cli.ts` | LAN/VPN WSS 인증, 실제 PTY, 재접속 출력 버퍼와 기기 폐기 |
 | `protocol/remote-host/v1/` | JSON Schema | `protocol.schema.json` | Android 원격 터미널과 Host가 공유하는 메시지 계약 |
-| `docker-compose.yml` | 로컬 통합 오케스트레이션 | Compose 서비스 정의 | Postgres, Redis, 5개 백엔드, 웹, 모바일, Ollama 네트워크 구성 |
+| `scripts/deploy-cloud.mjs` | staging-first 클라우드 배포 | `scripts/cloud-environments.json` | 환경별 배포, cloud E2E, 같은 소스 검증 후 production |
 | `docs/`, `logs/` | 지식/운영 기록 | `docs/README.md`, `logs/report/` | 설계 기준, 제품 사양, 분석·배포 결과 |
 
 ## 모바일 Railway 배포 코드맵
@@ -61,7 +60,7 @@ Flownote는 기획한 내용을 바탕으로 관련 필기를 텍스트와 그�
 | --- | --- | --- | --- |
 | `flownote-mobile/app/canvas.tsx` | 모바일 필기·요소 편집·로컬 초안·서버 자동 저장 | React Native responder → SVG 요소 → `/api/canvas/**` | Expo Go, 네이티브 앱, Expo 웹에서 같은 캔버스 모델을 사용한다. |
 | `flownote-mobile/lib/flownote-api.ts` | 모바일 REST 클라이언트와 캔버스 DTO | `EXPO_PUBLIC_WAS_URL` → FastAPI gateway | 모든 공개 요청을 Railway 게이트웨이 한 곳으로 보낸다. |
-| `flownote-mobile/Dockerfile` | 개발 Expo 서버와 production 정적 웹의 다중 단계 빌드 | Compose는 `development`, Railway는 최종 `production` 단계 | 로컬 QR 개발과 Railway 웹 배포를 하나의 Dockerfile로 분리한다. |
+| `flownote-mobile/Dockerfile` | Railway 정적 모바일 웹 빌드 | 환경별 `EXPO_PUBLIC_WAS_URL` | Expo Go cloud bundle은 별도 `Dockerfile.expo-go`로 배포한다. |
 | `flownote-mobile/scripts/serve-static.mjs` | Expo 정적 결과와 `/health` 제공 | Railway public domain → iPad Safari | 확장자 없는 Expo Router 경로와 SPA fallback을 제공한다. |
 | `flownote-mobile/eas.json` | preview/production 공개 API 주소 | EAS iOS/Android build → Railway gateway | 향후 서명된 네이티브 빌드도 같은 운영 API를 사용한다. |
 | `flownote-mobile/railway.json` | Dockerfile builder와 healthcheck | Railway deployment | 모바일 웹 테스트 서비스의 배포 계약이다. |
@@ -75,7 +74,7 @@ entities/canvas/model/types.ts
      (drawing, rendering, persistence, history, selection, assets)
   -> widgets/CanvasWidget/InfiniteCanvas/*
   -> CanvasSavePayload / CanvasLoadData
-  -> Socket.IO canvas:save / canvas:load
+  -> Socket.IO canvas:save / canvas:load (large saves: POST /api/canvas/save)
   -> flownote-API/app/canvas_socket.py
   -> flownote-canvas/internal/canvas/{model,handler,repo}.go
   -> PostgreSQL canvas_* tables
@@ -90,11 +89,14 @@ entities/canvas/model/types.ts
 | `/api/users/**`, `/api/mobile/**`, 그 외 기본 `/api/**` | Spring | `flownote-API/app/gateway.py` → `flownote-server/src/main/java/com/flownote/{user,mobile}/` |
 | `/api/canvas/**`, `/api/notes/**`, `/api/note-folders/**`, `/api/upload/**`, `/api/admin/**`, `/uploads/**` | Go canvas | `flownote-API/app/gateway.py` → `flownote-canvas/internal/{canvas,notes}/` |
 | `/api/schedule-items/**`, `/api/tasks/**`, `/api/stocks/**`, `/api/social/**`, `/api/chat/**`, `/api/diary/**` | Go serve | `flownote-API/app/gateway.py` → `flownote-serve/internal/` |
-| `/api/aiclient/**`, `/api/agent-note/**`, `/api/market/**` | Python AI | `flownote-API/app/gateway.py` → `flownote-ai/app/api/` |
+| `/api/aiclient/**`, `/api/market/**` | Python AI (가동 시) | `flownote-API/app/gateway.py` → `flownote-ai/app/api/` |
+| `/api/capabilities`, `/api/agent-note/**` | FastAPI gateway | AI 중지 상태와 제거된 agent-note 계약을 상류 연결 없이 응답 |
 | Socket.IO `canvas:*` | FastAPI gateway + Go canvas | `flownote/src/features/canvas/model/canvasSocketClient.ts` → `flownote-API/app/canvas_socket.py` → Go canvas HTTP |
+| HTTP `POST /api/canvas/save` | FastAPI gateway + Go canvas | `app/canvas_http.py` → `canvas_socket.save_canvas`; 소켓과 같은 mutation/ack/변경 알림 계약, 요청 최대 32MiB |
+| Socket.IO `/sync` namespace | FastAPI gateway | `shared/lib/sync.ts` → `app/sync_socket.py`; Spring 세션 검증 후 사용자별 변경 알림, Redis manager 공유 |
 | SSE AI 응답 | Python AI | `/api/aiclient/ask_stream`, 게이트웨이의 스트리밍 프록시 |
 | SSE 주식 스트림 | Go serve | `/api/stocks/stream`, 게이트웨이의 스트리밍 프록시 |
-| 내부 LLM HTTP | Ollama | `flownote-ai/app/services/ollama_client.py` → `ollama:11434` |
+| 로컬 LLM | 제거됨 | 기존 agent-note 경로는 410 응답만 제공 |
 
 모든 사용자 보호 API는 `Authorization: Bearer <session UUID>`를 전달한다. Spring은 세션을 발급하고 Go 서비스는 같은 `app_sessions` 테이블과 Redis 캐시를 이용해 사용자를 확인한다. 게이트웨이는 `X-Request-ID`와 전달 헤더를 유지하며, 연결이 성립되기 전의 상류 연결 오류만 최대 2회 재시도한다.
 
@@ -112,7 +114,7 @@ entities/canvas/model/types.ts
 | | `api/canvasLibraryData.ts` | 문서·폴더 CRUD 10종 — `VITE_CANVAS_API_URL`(Go) 직결 |
 | `features/canvas/model/` | `usePersistence.tsx` | 저장/로드 오케스트레이션의 중심: dirty 추적, 디바운스 자동 저장, 재시도 큐 소비, 원격 변경 큐·**증분 델타 적용**, 소켓 방 참여·재연결 즉시 재시도 |
 | | `canvasSocketClient.ts` | Socket.IO 싱글턴, 요청/ack(`canvas:save`·`canvas:load`), 이벤트 타입 |
-| | `canvasLocalDraft.ts` | 재시도 큐(캔버스별 1항목·백오프·재연결 리셋), 로컬 초안 직렬화 |
+| | `canvasLocalDraft.ts` | 재시도 큐(캔버스별 1항목·백오프 유지·영구 오류 blocked), 로컬 초안 직렬화 |
 | | `canvasIndexedDb.ts` | 재시도 큐·초안·기기 진단의 IndexedDB 영속화 |
 | | `canvasPersistenceModel.ts` | 직렬화(serialize*), 트리거 우선순위 큐, 로드 데이터 정규화 |
 | | `canvasAssetApi.ts` | 이미지 업로드·프록시 URL·`hydrateImageElement` |
@@ -130,6 +132,8 @@ entities/canvas/model/types.ts
 | 파일 | 책임 |
 | --- | --- |
 | `app/canvas_socket.py` | Socket.IO 허브: `canvas:join/leave` 방 관리, `canvas:save`/`canvas:load` 중계(Go로 HTTP 전달, 저장 90s 타임아웃), 라인 스트림 브로드캐스트, **`canvas:changed`+`changes` 증분 브로드캐스트(256KB 가드)**, 자산 업로드 중계 |
+| `app/canvas_http.py` | 큰 저장의 HTTP 진입점. 본문 크기 제한과 헤더 인증을 적용하고 소켓과 동일한 저장 함수를 호출 |
+| `app/sync_socket.py` | `/sync` 연결·발행·주기적 세션 검증, 사용자별 room으로 변경 알림 전달 |
 | `app/gateway.py` | HTTP `/api/canvas/**` → `CANVAS_API_BASE_URL` 프록시(스트리밍·재시도·X-Request-ID) |
 | `app/core_api.py` | 백엔드 전달 헬퍼(`forward_request`, base_url·timeout 파라미터) |
 | 환경 변수 | `CANVAS_API_BASE_URL`, `CANVAS_SAVE_FORWARD_TIMEOUT_SECONDS`(기본 90), `CANVAS_CHANGED_MAX_INLINE_BYTES`(기본 256KB) |
@@ -184,17 +188,15 @@ entities/canvas/model/types.ts
 | 위치 | 책임 |
 | --- | --- |
 | `app/api/agent_router.py` | `/api/aiclient/ask_stream` — AI 응답 스트림 |
-| `app/api/agent_note_router.py` | `/api/agent-note/{health,index,query,ask}` — 노트 인덱싱과 질의 |
+| `app/api/agent_note_router.py` | AI 단독 실행 시 폐기된 로컬 기능의 health/410 호환 응답 |
 | `app/api/market_router.py` | `/api/market/{search,quotes,history}` — 외부 시장 데이터와 Redis TTL 캐시 |
 | `app/services/agent_service.py` | 에이전트 요청 오케스트레이션과 MCP 도구 결합 |
-| `app/services/agent_note_{service,store}.py` | Ollama 임베딩/질의와 로컬 SQLite 인덱스 관리 |
-| `app/services/ollama_client.py` | 내부망 Ollama HTTP 클라이언트 |
-| `app/capabilities.py` | Gemini 설정 및 내부망 Ollama 기능 가용성을 `/api/capabilities`로 노출 |
+| `app/capabilities.py` | AI 단독 실행 시 Gemini 가용성과 제거된 agent-note 상태를 노출 |
 | `app/core_api.py` | MCP/AI 서비스가 게이트웨이의 코어 API를 다시 호출하는 클라이언트 |
 
 `flownote-ai/app/api/chat_router.py`와 `social_router.py`에는 호환 코드가 남아 있지만, 현재 게이트웨이의 `/api/chat`과 `/api/social` 라우팅 소유자는 `flownote-serve`다. 외부 클라이언트 기준 계약은 게이트웨이 라우팅을 우선한다.
 
-`agent-note`는 `AGENT_NOTE_ENABLED=true`인 Compose/내부망에서만 활성화한다. 기능 요청은 Core API 세션을 검증하고 인덱스를 `userId + roomId`로 격리한다. Railway처럼 Ollama가 없는 환경은 앱 전체를 실패시키지 않고 health/capability에서 비활성을 보고하며 기능 요청에는 503을 반환한다.
+2026-09-09 로컬 Ollama 네트워크·인덱싱 구현을 제거했다. agent-note 기능 경로는 게이트웨이에서 410을 반환하며 환경 변수로 재활성화할 수 없다. AI 서비스가 중지돼도 `/api/capabilities`와 이 호환 응답은 유지된다. 기존 모델·인덱스 데이터는 자동 삭제하지 않는다.
 
 ## 프론트엔드 도메인 탐색
 
@@ -207,7 +209,7 @@ entities/canvas/model/types.ts
 | 조합 UI | `flownote/src/widgets/` | 페이지에서 사용하는 큰 UI 단위 |
 | 공통 통신 | `flownote/src/shared/api/index.ts` | 환경 변수 기반 API URL, LAN 호스트 치환, Bearer 인증 저장/헤더 |
 
-`flownote-next/`는 2026-07-28 제거되었으므로 현재 코드맵과 통합 실행 대상에 포함하지 않는다. 과거 Next.js 동기화 URL 환경 변수는 프론트 호환 설정에 남아 있을 수 있으나 현재 저장소에는 Next 실행 서비스가 없다.
+`flownote-next/`는 2026-07-28 제거되었으므로 현재 코드맵과 통합 실행 대상에 포함하지 않는다. 2026-09-07 동기화는 게이트웨이 `/sync` Socket.IO namespace로 이전했다. 프론트는 `VITE_CANVAS_SOCKET_URL` 또는 `VITE_API_BASE_URL`을 사용하며 폐기된 `VITE_SYNC_API_URL`은 읽지 않는다.
 
 ## 인증·세션
 
@@ -231,12 +233,16 @@ entities/canvas/model/types.ts
 
 ## 실행 및 배포 코드맵
 
+### AI 연구 코드
+
+`research/flownote-agent/`는 2026-10-14 편입한 노트·작업 에이전트 연구 모듈이다. 데이터 준비·학습·평가·모의 도구 실행과 독립 requirements를 소유하며 현재 운영 API·배포 대상이 아니다. 향후 서비스 연결과 모델 선정 상태는 [편입 실행 계획](docs/exec-plan/active/2026-10-14-flownote-agent-integration.md)에서 관리한다.
+
 반복 가능한 검증·production 배포·롤백 절차는 `docs/DEPLOYMENT.md`를 기준으로 한다.
 
 | 환경 | 구성 파일 | 실행/배포 대상 |
 | --- | --- | --- |
-| 로컬/내부망 | `docker-compose.yml`, 각 서비스 `Dockerfile` | `db`, `redis`, `spring-server`, `canvas-server`, `serve-server`, `ai-server`, `api-server`, `react-app`, `mobile-app`, 내부 전용 `ollama` |
-| Vercel production | `flownote/vercel.json` | Vite SPA와 SPA fallback rewrite |
+| staging/production | `scripts/cloud-environments.json`, `scripts/deploy-cloud.mjs` | 별도 Railway 환경·DB·저장소와 Vercel 프로젝트 |
+| Vercel | `flownote/vercel.json` | Vite SPA와 SPA fallback rewrite, Git 직접 자동 배포 차단 |
 | Railway | 각 서비스의 `railway.json` | 5개 백엔드와 `flownote-mobile` 정적 웹 테스트 클라이언트; Dockerfile 빌드와 서비스별 healthcheck |
 
-로컬 포트는 React `5173`, gateway `8000`, Spring `8080`, canvas `8090`, serve `8095`, AI host `8010`, mobile `8081`, PostgreSQL `5432`, Redis `6379`다. Ollama는 Compose 내부의 `ollama:11434`로만 접근하며 공개 포트를 두지 않는다.
+LAN/loopback API 및 로컬 Compose는 폐기됐다. 클라이언트는 공개 HTTPS를 사용하고 Railway 서비스·DB·Redis 간 private networking은 유지한다. staging cloud 검증 후 같은 소스만 production에 배포한다.

@@ -81,7 +81,7 @@ func main() {
 	social.NewHandler(social.NewRepo(pool, store), authenticator).Register(mux)
 	chat.NewHandler(chat.NewRepo(pool, store), authenticator).Register(mux)
 	diary.NewHandler(diary.NewRepo(pool), authenticator).Register(mux)
-	feedback.NewHandler(feedback.NewRepo(pool), authenticator).Register(mux)
+	feedback.NewHandler(feedback.NewRepo(pool), authenticator, cfg.FeedbackAutomationToken).Register(mux)
 
 	root := withCORS(cfg.CORSOrigins, withRequestLog(mux))
 

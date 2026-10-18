@@ -1,0 +1,91 @@
+# FlowNote agent - QLoRA SFT config for Gemma 4 E2B
+# Sized for a single 24GB card (RTX 4090 / L4) on RunPod.
+# Unsloth reports E2B LoRA fitting in 8-10GB, so 24GB leaves plenty of headroom
+# for a longer context.
+
+model:
+  # Gemma 4 E2B: 5.15B raw params, 2.3B "effective" via Per-Layer Embeddings.
+  # The raw count is what occupies VRAM during training.
+  # Apache-2.0 and NOT gated - no HF token needed to download.
+  base_id: google/gemma-4-E2B-it
+  # Pre-patched mirror with Unsloth's fixes applied:
+  #   base_id: unsloth/gemma-4-E2B-it
+  dtype: bfloat16
+  # No attn_implementation override. Gemma 4 interleaves local sliding-window
+  # (512) with global attention and picks its own kernel; forcing eager here
+  # only makes it slower.
+
+quantization:
+  load_in_4bit: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_use_double_quant: true
+  bnb_4bit_compute_dtype: bfloat16
+
+lora:
+  r: 32
+  alpha: 64
+  dropout: 0.05
+  bias: none
+  # Leaf names to attach adapters to. The trainer resolves these against the
+  # ACTUAL module names at runtime and scopes them to the text decoder.
+  #
+  # This is not a nicety. Gemma 4's vision and audio towers reuse these exact
+  # leaf names but wrap them in Gemma4ClippableLinear, which PEFT rejects:
+  # passing bare suffixes (or "all-linear") fails the run with
+  #   ValueError: Target module Gemma4ClippableLinear is not supported.
+  # Scoping to language_model yields 205 clean targets on E2B (~48M trainable,
+  # 0.94% of the model). Note 35 q_proj/o_proj but only 15 k_proj/v_proj -
+  # E2B shares KV across layers, and enumeration gets that right for free.
+  target_suffixes:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  scope_contains: language_model
+  # Deliberately NOT included above: per_layer_projection / per_layer_input_gate
+  # (the PLE machinery) and lm_head. And never embed_tokens - the vocab is 262k.
+  modules_to_save: []
+
+data:
+  train_file: data/processed/train.jsonl
+  eval_file: data/processed/eval.jsonl
+  # Gemma 4 supports 128K context, but memory scales with what you actually
+  # train on. 4096 covers a multi-step agent loop with room to spare.
+  max_seq_len: 4096
+  drop_overlong: true        # cutting mid tool-call teaches unterminated calls
+  train_on_model_turns_only: true
+
+train:
+  output_dir: outputs/flownote-e2b-qlora
+  num_train_epochs: 3
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 16     # effective batch = 16
+  learning_rate: 2.0e-4               # Unsloth's Gemma 4 recommendation
+  lr_scheduler_type: cosine
+  warmup_ratio: 0.03
+  weight_decay: 0.01
+  max_grad_norm: 0.3
+  optim: paged_adamw_8bit
+  gradient_checkpointing: true
+  bf16: true
+  # CONTESTED SETTING, left ON deliberately. E2B/E4B share KV across layers and
+  # are reported to emit gibberish when the cache is disabled during training -
+  # the opposite of the usual advice for gradient checkpointing. If your loss
+  # curve looks healthy but sampled generations are garbage, this is the first
+  # switch to flip. Verify on a short run before committing to a long one.
+  use_cache: true
+  logging_steps: 10
+  eval_strategy: steps
+  eval_steps: 100
+  save_strategy: steps
+  save_steps: 200
+  save_total_limit: 3
+  seed: 42
+  report_to: []               # ["wandb"] once WANDB_API_KEY is set
+
+# Expected loss: 13-15 is NORMAL for E2B/E4B (multimodal head over a 262k vocab).
+# Values in the hundreds mean gradient accumulation is misconfigured, not that
+# the data is bad.

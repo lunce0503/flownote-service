@@ -11,6 +11,11 @@ export const CANVAS_SAVE_REQUEST_TIMEOUT_MS = 95_000;
 export const CANVAS_SOCKET_REQUEST_TIMEOUT_MS = 30_000;
 export const CANVAS_SOCKET_LOAD_TIMEOUT_MS = 180_000;
 export const CANVAS_SOCKET_UPLOAD_TIMEOUT_MS = 120_000;
+// Leave space for the Socket.IO event name, ack id and authorization envelope.
+export const CANVAS_SOCKET_SAFE_BYTES = 900_000;
+export const CANVAS_SAVE_MAX_BYTES = 32 * 1024 * 1024;
+
+export const canvasMessageBytes = (payload: unknown) => new TextEncoder().encode(JSON.stringify(payload)).byteLength;
 
 export type CanvasSocketResponse<T> = {
   ok: boolean;
@@ -38,6 +43,14 @@ export class CanvasSocketError extends Error {
 // 같은 (mutationId, payload) 조합으로는 영원히 409이므로 새 mutationId로 갈아타야 자가 치유된다.
 export const isCanvasMutationConflict = (error: unknown) => (
   error instanceof CanvasSocketError && error.status === 409
+);
+
+export const isCanvasPermanentSaveError = (error: unknown) => (
+  error instanceof CanvasSocketError && (
+    error.retryable === false
+    || (error.status !== undefined && error.status >= 400 && error.status < 500
+      && ![408, 409, 429].includes(error.status))
+  )
 );
 
 export type CanvasSaveResponse = {
@@ -109,6 +122,10 @@ export const emitCanvasSocket = <T,>(
   init?: Pick<RequestInit, "signal"> & { timeoutMs?: number },
 ): Promise<T> => (
   new Promise((resolve, reject) => {
+    if (canvasMessageBytes(payload) > CANVAS_SOCKET_SAFE_BYTES) {
+      reject(new CanvasSocketError("소켓 전송 크기를 초과했습니다.", 413, false));
+      return;
+    }
     const socket = getCanvasSocket(socketUrl);
     const rejectAbort = () => reject(new DOMException("Socket request aborted", "AbortError"));
 
@@ -149,6 +166,13 @@ export const emitCanvasSocket = <T,>(
   })
 );
 
+export const emitCanvasStream = (socketUrl: string, event: string, payload: Record<string, unknown>) => {
+  const socket = getCanvasSocket(socketUrl);
+  if (!socket.connected || canvasMessageBytes(payload) > CANVAS_SOCKET_SAFE_BYTES) return;
+  // Transient previews are recoverable from the durable save; never buffer them offline.
+  socket.volatile.emit(event, payload);
+};
+
 export const saveCanvasPayload = async (
   socketUrl: string,
   canvasId: string | null | undefined,
@@ -158,7 +182,7 @@ export const saveCanvasPayload = async (
   init?: Pick<RequestInit, "keepalive" | "signal">,
 ): Promise<CanvasSaveResponse> => {
   try {
-    const response = await emitCanvasSocket<CanvasSaveResponse>(socketUrl, "canvas:save", {
+    const request = {
       authorization: authHeaders().Authorization,
       canvasId: canvasId ?? null,
       mutationId,
@@ -166,10 +190,40 @@ export const saveCanvasPayload = async (
       trigger: trigger === "auto" ? "automatic" : trigger,
       clientCreatedAt: new Date().toISOString(),
       payload,
-    }, {
-      signal: init?.signal,
-      timeoutMs: CANVAS_SAVE_REQUEST_TIMEOUT_MS,
-    });
+    };
+    const requestBytes = canvasMessageBytes(request);
+    if (requestBytes > CANVAS_SAVE_MAX_BYTES) {
+      throw new CanvasSocketError("저장 데이터가 32MB 제한을 초과했습니다. 내용을 나눈 뒤 다시 저장해 주세요.", 413, false);
+    }
+    let response: CanvasSaveResponse;
+    if (requestBytes > CANVAS_SOCKET_SAFE_BYTES) {
+      const controller = new AbortController();
+      const abort = () => controller.abort();
+      init?.signal?.addEventListener("abort", abort, { once: true });
+      if (init?.signal?.aborted) controller.abort();
+      const timer = setTimeout(abort, CANVAS_SAVE_REQUEST_TIMEOUT_MS);
+      try {
+        const result = await fetch(`${socketUrl}/api/canvas/save`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify(request),
+          signal: controller.signal,
+        });
+        const body = await result.json().catch(() => null) as CanvasSocketResponse<CanvasSaveResponse> | null;
+        if (!result.ok || !body?.ok || !body.data) {
+          throw new CanvasSocketError(body?.error || "캔버스 HTTP 저장에 실패했습니다.", result.ok ? body?.status : result.status, body?.retryable);
+        }
+        response = body.data;
+      } finally {
+        clearTimeout(timer);
+        init?.signal?.removeEventListener("abort", abort);
+      }
+    } else {
+      response = await emitCanvasSocket<CanvasSaveResponse>(socketUrl, "canvas:save", request, {
+        signal: init?.signal,
+        timeoutMs: CANVAS_SAVE_REQUEST_TIMEOUT_MS,
+      });
+    }
     if (response.mutationId !== mutationId) {
       throw new Error("캔버스 저장 응답의 mutationId가 요청과 일치하지 않습니다.");
     }

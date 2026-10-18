@@ -3,6 +3,7 @@ package com.flownote.user;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,6 +18,7 @@ import com.flownote.user.UserDtos.LoginResponse;
 import com.flownote.user.UserDtos.RegisterRequest;
 import com.flownote.user.UserDtos.UserResponse;
 import com.flownote.user.UserDtos.UserSearchResponse;
+import com.flownote.user.UserDtos.UpdateProfileRequest;
 
 @RestController
 @RequestMapping("/api/users")
@@ -57,5 +59,12 @@ public class UserController {
         throw new org.springframework.web.server.ResponseStatusException(
                 org.springframework.http.HttpStatus.FORBIDDEN,
                 "사용자 목록 조회는 허용되지 않습니다.");
+    }
+
+    @PatchMapping("/me")
+    public UserResponse updateProfile(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @Validated @RequestBody UpdateProfileRequest request) {
+        return userService.updateProfile(authService.requireUserId(authorization), request);
     }
 }

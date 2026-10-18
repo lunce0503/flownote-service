@@ -1,6 +1,13 @@
 import { useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { markModified, removeOrMarkDeleted, type LassoSelection } from "@/features/canvas";
+import {
+    markModified,
+    readCanvasClipboard,
+    removeOrMarkDeleted,
+    writeCanvasClipboard,
+    type CanvasClipboard,
+    type LassoSelection,
+} from "@/features/canvas";
 import type { CanvasElementStatus, ImageElement, LineElement, Point, TextBoxElement, ToolType } from "@/entities/canvas";
 
 type Layerable = { id: string; zIndex?: number; status?: CanvasElementStatus };
@@ -36,12 +43,6 @@ const sendToBack = <T extends Layerable>(items: T[], ids: Set<string>): T[] => {
     return changed ? next : items;
 };
 
-export type LassoClipboard = {
-    lines: LineElement[];
-    images: ImageElement[];
-    textBoxes: TextBoxElement[];
-};
-
 const LASSO_PASTE_OFFSET = 32;
 
 type LassoBounds = { minX: number; minY: number; maxX: number; maxY: number } | null;
@@ -74,7 +75,7 @@ export const useLassoActions = ({
     setTool,
     recordHistory,
 }: UseLassoActionsParams) => {
-    const [lassoClipboard, setLassoClipboard] = useState<LassoClipboard | null>(null);
+    const [lassoClipboard, setLassoClipboard] = useState<CanvasClipboard | null>(() => readCanvasClipboard());
     const lassoPasteCountRef = useRef(0);
 
     const moveLassoSelection = (dx: number, dy: number) => {
@@ -130,7 +131,7 @@ export const useLassoActions = ({
     const handleCopyLassoSelection = () => {
         if (!lassoSelection) return;
 
-        setLassoClipboard({
+        const copiedSelection: CanvasClipboard = {
             lines: drawnLines
                 .filter((line) => line.status !== "deleted" && lassoSelection.lineIds.has(line.id))
                 .map((line) => ({ ...line, points: line.points.map((point) => ({ ...point })) })),
@@ -140,7 +141,9 @@ export const useLassoActions = ({
             textBoxes: textBoxes
                 .filter((textBox) => textBox.status !== "deleted" && lassoSelection.textBoxIds.has(textBox.id))
                 .map((textBox) => ({ ...textBox })),
-        });
+        };
+        writeCanvasClipboard(copiedSelection);
+        setLassoClipboard(readCanvasClipboard());
         lassoPasteCountRef.current = 0;
     };
 

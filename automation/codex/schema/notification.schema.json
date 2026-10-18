@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sent": { "type": "boolean" },
+    "recipient": { "type": "string", "const": "lunce0503@gmail.com" },
+    "message_id": { "type": "string" }
+  },
+  "required": ["sent", "recipient", "message_id"],
+  "additionalProperties": false
+}

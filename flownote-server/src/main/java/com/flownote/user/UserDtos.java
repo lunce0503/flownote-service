@@ -1,6 +1,7 @@
 package com.flownote.user;
 
 import java.util.UUID;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -22,6 +23,17 @@ public final class UserDtos {
             @Email @NotBlank String email,
             @NotBlank String password
     ) {
+    }
+
+    public record UpdateProfileRequest(
+            @NotBlank @Size(max = 80) String username,
+            @Email @NotBlank @Size(max = 254) String email,
+            @NotBlank @Size(max = 80) String nickname,
+            @JsonProperty("current_password") @Size(max = 200) String currentPassword
+    ) {
+        public UpdateProfileRequest(String username, String email, String nickname) {
+            this(username, email, nickname, null);
+        }
     }
 
     public record UserResponse(UUID id, String username, String email, String nickname, String role) {

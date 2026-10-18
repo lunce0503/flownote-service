@@ -11,7 +11,7 @@ echo "== Verify Spring mobile contract =="
   ./gradlew test --tests com.flownote.mobile.MobileConfigControllerTest
 )
 
-echo "== Verify Compose configuration =="
-(cd "$ROOT_DIR" && docker compose config --quiet)
+echo "== Verify cloud configuration =="
+node "$ROOT_DIR/scripts/check-cloud-config.mjs"
 
 echo "Mobile WAS verification passed."

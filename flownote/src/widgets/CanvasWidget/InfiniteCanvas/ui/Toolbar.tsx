@@ -1,15 +1,19 @@
 import React from 'react';
+import { CalendarDays } from 'lucide-react';
 import type { ToolType } from '@/entities/canvas';
 import type { CanvasLoadTrigger, CanvasSaveState, CanvasSaveStatus } from '@/features/canvas';
-import { ArrowLeft, BringToFront, CheckCircle2, ClipboardPaste, Copy, Download, Eraser, Hand, ImagePlus, Lasso, Loader2, Maximize, Minimize, MoreVertical, Palette, PenLine, RefreshCw, RotateCcw, SendToBack, Settings, Trash2, TriangleAlert, Type, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { BringToFront, Check, CheckCircle2, ChevronDown, ClipboardPaste, Cloud, CloudUpload, Copy, Crosshair, Download, Eraser, Hand, ImagePlus, Lasso, LayoutGrid, Loader2, Maximize, Minimize, MoreVertical, Palette, PenLine, Pencil, RefreshCw, RotateCcw, SendToBack, Settings, Trash2, TriangleAlert, Type, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useFullscreen } from '@/shared/lib/useFullscreen';
 
 interface ToolbarProps {
   canvasTitle: string;
   onNavigateToCanvasList: () => void;
+  onRenameCanvas: (title: string) => Promise<void>;
   tool: ToolType;
   setTool: (tool: ToolType) => void;
-  handleImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  handleAssetUpload: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  isImportingAssets: boolean;
+  assetImportMessage: string;
   handleSave: () => Promise<void>;
   handleLoad: (trigger?: CanvasLoadTrigger) => Promise<void>;
   cancelCanvasLoad: () => void;
@@ -32,6 +36,7 @@ interface ToolbarProps {
   onPenColorChange: (color: string) => void;
   isCanvasSettingsVisible: boolean;
   onToggleCanvasSettingsVisible: () => void;
+  onOpenPlannerSuggestions: () => void;
   zoomPercent: number;
   viewportCenter: { x: number; y: number };
 }
@@ -45,12 +50,13 @@ const PEN_COLORS = [
   { label: '보라', value: '#7C3AED' },
 ];
 
-// 원형 아이콘 버튼 공통 크기. 예외: 저장 상태 필 아이콘(14)은 text-xs 라벨과, 장식용 Palette(16)는 스와치와 정렬을 맞추기 위해 작게 유지한다.
+// 원형 아이콘 버튼 공통 크기. 장식용 Palette(16)는 스와치와 정렬을 맞추기 위해 작게 유지한다.
 const TOOLBAR_ICON_SIZE = 18;
 
 const floatingPillClass = 'pointer-events-auto flex min-h-12 shrink-0 items-center gap-1 rounded-full bg-white/95 px-2 shadow-lg ring-1 ring-stone-200/80 backdrop-blur';
 const iconButtonClass = 'inline-flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full p-3 text-stone-950 transition hover:bg-stone-100 active:scale-95';
 const selectedIconButtonClass = 'bg-stone-950 text-white hover:bg-stone-800';
+const libraryButtonClass = `${iconButtonClass} bg-white/95 shadow-lg ring-1 ring-stone-200/80 backdrop-blur`;
 
 const saveStatusClassByStatus: Record<CanvasSaveStatus, string> = {
   idle: 'bg-stone-100 text-stone-600',
@@ -74,7 +80,8 @@ type TouchActivation = (action: () => void) => {
 
 const useTouchActivation = (): TouchActivation => {
   const touchStartsRef = React.useRef(new Map<number, { x: number; y: number }>());
-  const lastTouchActivationAtRef = React.useRef(0);
+  // No touch has occurred on mount: allow mouse/keyboard actions immediately.
+  const lastTouchActivationAtRef = React.useRef(Number.NEGATIVE_INFINITY);
 
   return React.useCallback((action: () => void) => ({
     onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
@@ -134,16 +141,22 @@ const ColorSwatchButton: React.FC<ColorSwatchButtonProps> = ({ color, selected, 
   </button>
 );
 
-interface PenColorPillProps {
+interface PenColorPaletteProps {
   penColor: string;
   onPenColorChange: (color: string) => void;
   touchActivation: TouchActivation;
 }
 
-const PenColorPill: React.FC<PenColorPillProps> = ({ penColor, onPenColorChange, touchActivation }) => {
+const PenColorPalette: React.FC<PenColorPaletteProps> = ({ penColor, onPenColorChange, touchActivation }) => {
   const isPenColorInPalette = PEN_COLORS.some((color) => color.value.toLowerCase() === penColor.toLowerCase());
   return (
-    <div className={floatingPillClass} role="group" aria-label="펜 색상" title="펜 색상">
+    <div
+      id="canvas-pen-color-palette"
+      data-pen-palette="true"
+      className={`${floatingPillClass} canvas-toolbar-scroll absolute left-1/2 top-[7.75rem] z-[60] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-x-auto lg:top-16`}
+      role="dialog"
+      aria-label="펜 색상 선택"
+    >
       <Palette size={16} className="ml-2 mr-1 shrink-0 text-stone-500" aria-hidden="true" />
       {!isPenColorInPalette && (
         <span className="inline-flex min-h-12 min-w-12 shrink-0 items-center justify-center" title="현재 펜 색상">
@@ -164,12 +177,95 @@ const PenColorPill: React.FC<PenColorPillProps> = ({ penColor, onPenColorChange,
   );
 };
 
+interface CanvasTitleEditorProps {
+  canvasTitle: string;
+  onRenameCanvas: (title: string) => Promise<void>;
+  className: string;
+}
+
+const CanvasTitleEditor: React.FC<CanvasTitleEditorProps> = ({ canvasTitle, onRenameCanvas, className }) => {
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [draftTitle, setDraftTitle] = React.useState(canvasTitle);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const cancelEditing = () => {
+    setDraftTitle(canvasTitle);
+    setError(null);
+    setIsEditing(false);
+  };
+
+  const saveTitle = async () => {
+    const nextTitle = draftTitle.trim();
+    if (!nextTitle || isSaving) return;
+    if (nextTitle === canvasTitle) {
+      setIsEditing(false);
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+    try {
+      await onRenameCanvas(nextTitle);
+      setIsEditing(false);
+    } catch (renameError) {
+      console.error('Failed to rename canvas:', renameError);
+      setError('제목을 저장하지 못했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!isEditing) {
+    return (
+      <button
+        type="button"
+        className={`${className} gap-2 text-left`}
+        onClick={() => { setDraftTitle(canvasTitle); setError(null); setIsEditing(true); }}
+        title="캔버스 제목 편집"
+        aria-label={`캔버스 제목 편집: ${canvasTitle}`}
+      >
+        <span className="min-w-0 flex-1 truncate">{canvasTitle}</span>
+        <Pencil size={14} className="shrink-0 text-stone-500" aria-hidden="true" />
+      </button>
+    );
+  }
+
+  return (
+    <form
+      className={`${className} gap-1 px-2`}
+      onSubmit={(event) => { event.preventDefault(); void saveTitle(); }}
+      title={error ?? '캔버스 제목 편집'}
+    >
+      <input
+        className="h-8 min-w-0 flex-1 rounded-md border border-amber-400 bg-white px-2 text-sm font-bold outline-none focus:ring-2 focus:ring-amber-300"
+        value={draftTitle}
+        onChange={(event) => setDraftTitle(event.target.value)}
+        onKeyDown={(event) => { if (event.key === 'Escape') cancelEditing(); }}
+        aria-label="캔버스 제목"
+        maxLength={120}
+        autoFocus
+      />
+      <button type="submit" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-stone-100 disabled:opacity-40" disabled={!draftTitle.trim() || isSaving} aria-label="제목 저장">
+        {isSaving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+      </button>
+      <button type="button" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-stone-100" onClick={cancelEditing} disabled={isSaving} aria-label="제목 편집 취소">
+        <X size={15} />
+      </button>
+      {error && <span className="sr-only" role="alert">{error}</span>}
+    </form>
+  );
+};
+
 export const Toolbar: React.FC<ToolbarProps> = ({
   canvasTitle,
   onNavigateToCanvasList,
+  onRenameCanvas,
   tool,
   setTool,
-  handleImageUpload,
+  handleAssetUpload,
+  isImportingAssets,
+  assetImportMessage,
   handleSave,
   handleLoad,
   cancelCanvasLoad,
@@ -192,13 +288,18 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onPenColorChange,
   isCanvasSettingsVisible,
   onToggleCanvasSettingsVisible,
+  onOpenPlannerSuggestions,
   zoomPercent,
   viewportCenter,
 }) => {
   const { isFullscreen, toggleFullscreen } = useFullscreen();
   const [isFileMenuOpen, setIsFileMenuOpen] = React.useState(false);
+  const [isMobileToolMenuOpen, setIsMobileToolMenuOpen] = React.useState(false);
+  const [isPenPaletteOpen, setIsPenPaletteOpen] = React.useState(false);
   const fileMenuButtonRef = React.useRef<HTMLButtonElement>(null);
   const fileMenuRef = React.useRef<HTMLDivElement>(null);
+  const mobileToolMenuButtonRef = React.useRef<HTMLButtonElement>(null);
+  const mobileToolMenuRef = React.useRef<HTMLDivElement>(null);
   const touchActivation = useTouchActivation();
   const toolButtons: Array<{ tool: ToolType; label: string; icon: React.ReactNode }> = [
     { tool: 'pen', label: '펜', icon: <PenLine size={TOOLBAR_ICON_SIZE} /> },
@@ -207,19 +308,86 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     { tool: 'handle', label: '이동', icon: <Hand size={TOOLBAR_ICON_SIZE} /> },
     { tool: 'text', label: '텍스트', icon: <Type size={TOOLBAR_ICON_SIZE} /> },
   ];
+  const activeTool = toolButtons.find((item) => item.tool === tool) ?? toolButtons[0];
   const shouldShowLassoActions = lassoSelectionCount > 0 || (tool === 'lasso' && hasCopiedLassoSelection);
   const isSaveBusy = saveState.status === 'loading' || saveState.status === 'saving' || saveState.status === 'retrying';
   const canCancelRetry = saveState.status === 'retrying' || saveState.pendingRetries > 0;
   const saveStatusIcon = (() => {
-    if (isSaveBusy) return <Loader2 size={14} className="animate-spin" />;
-    if (saveState.status === 'failed') return <TriangleAlert size={14} />;
-    if (saveState.status === 'saved') return <CheckCircle2 size={14} />;
-    return null;
+    if (isSaveBusy) return <Loader2 size={TOOLBAR_ICON_SIZE} className="animate-spin" aria-hidden="true" />;
+    if (saveState.status === 'failed') return <TriangleAlert size={TOOLBAR_ICON_SIZE} aria-hidden="true" />;
+    if (saveState.status === 'saved') return <CheckCircle2 size={TOOLBAR_ICON_SIZE} aria-hidden="true" />;
+    if (saveState.status === 'pending') return <CloudUpload size={TOOLBAR_ICON_SIZE} aria-hidden="true" />;
+    return <Cloud size={TOOLBAR_ICON_SIZE} aria-hidden="true" />;
   })();
   const saveStatusLabel = saveState.pendingRetries > 0
     ? `${saveState.message} ${saveState.pendingRetries}`
     : saveState.message;
-  const mobileSaveStatusLabel = saveStatusLabel.replace(/^저장\s+/, '');
+
+  const activateTool = (nextTool: ToolType) => {
+    setIsMobileToolMenuOpen(false);
+    if (nextTool === 'pen') {
+      setTool('pen');
+      setIsPenPaletteOpen((open) => tool === 'pen' ? !open : true);
+      return;
+    }
+    setIsPenPaletteOpen(false);
+    setTool(nextTool);
+  };
+
+  const selectPenColor = (color: string) => {
+    onPenColorChange(color);
+    setIsPenPaletteOpen(false);
+  };
+
+  const toggleMobileToolMenu = () => {
+    setIsFileMenuOpen(false);
+    setIsPenPaletteOpen(false);
+    setIsMobileToolMenuOpen((open) => !open);
+  };
+
+  const handleMobileImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setIsMobileToolMenuOpen(false);
+    void handleAssetUpload(event);
+  };
+
+  React.useEffect(() => {
+    if (!isPenPaletteOpen) return;
+    const closePalette = (event: Event) => {
+      if (event.type === 'keydown' && (event as KeyboardEvent).key !== 'Escape') return;
+      const target = event.target;
+      if (target instanceof Element && (target.closest('[data-pen-palette]') || target.closest('[data-pen-trigger]'))) return;
+      setIsPenPaletteOpen(false);
+    };
+    document.addEventListener('keydown', closePalette);
+    document.addEventListener('pointerdown', closePalette);
+    return () => {
+      document.removeEventListener('keydown', closePalette);
+      document.removeEventListener('pointerdown', closePalette);
+    };
+  }, [isPenPaletteOpen]);
+
+  React.useEffect(() => {
+    if (!isMobileToolMenuOpen) return;
+    const closeMenu = (restoreFocus: boolean) => {
+      setIsMobileToolMenuOpen(false);
+      if (restoreFocus) window.requestAnimationFrame(() => mobileToolMenuButtonRef.current?.focus());
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeMenu(true);
+    };
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!mobileToolMenuRef.current?.contains(target) && !mobileToolMenuButtonRef.current?.contains(target)) {
+        closeMenu(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [isMobileToolMenuOpen]);
 
   React.useEffect(() => {
     if (!isFileMenuOpen) return;
@@ -264,26 +432,28 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     >
       <div className="pointer-events-auto relative flex w-full items-center gap-2 p-1 lg:hidden">
         <button
-          ref={fileMenuButtonRef}
           type="button"
           {...touchActivation(onNavigateToCanvasList)}
-          className={`${iconButtonClass} bg-white/95 shadow-lg ring-1 ring-stone-200/80 backdrop-blur`}
+          data-testid="canvas-library-button"
+          className={libraryButtonClass}
           aria-label="그림판 목록으로"
         >
-          <ArrowLeft size={TOOLBAR_ICON_SIZE} />
+          <LayoutGrid size={TOOLBAR_ICON_SIZE} />
         </button>
-        <div className="flex min-h-12 min-w-0 flex-1 items-center rounded-full bg-white/95 px-4 text-sm font-black shadow-lg ring-1 ring-stone-200/80 backdrop-blur" aria-label={`그림판 제목: ${canvasTitle}`}>
-          <span className="truncate">{canvasTitle}</span>
-        </div>
+        <CanvasTitleEditor canvasTitle={canvasTitle} onRenameCanvas={onRenameCanvas} className="flex min-h-12 min-w-0 flex-1 items-center rounded-full bg-white/95 px-4 text-sm font-black shadow-lg ring-1 ring-stone-200/80 backdrop-blur" />
         <div
-          className={`inline-flex min-h-10 max-w-[104px] shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-black shadow-lg ${saveStatusClassByStatus[saveState.status]}`}
+          data-testid="canvas-save-status"
+          className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-lg ${saveStatusClassByStatus[saveState.status]}`}
           title={saveStatusLabel}
+          role="status"
+          aria-label={saveStatusLabel}
           aria-live="polite"
         >
           {saveStatusIcon}
-          <span className="truncate">{mobileSaveStatusLabel}</span>
+          <span className="sr-only">{saveStatusLabel}</span>
         </div>
         <button
+          ref={fileMenuButtonRef}
           type="button"
           {...touchActivation(() => setIsFileMenuOpen((open) => !open))}
           className={`${iconButtonClass} bg-white/95 shadow-lg ring-1 ring-stone-200/80 backdrop-blur`}
@@ -296,6 +466,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
         {isFileMenuOpen && (
           <div ref={fileMenuRef} className="absolute right-1 top-full z-50 mt-1 w-56 overflow-hidden rounded-lg bg-white py-1 shadow-xl ring-1 ring-stone-200" role="menu" onKeyDown={handleFileMenuKeyDown}>
+            <button type="button" role="menuitem" className={mobileMenuItemClass} {...touchActivation(() => { setIsFileMenuOpen(false); onOpenPlannerSuggestions(); })}><CalendarDays size={18} /> 플래너 제안</button>
             {saveState.status === 'failed' && (
               <button type="button" role="menuitem" className={mobileMenuItemClass} {...touchActivation(() => { setIsFileMenuOpen(false); void retryPendingSaves(); })}>
                 <RefreshCw size={18} /> 저장 재시도
@@ -333,33 +504,77 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <button
             type="button"
             {...touchActivation(handleUndo)}
+            data-testid="canvas-undo-button"
             disabled={!canUndo}
             className={`${iconButtonClass} ${canUndo ? '' : 'disabled:cursor-not-allowed disabled:opacity-40'}`}
             aria-label="되돌리기"
           >
             <RotateCcw size={TOOLBAR_ICON_SIZE} />
           </button>
+          <span
+            data-testid="canvas-current-tool"
+            className={`${iconButtonClass} ${selectedIconButtonClass} relative`}
+            title={`현재 도구: ${activeTool.label}`}
+            aria-label={`현재 도구: ${activeTool.label}`}
+          >
+            {activeTool.icon}
+            {activeTool.tool === 'pen' && (
+              <span className="absolute bottom-1.5 h-2 w-2 rounded-full ring-1 ring-white/80" style={{ backgroundColor: penColor }} aria-hidden="true" />
+            )}
+          </span>
+          <button
+            ref={mobileToolMenuButtonRef}
+            data-testid="canvas-tool-menu-toggle"
+            type="button"
+            {...touchActivation(toggleMobileToolMenu)}
+            className={iconButtonClass}
+            aria-label={isMobileToolMenuOpen ? '도구 접기' : '도구 펼치기'}
+            aria-controls="canvas-mobile-tool-menu"
+            aria-expanded={isMobileToolMenuOpen}
+          >
+            <ChevronDown size={TOOLBAR_ICON_SIZE} className={`transition-transform ${isMobileToolMenuOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      {isMobileToolMenuOpen && (
+        <div
+          ref={mobileToolMenuRef}
+          id="canvas-mobile-tool-menu"
+          className={`${floatingPillClass} canvas-toolbar-scroll max-w-full overflow-x-auto lg:hidden`}
+          role="group"
+          aria-label="도구 선택"
+        >
           {toolButtons.map((item) => {
             const selected = tool === item.tool;
             return (
               <button
                 key={item.tool}
                 type="button"
-                {...touchActivation(() => setTool(item.tool))}
-                className={`${iconButtonClass} ${selected ? selectedIconButtonClass : ''}`}
+                {...touchActivation(() => activateTool(item.tool))}
+                className={`${iconButtonClass} relative ${selected ? selectedIconButtonClass : ''}`}
                 aria-label={item.label}
                 aria-pressed={selected}
+                {...(item.tool === 'pen' ? {
+                  'data-pen-trigger': 'true',
+                  'aria-controls': 'canvas-pen-color-palette',
+                  'aria-expanded': isPenPaletteOpen,
+                  'aria-haspopup': 'dialog' as const,
+                } : {})}
               >
                 {item.icon}
+                {item.tool === 'pen' && (
+                  <span className="absolute bottom-1.5 h-2 w-2 rounded-full ring-1 ring-white/80" style={{ backgroundColor: penColor }} aria-hidden="true" />
+                )}
               </button>
             );
           })}
-          <label className={`${iconButtonClass} cursor-pointer`} aria-label="이미지 추가">
-            <ImagePlus size={TOOLBAR_ICON_SIZE} />
-            <input className="sr-only" type="file" accept="image/*" onChange={handleImageUpload} />
+          <label className={`${iconButtonClass} ${isImportingAssets ? 'cursor-wait opacity-60' : 'cursor-pointer'}`} aria-label="이미지 또는 PDF 추가" title={assetImportMessage}>
+            {isImportingAssets ? <Loader2 size={TOOLBAR_ICON_SIZE} className="animate-spin" /> : <ImagePlus size={TOOLBAR_ICON_SIZE} />}
+            <input className="sr-only" type="file" accept="image/*,application/pdf" multiple onChange={handleMobileImageUpload} disabled={isImportingAssets} />
           </label>
         </div>
-      </div>
+      )}
 
       {/* 폴더 패널처럼 캔버스 위에 떠 있는 플로팅 툴바 — 필 사이 빈 공간은 캔버스 입력을 통과시킨다. */}
       <div className="canvas-toolbar-scroll pointer-events-auto hidden w-max max-w-full items-start gap-2 overflow-x-auto p-1 lg:flex">
@@ -367,20 +582,21 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <button
             type="button"
             {...touchActivation(onNavigateToCanvasList)}
-            className={`${iconButtonClass} bg-white/95 shadow-lg ring-1 ring-stone-200/80 backdrop-blur`}
+            data-testid="canvas-library-button"
+            className={libraryButtonClass}
             title="그림판 목록으로"
             aria-label="그림판 목록으로"
           >
-            <ArrowLeft size={TOOLBAR_ICON_SIZE} />
+            <LayoutGrid size={TOOLBAR_ICON_SIZE} />
           </button>
-          <div className="pointer-events-auto flex min-h-12 max-w-[128px] shrink-0 items-center rounded-full bg-white/95 px-4 text-sm font-black shadow-lg ring-1 ring-stone-200/80 backdrop-blur sm:max-w-[220px] xl:max-w-xs" title={canvasTitle}>
-            <span className="truncate">{canvasTitle}</span>
-          </div>
+          <button type="button" {...touchActivation(onOpenPlannerSuggestions)} className={libraryButtonClass} aria-label="플래너 제안" title="캔버스에서 플래너 제안"><CalendarDays size={TOOLBAR_ICON_SIZE} /></button>
+          <CanvasTitleEditor canvasTitle={canvasTitle} onRenameCanvas={onRenameCanvas} className="pointer-events-auto flex min-h-12 max-w-[128px] shrink-0 items-center rounded-full bg-white/95 px-4 text-sm font-black shadow-lg ring-1 ring-stone-200/80 backdrop-blur sm:max-w-[220px] xl:max-w-xs" />
 
           <div className={floatingPillClass} aria-label="도구">
             <button
               type="button"
               {...touchActivation(handleUndo)}
+              data-testid="canvas-undo-button"
               disabled={!canUndo}
               className={`${iconButtonClass} ${canUndo ? '' : 'disabled:cursor-not-allowed disabled:opacity-40'}`}
               title="되돌리기"
@@ -394,41 +610,45 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <button
                   key={item.tool}
                   type="button"
-                  {...touchActivation(() => setTool(item.tool))}
-                  className={`${iconButtonClass} ${selected ? selectedIconButtonClass : ''}`}
+                  {...touchActivation(() => activateTool(item.tool))}
+                  className={`${iconButtonClass} relative ${selected ? selectedIconButtonClass : ''}`}
                   title={item.label}
+                  aria-label={item.label}
                   aria-pressed={selected}
+                  {...(item.tool === 'pen' ? {
+                    'data-pen-trigger': 'true',
+                    'aria-controls': 'canvas-pen-color-palette',
+                    'aria-expanded': isPenPaletteOpen,
+                    'aria-haspopup': 'dialog' as const,
+                  } : {})}
                 >
                   {item.icon}
+                  {item.tool === 'pen' && (
+                    <span className="absolute bottom-1.5 h-2 w-2 rounded-full ring-1 ring-white/80" style={{ backgroundColor: penColor }} aria-hidden="true" />
+                  )}
                 </button>
               );
             })}
-            <label className={`${iconButtonClass} cursor-pointer`} title="이미지 추가">
-              <ImagePlus size={TOOLBAR_ICON_SIZE} />
-              <input className="sr-only" type="file" accept="image/*" onChange={handleImageUpload} />
+            <label className={`${iconButtonClass} ${isImportingAssets ? 'cursor-wait opacity-60' : 'cursor-pointer'}`} title={assetImportMessage} aria-label="이미지 또는 PDF 추가">
+              {isImportingAssets ? <Loader2 size={TOOLBAR_ICON_SIZE} className="animate-spin" /> : <ImagePlus size={TOOLBAR_ICON_SIZE} />}
+              <input className="sr-only" type="file" accept="image/*,application/pdf" multiple onChange={handleAssetUpload} disabled={isImportingAssets} />
             </label>
           </div>
 
-          {/* lg 이상에서는 펜 색상이 첫 줄에 합류해 툴바가 한 줄이 된다. 그 미만에서는 아래 두 번째 줄로 표시. */}
-          <div className="hidden lg:flex">
-            <PenColorPill penColor={penColor} onPenColorChange={onPenColorChange} touchActivation={touchActivation} />
-          </div>
         </div>
 
         <div className="flex shrink-0 items-start gap-2">
-          <div className="pointer-events-auto hidden min-h-12 shrink-0 items-center gap-1 rounded-full bg-white/95 px-2 shadow-lg ring-1 ring-stone-200/80 backdrop-blur sm:flex" title="현재 확대율과 화면 중앙 좌표">
-            <span className="px-3 text-sm font-black">{zoomPercent}%</span>
-            <span className="rounded-full bg-stone-100 px-3 py-2 text-xs font-black">⌂ {Math.round(viewportCenter.x)}, {Math.round(viewportCenter.y)}</span>
-          </div>
-
           <div className={floatingPillClass} aria-label="파일과 설정">
             <div
-              className={`inline-flex min-h-9 min-w-[104px] items-center justify-center gap-1.5 rounded-full px-3 text-xs font-black ${saveStatusClassByStatus[saveState.status]}`}
+              data-testid="canvas-save-status"
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${saveStatusClassByStatus[saveState.status]}`}
               title={saveStatusLabel}
+              role="status"
+              aria-label={saveStatusLabel}
               aria-live="polite"
             >
               {saveStatusIcon}
-              <span className="max-w-[90px] truncate">{saveStatusLabel}</span>
+              <span className="sr-only">{saveStatusLabel}</span>
             </div>
             {saveState.status === 'failed' && (
               <button
@@ -503,8 +723,22 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         </div>
       </div>
 
-      <div className="canvas-toolbar-scroll pointer-events-auto flex w-max max-w-full items-start gap-3 overflow-x-auto p-1 lg:hidden">
-        <PenColorPill penColor={penColor} onPenColorChange={onPenColorChange} touchActivation={touchActivation} />
+      {isPenPaletteOpen && (
+        <PenColorPalette penColor={penColor} onPenColorChange={selectPenColor} touchActivation={touchActivation} />
+      )}
+
+      <div
+        data-testid="canvas-viewport-status"
+        className="pointer-events-none fixed z-40 inline-flex min-h-10 items-center gap-2 rounded-full bg-white/95 px-3 text-xs font-black text-stone-800 shadow-lg ring-1 ring-stone-200/80 backdrop-blur"
+        style={{ left: 'max(12px, env(safe-area-inset-left))', bottom: 'max(12px, env(safe-area-inset-bottom))' }}
+        title="현재 확대율과 화면 중앙 좌표"
+        aria-label={`확대율 ${zoomPercent}퍼센트, 화면 중앙 좌표 ${Math.round(viewportCenter.x)}, ${Math.round(viewportCenter.y)}`}
+      >
+        <ZoomIn size={16} aria-hidden="true" />
+        <span>{zoomPercent}%</span>
+        <span className="h-4 w-px bg-stone-200" aria-hidden="true" />
+        <Crosshair size={16} aria-hidden="true" />
+        <span>{Math.round(viewportCenter.x)}, {Math.round(viewportCenter.y)}</span>
       </div>
 
       {/* 라쏘 액션 바는 툴바 행을 추가하는 대신 캔버스 위에 떠 있는 오버레이로 표시한다(라이브러리·설정 패널과 같은 z-40 층). */}

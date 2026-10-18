@@ -1,0 +1,31 @@
+[Unit]
+Description=Collect and triage new Flownote user feedback
+Documentation=file:%h/Flownote/service/automation/codex/README.md
+Wants=network-online.target
+After=network-online.target
+ConditionFileIsExecutable=%h/.local/bin/flownote-codex-feedback-collect
+ConditionPathExists=%h/.config/flownote-codex/feedback-token
+
+[Service]
+Type=oneshot
+Environment=HOME=%h
+Environment=CODEX_HOME=%h/.codex
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=GIT_TERMINAL_PROMPT=0
+Environment=FLOWNOTE_FEEDBACK_API_URL=https://flownote-api-production.up.railway.app/api/feedback/automation
+Environment=FLOWNOTE_AUTOMATION_FEEDBACK_RELEASE=1
+LoadCredential=feedback-token:%h/.config/flownote-codex/feedback-token
+UnsetEnvironment=FACTCHAT_API_KEY OPENAI_API_KEY CODEX_API_KEY CODEX_ACCESS_TOKEN RAILWAY_TOKEN VERCEL_TOKEN GH_TOKEN GITHUB_TOKEN AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN DATABASE_URL REDIS_URL
+ExecStart=/usr/bin/env flownote-codex-feedback-collect
+TimeoutStartSec=6h
+UMask=0077
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+Restart=no

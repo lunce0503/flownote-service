@@ -25,15 +25,17 @@
 
 ## 모바일
 
+- Android 설치 APK(`flownote-android/`)는 시스템 WebView로 웹 제품을 실행한다. UA marker가 있는 경우 기존 헤더를 제거하고 아이보리·검정 UI와 하단 탐색을 적용한다. 세부 기준은 `docs/product-specs/android-app.md`를 따른다. 아래 React Native 기준은 Expo 클라이언트에 적용한다.
+
 - 모바일 앱은 `EXPO_PUBLIC_WAS_URL`의 FastAPI 게이트웨이를 호출하고 React Native 화면을 직접 렌더링한다.
 - `/api/mobile/config`는 운영 URL과 최소 지원 버전 표시용이며 일반 데이터 API의 base URL을 런타임에 교체하는 용도가 아니다.
-- 실기기에서는 `localhost` 대신 개발 PC LAN IP를 사용한다.
+- 실기기도 공개 cloud staging HTTPS URL만 사용한다. 개발 PC 주소를 사용하지 않는다.
 - 모바일 기능 변경은 `docs/product-specs/mobile-was-architecture.md`와 함께 검토한다.
 
 ## 검증
 
 - `cd flownote && yarn build`
 - 모바일 정적 검증은 `cd flownote-mobile && yarn verify`
-- 최종 통합은 저장소 루트에서 `docker compose up -d --build`
+- 최종 통합은 배포된 cloud staging의 `yarn e2e`로 확인한 뒤 같은 소스의 production 배포로 진행한다.
 - 파일을 수정한 작업이면 `flownote/`에서 Vercel production 배포를 실행하고, 연동 백엔드 변경이 있으면 Railway 배포와 헬스체크도 함께 확인한다.
 - `logs/report/` 아래 보고서만 작성하거나 수정하는 작업은 프론트 산출물이 바뀌지 않으므로 Vercel 배포를 생략한다.

@@ -1,0 +1,172 @@
+[
+  {
+    "name": "create_note",
+    "description": "Create a new note. Returns the new note id.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Note title" },
+        "body": { "type": "string", "description": "Markdown body" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "folder": { "type": "string", "description": "Target folder path, e.g. 'work/meetings'" }
+      },
+      "required": ["title", "body"]
+    }
+  },
+  {
+    "name": "search_notes",
+    "description": "Full-text and tag search over notes. Returns id, title, snippet, updated_at.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "updated_after": { "type": "string", "description": "ISO 8601 date" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 50, "default": 10 }
+      },
+      "required": ["query"]
+    }
+  },
+  {
+    "name": "get_note",
+    "description": "Fetch the full body of one note by id.",
+    "parameters": {
+      "type": "object",
+      "properties": { "note_id": { "type": "string" } },
+      "required": ["note_id"]
+    }
+  },
+  {
+    "name": "update_note",
+    "description": "Patch an existing note. Only the supplied fields change. Use mode='append' to add to the body instead of replacing it.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "note_id": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "mode": { "type": "string", "enum": ["replace", "append", "prepend"], "default": "replace" },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["note_id"]
+    }
+  },
+  {
+    "name": "delete_note",
+    "description": "Move a note to trash. Irreversible after 30 days.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "note_id": { "type": "string" },
+        "confirm": { "type": "boolean", "description": "Must be true. Ask the user before setting it." }
+      },
+      "required": ["note_id", "confirm"]
+    }
+  },
+  {
+    "name": "link_notes",
+    "description": "Create a bidirectional link between two notes.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "source_id": { "type": "string" },
+        "target_id": { "type": "string" },
+        "relation": { "type": "string", "enum": ["related", "follows", "supports", "contradicts"], "default": "related" }
+      },
+      "required": ["source_id", "target_id"]
+    }
+  },
+  {
+    "name": "summarize_note",
+    "description": "Produce an extractive summary of a note in the requested language.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "note_id": { "type": "string" },
+        "language": { "type": "string", "enum": ["ko", "en"], "default": "ko" },
+        "max_sentences": { "type": "integer", "minimum": 1, "maximum": 10, "default": 3 }
+      },
+      "required": ["note_id"]
+    }
+  },
+  {
+    "name": "create_task",
+    "description": "Create a task, optionally attached to a note.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "due_at": { "type": "string", "description": "ISO 8601 datetime with offset, e.g. 2026-08-01T18:00:00+09:00" },
+        "priority": { "type": "string", "enum": ["low", "normal", "high"], "default": "normal" },
+        "note_id": { "type": "string", "description": "Note to attach the task to" }
+      },
+      "required": ["title"]
+    }
+  },
+  {
+    "name": "list_tasks",
+    "description": "List tasks filtered by status and due window.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["open", "done", "all"], "default": "open" },
+        "due_before": { "type": "string", "description": "ISO 8601 datetime" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+      }
+    }
+  },
+  {
+    "name": "set_reminder",
+    "description": "Schedule a reminder notification.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" },
+        "remind_at": { "type": "string", "description": "ISO 8601 datetime with offset. Resolve relative phrases like '30분 뒤' against get_current_time first." },
+        "task_id": { "type": "string" }
+      },
+      "required": ["message", "remind_at"]
+    }
+  },
+  {
+    "name": "get_current_time",
+    "description": "Current time in the user's timezone. Call this before computing any relative time.",
+    "parameters": {
+      "type": "object",
+      "properties": { "timezone": { "type": "string", "default": "Asia/Seoul" } }
+    }
+  },
+  {
+    "name": "web_search",
+    "description": "Search the web and return titles, urls, and snippets.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": { "type": "string" },
+        "num_results": { "type": "integer", "minimum": 1, "maximum": 10, "default": 5 }
+      },
+      "required": ["query"]
+    }
+  },
+  {
+    "name": "fetch_url",
+    "description": "Fetch a web page and return it as readable markdown.",
+    "parameters": {
+      "type": "object",
+      "properties": { "url": { "type": "string" } },
+      "required": ["url"]
+    }
+  },
+  {
+    "name": "export_note",
+    "description": "Export a note to a file format and return a download url.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "note_id": { "type": "string" },
+        "format": { "type": "string", "enum": ["md", "pdf", "docx", "html"] }
+      },
+      "required": ["note_id", "format"]
+    }
+  }
+]

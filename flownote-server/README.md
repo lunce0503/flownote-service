@@ -15,7 +15,7 @@ Java 17 Spring Boot 서비스다. 인증, 사용자, 모바일 런타임 설정�
 ./gradlew test
 
 # repository root
-docker compose up spring-server
+node scripts/deploy-cloud.mjs release main
 ```
 
 Railway 서비스명은 `flownote-main`이다. DB, Redis, CORS, 모바일 공개 URL은 환경 변수로 주입하며 실제 값이나 토큰을 저장소에 기록하지 않는다.

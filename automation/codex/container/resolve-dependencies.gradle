@@ -1,0 +1,8 @@
+// Trusted dependency priming; application tests run later with Docker network=none.
+allprojects {
+    tasks.register('resolveAutomationDependencies') {
+        doLast {
+            configurations.findAll { it.canBeResolved }.each { it.resolve() }
+        }
+    }
+}

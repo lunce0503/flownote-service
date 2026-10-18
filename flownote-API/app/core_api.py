@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
-CORE_API_BASE_URL = os.getenv("CORE_API_BASE_URL") or os.getenv("SPRING_API_URL") or "http://spring-server:8080"
+CORE_API_BASE_URL = os.getenv("CORE_API_BASE_URL") or "http://flownote.railway.internal:8080"
 
 
 def forward_request(
@@ -48,3 +48,12 @@ async def forward_request_async(
 ) -> Any:
     """이벤트 루프를 막지 않도록 동기 forward_request를 스레드에서 실행한다."""
     return await asyncio.to_thread(forward_request, method, path, authorization, body)
+
+
+async def require_user_id(authorization: str) -> str:
+    if not isinstance(authorization, str) or not authorization.startswith("Bearer ") or not authorization[7:].strip():
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    user = await forward_request_async("GET", "/api/users/me", authorization)
+    if not isinstance(user, dict) or not user.get("id"):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return str(user["id"])

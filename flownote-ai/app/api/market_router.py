@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime, timezone
+from functools import cache
 from typing import Any
 
-import yfinance as yf
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
@@ -92,7 +92,15 @@ def _as_int(value: Any, fallback: int = 0) -> int:
         return fallback
 
 
-def _safe_fast_info(ticker: yf.Ticker) -> dict[str, Any]:
+@cache
+def _yfinance():
+    # pandas/numpy를 포함하는 yfinance는 실제 시장 데이터 요청에서만 로딩한다.
+    import yfinance
+
+    return yfinance
+
+
+def _safe_fast_info(ticker: Any) -> dict[str, Any]:
     try:
         fast_info = ticker.fast_info
         return dict(fast_info.items()) if hasattr(fast_info, "items") else dict(fast_info)
@@ -100,7 +108,7 @@ def _safe_fast_info(ticker: yf.Ticker) -> dict[str, Any]:
         return {}
 
 
-def _safe_info(ticker: yf.Ticker) -> dict[str, Any]:
+def _safe_info(ticker: Any) -> dict[str, Any]:
     try:
         return ticker.info or {}
     except Exception:
@@ -108,6 +116,7 @@ def _safe_info(ticker: yf.Ticker) -> dict[str, Any]:
 
 
 def _search_sync(query: str, limit: int) -> list[MarketSearchResult]:
+    yf = _yfinance()
     local_results = _search_local_aliases(query, limit)
     prefer_local = _should_prefer_local_aliases(query)
     results: list[MarketSearchResult] = local_results.copy() if prefer_local else []
@@ -186,6 +195,7 @@ def _search_local_aliases(query: str, limit: int) -> list[MarketSearchResult]:
 
 
 def _quote_sync(symbol: str) -> MarketQuote | None:
+    yf = _yfinance()
     normalized = symbol.strip().upper()
     if not normalized:
         return None
@@ -248,6 +258,7 @@ def _quotes_sync(symbols: list[str]) -> list[MarketQuote]:
 
 
 def _history_sync(symbol: str, period: str) -> list[MarketHistoryPoint]:
+    yf = _yfinance()
     normalized = symbol.strip().upper()
     normalized_period = period.strip().lower()
     interval = HISTORY_INTERVALS.get(normalized_period)
