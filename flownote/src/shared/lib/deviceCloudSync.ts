@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { API_BASE_URL, authHeaders } from '../api';
 import { withDeviceWorkspace } from './deviceStorage';
+import { deviceOwner } from './deviceMode';
 import { buildDeviceSyncPlan, prepareOfflineWorkspace } from './deviceSyncModel';
 import { DEVICE_SYNC_HEADER, runWithDeviceSyncNetwork } from './deviceSyncNetwork';
 import {
@@ -55,12 +56,15 @@ const downloadCanvasImage = async (image: Item): Promise<Item> => {
 
 const fetchNotes = async (progress: Progress) => {
   const summaries: Item[] = [];
+  const cursors = new Set<string>();
   let cursor = '';
   do {
     const response = await axios.get(api('/api/notes'), { params: { view: 'summary', limit: 50, cursor: cursor || undefined }, headers: headers() });
     const page = response.data && typeof response.data === 'object' ? response.data as Record<string, unknown> : {};
     summaries.push(...asItems(page.notes));
     cursor = typeof page.next_cursor === 'string' ? page.next_cursor : '';
+    if (cursor && cursors.has(cursor)) throw new Error('노트 목록 페이지가 반복되어 스냅샷을 중단했습니다.');
+    if (cursor) cursors.add(cursor);
   } while (cursor);
   const notes: Item[] = [];
   for (let index = 0; index < summaries.length; index += 1) {
@@ -73,6 +77,9 @@ const fetchNotes = async (progress: Progress) => {
 
 export async function fetchCloudWorkspace(progress: Progress = () => {}): Promise<WorkspaceSnapshot> {
   progress('서버 자료 확인 중');
+  const owner = deviceOwner();
+  const session = await axios.get<Item>(api('/api/users/me'), { headers: headers() });
+  if (!owner || session.data.id !== owner || deviceOwner() !== owner) throw new Error('서버 로그인 계정이 기기 자료 계정과 다릅니다. 같은 계정으로 다시 로그인해주세요.');
   const result = createWorkspaceSnapshot();
   result.notes = await fetchNotes(progress);
   progress('폴더와 플래너 저장 중');
@@ -135,10 +142,14 @@ const ensureStorageCapacity = async (snapshot: WorkspaceSnapshot) => {
 };
 
 export async function prepareDeviceOffline(progress: Progress = () => {}) {
+  const owner = deviceOwner();
   const cloud = await fetchCloudWorkspace(progress);
   await ensureStorageCapacity(cloud);
   progress('기기 저장소에 확정 중');
-  await withDeviceWorkspace(true, state => prepareOfflineWorkspace(state, cloud));
+  await withDeviceWorkspace(true, state => {
+    if (deviceOwner() !== owner) throw new Error('계정이 변경되어 스냅샷 저장을 중단했습니다.');
+    prepareOfflineWorkspace(state, cloud);
+  });
 }
 
 const valuesById = (value: unknown) => new Map((Array.isArray(value) ? value : []).filter((item): item is Item => Boolean(item) && typeof item === 'object' && typeof item.id === 'string').map(item => [item.id, item]));
@@ -219,9 +230,10 @@ async function applyOperation(plan: DeviceSyncPlan, operation: DeviceSyncOperati
     const desired = structuredClone(value!) as CanvasSnapshot;
     desired.images = await restoreCanvasImages(desired.images);
     const payload = canvasDelta(operation.remote as CanvasSnapshot | undefined, desired);
-    await axios.post(api('/api/canvas/elements/save'), { mutationId: plan.id, ...payload, trigger: 'offline-sync', operationId: operation.id, clientCreatedAt: plan.createdAt }, {
-      params: { canvasId: operation.itemId }, headers: headers(),
-    });
+    await axios.post(api('/api/canvas/save'), {
+      canvasId: operation.itemId, mutationId: plan.id, payload,
+      trigger: 'offline-sync', operationId: operation.id, clientCreatedAt: plan.createdAt,
+    }, { headers: headers() });
     return;
   }
   if (operation.collection === 'tasks') {
@@ -261,20 +273,26 @@ async function applyOperation(plan: DeviceSyncPlan, operation: DeviceSyncOperati
 
 export async function reconcileDeviceToCloud(progress: Progress = () => {}) {
   return runWithDeviceSyncNetwork(async () => {
-    let plan = await withDeviceWorkspace(false, state => state.sync.pending);
-    if (!plan) {
+    const owner = deviceOwner();
+    let plan: DeviceSyncPlan;
+    try {
+      await withDeviceWorkspace(true, state => { state.sync.status = 'syncing'; });
       progress('서버의 최신 변경 확인 중');
       const remote = await fetchCloudWorkspace(progress);
       plan = await withDeviceWorkspace(true, state => {
         const created = buildDeviceSyncPlan(state, remote);
+        // A failed attempt may already have reached the server. Re-plan against
+        // its latest state, keeping stable ID mappings and earlier recovery copies.
+        if (state.sync.pending) {
+          state.sync.recovery = [...state.sync.recovery, ...state.sync.pending.conflicts].slice(-200);
+        }
         state.sync.status = 'syncing';
         state.sync.pending = created;
         state.sync.lastError = undefined;
         return created;
       });
-    }
-    try {
       for (let index = plan.cursor; index < plan.operations.length; index += 1) {
+        if (deviceOwner() !== owner) throw new Error('계정이 변경되어 동기화를 중단했습니다.');
         progress(`변경 업로드 중 · ${index + 1}/${plan.operations.length}`);
         await applyOperation(plan, plan.operations[index]);
         plan.cursor = index + 1;

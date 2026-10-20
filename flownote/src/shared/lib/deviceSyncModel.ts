@@ -15,7 +15,7 @@ const collections = [
 const operationOrder = [
   'notes', 'canvases', 'canvasContents', 'tasks', 'schedules', 'diaries', 'noteFolders', 'canvasFolders',
 ] as const satisfies readonly (keyof WorkspaceSnapshot)[];
-const metadataKeys = new Set(['created_at', 'updated_at', 'revision', 'client_id', 'lastMutation']);
+const metadataKeys = new Set(['created_at', 'updated_at', 'create_at', 'update_at', 'revision', 'client_id', 'lastMutation']);
 
 const itemKey = (collection: keyof WorkspaceSnapshot, item: Item) => (
   collection === 'diaries' && typeof item.entry_date === 'string' ? item.entry_date : item.id
@@ -72,8 +72,8 @@ export const meaningfulEditScore = (base: unknown, changed: unknown): number => 
 };
 
 const latestSide = (local: Item | null, remote: Item | null): 'local' | 'remote' => {
-  const localTime = Date.parse(String(local?.updated_at ?? '')) || 0;
-  const remoteTime = Date.parse(String(remote?.updated_at ?? '')) || 0;
+  const localTime = Date.parse(String(local?.updated_at ?? local?.update_at ?? '')) || 0;
+  const remoteTime = Date.parse(String(remote?.updated_at ?? remote?.update_at ?? '')) || 0;
   return remoteTime > localTime ? 'remote' : 'local';
 };
 

@@ -1,27 +1,32 @@
 import ExpoModulesCore
 import UIKit
 
-public final class ApplePencilEventsModule: Module, UIPencilInteractionDelegate {
-  private weak var attachedView: UIView?
-  private var pencilInteraction: UIPencilInteraction?
-  private var lastTapUptime: TimeInterval = 0
+public final class ApplePencilEventsModule: Module {
+  private lazy var handler = PencilInteractionHandler { [weak self] action in
+    self?.sendEvent("onDoubleTap", ["action": action])
+  }
 
   public func definition() -> ModuleDefinition {
     Name("ApplePencilEvents")
     Events("onDoubleTap")
+    OnStartObserving("onDoubleTap") { self.handler.installInteraction() }
+    OnStopObserving("onDoubleTap") { self.handler.removeInteraction() }
+    OnDestroy { self.handler.removeInteraction() }
+  }
+}
 
-    OnStartObserving("onDoubleTap") {
-      self.installInteraction()
-    }
-    OnStopObserving("onDoubleTap") {
-      self.removeInteraction()
-    }
-    OnDestroy {
-      self.removeInteraction()
-    }
+private final class PencilInteractionHandler: NSObject, UIPencilInteractionDelegate {
+  private let onDoubleTap: (String) -> Void
+  private weak var attachedView: UIView?
+  private var pencilInteraction: UIPencilInteraction?
+  private var lastTapUptime: TimeInterval = 0
+
+  init(onDoubleTap: @escaping (String) -> Void) {
+    self.onDoubleTap = onDoubleTap
+    super.init()
   }
 
-  private func installInteraction() {
+  func installInteraction() {
     DispatchQueue.main.async { [weak self] in
       guard let self, self.pencilInteraction == nil, let view = Self.activeRootView() else { return }
       let interaction = UIPencilInteraction()
@@ -33,9 +38,8 @@ public final class ApplePencilEventsModule: Module, UIPencilInteractionDelegate 
     }
   }
 
-  private func removeInteraction() {
-    DispatchQueue.main.async { [weak self] in
-      guard let self else { return }
+  func removeInteraction() {
+    DispatchQueue.main.async { [self] in
       if let interaction = self.pencilInteraction {
         self.attachedView?.removeInteraction(interaction)
       }
@@ -66,15 +70,15 @@ public final class ApplePencilEventsModule: Module, UIPencilInteractionDelegate 
     case .ignore: action = "ignore"
     @unknown default: action = "unknown"
     }
-    sendEvent("onDoubleTap", ["action": action])
+    onDoubleTap(action)
   }
 
-  public func pencilInteractionDidTap(_ interaction: UIPencilInteraction) {
+  func pencilInteractionDidTap(_ interaction: UIPencilInteraction) {
     emitDoubleTap()
   }
 
   @available(iOS 17.5, *)
-  public func pencilInteraction(_ interaction: UIPencilInteraction, didReceiveTap tap: UIPencilInteraction.Tap) {
+  func pencilInteraction(_ interaction: UIPencilInteraction, didReceiveTap tap: UIPencilInteraction.Tap) {
     emitDoubleTap()
   }
 }

@@ -48,10 +48,11 @@ if (process.argv.includes('--post-install')) {
   assert.equal(await page.evaluate(() => localStorage.getItem('flownote-native-update-draft-probe')), 'preserved');
   await waitFor(() => ui().includes('최신 버전'), 'same-version skip after OS upgrade');
   await browser.close();
-  console.log('PASS Android 10001→11000 OS installation completed; login and draft preserved; native same-version skip confirmed');
+  console.log(`PASS Android versionCode ${manifest.versionCode} OS installation completed; login and draft preserved; native same-version skip confirmed`);
   process.exit(0);
 }
-assert(adb('shell', 'dumpsys', 'package', packageName).includes('versionCode=10001'), 'Install the updater-enabled 1.0.1 debug baseline first');
+const baselineVersion = Number(adb('shell', 'dumpsys', 'package', packageName).match(/versionCode=(\d+)/)?.[1]);
+assert(baselineVersion > 0 && baselineVersion < manifest.versionCode, 'Install an earlier updater-enabled debug baseline first');
 adb('shell', 'appops', 'set', packageName, 'REQUEST_INSTALL_PACKAGES', 'default');
 adb('shell', 'input', 'keyevent', 'KEYCODE_HOME');
 adb('shell', 'am', 'force-stop', packageName);
@@ -113,7 +114,7 @@ if (switchNode) {
 await waitFor(() => ui().includes('text="설치"'), 'return to app with verified install action');
 tap('설치'); tap('설치');
 await waitFor(() => /topResumedActivity=.*packageinstaller/.test(adb('shell', 'dumpsys', 'activity', 'activities')), 'Android OS installer');
-assert(adb('shell', 'dumpsys', 'package', packageName).includes('versionCode=10001'), 'Download must not silently install');
+assert(adb('shell', 'dumpsys', 'package', packageName).includes(`versionCode=${baselineVersion}`), 'Download must not silently install');
 const installUI = ui(); const label = installUI.includes('text="UPDATE"') ? 'UPDATE' : installUI.includes('text="Update"') ? 'Update' : installUI.includes('text="업데이트"') ? '업데이트' : installUI.includes('text="INSTALL"') ? 'INSTALL' : installUI.includes('text="Install"') ? 'Install' : '설치';
 tap(label);
 await waitFor(() => adb('shell', 'dumpsys', 'package', packageName).includes(`versionCode=${manifest.versionCode}`), 'user-confirmed version upgrade');
@@ -139,4 +140,4 @@ assert.equal(await page.evaluate(() => localStorage.getItem('flownote-native-upd
 assert(!page.url().includes('/login'), 'Login must survive the APK upgrade');
 await waitFor(() => ui().includes('최신 버전'), 'same-version update skip after upgrade');
 await browser.close();
-console.log('PASS Android OS upgrade: signed staging feed, APK auto-download/hash/native signer, cache restart, native history, permission explanation, explicit OS confirmation, version 10001→11000, login/draft preservation and same-version skip');
+console.log(`PASS Android OS upgrade: signed staging feed, APK auto-download/hash/native signer, cache restart, native history, permission explanation, explicit OS confirmation, version ${baselineVersion}→${manifest.versionCode}, login/draft preservation and same-version skip`);

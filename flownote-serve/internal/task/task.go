@@ -163,7 +163,9 @@ func normalizeTimeLog(entry map[string]json.RawMessage) TimeLog {
 }
 
 func (r *Repo) storeText(ctx context.Context, userID, taskID, name, contentType string, data []byte) (string, string, int, error) {
-	objectKey := fmt.Sprintf("task-payloads/%s/%s/%s", userID, taskID, name)
+	// A rejected/retried write must not overwrite objects referenced by an
+	// already committed row before the user/id predicate has been evaluated.
+	objectKey := fmt.Sprintf("task-payloads/%s/%s/%s/%s", userID, taskID, storage.NewUUID(), name)
 	publicURL, err := r.store.Put(ctx, objectKey, contentType, data)
 	if err != nil {
 		return "", "", 0, err

@@ -120,7 +120,7 @@ func (r *Repo) FindAll(ctx context.Context, userID string) ([]Item, error) {
 }
 
 func (r *Repo) storeMemo(ctx context.Context, userID, itemID, memo string) (string, string, int, error) {
-	objectKey := fmt.Sprintf("schedule-payloads/%s/%s/memo.txt", userID, itemID)
+	objectKey := fmt.Sprintf("schedule-payloads/%s/%s/%s/memo.txt", userID, itemID, newUUID())
 	publicURL, err := r.store.Put(ctx, objectKey, "text/plain; charset=utf-8", []byte(memo))
 	if err != nil {
 		return "", "", 0, err

@@ -22,6 +22,9 @@ test('snapshotted cloud notes keep their UUID while edited offline', () => {
   const saved = handleDeviceRequest(state, 'POST', '/api/notes', { id, title: 'Cloud', content: { format: 'markdown', markdown: 'offline' }, revision: 5 });
   assert.equal(saved.id, id);
   assert.equal(saved.content.markdown, 'offline');
+  state.sync.status = 'syncing';
+  assert.throws(() => handleDeviceRequest(state, 'POST', '/api/notes', { ...saved, revision: 6 }), /동기화 중/);
+  assert.equal(handleDeviceRequest(state, 'GET', `/api/notes/${id}`).content.markdown, 'offline');
 });
 
 test('planner contracts, unsupported cloud actions and foreign resource IDs fail closed', () => {

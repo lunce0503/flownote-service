@@ -127,6 +127,7 @@ export function handleDeviceRequest(state: DeviceWorkspace, method: string, path
   const parts = url.pathname.replace(/^.*?\/api\//, '').split('/').map(decodeURIComponent);
   const body = record(input);
   const verb = method.toUpperCase();
+  if (verb !== 'GET' && state.sync.status === 'syncing') throw new Error('동기화 중입니다. 완료 후 다시 편집해주세요. 입력은 편집기 초안에 보존됩니다.');
   const [resource, id, relation, memberId] = parts;
   if (resource === 'notes' && parts.length <= 2) {
     if (verb === 'GET') {
@@ -232,6 +233,7 @@ export function handleDeviceRequest(state: DeviceWorkspace, method: string, path
 }
 
 export function handleDeviceCanvas(state: DeviceWorkspace, event: string, request: Record<string, unknown>): unknown {
+  if (event === 'canvas:save' && state.sync.status === 'syncing') throw new Error('동기화 중입니다. 완료 후 다시 저장해주세요.');
   if (!['canvas:load', 'canvas:save'].includes(event)) throw new Error('기기 전용 모드에서는 이 캔버스 서버 기능을 사용할 수 없습니다.');
   const canvasId = typeof request.canvasId === 'string' ? request.canvasId : undefined;
   const canvas = find(state.canvasContents, canvasId);

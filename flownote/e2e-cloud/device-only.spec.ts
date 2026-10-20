@@ -73,7 +73,7 @@ test('cloud material is available offline and device edits reconcile on re-enabl
     await expect.poll(() => page.evaluate(() => (window as Window & { deviceExports: string[] }).deviceExports.length)).toBe(1);
     const exported = await page.evaluate(() => JSON.parse((window as Window & { deviceExports: string[] }).deviceExports[0]));
     const backup = JSON.parse(Buffer.from(exported.base64, 'base64').toString('utf8'));
-    expect(backup.workspace.notes[0].content.markdown).toContain('Do not upload'); expect(backup).not.toHaveProperty('token');
+    expect(backup.workspace.notes.find((item: { title: string }) => item.title === 'Device note').content.markdown).toContain('Do not upload'); expect(backup).not.toHaveProperty('token');
     const stalePageBlocked = await page.evaluate(async ({ owner }) => {
       localStorage.setItem(`flownote.device-mode:${owner}`, 'cloud');
       try {
