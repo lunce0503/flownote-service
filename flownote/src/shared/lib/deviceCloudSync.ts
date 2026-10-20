@@ -216,7 +216,9 @@ async function applyOperation(plan: DeviceSyncPlan, operation: DeviceSyncOperati
   const value = operation.value;
   if (operation.collection === 'notes') {
     if (operation.action === 'delete') return ignoreMissingDelete(() => axios.delete(api(`/api/notes/${encodeURIComponent(operation.itemId)}`), { headers: headers() }));
-    const nextRevision = operation.remote ? Math.max(Number(operation.remote.revision ?? 0), Number(value?.revision ?? 0)) + 1 : Math.max(1, Number(value?.revision ?? 1));
+    // Offline revisions count local saves. Cloud Markdown requires exactly one
+    // increment from its current revision, regardless of local edit count.
+    const nextRevision = operation.remote ? Number(operation.remote.revision ?? 0) + 1 : 1;
     await axios.post(api('/api/notes'), { ...withoutMeta(value!), revision: nextRevision, client_id: plan.id }, { headers: headers() });
     return;
   }

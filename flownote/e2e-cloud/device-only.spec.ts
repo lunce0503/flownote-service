@@ -42,6 +42,11 @@ test('cloud material is available offline and device edits reconcile on re-enabl
     page.on('request', request => { if (/\/web-api\/|\.railway\.app/.test(request.url())) outgoing.push(`${request.method()} ${request.url()}`); });
     await page.reload(); await expect(page.getByText('꺼짐 · 기기 전용', { exact: true })).toBeVisible();
     await page.goto('/blog'); await expect(page.getByRole('treeitem', { name: 'Cloud original.md', exact: true })).toBeVisible();
+    await page.getByRole('treeitem', { name: 'Cloud original.md', exact: true }).click();
+    await page.getByLabel('Markdown 본문').fill('first offline revision of cloud note');
+    await expect(page.getByTestId('note-save-status')).toHaveText('기기에 저장됨 · 동기화 꺼짐');
+    await page.getByLabel('Markdown 본문').fill('second offline revision of cloud note');
+    await expect(page.getByTestId('note-save-status')).toHaveText('기기에 저장됨 · 동기화 꺼짐');
     page.once('dialog', dialog => dialog.accept('Device note'));
     await page.getByRole('button', { name: '새 노트', exact: true }).first().click();
     await expect(page).toHaveURL(/\/blog\/device-/);
@@ -122,6 +127,7 @@ test('cloud material is available offline and device edits reconcile on re-enabl
     await expect(page.getByRole('treeitem', { name: 'Device note.md', exact: true })).toBeVisible();
     const afterCloud = await (await request.get(`${api}/api/notes`, { headers })).json();
     expect(afterCloud).toHaveLength(2);
+    expect(afterCloud.find((item: { id: string }) => item.id === cloudId)?.content.markdown).toBe('second offline revision of cloud note');
     expect(afterCloud.find((item: { title: string; content: { markdown: string } }) => item.title === 'Device note')?.content.markdown).toContain('Do not upload');
     const cloudCanvases = await (await request.get(`${api}/api/canvas/documents`, { headers })).json();
     expect(cloudCanvases).toHaveLength(1);
