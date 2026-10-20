@@ -53,8 +53,9 @@ test('Android tablet layout preserves touch targets and canvas full working area
   const login = await request.post(`${api}/api/users/login`, { data: { email, password } });
   expect(login.ok()).toBeTruthy();
   const { token, user } = await login.json();
-  await page.addInitScript(({ token, user }) => {
-    localStorage.setItem('flownote_auth_token', token);
+  await page.context().addCookies([{ name: '__Host-flownote_session', value: token,
+    url: 'https://flownote-react-staging.vercel.app', secure: true, httpOnly: true, sameSite: 'Strict' }]);
+  await page.addInitScript(({ user }) => {
     localStorage.setItem('flownote_auth_user', JSON.stringify(user));
   }, { token, user });
   const headers = { Authorization: `Bearer ${token}` };
@@ -83,7 +84,7 @@ test('Android tablet layout preserves touch targets and canvas full working area
   }
 });
 
-test('Android uses the full structured note editor and saves changes to the shared cloud API', async ({ page, request }) => {
+test('Android preserves the structured original and saves Markdown through the shared cloud API', async ({ page, request }) => {
   const email = `android-notes-${randomUUID()}@example.com`;
   const password = randomUUID();
   expect((await request.post(`${api}/api/users`, { data: {
@@ -100,29 +101,39 @@ test('Android uses the full structured note editor and saves changes to the shar
     id, title: 'Android structured note', content, created_at: new Date().toISOString(), revision: 1, client_id: randomUUID(),
   } })).ok()).toBeTruthy();
   try {
-    await page.addInitScript(({ token, user }) => {
-      localStorage.setItem('flownote_auth_token', token);
+    await page.context().addCookies([{ name: '__Host-flownote_session', value: token,
+      url: 'https://flownote-react-staging.vercel.app', secure: true, httpOnly: true, sameSite: 'Strict' }]);
+    await page.addInitScript(({ user }) => {
       localStorage.setItem('flownote_auth_user', JSON.stringify(user));
     }, { token, user });
     await page.goto(`/blog/${id}`);
     await expect(page.getByLabel('노트 제목')).toHaveValue('Android structured note');
-    await expect(page.locator('strong').filter({ hasText: '서식 노트 원본' })).toBeVisible();
-    const editor = page.locator('.bn-editor[contenteditable="true"]');
+    await page.getByRole('button', { name: '원본 보기', exact: true }).click();
+    await expect(page.getByTestId('legacy-original')).toContainText('서식 노트 원본');
+    const untouched = await (await request.get(`${api}/api/notes/${id}`, { headers })).json();
+    expect(untouched.content).toEqual(content);
+    expect(untouched.revision).toBe(1);
+    page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('button', { name: '원본 보관 후 Markdown으로 전환' }).click();
+    const editor = page.getByLabel('Markdown 본문');
     await expect(editor).toBeVisible();
+    await expect(editor).toHaveValue('**서식 노트 원본**');
     await page.getByLabel('노트 제목').fill('Android edited note');
-    await editor.click();
-    await editor.press('ControlOrMeta+End');
-    await page.keyboard.insertText(' 앱에서 편집');
+    await editor.fill('**서식 노트 원본** 앱에서 편집');
     await expect.poll(async () => {
       const response = await request.get(`${api}/api/notes`, { headers });
       expect(response.ok()).toBeTruthy();
       const payload = await response.json();
       const note = (Array.isArray(payload) ? payload : payload.notes).find((item: { id: string }) => item.id === id);
-      return note?.title === 'Android edited note' && JSON.stringify(note.content).includes('앱에서 편집');
+      if (note?.title !== 'Android edited note') return false;
+      expect(note.content.legacy_original).toEqual(content);
+      return note.content.format === 'markdown' && note.content.version === 1 && note.content.markdown === '**서식 노트 원본** 앱에서 편집';
     }, { timeout: 30000 }).toBeTruthy();
     await page.reload();
     await expect(page.getByLabel('노트 제목')).toHaveValue('Android edited note');
-    await expect(editor).toContainText('앱에서 편집');
+    await expect(editor).toHaveValue('**서식 노트 원본** 앱에서 편집');
+    await page.getByRole('button', { name: '미리보기', exact: true }).click();
+    await expect(page.locator('strong').filter({ hasText: '서식 노트 원본' })).toBeVisible();
   } finally {
     expect((await request.delete(`${api}/api/notes/${id}`, { headers })).ok()).toBeTruthy();
   }

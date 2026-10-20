@@ -37,7 +37,7 @@ def register_sync_namespace(sio: socketio.AsyncServer) -> None:
 
     @sio.on("connect", namespace=NAMESPACE)
     async def connect(sid, environ, auth):
-        authorization = auth.get("authorization", "") if isinstance(auth, dict) else ""
+        authorization = environ.get("HTTP_AUTHORIZATION", "") or (auth.get("authorization", "") if isinstance(auth, dict) else "")
         try:
             user_id = await require_user_id(authorization)
         except Exception:

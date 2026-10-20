@@ -4,13 +4,10 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"os"
 	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 
 	"github.com/flownote/flownote-serve/internal/httpjson"
 )
@@ -19,41 +16,21 @@ type ctxKey int
 
 const userIDKey ctxKey = iota
 
-// 세션 캐시 TTL. 로그아웃 엔드포인트가 없어 세션은 expires_at으로만 끝나므로
-// 만료 직후 최대 이 시간만큼의 오차를 허용한다(모든 요청의 DB 왕복 제거가 목적).
-const sessionCacheTTL = 5 * time.Minute
-
-// Authenticator는 Spring의 AuthService와 동일하게 app_sessions 테이블을 조회해
-// Bearer 토큰(UUID)을 사용자 UUID로 해석한다. REDIS_URL이 설정되면 토큰→사용자를
-// Redis에 캐시해 서비스 공통의 세션 DB 조회를 줄인다.
+// Authenticator checks current session lifetime, revocation and role in PostgreSQL.
 type Authenticator struct {
-	pool  *pgxpool.Pool
-	cache *redis.Client
+	pool sessionQuerier
+}
+
+type sessionQuerier interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
 }
 
 func New(pool *pgxpool.Pool) *Authenticator {
-	a := &Authenticator{pool: pool}
-	if redisURL := strings.TrimSpace(os.Getenv("REDIS_URL")); redisURL != "" {
-		if opts, err := redis.ParseURL(redisURL); err == nil {
-			opts.DialTimeout = 2 * time.Second
-			opts.ReadTimeout = 500 * time.Millisecond
-			opts.WriteTimeout = 500 * time.Millisecond
-			a.cache = redis.NewClient(opts)
-		}
-	}
-	return a
+	return &Authenticator{pool: pool}
 }
 
-// lookupSession은 토큰을 (userID, role)로 해석한다. Redis 캐시 우선, 실패는 조용히 DB 폴백.
+// Positive caches are deliberately excluded: a stale entry must not restore a revoked session.
 func (a *Authenticator) lookupSession(ctx context.Context, token string) (string, string, error) {
-	cacheKey := "session:" + token
-	if a.cache != nil {
-		if cached, err := a.cache.Get(ctx, cacheKey).Result(); err == nil {
-			if userID, role, ok := strings.Cut(cached, "|"); ok {
-				return userID, role, nil
-			}
-		}
-	}
 
 	var userID, role string
 	err := a.pool.QueryRow(ctx, `
@@ -67,9 +44,6 @@ func (a *Authenticator) lookupSession(ctx context.Context, token string) (string
 	}
 	if err != nil {
 		return "", "", err
-	}
-	if a.cache != nil {
-		_ = a.cache.Set(ctx, cacheKey, userID+"|"+role, sessionCacheTTL).Err()
 	}
 	return userID, role, nil
 }

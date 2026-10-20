@@ -21,5 +21,5 @@ export const groupCanvasFoldersByCategory = (folders: CanvasFolder[]) => (
 export const getCanvasTitle = (
     documents: CanvasDocumentSummary[],
     selectedCanvasId: string | null,
-    fallback = "그림판",
+    fallback = "캔버스",
 ) => documents.find((document) => document.id === selectedCanvasId)?.title ?? fallback;

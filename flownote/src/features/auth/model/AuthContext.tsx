@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   axios,
@@ -11,6 +11,7 @@ import {
   setAuthUser,
 } from "@/shared/api";
 import type { AuthUser } from "@/shared/api";
+import { noteDrafts } from "@/entities/blog";
 import { AuthContext } from "./authContext";
 
 // 스테이징 전용 게스트 자동 로그인 설정(빌드 타임 주입).
@@ -27,14 +28,26 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
   // ProtectedRoute가 /login으로 순간 리다이렉트하는 것을 막는다.
   const [bootstrapping, setBootstrapping] = useState(() => guestConfigured && !getAuthToken());
 
-  const logout = () => {
+  const resetAuth = useCallback(() => {
     clearAuth();
     setToken(null);
     setUser(null);
-  };
+  }, []);
+
+  const logout = useCallback(async () => {
+    const owner = getAuthUser()?.id;
+    const hasDrafts = owner ? await noteDrafts.hasUser(owner).catch(() => true) : false;
+    if (hasDrafts && !window.confirm("로그아웃하면 이 계정의 기기 초안을 삭제합니다. 필요한 입력을 내보낸 뒤 계속할까요?")) return;
+    await axios.post(`${API_CORE_BASE_URL}/api/users/logout`, {}, { headers: authHeaders() });
+    if (owner) await noteDrafts.clearUser(owner).catch(() => {
+      window.alert("로그아웃했습니다. 기기 초안 정리에 실패했습니다. 공유 기기에서는 브라우저 사이트 데이터를 삭제하세요.");
+    });
+    resetAuth();
+    window.location.assign("/login");
+  }, [resetAuth]);
 
   const login = (nextToken: string, nextUser: AuthUser) => {
-    setAuthToken(nextToken);
+    setAuthToken();
     setAuthUser(nextUser);
     setToken(nextToken);
     setUser(nextUser);
@@ -62,7 +75,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
           );
           if (!active) return;
           const { token: nextToken, user: nextUser } = response.data;
-          setAuthToken(nextToken);
+          setAuthToken();
           setAuthUser(nextUser);
           setToken(nextToken);
           setUser(nextUser);
@@ -89,7 +102,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
-          logout();
+          resetAuth();
           if (guestConfigured) {
             // 스테이징: /login 대신 게스트로 다시 로그인한다(막다른 로그인 화면 방지).
             setBootstrapping(true);
@@ -105,7 +118,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       axios.interceptors.response.eject(interceptorId);
     };
-  }, []);
+  }, [resetAuth]);
 
   useEffect(() => {
     if (!token || !API_CORE_BASE_URL) return;
@@ -133,7 +146,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
       logout,
       updateProfile,
     }),
-    [token, user],
+    [token, user, logout],
   );
 
   return (

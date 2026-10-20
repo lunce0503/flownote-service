@@ -38,24 +38,14 @@ async def add_note(
     """텍스트 기반 노트를 생성합니다."""
     revision = 1
     if note_id:
-        notes = await forward_request_async("GET", "/api/notes", authorization)
-        if isinstance(notes, list):
-            current = next((note for note in notes if isinstance(note, dict) and note.get("id") == note_id), None)
-            if current:
-                revision = int(current.get("revision") or 0) + 1
+        current = await forward_request_async("GET", f"/api/notes/{uuid.UUID(note_id)}", authorization)
+        if isinstance(current, dict):
+            revision = int(current.get("revision") or 0) + 1
 
     body = {
         "id": note_id or str(uuid.uuid4()),
         "title": title,
-        "content": [
-            {
-                "id": str(uuid.uuid4()),
-                "type": "paragraph",
-                "props": {},
-                "content": [{"type": "text", "text": content_text, "styles": {}}],
-                "children": [],
-            }
-        ],
+        "content": {"format": "markdown", "version": 1, "markdown": content_text},
         "revision": revision,
         "client_id": f"mcp-{uuid.uuid4()}",
     }

@@ -6,7 +6,7 @@ export function resolveBrowserReachableUrl(value: string | undefined): string | 
     || !url.hostname.endsWith(".up.railway.app")) {
     throw new Error("Flownote API requires a public Railway HTTPS URL.");
   }
-  return url.origin;
+  return typeof window !== "undefined" ? `${window.location.origin}/web-api` : url.origin;
 }
 
 export function requireBrowserReachableUrl(name: string, value: string | undefined): string {

@@ -58,6 +58,7 @@ run_mobile() {
 
 run_target() {
   case "$1" in
+    blog) run_web; run_canvas ;;
     web) run_web ;;
     api) run_api ;;
     main) run_main ;;
@@ -67,7 +68,7 @@ run_target() {
     mobile|expo) run_mobile ;;
     *)
       echo "Unknown target: $1" >&2
-      echo "Usage: $0 [all|web|api|main|canvas|serve|ai|mobile|expo]" >&2
+      echo "Usage: $0 [all|blog|web|api|main|canvas|serve|ai|mobile|expo]" >&2
       exit 2
       ;;
   esac

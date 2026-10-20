@@ -42,8 +42,7 @@ export default function NoteDetailScreen() {
     setLoading(true);
     setError(null);
     try {
-      const notes = await flownoteApi.listNotes(token);
-      const found = notes.find((item) => item.id === noteId);
+      const found = await flownoteApi.getNote(token, noteId);
       if (!found) {
         setNote(null);
         setError('노트를 찾을 수 없습니다. 목록에서 다시 선택해 주세요.');

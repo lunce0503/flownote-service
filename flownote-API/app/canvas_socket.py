@@ -15,7 +15,7 @@ import httpx
 import socketio
 from fastapi import HTTPException
 
-from app.core_api import CORE_API_BASE_URL, forward_request
+from app.core_api import CORE_API_BASE_URL, forward_request, require_user_id
 
 # 캔버스 부하 분리: 설정 시 캔버스 중계만 전용 Spring 인스턴스로 보낸다. 미설정이면 기존 Core API 그대로.
 import os
@@ -395,6 +395,8 @@ def create_canvas_socket_server(cors_allowed_origins: list[str]) -> socketio.Asy
 
     @sio.event
     async def connect(sid: str, environ: dict[str, Any], auth: Any) -> bool:
+        authorization = environ.get("HTTP_AUTHORIZATION", "")
+        await sio.save_session(sid, {"authorization": authorization})
         return True
 
     @sio.event
@@ -558,14 +560,29 @@ def create_canvas_socket_server(cors_allowed_origins: list[str]) -> socketio.Asy
     if register_socket_event is None:
         raise RuntimeError("Socket.IO event registration is not available.")
 
-    register_socket_event("canvas:join", handler=canvas_join)
-    register_socket_event("canvas:leave", handler=canvas_leave)
-    register_socket_event("canvas:load", handler=canvas_load)
-    register_socket_event("canvas:load-cancel", handler=canvas_load_cancel)
-    register_socket_event("canvas:save", handler=canvas_save)
-    register_socket_event("canvas:line-start", handler=canvas_line_start)
-    register_socket_event("canvas:line-points", handler=canvas_line_points)
-    register_socket_event("canvas:line-end", handler=canvas_line_end)
-    register_socket_event("canvas:asset-upload", handler=canvas_asset_upload)
+    def with_session(handler):
+        async def authenticated(sid, data):
+            if not isinstance(data, dict):
+                return _error_response(HTTPException(status_code=400, detail="잘못된 요청입니다."))
+            try:
+                session = await sio.get_session(sid)
+                authorization = session.get("authorization")
+                if authorization:
+                    data = {**data, "authorization": authorization}
+                if handler in {canvas_line_start, canvas_line_points, canvas_line_end}:
+                    await require_user_id(_authorization(data) or "")
+                return await handler(sid, data)
+            except Exception as error:
+                return _error_response(error)
+        return authenticated
+
+    for event, handler in {
+        "canvas:join": canvas_join, "canvas:leave": canvas_leave,
+        "canvas:load": canvas_load, "canvas:load-cancel": canvas_load_cancel,
+        "canvas:save": canvas_save, "canvas:line-start": canvas_line_start,
+        "canvas:line-points": canvas_line_points, "canvas:line-end": canvas_line_end,
+        "canvas:asset-upload": canvas_asset_upload,
+    }.items():
+        register_socket_event(event, handler=with_session(handler))
 
     return sio

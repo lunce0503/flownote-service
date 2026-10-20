@@ -59,3 +59,14 @@
   -webkit-user-select: text;
   user-select: text;
 }
+/* Short landscape displays need a side-by-side book, not two shallow panes. */
+@media (min-width: 600px) and (max-height: 600px) {
+    .canvas-reading-layout { flex-direction: row; }
+    .canvas-pdf-reader {
+        order: 1;
+        height: 100%;
+        width: 45%;
+        border-bottom: 0;
+        border-left: 1px solid #e7e5e4;
+    }
+}

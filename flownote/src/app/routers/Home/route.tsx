@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 const destinations = [
     {
-        label: "게시글 관리",
+        label: "노트 관리",
         description: "노트 작성과 폴더 정리",
         keywords: "노트 문서 블로그 글",
         href: "/blog",
@@ -27,7 +27,7 @@ const destinations = [
     {
         label: "캔버스 열기",
         description: "아이디어를 자유롭게 배치",
-        keywords: "그림판 필기 드로잉",
+        keywords: "캔버스 필기 드로잉",
         href: "/canvas",
         icon: Palette,
     },

@@ -50,3 +50,23 @@ test('bad hashes and interrupted downloads fail closed and a later check retries
   await writeFile(client.state.file, 'changed after download');
   await assert.rejects(() => client.verifyReady());
 });
+test('an observed newer version cannot be replaced by an older signed feed', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'flownote-update-test-'));
+  await writeFile(path.join(directory, 'highest.json'), JSON.stringify({ version: '1.2.0' }));
+  let downloads = 0;
+  const fetcher = async url => { if (url.endsWith('.json')) return new Response(envelope(manifest())); downloads++; return new Response(bytes); };
+  const client = new UpdateClient({ directory, channel: 'production', version: '1.0.0', kind: 'installer', publicKey, fetcher });
+  await client.check(); assert.equal(client.state.status, 'error'); assert.equal(downloads, 0);
+});
+test('HTTP downgrade, unknown hosts and oversized streams never produce an installable file', async () => {
+  for (const location of ['http://github.com/file', 'https://evil.example/a.exe', 'https://github.com@evil.example/a.exe', 'https://github.com:444/a.exe']) {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'flownote-update-test-'));
+    const fetcher = async url => url.endsWith('.json') ? new Response(envelope(manifest())) : new Response(null, { status: 302, headers: { location } });
+    const client = new UpdateClient({ directory, channel: 'production', version: '1.0.0', kind: 'installer', publicKey, fetcher });
+    await client.check(); assert.equal(client.state.status, 'error'); assert(!client.state.file);
+  }
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'flownote-update-test-'));
+  const fetcher = async url => url.endsWith('.json') ? new Response(envelope(manifest())) : new Response(Buffer.concat([bytes, bytes]));
+  const client = new UpdateClient({ directory, channel: 'production', version: '1.0.0', kind: 'installer', publicKey, fetcher });
+  await client.check(); assert.equal(client.state.status, 'error'); assert(!(await readdir(directory)).some(name => name.endsWith('.exe') || name.endsWith('.part')));
+});

@@ -3,6 +3,20 @@ import assert from 'node:assert/strict';
 import { suggestCanvasPlans, addSuggestedSchedule } from './canvasPlannerSuggestions.ts';
 
 const today = new Date(2026, 9, 6);
+test('canvas title is the first candidate and its written time fills the timetable', () => {
+  const items = suggestCanvasPlans([{ id: 'box', text: '다른 할 일\n2026-12-17 14:00~15:00 팀 회의' }], today, '2026-12-17 14:00~15:00 팀 회의');
+  assert.equal(items.length, 2, 'duplicate body candidate is excluded');
+  assert.deepEqual(items[0], { id: 'canvas-title:0', kind: 'schedule', title: '팀 회의', date: '2026-12-17', startTime: '14:00', endTime: '15:00' });
+  const entry = { todos: [], journal: [], grid: { startHour: 0, endHour: 24, cols: 12, cells: {}, strokes: [] } };
+  const next = addSuggestedSchedule(entry, items[0], 'title-schedule');
+  assert.equal(next.todos[0].label, '팀 회의');
+  assert.equal(next.grid.cells['168'], 'title-schedule');
+  assert.equal(Object.keys(next.grid.cells).length, 12);
+});
+test('blank canvas names fall back to body text and title-only canvases produce a task', () => {
+  assert.equal(suggestCanvasPlans([{ id: 'a', text: '본문 작업' }], today, '  ')[0].title, '본문 작업');
+  assert.equal(suggestCanvasPlans([], today, '연구 계획')[0].title, '연구 계획');
+});
 test('extracts tasks, dates and timed schedules from canvas text', () => {
   const items = suggestCanvasPlans([{ id: 'box', text: '- [ ] 내일 보고서 제출\n2026-10-08 14:00~15:30 팀 회의\n오늘 할 일', status: 'unchanged' }], today);
   assert.equal(items.length, 3);

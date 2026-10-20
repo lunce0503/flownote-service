@@ -10,6 +10,7 @@ from app.canvas_socket import create_canvas_socket_server
 from app.canvas_http import create_canvas_http_router
 from app.sync_socket import register_sync_namespace
 from app.gateway import router as gateway_router
+from app.web_session import WebSessionMiddleware
 
 # flownote-API는 API 게이트웨이다. 클라이언트 /api/** 요청을 받아 경로에 따라 백엔드로 라우팅한다.
 # - /api/canvas/**                       → flownote-canvas(Go)
@@ -47,7 +48,7 @@ socket_server = create_canvas_socket_server(origins)
 register_sync_namespace(socket_server)
 fastapi_app.include_router(create_canvas_http_router(socket_server))
 fastapi_app.include_router(gateway_router)
-app = socketio.ASGIApp(socket_server, fastapi_app)
+app = WebSessionMiddleware(socketio.ASGIApp(socket_server, fastapi_app))
 
 
 if __name__ == "__main__":

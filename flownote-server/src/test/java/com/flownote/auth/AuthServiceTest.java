@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.util.List;
 import java.util.UUID;
@@ -30,7 +32,7 @@ class AuthServiceTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    void fallsBackToDatabaseWhenRedisReadFails() {
+    void alwaysChecksDatabaseEvenWhenRedisContainsAnOldSession() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         StringRedisTemplate redis = mock(StringRedisTemplate.class);
         ValueOperations<String, String> values = mock(ValueOperations.class);
@@ -38,11 +40,12 @@ class AuthServiceTest {
         UUID userId = UUID.randomUUID();
 
         when(redis.opsForValue()).thenReturn(values);
-        when(values.get(anyString())).thenThrow(new IllegalStateException("redis unavailable"));
+        when(values.get(anyString())).thenReturn(userId + "|ADMIN");
         when(jdbc.query(anyString(), any(RowMapper.class), any(), any()))
                 .thenReturn(List.of(new AuthService.AuthenticatedUser(userId, "USER")));
 
-        assertThat(service(jdbc, redis).requireUser("Bearer " + token).userId()).isEqualTo(userId);
+        assertThat(service(jdbc, redis).requireUser("Bearer " + token).role()).isEqualTo("USER");
+        verifyNoInteractions(redis);
     }
 
     @SuppressWarnings("unchecked")
@@ -64,5 +67,27 @@ class AuthServiceTest {
 
     private AuthService service(JdbcTemplate jdbc, StringRedisTemplate redis) {
         return new AuthService(jdbc, redis);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void deletedOrExpiredSessionCannotUseStaleCache() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        when(jdbc.query(anyString(), any(RowMapper.class), any(), any())).thenReturn(List.of());
+        assertThatThrownBy(() -> service(jdbc, redis).requireUser("Bearer " + UUID.randomUUID()))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        error -> assertThat(error.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED));
+        verifyNoInteractions(redis);
+    }
+
+    @Test
+    void logoutDeletesDatabaseSessionEvenWhenCacheDeletionFails() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        UUID token = UUID.randomUUID();
+        when(redis.delete("session:" + token)).thenThrow(new IllegalStateException("redis unavailable"));
+        service(jdbc, redis).logout("Bearer " + token);
+        verify(jdbc).update("DELETE FROM app_sessions WHERE token = ?", token);
     }
 }

@@ -4,6 +4,13 @@
 
 ## 현재 참조 문서
 
+- [게시글 Markdown·탐색 사이드바·로딩 개선](blog/markdown-workspace-plan.md): Markdown 원문, 레거시 보존, 폴더 트리, Canvas 방식의 목록·본문 분리.
+
+- [노트 저장·화면 이동 복구 계획](blog/note-save-recovery-plan.md): 미저장 초안 보존·복구·계정 격리.
+- [노트 메타 목록·단건 조회 분리 계획](blog/note-query-split-plan.md): 본문 전체 읽기 제거와 API 호환.
+- [플래너 동시 편집 충돌 방지 계획](planner/concurrent-edit-plan.md): 버전 조건부 저장과 캔버스 일정 추가.
+- [AI 가용성·메뉴·오류 정합성 계획](agent/capability-ui-plan.md): 중지 상태와 사용자 진입점 일치.
+
 - `docs/design-docs/canvas/canvas.md`: Canvas 목록, 편집, 저장, 실시간 통신 코드맵과 상태 불변식.
 - `docs/design-docs/blog/blog.md`: Blog 목록, BlockNote 편집, revision 저장과 폴더 관리 코드맵.
 - `docs/DESIGN.md`: 하위 프로젝트, 서비스 경계, 데이터 소유권.
@@ -34,3 +41,5 @@
 
 ## 검증
 ```
+
+- [캔버스·노트 작업 공간 디자인](canvas/workspace-explorer-design.md): 공통 베이지/흰색/검정 팔레트, 폴더 탐색기와 제품 명칭.

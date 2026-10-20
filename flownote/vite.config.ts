@@ -19,11 +19,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('/react-dom/') || id.includes('/react/') || id.includes('/scheduler/')) return 'vendor-react'
-          if (id.includes('/@blocknote/mantine/')) return 'editor-integration'
-          if (id.includes('/@blocknote/') || id.includes('/@tiptap/')) return 'editor-blocknote'
-          if (id.includes('/prosemirror-') || id.includes('/orderedmap/')) return 'editor-prosemirror'
-          if (id.includes('/yjs/') || id.includes('/y-prosemirror/') || id.includes('/lib0/')) return 'editor-yjs'
+          // Shared interop helpers must not make React depend on a lazy editor.
+          if (id.includes('commonjsHelpers.js')) return 'vendor-react'
+          // Match package roots: '/react/' also matches @blocknote/react.
+          if (/\/node_modules\/(react-dom|react|scheduler)\//.test(id)) return 'vendor-react'
           return undefined
         },
       },

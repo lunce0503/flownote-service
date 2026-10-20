@@ -438,6 +438,7 @@ export const flownoteApi = {
     const notes = await request<NoteResponse[]>('/api/notes', { token });
     return notes.map(normalizeNote);
   },
+  getNote: async (token: string, id: string) => normalizeNote(await request<NoteResponse>(`/api/notes/${encodeURIComponent(id)}`, { token })),
   createNote: async (token: string, input: CreateNoteInput) => {
     const note = await request<NoteResponse>('/api/notes', {
       method: 'POST',

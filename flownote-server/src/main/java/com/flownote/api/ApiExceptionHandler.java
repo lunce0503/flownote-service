@@ -18,12 +18,15 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ResponseStatusException.class)
     ResponseEntity<Map<String, Object>> handleResponseStatus(ResponseStatusException exception) {
         int status = exception.getStatusCode().value();
+        boolean loginLimit = status == 429 && exception.getHeaders().containsKey("Retry-After");
         return ResponseEntity.status(exception.getStatusCode())
+                .headers(exception.getHeaders())
                 .body(errorBody(
-                        status == 429 ? "CANVAS_QUEUE_FULL" : status == 503 ? "CANVAS_TEMPORARILY_UNAVAILABLE" : "REQUEST_FAILED",
+                        loginLimit ? "LOGIN_RATE_LIMIT" : status == 429 ? "CANVAS_QUEUE_FULL" : status == 503 ? "CANVAS_TEMPORARILY_UNAVAILABLE" : "REQUEST_FAILED",
                         exception.getReason() == null ? "요청을 처리하지 못했습니다." : exception.getReason(),
                         status == 429 || status >= 500,
-                        status == 429 ? 1500L : status >= 500 ? 3000L : 0L));
+                        loginLimit ? Long.parseLong(exception.getHeaders().getFirst("Retry-After")) * 1000L
+                                : status == 429 ? 1500L : status >= 500 ? 3000L : 0L));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

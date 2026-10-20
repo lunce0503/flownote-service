@@ -22,12 +22,16 @@
 
 ## 진행 중인 작업
 
+- [Flownote 핵심 MVP 안정화](exec-plan/active/2026-10-18-mvp-stabilization.md): 기능별 해결 계획을 `design-docs/blog/`, `design-docs/planner/`, `design-docs/agent/`에 두고 백그라운드 구현·검증·릴리스를 추적한다.
+
 - [IDLE 계획의 Flownote 편입](exec-plan/active/2026-10-14-idle-integration.md): 개발 작업 공간·에이전트 실행·데스크톱 편집기·모바일 제어 계획. 문서 편입 완료, 실행 계약과 조회가 다음 구현 단계다.
 - [flownote-agent의 Flownote 편입](exec-plan/active/2026-10-14-flownote-agent-integration.md): 연구 코드·테스트·학습 계획 편입 완료. 실제 노트·작업 도구 계약과 기본 모델 평가가 다음 단계다.
 
 장기 실행 계획은 `docs/exec-plan/active/`에 일급 아티팩트로 저장한다(작성 요령: `docs/exec-plan/README.md`). 완료되면 의사결정 로그를 채워 `docs/exec-plan/completed/`로 옮기고, 남은 부채는 `docs/exec-plan/tech-debt-tracker.md`에 등재한다. 반복될 계획은 `docs/design-docs/` 또는 `docs/product-specs/`로 승격한다.
 
 ## 완료된 작업
+
+- [게시글 Markdown 작업 공간과 로딩 개선](exec-plan/completed/2026-10-19-blog-markdown-workspace.md): staging E2E 47개 통과 후 canvas/web 운영 배포 완료.
 
 완료된 계획은 다음 중 하나로 정리한다.
 

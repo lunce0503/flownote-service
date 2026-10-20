@@ -11,8 +11,9 @@ test('Windows app restores login and adapts its header-free navigation to window
   const login = await request.post(`${api}/api/users/login`, { data: { email, password } });
   expect(login.ok()).toBeTruthy();
   const { token, user } = await login.json();
-  await page.addInitScript(({ token, user }) => {
-    localStorage.setItem('flownote_auth_token', token);
+  await page.context().addCookies([{ name: '__Host-flownote_session', value: token,
+    url: 'https://flownote-react-staging.vercel.app', secure: true, httpOnly: true, sameSite: 'Strict' }]);
+  await page.addInitScript(({ user }) => {
     localStorage.setItem('flownote_auth_user', JSON.stringify(user));
   }, { token, user });
   await page.goto('/');

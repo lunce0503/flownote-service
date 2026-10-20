@@ -5,9 +5,9 @@ import { isInstalledApp } from '@/shared/lib/androidApp';
 const THEME_STORAGE_KEY = "flownote_theme";
 const readInitialTheme = (): ThemeMode => {
   if (isInstalledApp) return 'light';
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "light";
   const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-  return storedTheme === "light" || storedTheme === "dark" ? storedTheme : "dark";
+  return storedTheme === "light" || storedTheme === "dark" ? storedTheme : "light";
 };
 
 const ThemeProvider = ({ children }: { children: ReactNode }) => {

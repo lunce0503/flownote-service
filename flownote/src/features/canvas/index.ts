@@ -18,6 +18,7 @@ export * from "./model/canvasLocalDraft";
 export * from "./model/canvasAssetApi";
 export * from "./model/canvasClipboard";
 export * from "./model/canvasPdfImport";
+export * from "./model/canvasPdfReader";
 export * from "./model/usePersistence";
 export * from "./model/useStoredCanvasViewport";
 export * from "./model/useLineStreaming";

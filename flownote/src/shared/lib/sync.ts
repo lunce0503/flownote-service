@@ -1,4 +1,4 @@
-import { API_SYNC_BASE_URL, getAuthToken } from "../api";
+import { API_SYNC_BASE_URL, authHeaders, getAuthToken } from "../api";
 import { io, type Socket } from "socket.io-client";
 
 export type SyncResource = "notes" | "canvas" | "tasks" | "schedule" | "all";
@@ -35,11 +35,13 @@ const getSyncSocket = () => {
     clearTimeout(reconnectTimer);
     socket?.disconnect();
     socketToken = token;
-    const connection = io(`${API_SYNC_BASE_URL}/sync`, {
-      path: "/socket.io",
-      transports: ["websocket", "polling"],
+    const connection = io(`${new URL(API_SYNC_BASE_URL).origin}/sync`, {
+      path: "/web-api/socket.io",
+      addTrailingSlash: false,
+      transports: ["polling"],
+      withCredentials: true,
+      extraHeaders: authHeaders(),
       forceNew: true,
-      auth: (callback) => callback({ authorization: `Bearer ${getAuthToken() ?? ""}` }),
     });
     socket = connection;
     let connectedBefore = false;

@@ -83,6 +83,7 @@ def test_saved_mutation_remains_successful_when_broadcast_fails(setup):
 async def test_socket_and_http_use_same_save_contract(monkeypatch):
     monkeypatch.delenv("REDIS_URL", raising=False)
     sio = canvas_socket.create_canvas_socket_server([])
+    sio.get_session = AsyncMock(return_value={})
     save = AsyncMock(return_value={"ok": True, "data": {"revision": 1}})
     monkeypatch.setattr(canvas_socket, "save_canvas", save)
     data = {"mutationId": str(uuid.uuid4())}

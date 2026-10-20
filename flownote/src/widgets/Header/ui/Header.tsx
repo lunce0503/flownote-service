@@ -20,7 +20,7 @@ import {
   Sparkles,
   Trophy,
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/features/auth";
 import { ThemeModeControl } from "@/features/theme";
 
@@ -45,13 +45,12 @@ export default function Header({ isCapabilityVisible }: HeaderProps) {
     localStorage.getItem("flownote_language") === "en" ? "en" : "ko"
   ));
   const { user, isAuthenticated, logout } = useAuth();
-  const navigate = useNavigate();
   const labels = {
     ko: {
-      blog: "게시글",
+      blog: "노트",
       social: "소셜",
       agent: "에이전트",
-      canvas: "그림판",
+      canvas: "캔버스",
       task: "플래너",
       stocks: "주식",
       puzzle: "퍼즐",
@@ -68,7 +67,7 @@ export default function Header({ isCapabilityVisible }: HeaderProps) {
       adminFeedback: "피드백 관리",
     },
     en: {
-      blog: "Blog",
+      blog: "Notes",
       social: "Social",
       agent: "Agent",
       canvas: "Canvas",
@@ -179,12 +178,16 @@ export default function Header({ isCapabilityVisible }: HeaderProps) {
     setIsMoreOpen(false);
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      window.alert("로그아웃하지 못했습니다. 연결을 확인하고 다시 시도해주세요.");
+      return;
+    }
     closeProfile();
     closeMore();
     closeSidebar();
-    navigate("/");
   };
 
   const primaryNavLinks = [

@@ -12,16 +12,16 @@ public final class UserDtos {
     }
 
     public record RegisterRequest(
-            @NotBlank String username,
-            @Email @NotBlank String email,
-            @Size(min = 6) String password,
-            @NotBlank String nickname
+            @NotBlank @Size(max = 80) String username,
+            @Email @NotBlank @Size(max = 254) String email,
+            @NotBlank @Size(min = 15, max = 72) String password,
+            @NotBlank @Size(max = 80) String nickname
     ) {
     }
 
     public record LoginRequest(
-            @Email @NotBlank String email,
-            @NotBlank String password
+            @Email @NotBlank @Size(max = 254) String email,
+            @NotBlank @Size(max = 200) String password
     ) {
     }
 

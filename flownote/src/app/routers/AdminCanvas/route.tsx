@@ -133,7 +133,7 @@ const AdminCanvasRoute = () => {
         <h2 className="mt-6 text-base font-bold">이 기기의 최근 오류</h2>
         <div className="mt-2 overflow-x-auto border border-stone-300 bg-white">
           <table className="w-full min-w-[620px] border-collapse text-left text-sm">
-            <thead className="bg-stone-200"><tr>{["시간", "작업", "그림판", "오류"].map((label) => <th key={label} className="px-3 py-3">{label}</th>)}</tr></thead>
+            <thead className="bg-stone-200"><tr>{["시간", "작업", "캔버스", "오류"].map((label) => <th key={label} className="px-3 py-3">{label}</th>)}</tr></thead>
             <tbody>
               {deviceEvents.map((event) => <tr key={event.id} className="border-t border-stone-200">
                 <td className="whitespace-nowrap px-3 py-3">{new Date(event.createdAt).toLocaleString()}</td>

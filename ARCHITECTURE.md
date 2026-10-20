@@ -8,7 +8,7 @@ Flownote는 캔버스와 텍스트 노트를 중심으로 일정, 작업, 주식
 
 ```text
 Browser (flownote/)              Mobile (flownote-mobile/)
-  | HTTP/SSE + Bearer              | REST + Bearer (native/Expo web)
+  | same-origin HttpOnly cookie    | REST + Bearer (native/Expo web)
   +------------------+-------------+
                      v
           flownote-API (FastAPI gateway, :8000)
@@ -99,7 +99,7 @@ entities/canvas/model/types.ts
 | SSE 주식 스트림 | Go serve | `/api/stocks/stream`, 게이트웨이의 스트리밍 프록시 |
 | 로컬 LLM | 제거됨 | 기존 agent-note 경로는 410 응답만 제공 |
 
-모든 사용자 보호 API는 `Authorization: Bearer <session UUID>`를 전달한다. Spring은 세션을 발급하고 Go 서비스는 같은 `app_sessions` 테이블과 Redis 캐시를 이용해 사용자를 확인한다. 게이트웨이는 `X-Request-ID`와 전달 헤더를 유지하며, 연결이 성립되기 전의 상류 연결 오류만 최대 2회 재시도한다.
+웹은 Vercel `/web-api/**` 프록시와 HttpOnly 세션 쿠키를 사용하며 gateway가 내부 Bearer 헤더로 변환한다. 네이티브 클라이언트는 `Authorization: Bearer <session UUID>`를 유지한다. Spring·Go는 `app_sessions`와 현재 역할을 매 요청 DB에서 확인하고 양성 인증 캐시를 사용하지 않는다. 게이트웨이는 `X-Request-ID`를 유지하며 연결 성립 전 오류만 최대 2회 재시도한다.
 
 ## Canvas
 
@@ -182,7 +182,7 @@ entities/canvas/model/types.ts
 | `internal/stocks/stocks.go` | `/api/stocks/**` — 보유·현금(NUMERIC 정밀도 보존), 시세는 `STOCK_MARKET_DATA_URL`(게이트웨이→flownote-ai) 중계+합성 폴백, SSE `/stream` |
 | `internal/social/social.go` | `/api/social/**` — 방 멤버십(비멤버 404), LATERAL 마지막 메시지, 메시지 S3 오프로드 |
 | `internal/chat/chat.go` | `/api/chat/**` — 메시지 CRUD·전체 삭제, S3 오프로드 |
-| `internal/{auth,httpjson,storage,config}/` | canvas와 동일 패턴 공유(세션 인증+Redis 캐시, JSON 응답, S3, 설정 PORT 기본 8095) |
+| `internal/{auth,httpjson,storage,config}/` | canvas와 동일 패턴 공유(DB 세션 인증, JSON 응답, S3, 설정 PORT 기본 8095) |
 
 ## AI 및 시장 데이터 (flownote-ai)
 
@@ -208,7 +208,7 @@ entities/canvas/model/types.ts
 | 도메인 모델/API | `flownote/src/entities/` | blog, canvas, chat, diary, schedule, social, stocks, task, users의 타입과 API |
 | 사용자 동작 | `flownote/src/features/` | 인증, 캔버스 영속화/편집, 노트/일기/일정/작업 상태 로직 |
 | 조합 UI | `flownote/src/widgets/` | 페이지에서 사용하는 큰 UI 단위 |
-| 공통 통신 | `flownote/src/shared/api/index.ts` | 환경 변수 기반 API URL, LAN 호스트 치환, Bearer 인증 저장/헤더 |
+| 공통 통신 | `flownote/src/shared/api/index.ts` | cloud URL 검증, 동일 출처 API 프록시, 쿠키 인증과 비밀값 없는 사용자 상태 |
 
 `flownote-next/`는 2026-07-28 제거되었으므로 현재 코드맵과 통합 실행 대상에 포함하지 않는다. 2026-09-07 동기화는 게이트웨이 `/sync` Socket.IO namespace로 이전했다. 프론트는 `VITE_CANVAS_SOCKET_URL` 또는 `VITE_API_BASE_URL`을 사용하며 폐기된 `VITE_SYNC_API_URL`은 읽지 않는다.
 
@@ -216,8 +216,9 @@ entities/canvas/model/types.ts
 
 | 서버 | 위치 | 책임 |
 | --- | --- | --- |
-| `flownote-server/`(인증 서버) | `com.flownote.{auth,user,mobile,api}` | 가입/로그인(BCrypt)·사용자 검색·`/me`, 모바일 설정, 세션 발급(`app_sessions`) |
-| 모든 백엔드 | Go `internal/auth/auth.go` · Spring `AuthService` | Bearer(UUID) → `app_sessions` 조회. **Redis 세션 캐시** `session:{token}` → `userId|role`, TTL 5분, 장애 시 DB 폴백(로그아웃 엔드포인트 없음 → TTL 오차만 허용) |
+| `flownote-server/`(인증 서버) | `com.flownote.{auth,user,mobile,api}` | BCrypt 가입·Redis 로그인 제한·사용자 검색·`/me`·현재/전체 세션 로그아웃·모바일 설정 |
+| 모든 백엔드 | Go `internal/auth/auth.go` · Spring `AuthService` | Bearer(UUID) → DB의 현재 `app_sessions` 만료와 역할 확인. Redis 양성 인증 캐시는 제거 |
+| 웹 세션 경계 | `flownote-API/app/web_session.py`, `flownote/vercel.json` | HttpOnly 쿠키, Origin/CSRF 검증, 로그인 JSON 토큰 제거, 같은 출처 Socket.IO polling |
 | Redis 기타 용도 | `flownote-API/app/canvas_socket.py`, `flownote-ai/app/api/market_router.py` | Socket.IO Redis 매니저(replica 대비), 시세 캐시(quotes 5s·search 1h·history 10m) |
 
 ## 데이터 및 스키마 소유권
@@ -225,7 +226,7 @@ entities/canvas/model/types.ts
 | 저장소 | 소유/사용 코드 | 용도 |
 | --- | --- | --- |
 | PostgreSQL | Flyway: `flownote-server/src/main/resources/db/migration/`; 런타임: Spring/Go | 사용자, 세션, 캔버스, 노트, 일정, 작업, 주식, 소셜, 채팅의 기준 데이터 |
-| Redis | Spring, 두 Go 서비스, API gateway, AI | 세션 캐시, Socket.IO 확장, 시장 데이터 캐시 |
+| Redis | Spring, API gateway, AI | 로그인 시도 제한, Socket.IO 확장, 시장 데이터 캐시 |
 | S3 호환 저장소 | `flownote-canvas/internal/storage/`, `flownote-serve/internal/storage/` | 캔버스 자산, 노트 본문, 일정/작업/메시지의 큰 payload |
 | 로컬 업로드 볼륨 | `flownote-canvas/internal/notes/handler.go` | `/uploads/**` 정적 파일 (`/mnt/storage/uploads` ↔ `/public/uploads`) |
 | SQLite 볼륨 | `flownote-ai/app/services/agent_note_store.py` | 에이전트 노트 인덱스 (`agent-note-data`) |

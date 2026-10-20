@@ -1,0 +1,34 @@
+/* Shared canvas/note chrome. Document artwork keeps its own colours. */
+.workspace-surface {
+  --workspace-paper: #ffffff;
+  --workspace-sidebar: #f5f1e8;
+  --workspace-subtle: #faf8f3;
+  --workspace-selected: #e9e0ce;
+  --workspace-border: #ded8cb;
+  --workspace-ink: #211f1b;
+  --workspace-muted: #716b60;
+  --workspace-strong: #211f1b;
+  --workspace-on-strong: #ffffff;
+  color: var(--workspace-ink);
+  background: var(--workspace-paper);
+  color-scheme: light;
+}
+.theme-dark .workspace-surface {
+  --workspace-paper: #1d1c19;
+  --workspace-sidebar: #25231f;
+  --workspace-subtle: #302d27;
+  --workspace-selected: #423c30;
+  --workspace-border: #4a4439;
+  --workspace-ink: #f5f1e8;
+  --workspace-muted: #bbb3a3;
+  --workspace-strong: #e9e0ce;
+  --workspace-on-strong: #211f1b;
+  color-scheme: dark;
+}
+.workspace-surface :focus-visible { outline: 2px solid var(--workspace-ink); outline-offset: -2px; }
+.workspace-surface button:disabled { opacity: .5; cursor: default; }
+
+html[data-installed-app="true"] .workspace-surface { --workspace-shell-offset: 76px; }
+@media (min-width: 1000px) {
+  html[data-desktop-app="true"] .workspace-surface { --workspace-shell-offset: 0px; }
+}

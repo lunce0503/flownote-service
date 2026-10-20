@@ -47,7 +47,7 @@ _CANVAS_PREFIXES = ("canvas", "notes", "note-folders", "upload", "admin")
 # 요청에서 상류로 전달하지 않는 hop-by-hop 헤더.
 _REQUEST_STRIP = {
     "host", "content-length", "connection", "keep-alive", "transfer-encoding",
-    "upgrade", "proxy-authenticate", "proxy-authorization", "te", "trailer",
+    "upgrade", "proxy-authenticate", "proxy-authorization", "te", "trailer", "cookie",
 }
 # 상류 응답에서 클라이언트로 전달하지 않는 헤더(프레이밍은 ASGI 서버가 다시 계산).
 # content-encoding은 원시(raw) 바이트를 그대로 흘리므로 유지한다.
@@ -131,6 +131,8 @@ async def _proxy(request: Request, target_base: str, target_name: str, full_path
     path = full_path
     request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
     headers = _forward_headers(request, request_id)
+    if path == "/api/users/login" and request.headers.get("x-flownote-web") == "1":
+        headers["accept-encoding"] = "identity"
     body = await request.body()
     started = time.monotonic()
 
@@ -170,6 +172,8 @@ async def _proxy(request: Request, target_base: str, target_name: str, full_path
 
     response_headers = {k: v for k, v in upstream.headers.items() if k.lower() not in _RESPONSE_STRIP}
     response_headers["X-Request-ID"] = request_id
+    if request.headers.get("authorization") or path.startswith("/api/users"):
+        response_headers["Cache-Control"] = "no-store"
     status = upstream.status_code
     logger.info("gateway_proxy target=%s method=%s path=%s status=%s latency_ms=%d request_id=%s",
                 target_name, request.method, path, status, int((time.monotonic() - started) * 1000), request_id)

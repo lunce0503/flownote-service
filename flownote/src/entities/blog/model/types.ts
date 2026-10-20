@@ -1,4 +1,5 @@
-export type NoteContent = unknown[];
+import { isMarkdown, type MarkdownContent } from './markdown';
+export type NoteContent = unknown[] | MarkdownContent;
 
 export interface BlockDataProps {
   id: string;
@@ -15,6 +16,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => (
 );
 
 export const getFirstNoteText = (content: NoteContent): string | null => {
+  if (isMarkdown(content)) return content.markdown.trim() || null;
   const visit = (value: unknown): string | null => {
     if (typeof value === "string") return value.trim() || null;
     if (Array.isArray(value)) {
@@ -31,3 +33,5 @@ export const getFirstNoteText = (content: NoteContent): string | null => {
 
   return visit(content);
 };
+
+export type NoteSummary = Omit<BlockDataProps, "content" | "client_id">;

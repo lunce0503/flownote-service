@@ -45,10 +45,10 @@ export const useDocumentTitle = (
 
 export const getRouteDocumentTitle = (pathname: string): [string, string?] => {
   if (pathname === "/") return ["홈"];
-  if (pathname === "/blog") return ["게시글", "목록"];
-  if (pathname.startsWith("/blog/")) return ["게시글", "문서"];
-  if (pathname === "/canvas") return ["그림판", "목록"];
-  if (pathname.startsWith("/canvas/")) return ["그림판", "캔버스"];
+  if (pathname === "/blog") return ["노트", "목록"];
+  if (pathname.startsWith("/blog/")) return ["노트", "문서"];
+  if (pathname === "/canvas") return ["캔버스", "목록"];
+  if (pathname.startsWith("/canvas/")) return ["캔버스", "캔버스"];
   if (pathname === "/planner") return ["플래너", new Date().toISOString().slice(0, 10)];
   if (pathname.startsWith("/social")) return ["소셜", "대화"];
   if (pathname.startsWith("/agent")) return ["AI 에이전트", "작업공간"];

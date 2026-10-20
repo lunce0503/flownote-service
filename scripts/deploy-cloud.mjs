@@ -15,11 +15,11 @@ const target = process.argv[3] ?? 'all';
 const services = { main: ['flownote-main', 'flownote-server'], canvas: ['flownote-canvas', 'flownote-canvas'],
   serve: ['flownote-sub', 'flownote-serve'], ai: ['flownote-ai', 'flownote-ai'], api: ['flownote-api', 'flownote-API'],
   mobile: [null, 'flownote-mobile'], expo: [null, 'flownote-mobile'], web: [null, 'flownote'] };
-if (!['release', 'staging', 'production'].includes(mode) || (target !== 'all' && target !== 'feedback' && target !== 'feedback-auto' && !services[target])) {
-  throw new Error('Usage: node scripts/deploy-cloud.mjs [release|staging|production] [all|feedback|web|api|main|canvas|serve|ai|mobile|expo]');
+if (!['release', 'staging', 'production'].includes(mode) || (target !== 'all' && target !== 'feedback' && target !== 'feedback-auto' && target !== 'blog' && !services[target])) {
+  throw new Error('Usage: node scripts/deploy-cloud.mjs [release|staging|production] [all|feedback|blog|web|api|main|canvas|serve|ai|mobile|expo]');
 }
 const targets = target === 'feedback-auto' ? (process.env.FLOWNOTE_RELEASE_TARGETS ?? '').split(',')
-  : target === 'all' ? allDeploymentTargets : target === 'feedback' ? ['main', 'web'] : [target];
+  : target === 'all' ? allDeploymentTargets : target === 'feedback' ? ['main', 'web'] : target === 'blog' ? ['canvas', 'web'] : [target];
 if (target === 'feedback-auto' && (targets.length === 0 || targets.some(name => !allDeploymentTargets.includes(name)) || !targets.includes('web') || new Set(targets).size !== targets.length)) {
   throw new Error('Automatic feedback release requires explicit unique active targets including web.');
 }
@@ -63,13 +63,14 @@ const revision = fingerprint();
 const message = process.env.RELEASE_MESSAGE ?? `Cloud-only release ${revision.slice(0, 12)}`;
 async function deployRailway(name, source, environment) {
   const args = ['--service', name, '--environment', profiles[environment].environmentId];
-  const result = JSON.parse(await runWithRetry('railway', ['up', path.join(root, source), '--path-as-root', '--project', profiles.projectId,
-    ...args, '--detach', '--json', '--message', message], { capture: true }));
+  const resume = JSON.parse(process.env.FLOWNOTE_RELEASE_RESUME_DEPLOYMENTS ?? '{}')[`${environment}/${name}`];
+  const result = resume ? { deploymentId: resume } : JSON.parse(await runWithRetry('railway', ['up', path.join(root, source), '--path-as-root', '--project', profiles.projectId,
+    ...args, '--detach', '--json', '--message', message], { capture: true, cwd: controlRoot }));
   const id = result.deploymentId;
   if (!id) throw new Error('Railway did not return a deployment ID');
   console.log(`${environment} ${name}: ${id}`);
   for (let attempt = 0; attempt < 180; attempt++) {
-    const rows = JSON.parse(await runWithRetry('railway', ['deployment', 'list', ...args, '--limit', '30', '--json'], { capture: true }));
+    const rows = JSON.parse(await runWithRetry('railway', ['deployment', 'list', ...args, '--limit', '30', '--json'], { capture: true, cwd: controlRoot }));
     const deployment = rows.find(row => row.id === id);
     if (deployment?.status === 'SUCCESS') return { service: name, id, status: 'SUCCESS' };
     if (['FAILED', 'CRASHED', 'REMOVED'].includes(deployment?.status)) throw new Error(`${name} ${id}: ${deployment.status}`);
@@ -80,7 +81,26 @@ async function deployRailway(name, source, environment) {
 function deployWeb(environment) {
   const profile = profiles[environment];
   const cliEnv = { ...env, VERCEL_ORG_ID: profiles.vercelOrgId, VERCEL_PROJECT_ID: profile.vercelProjectId };
+  const resume = JSON.parse(process.env.FLOWNOTE_RELEASE_RESUME_DEPLOYMENTS ?? '{}')[`${environment}/web`];
+  if (resume) {
+    const deployment = JSON.parse(run('vercel', ['inspect', resume, '--json'], { env: cliEnv, capture: true, cwd: controlRoot }));
+    const expectedName = new URL(profile.webUrl).hostname.split('.')[0];
+    const active = JSON.parse(run('vercel', ['inspect', profile.webUrl, '--json'], { env: cliEnv, capture: true, cwd: controlRoot }));
+    if (deployment.name !== expectedName || !deployment.url?.endsWith('.vercel.app')
+      || deployment.readyState !== 'READY' || deployment.id !== active.id) {
+      throw new Error('Resumed web deployment must be Ready and match the selected environment.');
+    }
+    console.log(`${environment} web (resumed): https://${deployment.url}`);
+    return { service: 'web', id: deployment.id, url: `https://${deployment.url}`, status: 'READY' };
+  }
   const args = ['deploy', '--prod', '--yes', '--json', '--project', profile.vercelProjectId];
+  const webConfig = JSON.parse(readFileSync(path.join(root, 'flownote/vercel.json')));
+  webConfig.rewrites = webConfig.rewrites.map(rule => rule.source === '/web-api/:path*'
+    ? { ...rule, destination: `${profile.apiUrl}/:path*` } : rule);
+  const webConfigPath = path.join(root, '.release', `vercel-${environment}.json`);
+  mkdirSync(path.dirname(webConfigPath), { recursive: true });
+  writeFileSync(webConfigPath, JSON.stringify(webConfig));
+  args.push('--local-config', webConfigPath);
   args.push('--build-env', 'VITE_ALLOW_ANONYMOUS=false');
   for (const key of ['VITE_API_BASE_URL', 'VITE_API_BASE_URL2', 'VITE_CORE_API_URL', 'VITE_AI_BASE_URL',
     'VITE_CANVAS_API_URL', 'VITE_CANVAS_SOCKET_URL', 'VITE_UPLOAD_API_URL']) args.push('--build-env', `${key}=${profile.apiUrl}`);
@@ -170,7 +190,9 @@ if (mode !== 'production') {
   const results = await deploy('staging');
   // Browser tests exercise cloud staging, never a local application or production DB.
   if (process.env.CI) run('yarn', ['e2e', '--retries=0'], { cwd: path.join(root, 'flownote') });
-  else run('docker', ['run', '--rm', '-v', `${root}:/work`, '-w', '/work/flownote', '-e', 'CI=true',
+  else run('docker', ['run', '--rm', '-v', `${root}:/work`,
+    ...(root !== controlRoot ? ['-v', `${controlRoot}/flownote/node_modules:/work/flownote/node_modules:ro`] : []),
+    '-w', '/work/flownote', '-e', 'CI=true',
     'mcr.microsoft.com/playwright:v1.62.1-noble', 'yarn', 'e2e', '--retries=0']);
   if (revision !== fingerprint()) throw new Error('Source changed while staging was being verified. Production is blocked.');
   checkSourceGuard();

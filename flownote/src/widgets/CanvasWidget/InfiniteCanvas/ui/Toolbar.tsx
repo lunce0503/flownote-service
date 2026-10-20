@@ -1,5 +1,5 @@
 import React from 'react';
-import { CalendarDays } from 'lucide-react';
+import { BookOpen, CalendarDays } from 'lucide-react';
 import type { ToolType } from '@/entities/canvas';
 import type { CanvasLoadTrigger, CanvasSaveState, CanvasSaveStatus } from '@/features/canvas';
 import { BringToFront, Check, CheckCircle2, ChevronDown, ClipboardPaste, Cloud, CloudUpload, Copy, Crosshair, Download, Eraser, Hand, ImagePlus, Lasso, LayoutGrid, Loader2, Maximize, Minimize, MoreVertical, Palette, PenLine, Pencil, RefreshCw, RotateCcw, SendToBack, Settings, Trash2, TriangleAlert, Type, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
@@ -37,6 +37,7 @@ interface ToolbarProps {
   isCanvasSettingsVisible: boolean;
   onToggleCanvasSettingsVisible: () => void;
   onOpenPlannerSuggestions: () => void;
+  onOpenPdfReader: () => void;
   zoomPercent: number;
   viewportCenter: { x: number; y: number };
 }
@@ -289,6 +290,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   isCanvasSettingsVisible,
   onToggleCanvasSettingsVisible,
   onOpenPlannerSuggestions,
+  onOpenPdfReader,
   zoomPercent,
   viewportCenter,
 }) => {
@@ -436,7 +438,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           {...touchActivation(onNavigateToCanvasList)}
           data-testid="canvas-library-button"
           className={libraryButtonClass}
-          aria-label="그림판 목록으로"
+          aria-label="캔버스 목록으로"
         >
           <LayoutGrid size={TOOLBAR_ICON_SIZE} />
         </button>
@@ -466,6 +468,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
         {isFileMenuOpen && (
           <div ref={fileMenuRef} className="absolute right-1 top-full z-50 mt-1 w-56 overflow-hidden rounded-lg bg-white py-1 shadow-xl ring-1 ring-stone-200" role="menu" onKeyDown={handleFileMenuKeyDown}>
+            <button type="button" role="menuitem" className={mobileMenuItemClass} {...touchActivation(() => { setIsFileMenuOpen(false); onOpenPdfReader(); })}><BookOpen size={18} /> PDF 책 읽기</button>
             <button type="button" role="menuitem" className={mobileMenuItemClass} {...touchActivation(() => { setIsFileMenuOpen(false); onOpenPlannerSuggestions(); })}><CalendarDays size={18} /> 플래너 제안</button>
             {saveState.status === 'failed' && (
               <button type="button" role="menuitem" className={mobileMenuItemClass} {...touchActivation(() => { setIsFileMenuOpen(false); void retryPendingSaves(); })}>
@@ -493,7 +496,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               {isFullscreen ? '전체 화면 종료' : '전체 화면'}
             </button>
             <button type="button" role="menuitem" className={mobileMenuItemClass} {...touchActivation(() => { setIsFileMenuOpen(false); onToggleCanvasSettingsVisible(); })}>
-              <Settings size={18} /> 그림판 설정
+              <Settings size={18} /> 캔버스 설정
             </button>
           </div>
         )}
@@ -584,12 +587,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             {...touchActivation(onNavigateToCanvasList)}
             data-testid="canvas-library-button"
             className={libraryButtonClass}
-            title="그림판 목록으로"
-            aria-label="그림판 목록으로"
+            title="캔버스 목록으로"
+            aria-label="캔버스 목록으로"
           >
             <LayoutGrid size={TOOLBAR_ICON_SIZE} />
           </button>
           <button type="button" {...touchActivation(onOpenPlannerSuggestions)} className={libraryButtonClass} aria-label="플래너 제안" title="캔버스에서 플래너 제안"><CalendarDays size={TOOLBAR_ICON_SIZE} /></button>
+          <button type="button" {...touchActivation(onOpenPdfReader)} className={libraryButtonClass} aria-label="PDF 책 읽기" title="PDF 책 읽기"><BookOpen size={TOOLBAR_ICON_SIZE} /></button>
           <CanvasTitleEditor canvasTitle={canvasTitle} onRenameCanvas={onRenameCanvas} className="pointer-events-auto flex min-h-12 max-w-[128px] shrink-0 items-center rounded-full bg-white/95 px-4 text-sm font-black shadow-lg ring-1 ring-stone-200/80 backdrop-blur sm:max-w-[220px] xl:max-w-xs" />
 
           <div className={floatingPillClass} aria-label="도구">
@@ -714,7 +718,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               type="button"
               {...touchActivation(onToggleCanvasSettingsVisible)}
               className={`${iconButtonClass} ${isCanvasSettingsVisible ? selectedIconButtonClass : ''}`}
-              title="그림판 설정"
+              title="캔버스 설정"
               aria-pressed={isCanvasSettingsVisible}
             >
               <Settings size={TOOLBAR_ICON_SIZE} />

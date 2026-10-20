@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import type {
     ImageElement,
@@ -14,6 +14,7 @@ import type {
     MovingCanvasObject,
 } from "@/features/canvas";
 import { buildLassoSelection, isPointInsideBounds, MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from "@/features/canvas";
+import { createCanvasPanMomentum } from "./canvasPanMomentum";
 
 type EraserTargets = EraserElementTargets & { lines: boolean };
 type PanAxis = "x" | "y";
@@ -35,6 +36,7 @@ const resolvePanAxis = (origin: Point, current: Point): PanAxis | null => {
 };
 
 type UseCanvasPointerInputOptions = {
+    canvasId: string | null;
     tool: ToolType;
     pencilOnlyMode: boolean;
     penColor: string;
@@ -104,6 +106,7 @@ const getCanvasViewportPoint = (
 };
 
 export const useCanvasPointerInput = ({
+    canvasId,
     tool,
     pencilOnlyMode,
     penColor,
@@ -153,11 +156,53 @@ export const useCanvasPointerInput = ({
     const lastTouchDistanceRef = useRef<number | null>(null);
     const lastTouchCenterRef = useRef<Point | null>(null);
     const touchGestureActiveRef = useRef(false);
+    const touchGestureStartScaleRef = useRef<number | null>(null);
     const singleTouchPanRef = useRef<SingleTouchPan | null>(null);
-    const middleDragStartRef = useRef<Point | null>(null);
+    const middleDragStartRef = useRef<{ pointerId: number; position: Point } | null>(null);
     const lassoDragStartRef = useRef<Point | null>(null);
     const [isMiddleDragging, setIsMiddleDragging] = useState(false);
     const [isLassoDragging, setIsLassoDragging] = useState(false);
+    const momentumRef = useRef<ReturnType<typeof createCanvasPanMomentum> | null>(null);
+
+    useEffect(() => {
+        const momentum = createCanvasPanMomentum({
+            getOffset: () => offsetRef.current,
+            setOffset: (nextOffset) => {
+                offsetRef.current = nextOffset;
+                setOffset(nextOffset);
+            },
+            requestFrame: (callback) => window.requestAnimationFrame(callback),
+            cancelFrame: (id) => window.cancelAnimationFrame(id),
+        });
+        momentumRef.current = momentum;
+        const stop = () => momentum.stop();
+        const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
+        // Capture also stops coasting when the next interaction is outside the canvas.
+        window.addEventListener("pointerdown", stop, true);
+        window.addEventListener("wheel", stop, true);
+        window.addEventListener("keydown", stop, true);
+        window.addEventListener("blur", stop);
+        window.addEventListener("flownote-preferences-change", stop);
+        document.addEventListener("visibilitychange", stop);
+        motionPreference.addEventListener("change", stop);
+        return () => {
+            momentum.stop();
+            momentumRef.current = null;
+            window.removeEventListener("pointerdown", stop, true);
+            window.removeEventListener("wheel", stop, true);
+            window.removeEventListener("keydown", stop, true);
+            window.removeEventListener("blur", stop);
+            window.removeEventListener("flownote-preferences-change", stop);
+            document.removeEventListener("visibilitychange", stop);
+            motionPreference.removeEventListener("change", stop);
+        };
+    }, [offsetRef, setOffset, tool, pencilOnlyMode, canvasId]);
+
+    const releaseMomentum = (event: React.PointerEvent<HTMLCanvasElement>) => {
+        if (event.type === "pointerup" && pointersRef.current.size === 0) {
+            momentumRef.current?.release(performance.now(), window.matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.classList.contains("motion-reduced"));
+        } else momentumRef.current?.stop();
+    };
 
     const setDrawingActive = (active: boolean) => {
         isDrawingRef.current = active;
@@ -219,6 +264,8 @@ export const useCanvasPointerInput = ({
             offsetRef.current = nextOffset;
             setScale(nextScale);
             setOffset(nextOffset);
+            // Track finger translation rather than intermediate pinch-induced offsets.
+            momentumRef.current?.track(performance.now(), newCenter);
         }
 
         lastTouchDistanceRef.current = newDistance;
@@ -244,11 +291,13 @@ export const useCanvasPointerInput = ({
         gesture.previous = position;
         offsetRef.current = nextOffset;
         setOffset(nextOffset);
+        momentumRef.current?.track(performance.now());
         return true;
     };
 
     const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
         event.preventDefault();
+        momentumRef.current?.stop();
         const position = getCanvasViewportPoint(event.currentTarget, event.nativeEvent);
         pointersRef.current.set(event.pointerId, position);
         if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -264,14 +313,17 @@ export const useCanvasPointerInput = ({
 
         if (event.pointerType === "mouse" && event.button === 1) {
             setIsMiddleDragging(true);
-            middleDragStartRef.current = position;
+            middleDragStartRef.current = { pointerId: event.pointerId, position };
+            momentumRef.current?.begin(performance.now());
             return;
         }
 
         if (event.pointerType === "touch" && pointersRef.current.size >= 2) {
             touchGestureActiveRef.current = true;
+            touchGestureStartScaleRef.current = scaleRef.current;
             resetActiveAction();
             updateTouchGestureBaseline();
+            momentumRef.current?.begin(performance.now(), lastTouchCenterRef.current ?? offsetRef.current);
             return;
         }
 
@@ -284,6 +336,7 @@ export const useCanvasPointerInput = ({
                 previous: position,
                 axis: null,
             };
+            momentumRef.current?.begin(performance.now());
             return;
         }
 
@@ -383,14 +436,15 @@ export const useCanvasPointerInput = ({
         event.preventDefault();
         const position = getCanvasViewportPoint(event.currentTarget, event.nativeEvent);
 
-        if (isMiddleDragging && middleDragStartRef.current) {
+        if (middleDragStartRef.current?.pointerId === event.pointerId) {
             const nextOffset = {
-                x: offsetRef.current.x + position.x - middleDragStartRef.current.x,
-                y: offsetRef.current.y + position.y - middleDragStartRef.current.y,
+                x: offsetRef.current.x + position.x - middleDragStartRef.current.position.x,
+                y: offsetRef.current.y + position.y - middleDragStartRef.current.position.y,
             };
             offsetRef.current = nextOffset;
             setOffset(nextOffset);
-            middleDragStartRef.current = position;
+            middleDragStartRef.current.position = position;
+            momentumRef.current?.track(performance.now());
             return;
         }
 
@@ -433,29 +487,47 @@ export const useCanvasPointerInput = ({
 
     const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
         event.preventDefault();
+        // A mouse can leave after pointerup has already removed it. Touch devices
+        // emit an implicit leave on release, which must not cancel a normal flick.
+        if (event.type === "pointerleave" && event.pointerType === "mouse") momentumRef.current?.stop();
+        if (event.type === "pointercancel") momentumRef.current?.stop();
+        if (!pointersRef.current.has(event.pointerId)) return;
         pointersRef.current.delete(event.pointerId);
         if (event.currentTarget.hasPointerCapture(event.pointerId)) {
             event.currentTarget.releasePointerCapture(event.pointerId);
         }
 
-        if (isMiddleDragging && event.button === 1) {
+        if (middleDragStartRef.current?.pointerId === event.pointerId) {
             setIsMiddleDragging(false);
             middleDragStartRef.current = null;
+            releaseMomentum(event);
+            return;
         }
 
         if (singleTouchPanRef.current?.pointerId === event.pointerId) {
+            releaseMomentum(event);
             singleTouchPanRef.current = null;
             setMovingObject(null);
             return;
         }
 
         if (touchGestureActiveRef.current) {
+            if (event.type !== "pointerup") momentumRef.current?.stop();
             if (pointersRef.current.size >= 2) updateTouchGestureBaseline();
             else {
                 lastTouchDistanceRef.current = null;
                 lastTouchCenterRef.current = null;
             }
-            if (pointersRef.current.size === 0) touchGestureActiveRef.current = false;
+            if (pointersRef.current.size === 0) {
+                touchGestureActiveRef.current = false;
+                // Paired touch moves arrive separately. Compare the completed gesture's
+                // scale rather than mistaking each intermediate distance change for a pinch.
+                const startScale = touchGestureStartScaleRef.current;
+                if (startScale !== null && Math.abs(scaleRef.current / startScale - 1) < 0.000001) {
+                    releaseMomentum(event);
+                } else momentumRef.current?.stop();
+                touchGestureStartScaleRef.current = null;
+            }
             return;
         }
 
@@ -486,8 +558,17 @@ export const useCanvasPointerInput = ({
         setMovingObject(null);
     };
 
+    const handleLostPointerCapture = (event: React.PointerEvent<HTMLCanvasElement>) => {
+        if (middleDragStartRef.current?.pointerId === event.pointerId
+            || singleTouchPanRef.current?.pointerId === event.pointerId
+            || touchGestureActiveRef.current) {
+            handlePointerUp(event);
+        }
+    };
+
     const handleWheel = (event: React.WheelEvent<HTMLCanvasElement>) => {
         event.preventDefault();
+        momentumRef.current?.stop();
         const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
         const previousScale = scaleRef.current;
         const nextScale = Math.min(MAX_CANVAS_SCALE, Math.max(MIN_CANVAS_SCALE, previousScale * factor));
@@ -507,5 +588,5 @@ export const useCanvasPointerInput = ({
         setOffset(nextOffset);
     };
 
-    return { handlePointerDown, handlePointerMove, handlePointerUp, handleWheel, isMiddleDragging };
+    return { handlePointerDown, handlePointerMove, handlePointerUp, handleLostPointerCapture, handleWheel, isMiddleDragging };
 };

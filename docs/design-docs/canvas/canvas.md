@@ -35,6 +35,8 @@ Canvas는 자유 필기, 이미지, 텍스트 박스를 무한 좌표계에서 �
 | `widgets/CanvasWidget/InfiniteCanvas/model/useLassoActions.ts` | 선택 이동, 크기, 색상, 복사, 레이어, 삭제 |
 | `features/canvas/model/canvasClipboard.ts` | SPA 문서 이동 중 유지되는 캔버스 요소 클립보드 |
 | `features/canvas/model/canvasPdfImport.ts` | PDF 페이지를 편집 가능한 이미지 파일로 변환 |
+| `widgets/CanvasWidget/InfiniteCanvas/ui/CanvasPdfReader.tsx` | 현재 기기 전용 PDF 페이지 뷰어와 키보드/터치 격리 |
+| `widgets/CanvasWidget/InfiniteCanvas/model/canvasPanMomentum.ts` | viewport px/ms 기반 유한 시간 감속과 취소 |
 | `shared/lib/librarySorting.ts` | Canvas와 Blog가 공유하는 최근/카테고리 정렬 |
 
 ## 포인터 입력과 렌더링
@@ -154,3 +156,8 @@ node scripts/deploy-cloud.mjs release all
 - `docs/RELIABILITY.md`
 - `docs/DEPLOYMENT.md`
 - `logs/bugs/2026-08-26-canvas-lasso-delete-status.md`
+
+
+## 라이브러리 디자인 갱신 (2026-10-20)
+
+CanvasList는 카드 그리드 대신 폴더 트리와 파일 상세 목록을 사용한다. 사용자 명칭은 캔버스·노트이며 공통 색상·파일 동작·반응형 기준은 [작업 공간 디자인](workspace-explorer-design.md)을 따른다. 기존 API와 저장된 캔버스/폴더를 그대로 사용한다.

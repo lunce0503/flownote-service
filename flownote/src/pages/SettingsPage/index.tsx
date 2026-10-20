@@ -19,37 +19,9 @@ import { useTheme, type ThemeMode } from "@/features/theme";
 import { isInstalledApp } from '@/shared/lib/androidApp';
 import { useAuth } from "@/features/auth";
 import { postFeedback, listMyFeedback, FEEDBACK_CATEGORIES, type FeedbackItem } from "@/entities/feedback";
+import { readPreferences, applyPreferences, defaultPreferences, PREF_STORAGE_KEY, type UserPreferences } from "@/shared/lib/userPreferences";
 
-type FontScale = "normal" | "large";
-type Density = "comfortable" | "compact";
 type Language = "ko" | "en";
-
-type UserPreferences = {
-  fontScale: FontScale;
-  density: Density;
-  reduceMotion: boolean;
-  confirmBeforeDelete: boolean;
-};
-
-const PREF_STORAGE_KEY = "flownote_user_preferences";
-
-const defaultPreferences: UserPreferences = {
-  fontScale: "normal",
-  density: "comfortable",
-  reduceMotion: false,
-  confirmBeforeDelete: true,
-};
-
-const readPreferences = (): UserPreferences => {
-  const stored = window.localStorage.getItem(PREF_STORAGE_KEY);
-  if (!stored) return defaultPreferences;
-
-  try {
-    return { ...defaultPreferences, ...JSON.parse(stored) } as UserPreferences;
-  } catch {
-    return defaultPreferences;
-  }
-};
 
 const OptionButton = ({
   active,
@@ -62,6 +34,7 @@ const OptionButton = ({
 }) => (
   <button
     type="button"
+    aria-pressed={active}
     onClick={onClick}
     className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
       active
@@ -93,6 +66,7 @@ const ToggleRow = ({
     <button
       type="button"
       role="switch"
+      aria-label={title}
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={`flex h-8 w-14 shrink-0 items-center rounded-full p-1 transition-colors ${
@@ -112,6 +86,7 @@ const SettingsPage = () => {
   const [profileError, setProfileError] = useState("");
   const profile = profileDraft ?? { username: user?.username ?? "", email: user?.email ?? "", nickname: user?.nickname ?? "", currentPassword: "" };
   const [preferences, setPreferences] = useState<UserPreferences>(readPreferences);
+  const [preferenceError, setPreferenceError] = useState("");
   const [language, setLanguage] = useState<Language>(() => (
     window.localStorage.getItem("flownote_language") === "en" ? "en" : "ko"
   ));
@@ -125,11 +100,12 @@ const SettingsPage = () => {
   const [myFeedback, setMyFeedback] = useState<FeedbackItem[]>([]);
 
   const updatePreferences = (next: Partial<UserPreferences>) => {
-    setPreferences((prev) => {
-      const merged = { ...prev, ...next };
+    const merged = { ...preferences, ...next };
+    setPreferences(merged);
+    try {
       window.localStorage.setItem(PREF_STORAGE_KEY, JSON.stringify(merged));
-      return merged;
-    });
+      setPreferenceError("");
+    } catch { setPreferenceError("설정을 기기에 저장하지 못했습니다. 현재 화면에만 적용됩니다."); }
   };
 
   const updateLanguage = (nextLanguage: Language) => {
@@ -139,10 +115,16 @@ const SettingsPage = () => {
   };
 
   useEffect(() => {
-    document.documentElement.dataset.fontScale = preferences.fontScale;
-    document.documentElement.dataset.density = preferences.density;
-    document.documentElement.classList.toggle("motion-reduced", preferences.reduceMotion);
+    applyPreferences(preferences);
   }, [preferences]);
+
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (event.key === PREF_STORAGE_KEY || event.key === null) setPreferences(readPreferences());
+    };
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
+  }, []);
 
   // 내가 보낸 피드백 목록을 서버에서 불러온다.
   useEffect(() => {
@@ -178,7 +160,7 @@ const SettingsPage = () => {
 
   return (
     <main className="min-h-[calc(100vh-56px)] bg-stone-950 p-3 text-stone-900 md:p-5">
-      <section className="mx-auto max-w-5xl rounded-2xl border border-stone-200 bg-stone-50 p-4 shadow-xl md:p-6">
+      <section data-testid="settings-panel" className="mx-auto w-full max-w-[1440px] rounded-2xl border border-stone-200 bg-stone-50 p-4 shadow-xl md:p-8">
         <div className="mb-6 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-bold uppercase text-emerald-700">Preferences</p>
@@ -294,16 +276,13 @@ const SettingsPage = () => {
             <section className="space-y-3">
               <ToggleRow
                 title="움직임 줄이기"
-                description="애니메이션과 화면 전환 움직임을 줄여 집중하기 쉽게 합니다."
+                description="애니메이션·화면 전환과 캔버스의 관성 이동을 줄입니다."
                 checked={preferences.reduceMotion}
                 onChange={(checked) => updatePreferences({ reduceMotion: checked })}
               />
-              <ToggleRow
-                title="삭제 전 확인"
-                description="삭제 버튼을 누를 때 한 번 더 확인하도록 설정합니다."
-                checked={preferences.confirmBeforeDelete}
-                onChange={(checked) => updatePreferences({ confirmBeforeDelete: checked })}
-              />
+              <p className="text-sm text-stone-600">보기 설정은 이 기기에 저장되며 다시 열어도 유지됩니다. 초기화는 프로필·노트·플래너에 영향을 주지 않습니다.</p>
+              <button type="button" onClick={() => updatePreferences(defaultPreferences)} className="min-h-11 rounded-lg border border-stone-300 bg-white px-4 text-sm font-bold">보기 설정 초기화</button>
+              {preferenceError && <p role="alert" className="text-sm text-red-700">{preferenceError}</p>}
             </section>
 
             <section className="rounded-2xl border border-stone-200 bg-white p-4">

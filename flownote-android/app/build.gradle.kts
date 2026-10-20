@@ -7,8 +7,8 @@ android {
         applicationId = "com.flownote.mobile"
         minSdk = 29
         targetSdk = 35
-        versionCode = 10000
-        versionName = "1.0.0"
+        versionCode = providers.gradleProperty("testVersionCode").orNull?.toInt() ?: 11000
+        versionName = providers.gradleProperty("testVersionName").orNull ?: "1.1.0"
     }
     signingConfigs {
         create("distribution") {
@@ -28,6 +28,7 @@ android {
             buildConfigField("String", "WEB_URL", "\"https://flownote-react-staging.vercel.app\"")
         }
         release {
+            check(!providers.gradleProperty("testVersionCode").isPresent && !providers.gradleProperty("testVersionName").isPresent || gradle.startParameter.taskNames.none { it.contains("Release", ignoreCase = true) }) { "Test version overrides are staging/debug only" }
             signingConfig = signingConfigs.getByName("distribution")
             buildConfigField("String", "WEB_URL", "\"https://flownote-react.vercel.app\"")
             isMinifyEnabled = false

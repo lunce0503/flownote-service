@@ -31,3 +31,13 @@
 Debug APK는 staging origin 및 별도 패키지 `.staging`을 사용하고 서명 release APK는 production origin을 사용한다. 배포는 `node scripts/deploy-cloud.mjs release web`으로 staging-first를 따른다. 설치 안내는 `/android.html`, APK는 `/downloads/flownote-1.0.0.apk`다.
 
 웹 E2E에는 Android UA의 최초 로그인·세션 유지·전체 기능 메뉴·헤더 제거·휴대폰/태블릿 overflow·캔버스 상세 탐색을 포함한다. Android 빌드/lint/서명 검증과 실제 기기 WebView 실행 검증은 구분하여 기록한다.
+
+## 1.1.0 자동 업데이트
+
+- 시작·재개 시와 실행 중 1시간마다 확인한다. 자동 확인은 최소 15분 간격이며 하단 네이티브 업데이트 표시에서 수동 재시도·변경 내용·최근 이력·설치를 제공한다.
+- release는 production, debug는 staging 고정 HTTPS origin의 `/updates/<channel>/android.json`만 사용한다. 채널별 APK 이름과 패키지(`com.flownote.mobile` / `.staging`)를 분리한다.
+- 앱에 고정한 RSA 공개키로 feed 서명을 검사하고 버전/versionCode·URL·크기·SHA-256을 확인한다. APK 패키지·버전·서명 인증서를 현재 설치와 대조하고 설치 직전 재검증한다. 다른 채널·패키지·서명 및 downgrade는 차단한다.
+- 자동 다운로드는 앱 내부 `files/updates/`에 저장하며 부분 파일은 설치에 노출하지 않는다. 검증된 캐시를 재사용하고 실패 시 부분 파일을 제거해 다음 확인에서 재시도한다. 사용자 자료 폴더·WebView 저장소는 삭제하지 않는다.
+- 사용자가 ‘설치’를 누른 뒤 필요하면 ‘이 출처 허용’을 켜고 Android 설치 확인을 완료한다. `REQUEST_INSTALL_PACKAGES`는 직접 APK 배포용이며 무인 설치를 의미하지 않는다.
+- 비공개 `UpdateProvider`가 검증된 APK 한 파일만 OS 설치기에 read-only content URI로 전달한다. native JS bridge는 추가하지 않는다.
+- 기존 1.0.0은 updater가 없으므로 1.1.0을 한 번 직접 설치한다. 기존 앱을 삭제하면 안 된다.

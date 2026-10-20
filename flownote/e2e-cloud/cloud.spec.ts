@@ -54,8 +54,9 @@ test.afterAll(async ({ request }) => {
 });
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(({ token, user }) => {
-    localStorage.setItem('flownote_auth_token', token);
+  await page.context().addCookies([{ name: '__Host-flownote_session', value: token,
+    url: 'https://flownote-react-staging.vercel.app', secure: true, httpOnly: true, sameSite: 'Strict' }]);
+  await page.addInitScript(({ user }) => {
     localStorage.setItem('flownote_auth_user', JSON.stringify(user));
   }, { token, user });
 });
@@ -174,12 +175,12 @@ test('new canvases appear immediately while the cloud request is pending', async
 
   try {
     await page.goto('/canvas');
-    await expect(page.getByRole('heading', { name: '그림판 관리' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '캔버스', exact: true })).toBeVisible();
     const createResponse = page.waitForResponse(response => (
       response.request().method() === 'POST' && response.url().endsWith('/api/canvas/documents')
     ));
-    await page.getByRole('button', { name: '새 캔버스' }).click();
-    await expect(page.locator('article[data-pending="true"]').first()).toContainText('서버에 만드는 중');
+    await page.getByRole('button', { name: '새 캔버스', exact: true }).click();
+    await expect(page.locator('[role="row"][data-pending="true"]').first()).toContainText('서버에 만드는 중');
     const response = await createResponse;
     createdCanvasId = ((await response.json()) as { id: string }).id;
     await expect(page).toHaveURL(new RegExp(`/canvas/${createdCanvasId}$`));
@@ -246,7 +247,7 @@ test('copied elements can be pasted after moving to another canvas', async ({ pa
 
     await page.getByTestId('canvas-library-button').filter({ visible: true }).click();
     await expect(page).toHaveURL(/\/canvas$/);
-    await page.getByTestId('canvas-recent-section').getByRole('button', { name: targetTitle }).click();
+    await page.getByTestId('canvas-recent-section').getByRole('button', { name: targetTitle, exact: true }).click();
     await expect(page.getByTestId('canvas-input-surface')).toHaveAttribute('data-ready', 'true');
     await page.getByRole('button', { name: '올가미', exact: true }).filter({ visible: true }).click();
     await page.getByTitle('복사한 선택 영역 붙여넣기').click();
@@ -313,6 +314,9 @@ test('pencil-only one-finger pan locks to the initial axis', async ({ page }) =>
   await expect(surface).toHaveAttribute('data-ready', 'true');
   const bounds = await surface.boundingBox();
   expect(bounds).not.toBeNull();
+  // Settle the requested inertia deterministically between the two axis gestures.
+  // Both movement and orthogonal-axis invariants remain asserted below.
+  await page.clock.install();
 
   const viewport = page.getByTestId('canvas-viewport-status');
   const readCenter = async () => {
@@ -328,17 +332,23 @@ test('pencil-only one-finger pan locks to the initial axis', async ({ page }) =>
   const initial = await readCenter();
 
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...start, id: 1 }] });
+  await page.clock.runFor(20);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: start.x + 80, y: start.y + 20, id: 1 }] });
+  await page.clock.runFor(20);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: start.x + 120, y: start.y + 100, id: 1 }] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await page.clock.runFor(400);
   await expect.poll(async () => (await readCenter()).x).not.toBe(initial.x);
   const afterHorizontal = await readCenter();
   expect(afterHorizontal.y).toBe(initial.y);
 
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...start, id: 2 }] });
+  await page.clock.runFor(20);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: start.x + 20, y: start.y + 80, id: 2 }] });
+  await page.clock.runFor(20);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: start.x + 100, y: start.y + 120, id: 2 }] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await page.clock.runFor(400);
   await expect.poll(async () => (await readCenter()).y).not.toBe(afterHorizontal.y);
   const afterVertical = await readCenter();
   expect(afterVertical.x).toBe(afterHorizontal.x);

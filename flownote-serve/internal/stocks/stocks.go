@@ -450,15 +450,15 @@ func syntheticQuote(h Holding, tick int64) map[string]json.RawMessage {
 		return b
 	}
 	return map[string]json.RawMessage{
-		"symbol":        str(h.Symbol),
-		"asset_name":    str(h.AssetName),
-		"market":        str(h.Market),
-		"price":         round2(price),
+		"symbol":         str(h.Symbol),
+		"asset_name":     str(h.AssetName),
+		"market":         str(h.Market),
+		"price":          round2(price),
 		"previous_close": round2(previousClose),
-		"change":        round2(change),
-		"change_rate":   round2(changeRate),
-		"volume":        json.RawMessage(strconv.FormatInt(volume, 10)),
-		"timestamp":     str(time.Now().UTC().Format(time.RFC3339)),
+		"change":         round2(change),
+		"change_rate":    round2(changeRate),
+		"volume":         json.RawMessage(strconv.FormatInt(volume, 10)),
+		"timestamp":      str(time.Now().UTC().Format(time.RFC3339)),
 	}
 }
 
@@ -563,7 +563,11 @@ func (h *Handler) updateCash(w http.ResponseWriter, r *http.Request) {
 
 // stream은 5초 간격 SSE로 시세를 내보낸다(Spring SseEmitter와 동일한 event: quotes).
 func (h *Handler) stream(w http.ResponseWriter, r *http.Request) {
-	userID, err := h.auth.RequireUser(r.Context(), "Bearer "+r.URL.Query().Get("token"))
+	authorization := r.Header.Get("Authorization")
+	if authorization == "" {
+		authorization = "Bearer " + r.URL.Query().Get("token")
+	}
+	userID, err := h.auth.RequireUser(r.Context(), authorization)
 	if err != nil {
 		httpjson.WriteError(w, err)
 		return

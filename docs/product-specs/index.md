@@ -4,18 +4,21 @@
 
 ## 기존 사양
 
+- [노트 Markdown 작업 공간](blog-markdown-workspace.md): Markdown 편집·폴더 탐색·빠른 목록 로딩. 캔버스와 공통 색상 및 명칭 기준을 적용한다.
+
 - [Windows 설치 앱](windows-app.md): 웹 기능 공유, 아이보리·검정 앱 UI, Windows 설치형/portable 배포와 실행 검증.
 
 - [Android 설치 앱](android-app.md): 웹 전체 기능 공유, 아이보리·검정 앱 UI, 헤더 제거, APK 설치·배포.
 
 - `mobile-was-architecture.md`: Expo 네이티브 앱과 Railway 웹 테스트 클라이언트의 gateway 통신, 캔버스 저장, 실행 방식.
 - `expo-go-railway-access.md`: Railway production Metro를 통한 Expo Go 접속, iPhone·iPad·Android 사용 절차와 장애 대응.
-- `web-workspace-ux.md`: 웹 홈·인증·Blog·Canvas의 상태 처리, 모바일 도구 배치, 키보드 접근성.
+- `web-workspace-ux.md`: 웹 홈·인증·노트·캔버스의 상태 처리, 모바일 도구 배치, 키보드 접근성.
 - `weekly-schedule-period-list.md`: 주간 일정 생성 시 여러 요일·시간 구간을 기간 리스트로 저장하는 흐름.
 - `planner-daily-timetable.md`: 오늘 시간표의 24시간·5분 격자, 레거시 데이터 변환, 칠하기 되돌리기 동작.
 - [캔버스 저장과 동기화 복구](canvas-save-recovery.md): 대용량 저장, 자동 재시도 중단, 로컬 초안 보존 및 기기 간 변경 알림.
 - [사용자 피드백 자동 분류와 알림](user-feedback-automation.md): 신규 피드백 polling, 개인정보 경계, 읽기 전용 검토와 조건부 이메일 알림.
-- [캔버스 플래너 제안](canvas-planner-suggestions.md): 캔버스 텍스트에서 작업·일정 후보를 만들고 확인 후 플래너에 추가하는 흐름.
+- [캔버스 플래너 제안](canvas-planner-suggestions.md): 캔버스 이름 우선·텍스트의 날짜/시간으로 작업·일정 후보를 만들고 확인 후 시간표에 추가하는 흐름.
+- [캔버스 PDF 책 읽기](canvas-pdf-reader.md): 기기 전용 PDF 페이지 이동과 캔버스 동시 필기, 반응형 분할과 키보드/터치 격리.
 
 ## 계획 중인 사양
 

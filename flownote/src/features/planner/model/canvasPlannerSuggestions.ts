@@ -19,10 +19,11 @@ const minutesOf = (value: string) => {
 };
 
 // Local text heuristics: no canvas content is sent to an AI or third-party service.
-export const suggestCanvasPlans = (boxes: { id: string; text: string; status?: string }[], today = new Date()): CanvasPlanSuggestion[] => {
+export const suggestCanvasPlans = (boxes: { id: string; text: string; status?: string }[], today = new Date(), canvasTitle = ""): CanvasPlanSuggestion[] => {
   const result: CanvasPlanSuggestion[] = [];
   const seen = new Set<string>();
-  for (const box of boxes) {
+  const sources = canvasTitle.trim() ? [{ id: "canvas-title", text: canvasTitle }, ...boxes] : boxes;
+  for (const box of sources) {
     if (box.status === "deleted") continue;
     for (const [index, raw] of box.text.slice(0, 20000).split(/\r?\n/).entries()) {
       if (/^\s*[-*]?\s*\[[xX]\]/.test(raw)) continue;

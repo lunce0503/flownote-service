@@ -58,7 +58,7 @@ export type Capability = {
   routes: CapabilityRoute[];
 };
 
-// 주력 제품(Canvas + 게시글)과 확장 역량, 시스템 라우트를 하나의 매니페스트로 관리한다.
+// 주력 제품(Canvas + 노트)과 확장 역량, 시스템 라우트를 하나의 매니페스트로 관리한다.
 // 새 역량 추가 = 이 배열에 항목 하나를 더하는 것. 분리 = enabled를 false로.
 export const capabilityManifest: Capability[] = [
   {
@@ -70,7 +70,7 @@ export const capabilityManifest: Capability[] = [
   },
   {
     id: 'blog',
-    label: '게시글',
+    label: '노트',
     nav: true,
     enabled: true,
     routes: [
@@ -85,11 +85,11 @@ export const capabilityManifest: Capability[] = [
   },
   {
     id: 'canvas',
-    label: '그림판',
+    label: '캔버스',
     nav: true,
     enabled: true,
     protected: true,
-    // /canvas = 그림판 목록, /canvas/:canvasId = 해당 캔버스 편집기(멀티 캔버스 URL 구분).
+    // /canvas = 캔버스 목록, /canvas/:canvasId = 해당 캔버스 편집기(멀티 캔버스 URL 구분).
     routes: [
       { path: '/canvas', element: routes.canvasList },
       { path: '/canvas/:canvasId', element: routes.canvas },

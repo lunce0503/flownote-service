@@ -132,5 +132,5 @@ export const updateStockCashBalance = (input: { amount: number; currency: string
 export const createStockStream = () => {
   const token = getAuthToken();
   if (!token) return null;
-  return new EventSource(`${API_CORE_BASE_URL}/api/stocks/stream?token=${encodeURIComponent(token)}`);
+  return new EventSource(`${API_CORE_BASE_URL}/api/stocks/stream`);
 };

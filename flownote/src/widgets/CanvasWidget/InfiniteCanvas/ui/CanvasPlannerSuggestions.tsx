@@ -7,8 +7,8 @@ import { getDiary, putDiary } from "@/entities/diary";
 import { postTaskData, type TaskProps } from "@/entities/task";
 import { suggestCanvasPlans, addSuggestedSchedule, type CanvasPlanSuggestion } from "@/features/planner";
 
-export const CanvasPlannerSuggestions = ({ textBoxes, onClose }: { textBoxes: TextBoxElement[]; onClose: () => void }) => {
-  const [items, setItems] = useState(() => suggestCanvasPlans(textBoxes));
+export const CanvasPlannerSuggestions = ({ canvasTitle, textBoxes, onClose }: { canvasTitle: string; textBoxes: TextBoxElement[]; onClose: () => void }) => {
+  const [items, setItems] = useState(() => suggestCanvasPlans(textBoxes, new Date(), canvasTitle));
   const [added, setAdded] = useState<string[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -43,7 +43,7 @@ export const CanvasPlannerSuggestions = ({ textBoxes, onClose }: { textBoxes: Te
         <h2 className="font-bold">캔버스에서 플래너 제안</h2>
         <button type="button" onClick={onClose} disabled={Boolean(saving)} aria-label="플래너 제안 닫기" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-stone-100"><X size={18} /></button>
       </div>
-      <p className="mb-3 text-xs text-stone-600">텍스트 박스에서 날짜·시간을 찾아 제안합니다. 내용을 확인하고 추가하세요. 손글씨·이미지는 인식하지 않습니다.</p>
+      <p className="mb-3 text-xs text-stone-600">캔버스 이름을 먼저 제안하고 텍스트 박스의 날짜·시간을 반영합니다. 시간을 적은 일정은 추가할 때 시간표에 자동 기입됩니다. 확인 후 추가하세요. 손글씨·이미지는 인식하지 않습니다.</p>
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain">
         {items.length === 0 && <p className="rounded-lg bg-stone-50 p-3 text-sm">제안할 텍스트가 없습니다. 캔버스에 텍스트로 할 일이나 “내일 14:00~15:00 회의”를 작성해주세요.</p>}
         {items.map((item) => {

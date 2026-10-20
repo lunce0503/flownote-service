@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/flownote/flownote-canvas/internal/auth"
@@ -29,6 +30,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	p := func(fn http.HandlerFunc) http.Handler { return h.auth.Middleware(fn) }
 
 	mux.Handle("GET /api/notes", p(h.list))
+	mux.Handle("GET /api/notes/{noteId}", p(h.get))
 	mux.Handle("POST /api/notes", p(h.upsert))
 	mux.Handle("PATCH /api/notes/{noteId}", p(h.updateTitle))
 	mux.Handle("DELETE /api/notes/{noteId}", p(h.deleteNote))
@@ -66,6 +68,24 @@ func decodeJSON(r *http.Request, target any) error {
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
+	if view := r.URL.Query().Get("view"); view != "" {
+		if view != "summary" {
+			httpjson.WriteError(w, httpjson.Errorf(400, "지원하지 않는 notes view입니다."))
+			return
+		}
+		limit := 50
+		if raw := r.URL.Query().Get("limit"); raw != "" {
+			parsed, err := strconv.Atoi(raw)
+			if err != nil {
+				httpjson.WriteError(w, httpjson.Errorf(400, "limit 형식이 올바르지 않습니다."))
+				return
+			}
+			limit = parsed
+		}
+		page, err := h.repo.ListSummary(r.Context(), auth.UserID(r.Context()), limit, r.URL.Query().Get("cursor"))
+		respond(w, page, err)
+		return
+	}
 	resp, err := h.repo.List(r.Context(), auth.UserID(r.Context()))
 	respond(w, resp, err)
 }
@@ -80,6 +100,10 @@ func (h *Handler) upsert(w http.ResponseWriter, r *http.Request) {
 		strings.TrimSpace(req.Title) == "" || len(req.Content) == 0 ||
 		req.Revision <= 0 || strings.TrimSpace(req.ClientID) == "" {
 		httpjson.WriteError(w, httpjson.Errorf(http.StatusBadRequest, "노트 요청 값이 올바르지 않습니다."))
+		return
+	}
+	if _, err := contentFormat(req.Content); err != nil {
+		httpjson.WriteError(w, err)
 		return
 	}
 	resp, err := h.repo.Upsert(r.Context(), auth.UserID(r.Context()), req)
@@ -247,4 +271,14 @@ func isUUID(s string) bool {
 		}
 	}
 	return true
+}
+
+func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("noteId")
+	if !isUUID(id) {
+		httpjson.WriteError(w, httpjson.Errorf(400, "노트 ID 형식이 올바르지 않습니다."))
+		return
+	}
+	note, err := h.repo.Get(r.Context(), auth.UserID(r.Context()), id)
+	respond(w, note, err)
 }

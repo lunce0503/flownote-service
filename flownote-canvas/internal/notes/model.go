@@ -53,3 +53,22 @@ type FolderResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+// Summary has no body field; absence cannot be mistaken for an empty note.
+type NoteSummary struct {
+	ID        string    `json:"id"`
+	Title     string    `json:"title"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Revision  int64     `json:"revision"`
+}
+type NoteSummaryPage struct {
+	Notes      []NoteSummary `json:"notes"`
+	NextCursor string        `json:"next_cursor,omitempty"`
+}
+type MarkdownContent struct {
+	Format         string          `json:"format"`
+	Version        int             `json:"version"`
+	Markdown       string          `json:"markdown"`
+	LegacyOriginal json.RawMessage `json:"legacy_original,omitempty"`
+}

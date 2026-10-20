@@ -1,0 +1,13 @@
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { createPublicKey } from 'node:crypto';
+import assert from 'node:assert/strict';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+const root = new URL('../', import.meta.url).pathname;
+const androidKey = readFileSync(path.join(root, 'flownote-android/app/src/main/java/com/flownote/mobile/AppUpdater.java'), 'utf8').match(/String KEY = "([^"]+)"/)[1];
+assert.equal(createPublicKey(readFileSync(path.join(root, 'flownote-desktop/update-public.pem'))).export({ type: 'spki', format: 'der' }).toString('base64'), androidKey, 'Android and Windows must pin the same feed signing key');
+execFileSync('node', ['--test', 'flownote-desktop/test/updater.test.cjs'], { cwd: root, stdio: 'inherit' });
+const output = mkdtempSync(path.join(tmpdir(), 'flownote-update-jvm-'));
+execFileSync('javac', ['-d', output, 'flownote-android/app/src/main/java/com/flownote/mobile/UpdatePolicy.java', 'flownote-android/app/src/test/java/com/flownote/mobile/UpdatePolicyTest.java'], { cwd: root, stdio: 'inherit' });
+execFileSync('java', ['-cp', output, 'com.flownote.mobile.UpdatePolicyTest'], { stdio: 'inherit' });

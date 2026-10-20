@@ -21,6 +21,11 @@ const SignUpWidget= () => {
         e.preventDefault();
         setErrorMessage("");
 
+        if (Array.from(userdata.password).length < 15 || new TextEncoder().encode(userdata.password).length > 72) {
+            setErrorMessage("비밀번호는 15자 이상, UTF-8 72바이트 이하로 입력해주세요.");
+            return;
+        }
+
         if (userdata.password !== confirmPassword) {
             setErrorMessage("비밀번호가 일치하지 않습니다. 다시 확인해주세요.");
             return;
@@ -121,6 +126,8 @@ const SignUpWidget= () => {
                                 <input
                                     id="signup-password"
                                     type="password"
+                                    minLength={15}
+                                    autoComplete="new-password"
                                     placeholder="••••••••"
                                     className="w-full pl-10 pr-4 py-3 bg-white text-black border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all"
                                     value={userdata.password}
@@ -130,6 +137,7 @@ const SignUpWidget= () => {
                             </div>
                         </div>
 
+                        <p className="text-xs text-stone-600">비밀번호: 15자 이상, UTF-8 72바이트 이하</p>
                         <div className="space-y-1">
                             <label className="text-sm font-medium text-stone-700 ml-1" htmlFor="signup-confirm-password">
                                 비밀번호 확인

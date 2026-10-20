@@ -39,6 +39,7 @@ import { useCanvasPointerInput } from "../model/useCanvasPointerInput";
 import { useLassoActions } from "../model/useLassoActions";
 import { Toolbar } from "./Toolbar";
 import { CanvasPlannerSuggestions } from "./CanvasPlannerSuggestions";
+import { CanvasPdfReader } from "./CanvasPdfReader";
 import "../index.css";
 
 const isEditableKeyboardTarget = (target: EventTarget | null) => {
@@ -77,6 +78,28 @@ const Canvas = () => {
     const canvasViewportRef = useRef<HTMLDivElement | null>(null);
     const konvaRendererRef = useRef<HTMLDivElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    useEffect(() => {
+        const root = canvasRootRef.current;
+        if (!root) return;
+        const resize = () => {
+            // Use the actual header edge, including its border and large-font mode.
+            const bottom = window.visualViewport ? window.visualViewport.offsetTop + window.visualViewport.height : window.innerHeight;
+            root.style.height = `${Math.max(1, Math.floor(bottom - root.getBoundingClientRect().top))}px`;
+        };
+        resize();
+        const observer = new ResizeObserver(resize);
+        const header = document.querySelector("header");
+        if (header) observer.observe(header);
+        window.addEventListener("resize", resize);
+        document.addEventListener("fullscreenchange", resize);
+        window.visualViewport?.addEventListener("resize", resize);
+        return () => {
+            observer.disconnect();
+            window.removeEventListener("resize", resize);
+            document.removeEventListener("fullscreenchange", resize);
+            window.visualViewport?.removeEventListener("resize", resize);
+        };
+    }, []);
     const [viewport, setViewport] = useState(() => ({
         width: window.innerWidth,
         height: Math.max(window.innerHeight - 56, 320),
@@ -160,6 +183,7 @@ const Canvas = () => {
     const skipTextBlurCommitRef = useRef(false);
     const [isCanvasSettingsVisible, setIsCanvasSettingsVisible] = useState(false);
     const [isPlannerSuggestionsVisible, setIsPlannerSuggestionsVisible] = useState(false);
+    const [isPdfReaderVisible, setIsPdfReaderVisible] = useState(false);
     const [assetImportState, setAssetImportState] = useState<AssetImportState>({
         status: "idle",
         message: "이미지 또는 PDF 추가",
@@ -301,7 +325,7 @@ const Canvas = () => {
             const rect = element.getBoundingClientRect();
             setViewport({
                 width: Math.max(Math.round(rect.width), 1),
-                height: Math.max(Math.round(rect.height), 320),
+                height: Math.max(Math.floor(rect.height), 1),
             });
         };
 
@@ -342,7 +366,7 @@ const Canvas = () => {
     const selectedCanvasTitle = useMemo(() => (
         getCanvasTitle(canvasDocuments, selectedCanvasId)
     ), [canvasDocuments, selectedCanvasId]);
-    useDocumentTitle("그림판", selectedCanvasTitle || selectedCanvasId || "캔버스");
+    useDocumentTitle("캔버스", selectedCanvasTitle || selectedCanvasId || "캔버스");
 
     const handleRenameCanvas = useCallback(async (title: string) => {
         if (!selectedCanvasId) throw new Error("선택된 캔버스가 없습니다.");
@@ -527,9 +551,11 @@ const Canvas = () => {
         handlePointerDown,
         handlePointerMove,
         handlePointerUp,
+        handleLostPointerCapture,
         handleWheel,
         isMiddleDragging,
     } = useCanvasPointerInput({
+        canvasId: selectedCanvasId,
         tool,
         pencilOnlyMode,
         penColor,
@@ -629,11 +655,12 @@ const Canvas = () => {
     return (
         <div
             ref={canvasRootRef}
-            className="canvas-touch-root flex h-[calc(100vh-56px)] w-full flex-col overflow-hidden bg-stone-50 text-stone-900"
+            className="canvas-touch-root flex w-full flex-col overflow-hidden bg-stone-50 text-stone-900"
             onContextMenu={handleContextMenu}
-            style={{ userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
+            style={{ userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: isPdfReaderVisible ? "auto" : "none" }}
         >
-            <div ref={canvasViewportRef} className="relative min-h-0 flex-1 overflow-hidden">
+            <div className="canvas-reading-layout flex min-h-0 flex-1 flex-col lg:flex-row">
+            <div ref={canvasViewportRef} className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
                 {/* 툴바는 폴더 패널과 같이 캔버스 위에 떠 있는 오버레이다(문서 흐름에서 제외 → 캔버스 전체 높이 사용). */}
                 <Toolbar
                     canvasTitle={selectedCanvasTitle}
@@ -667,10 +694,11 @@ const Canvas = () => {
                     isCanvasSettingsVisible={isCanvasSettingsVisible}
                     onToggleCanvasSettingsVisible={() => setIsCanvasSettingsVisible((current) => !current)}
                     onOpenPlannerSuggestions={() => { setIsCanvasSettingsVisible(false); setIsPlannerSuggestionsVisible(true); }}
+                    onOpenPdfReader={() => { setIsCanvasSettingsVisible(false); setIsPlannerSuggestionsVisible(false); setIsPdfReaderVisible(true); }}
                     zoomPercent={Math.round(scale * 100)}
                     viewportCenter={viewportCenter}
                 />
-                {isPlannerSuggestionsVisible && <CanvasPlannerSuggestions key={selectedCanvasId} textBoxes={textBoxes} onClose={() => setIsPlannerSuggestionsVisible(false)} />}
+                {isPlannerSuggestionsVisible && <CanvasPlannerSuggestions key={selectedCanvasId} canvasTitle={selectedCanvasTitle} textBoxes={textBoxes} onClose={() => setIsPlannerSuggestionsVisible(false)} />}
                 {assetImportState.status !== "idle" && (
                     <div
                         data-canvas-touch-allow="true"
@@ -692,7 +720,7 @@ const Canvas = () => {
                         <div className="mb-3 flex items-center justify-between">
                             <div>
                                 <p className="text-[11px] font-bold uppercase text-amber-700">Canvas Settings</p>
-                                <h2 className="text-base font-black">그림판 설정</h2>
+                                <h2 className="text-base font-black">캔버스 설정</h2>
                             </div>
                             <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => setIsCanvasSettingsVisible(false)} title="설정 닫기">
                                 <X size={16} />
@@ -758,7 +786,7 @@ const Canvas = () => {
                     className="relative z-20 block"
                     style={{
                         backgroundColor: "transparent",
-                        border: "1px solid #292524",
+                        boxShadow: "inset 0 0 0 1px #292524",
                         touchAction: "none",
                         userSelect: "none",
                         WebkitUserSelect: "none",
@@ -772,6 +800,7 @@ const Canvas = () => {
                     onPointerMove={handlePointerMove}
                     onPointerUp={handlePointerUp}
                     onPointerCancel={handlePointerUp}
+                    onLostPointerCapture={handleLostPointerCapture}
                     onPointerLeave={handlePointerUp}
                     onContextMenu={handleContextMenu}
                 />
@@ -824,6 +853,12 @@ const Canvas = () => {
                         }}
                     />
                 )}
+            </div>
+            {isPdfReaderVisible && <CanvasPdfReader key={selectedCanvasId} onClose={() => {
+                setIsPdfReaderVisible(false);
+                const buttons = canvasRootRef.current?.querySelectorAll<HTMLButtonElement>('button[aria-label="PDF 책 읽기"], button[aria-label="파일 동작"]');
+                Array.from(buttons ?? []).find((button) => button.getClientRects().length > 0)?.focus();
+            }} />}
             </div>
         </div>
     );

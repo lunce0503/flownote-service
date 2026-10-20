@@ -105,9 +105,11 @@ export const getCanvasSocket = (socketUrl: string) => {
   if (!canvasSocket || canvasSocketUrl !== socketUrl) {
     canvasSocket?.disconnect();
     canvasSocketUrl = socketUrl;
-    canvasSocket = io(socketUrl, {
-      path: "/socket.io",
-      transports: ["websocket", "polling"],
+    canvasSocket = io(new URL(socketUrl).origin, {
+      path: "/web-api/socket.io",
+      addTrailingSlash: false,
+      transports: ["polling"],
+      extraHeaders: authHeaders(),
       withCredentials: true,
       autoConnect: true,
     });

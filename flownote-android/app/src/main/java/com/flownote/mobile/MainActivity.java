@@ -46,6 +46,7 @@ public final class MainActivity extends Activity {
     private byte[] pendingDownload;
     private View fullscreenView;
     private WebChromeClient.CustomViewCallback fullscreenCallback;
+    private AppUpdater updater;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override public void onCreate(Bundle state) {
@@ -62,6 +63,11 @@ public final class MainActivity extends Activity {
             return insets;
         });
         setContentView(root);
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        FrameLayout webContainer = new FrameLayout(this);
+        content.addView(webContainer, new LinearLayout.LayoutParams(-1, 0, 1));
+        root.addView(content, new FrameLayout.LayoutParams(-1, -1));
         web = new WebView(this);
         web.setBackgroundColor(IVORY);
         web.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_YES);
@@ -72,14 +78,14 @@ public final class MainActivity extends Activity {
         settings.setAllowContentAccess(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setMediaPlaybackRequiresUserGesture(true);
-        settings.setUserAgentString(settings.getUserAgentString() + " FlownoteAndroid/1.0.0");
+        settings.setUserAgentString(settings.getUserAgentString() + " FlownoteAndroid/" + BuildConfig.VERSION_NAME);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, false);
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
-        root.addView(web, new FrameLayout.LayoutParams(-1, -1));
+        webContainer.addView(web, new FrameLayout.LayoutParams(-1, -1));
         progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.rgb(23, 23, 20)));
-        root.addView(progress, new FrameLayout.LayoutParams(-1, dp(3)));
+        webContainer.addView(progress, new FrameLayout.LayoutParams(-1, dp(3)));
         errorPanel = new LinearLayout(this);
         errorPanel.setOrientation(LinearLayout.VERTICAL);
         errorPanel.setGravity(android.view.Gravity.CENTER);
@@ -95,8 +101,9 @@ public final class MainActivity extends Activity {
         retry.setText("다시 시도");
         retry.setOnClickListener(view -> { errorPanel.setVisibility(View.GONE); web.reload(); });
         errorPanel.addView(retry);
-        root.addView(errorPanel, new FrameLayout.LayoutParams(-1, -1));
+        webContainer.addView(errorPanel, new FrameLayout.LayoutParams(-1, -1));
         errorPanel.setVisibility(View.GONE);
+        updater = new AppUpdater(this, content);
 
         web.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -281,8 +288,9 @@ public final class MainActivity extends Activity {
     @Override public void onBackPressed() { goBack(); }
     @Override protected void onSaveInstanceState(Bundle state) { web.saveState(state); super.onSaveInstanceState(state); }
     @Override protected void onPause() { CookieManager.getInstance().flush(); web.onPause(); super.onPause(); }
-    @Override protected void onResume() { super.onResume(); if (web != null) web.onResume(); }
+    @Override protected void onResume() { super.onResume(); if (web != null) web.onResume(); if (updater != null) updater.resume(); }
     @Override protected void onDestroy() {
+        if (updater != null) updater.close();
         if (fileCallback != null) fileCallback.onReceiveValue(null);
         pendingDownload = null;
         ((ViewGroup) web.getParent()).removeView(web);

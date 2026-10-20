@@ -10,7 +10,7 @@ type Props = {
   onChange: (blocks: DiaryJournalBlock[]) => void;
 };
 
-// 게시글(노트)에서 쓰는 BlockNote 에디터를 그대로 재사용한다.
+// 노트(노트)에서 쓰는 BlockNote 에디터를 그대로 재사용한다.
 // 부모가 날짜를 key로 remount 하므로 initialContent는 마운트 시 한 번만 반영하면 된다.
 const PlannerJournal = ({ initialContent, onChange }: Props) => {
   const editor = useCreateBlockNote({

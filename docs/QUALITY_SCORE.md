@@ -42,7 +42,7 @@
 - `docs/generated/db-schema.md`는 수동 작성 문서이므로 새 마이그레이션 이후 드리프트가 생길 수 있다.
 - 여러 서비스가 같은 PostgreSQL을 공유하므로 마이그레이션 변경은 Spring Flyway, Go 소비자, 웹·모바일 호출부를 함께 확인해야 한다.
 - 캔버스 실시간과 노트 저장이 `flownote-API` 단일 이벤트 루프를 공유한다. 새 async 핸들러에서 동기 I/O를 직접 호출하지 말고 `asyncio.to_thread`(또는 `forward_request_async`)로 감싼다.
-- 노트 목록 API가 본문까지 반환해 N+1 R2 읽기를 유발한다(진단 4번, 다음 스프린트 대상). 메타 전용 목록 + 단건 조회 분리 전까지 목록 규모 증가에 주의한다.
+- 노트 조회 개선(2026-10-19): 웹 Blog는 summary(본문 storage 읽기 0회) → 소유한 detail(대상 1회)로 분리했다. 기본 전체 목록의 N+1은 구 소비자 호환을 위해 유지한다. Go 전체 테스트와 staging E2E47개 통과 후 운영 배포 완료. 동일 데이터의 warm API 중앙값은 full594ms→summary180ms(Canvas182ms)였다. [실행 계획](exec-plan/completed/2026-10-19-blog-markdown-workspace.md)을 따른다.
 
 ## 검토 주기
 

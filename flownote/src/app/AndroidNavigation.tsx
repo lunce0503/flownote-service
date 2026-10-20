@@ -79,7 +79,9 @@ export default function AndroidNavigation() {
             </Link> : null;
           })}
         </div>
-        <button type="button" className="android-logout" onClick={() => { setMenuOpen(false); logout(); }}>로그아웃</button>
+        <button type="button" className="android-logout" onClick={() => {
+          void logout().then(() => setMenuOpen(false)).catch(() => window.alert("로그아웃하지 못했습니다. 다시 시도해주세요."));
+        }}>로그아웃</button>
       </section>
     </div>}
   </>;

@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.flownote.user.UserDtos.LoginRequest;
@@ -21,12 +22,21 @@ import com.flownote.user.UserDtos.UpdateProfileRequest;
 public class UserService {
     private final JdbcTemplate jdbcTemplate;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final LoginThrottle loginThrottle;
+    private final String dummyHash = passwordEncoder.encode(UUID.randomUUID().toString());
 
     public UserService(JdbcTemplate jdbcTemplate) {
+        this(jdbcTemplate, null);
+    }
+
+    @Autowired
+    public UserService(JdbcTemplate jdbcTemplate, LoginThrottle loginThrottle) {
         this.jdbcTemplate = jdbcTemplate;
+        this.loginThrottle = loginThrottle;
     }
 
     public UserResponse register(RegisterRequest request) {
+        PasswordPolicy.validate(request.password());
         UUID id = UUID.randomUUID();
         String passwordHash = passwordEncoder.encode(request.password());
         return jdbcTemplate.queryForObject("""
@@ -47,7 +57,8 @@ public class UserService {
                 request.nickname());
     }
 
-    public LoginResponse login(LoginRequest request) {
+    public LoginResponse login(LoginRequest request, String remoteAddress) {
+        if (loginThrottle != null) loginThrottle.check(request.email(), remoteAddress);
         UserWithPassword user = jdbcTemplate.query("""
                 SELECT id, username, email, nickname, password_hash, role
                 FROM users
@@ -64,9 +75,12 @@ public class UserService {
                 request.email())
                 .stream()
                 .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."));
+                .orElse(null);
 
-        if (!passwordEncoder.matches(request.password(), user.passwordHash())) {
+        String hash = user == null || user.passwordHash() == null || user.passwordHash().isBlank() ? dummyHash : user.passwordHash();
+        boolean matches = request.password().getBytes(java.nio.charset.StandardCharsets.UTF_8).length <= 72
+                && passwordEncoder.matches(request.password(), hash);
+        if (user == null || !matches) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다.");
         }
 

@@ -9,6 +9,7 @@ const API_AI_BASE_URL = resolveBrowserReachableUrl(import.meta.env.VITE_AI_BASE_
 const API_SYNC_BASE_URL = resolveBrowserReachableUrl(import.meta.env.VITE_CANVAS_SOCKET_URL) ?? API_BASE_URL;
 const AUTH_TOKEN_KEY = "flownote_auth_token";
 const AUTH_USER_KEY = "flownote_auth_user";
+axios.defaults.headers.common["X-Flownote-Web"] = "1";
 
 type AuthUser = {
   id: string;
@@ -22,10 +23,15 @@ const DEFAULT_HEADERS = {
   "Content-Type": "application/json",
 };
 
-const getAuthToken = () => localStorage.getItem(AUTH_TOKEN_KEY);
+// Browser state is not a credential. The server session lives in an HttpOnly cookie.
+const getAuthToken = () => {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  const user = getAuthUser();
+  return user ? `web:${user.id}` : null;
+};
 
-const setAuthToken = (token: string) => {
-  localStorage.setItem(AUTH_TOKEN_KEY, token);
+const setAuthToken = () => {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
 };
 
 const getAuthUser = (): AuthUser | null => {
@@ -56,8 +62,7 @@ const clearAuth = () => {
 const isAuthenticated = () => Boolean(getAuthToken() && getAuthUser());
 
 const authHeaders = (): Record<string, string> => {
-  const token = getAuthToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return { "X-Flownote-Web": "1" };
 };
 
 export {

@@ -332,7 +332,7 @@ const BlogList = () => {
       <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-bold uppercase text-amber-700">Knowledge Stream</p>
-          <h1 className="text-2xl font-black text-stone-950 md:text-3xl">게시글 관리</h1>
+          <h1 className="text-2xl font-black text-stone-950 md:text-3xl">노트 관리</h1>
           <p className="text-sm text-stone-500">폴더, 최근 노트, 드로잉 필기를 한 화면에서 정리합니다.</p>
         </div>
       </div>

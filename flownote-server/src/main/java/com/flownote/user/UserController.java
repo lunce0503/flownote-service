@@ -11,6 +11,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 import com.flownote.auth.AuthService;
 import com.flownote.user.UserDtos.LoginRequest;
@@ -37,8 +40,20 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public LoginResponse login(@Validated @RequestBody LoginRequest request) {
-        return userService.login(request);
+    public LoginResponse login(@Validated @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        return userService.login(request, httpRequest.getRemoteAddr());
+    }
+
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(@RequestHeader(value = "Authorization", required = false) String authorization) {
+        authService.logout(authorization);
+    }
+
+    @PostMapping("/logout-all")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logoutAll(@RequestHeader(value = "Authorization", required = false) String authorization) {
+        authService.logoutAll(authorization);
     }
 
     @GetMapping("/search")

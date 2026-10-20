@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, Folder, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Clock3, Ellipsis, Files, Folder, FolderPlus, Loader2, PanelLeft, PanelsTopLeft, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
 import {
     addCanvasToFolder, createCanvasDocument, createCanvasFolder, deleteCanvasDocument,
     deleteCanvasFolder, getCanvasDocuments, getCanvasFolders, removeCanvasFromFolder,
@@ -13,6 +13,9 @@ import {
 import { getRecentLibraryItems, sortLibraryCategoryEntries, sortLibraryItemsByRecent } from "@/shared/lib/librarySorting";
 import { useLocalStorageStringSet } from "@/shared/lib/useLocalStorageStringSet";
 import { subscribeSyncEvents } from "@/shared/lib/sync";
+
+import '@/shared/styles/workspace.css';
+import './canvas-library.css';
 
 type FolderForm = { category: string; name: string };
 const EMPTY_FOLDER_FORM: FolderForm = { category: "", name: "" };
@@ -32,6 +35,13 @@ const formatDate = (value?: string) => {
 
 export default function CanvasList() {
     const navigate = useNavigate();
+    const [location, setLocation] = useState('recent');
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [search, setSearch] = useState('');
+    const [explorerOpen, setExplorerOpen] = useState(() => window.matchMedia('(min-width: 701px)').matches);
+    const explorerToggle = useRef<HTMLButtonElement>(null);
+    const [showFolderForm, setShowFolderForm] = useState(false);
+    const [movingCanvasId, setMovingCanvasId] = useState<string | null>(null);
     const [documents, setDocuments] = useState<CanvasDocumentSummary[]>([]);
     const [folders, setFolders] = useState<CanvasFolder[]>([]);
     const [folderForm, setFolderForm] = useState<FolderForm>(EMPTY_FOLDER_FORM);
@@ -179,6 +189,8 @@ export default function CanvasList() {
         setFolderForm(EMPTY_FOLDER_FORM);
         try {
             const created = await createCanvasFolder(submittedForm);
+            setShowFolderForm(false);
+            setLocation(created.id);
             setFolders((current) => [
                 created,
                 ...current.filter((folder) => folder.id !== temporaryId && folder.id !== created.id),
@@ -207,6 +219,7 @@ export default function CanvasList() {
     const handleDeleteFolder = async (folderId: string) => {
         try {
             await deleteCanvasFolder(folderId);
+            if (location === folderId) setLocation("unfiled");
             setFolders((current) => current.filter((folder) => folder.id !== folderId));
         } catch (deleteError) {
             console.error("Failed to delete canvas folder:", deleteError);
@@ -275,86 +288,152 @@ export default function CanvasList() {
         return next;
     });
 
-    const canvasCard = (document: CanvasDocumentSummary) => {
-        const isPending = isOptimisticCanvas(document.id);
-        return (
-        <article key={document.id} data-pending={isPending ? "true" : "false"} draggable={!isPending} onDragStart={(event) => event.dataTransfer.setData("text/plain", document.id)} className={`flex min-h-28 flex-col rounded-md border bg-white shadow-sm transition ${isPending ? "border-amber-300" : "border-stone-200 hover:border-amber-400 hover:shadow-md"}`}>
-            <div className="flex flex-1 items-start gap-2 p-3">
-                {isPending ? (
-                    <div className="flex min-w-0 flex-1 items-center gap-2" role="status">
-                        <Loader2 size={16} className="shrink-0 animate-spin text-amber-700" />
-                        <div className="min-w-0"><h3 className="truncate text-sm font-black text-stone-900">{document.title}</h3><p className="mt-1 text-xs text-amber-700">서버에 만드는 중</p></div>
-                    </div>
-                ) : editingCanvasId === document.id ? (
-                    <input className="min-w-0 flex-1 rounded-md border border-stone-300 px-2 py-1 text-sm font-bold" value={editingCanvasTitle} onChange={(event) => setEditingCanvasTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void handleUpdateCanvas(document.id); if (event.key === "Escape") setEditingCanvasId(null); }} autoFocus />
-                ) : (
-                    <button type="button" onClick={() => navigate(`/canvas/${document.id}`)} className="min-w-0 flex-1 text-left">
-                        <h3 className="line-clamp-2 text-sm font-black text-stone-900">{document.title || "제목 없음"}</h3>
-                        <p className="mt-2 text-xs text-stone-400">{formatDate(document.updated_at ?? document.created_at)}</p>
-                    </button>
-                )}
-                <div className="flex shrink-0 gap-1">
-                    {editingCanvasId === document.id ? (
-                        <><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => void handleUpdateCanvas(document.id)} title="이름 저장"><Check size={15} /></button><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => setEditingCanvasId(null)} title="이름 수정 취소"><X size={15} /></button></>
-                    ) : (
-                        <><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-stone-500 hover:bg-stone-100" onClick={() => { setEditingCanvasId(document.id); setEditingCanvasTitle(document.title); }} title="이름 수정"><Pencil size={15} /></button><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-stone-500 hover:bg-red-50 hover:text-red-600" onClick={() => setConfirmingDeleteId(document.id)} title="캔버스 삭제"><Trash2 size={15} /></button></>
-                    )}
-                </div>
+    const selectedFolder = folders.find(folder => folder.id === location);
+    const locationName = selectedFolder?.name ?? ({ recent: '최근 항목', all: '모든 캔버스', unfiled: '미분류' }[location] ?? '최근 항목');
+    const visibleDocuments = (selectedFolder
+        ? sortLibraryItemsByRecent(documents.filter(document => selectedFolder.canvasIds.includes(document.id)), document => document.title)
+        : location === 'all' ? sortLibraryItemsByRecent(documents, document => document.title)
+            : location === 'unfiled' ? unfiledCanvases : recentCanvases)
+        .filter(document => document.title.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
+    const selectedDocument = visibleDocuments.find(document => document.id === selectedId);
+    const selectLocation = (next: string) => {
+        setLocation(next); setSelectedId(null); setSearch('');
+        if (window.matchMedia('(max-width: 700px)').matches) {
+            setExplorerOpen(false); explorerToggle.current?.focus();
+        }
+    };
+    const moveCanvas = async (canvasId: string, destination: string) => {
+        if (movingCanvasId) return;
+        setMovingCanvasId(canvasId); setError(null);
+        try {
+            const source = folderIdByCanvasId.get(canvasId);
+            if (destination) {
+                const updated = await addCanvasToFolder(destination, canvasId);
+                setFolders(current => current.map(folder => folder.id === updated.id ? updated : { ...folder, canvasIds: folder.canvasIds.filter(id => id !== canvasId) }));
+            } else if (source) replaceFolder(await removeCanvasFromFolder(source, canvasId));
+        } catch {
+            setError('캔버스를 이동하지 못했습니다. 다시 시도하세요.');
+        } finally { setMovingCanvasId(null); }
+    };
+    const beginRename = (document: CanvasDocumentSummary) => {
+        setEditingCanvasId(document.id); setEditingCanvasTitle(document.title);
+    };
+    const canvasRow = (document: CanvasDocumentSummary) => {
+        const pending = isOptimisticCanvas(document.id);
+        return <div key={document.id} role="row" className="canvas-file-row" aria-selected={selectedId === document.id}
+            data-pending={pending ? 'true' : 'false'} tabIndex={pending ? -1 : 0} draggable={!pending}
+            onDragStart={event => event.dataTransfer.setData('text/plain', document.id)}
+            onClick={() => setSelectedId(document.id)}
+            onDoubleClick={event => { if (!pending && !(event.target as HTMLElement).closest('button,input,select')) navigate(`/canvas/${document.id}`); }}
+            onKeyDown={event => {
+                if (event.target !== event.currentTarget || pending) return;
+                if (event.key === 'Enter') navigate(`/canvas/${document.id}`);
+                if (event.key === 'F2') { event.preventDefault(); beginRename(document); }
+                if (event.key === 'Delete') setConfirmingDeleteId(document.id);
+            }}>
+            <div role="cell" className="canvas-file-main">
+                {pending ? <Loader2 size={19} className="canvas-loading-icon" /> : <PanelsTopLeft size={19} aria-hidden="true" />}
+                {pending ? <div role="status"><strong>{document.title}</strong><small>서버에 만드는 중</small></div>
+                    : editingCanvasId === document.id ? <div className="canvas-inline-rename">
+                        <input aria-label="캔버스 이름" value={editingCanvasTitle} onChange={event => setEditingCanvasTitle(event.target.value)}
+                            onKeyDown={event => { if (event.key === 'Enter') void handleUpdateCanvas(document.id); if (event.key === 'Escape') setEditingCanvasId(null); }} autoFocus />
+                        <button onClick={() => void handleUpdateCanvas(document.id)} aria-label="이름 저장"><Check size={16} /></button>
+                        <button onClick={() => setEditingCanvasId(null)} aria-label="이름 수정 취소"><X size={16} /></button>
+                    </div> : <button className="canvas-file-name" onClick={() => navigate(`/canvas/${document.id}`)} title={document.title}>{document.title || '제목 없음'}</button>}
             </div>
-            {confirmingDeleteId === document.id && <div className="flex items-center justify-end gap-2 border-t border-stone-100 px-3 py-2 text-xs"><span className="mr-auto text-stone-500">삭제할까요?</span><button type="button" className="font-bold text-red-600" onClick={() => void handleDeleteCanvas(document.id)}>삭제</button><button type="button" className="font-bold text-stone-500" onClick={() => setConfirmingDeleteId(null)}>취소</button></div>}
-        </article>
-        );
+            <div role="cell" className="canvas-file-date">{formatDate(document.updated_at ?? document.created_at)}</div>
+            <div role="cell" className="canvas-file-kind">캔버스</div>
+            <div role="cell" className="canvas-file-actions">
+                {!pending && <>
+                    <select aria-label={`${document.title} 이동`} disabled={!!movingCanvasId} value={folderIdByCanvasId.get(document.id) ?? ''}
+                        onChange={event => void moveCanvas(document.id, event.target.value)}>
+                        <option value="">미분류</option>{folders.filter(folder => !isOptimisticFolder(folder.id)).map(folder => <option key={folder.id} value={folder.id}>{folder.category} / {folder.name}</option>)}
+                    </select>
+                    <button aria-label={`${document.title} 이름 수정`} title="이름 수정" onClick={() => beginRename(document)}><Pencil size={15} /></button>
+                    <button aria-label={`${document.title} 삭제`} title="캔버스 삭제" onClick={() => setConfirmingDeleteId(document.id)}><Trash2 size={15} /></button>
+                </>}
+            </div>
+            {confirmingDeleteId === document.id && <div className="canvas-delete-confirm" role="alert">
+                <span>이 캔버스를 삭제할까요?</span><button onClick={() => void handleDeleteCanvas(document.id)}>삭제</button><button onClick={() => setConfirmingDeleteId(null)}>취소</button>
+            </div>}
+        </div>;
     };
 
-    return (
-        <div className="min-h-[calc(100vh-56px)] bg-stone-50 px-4 py-6 text-stone-900">
-            <div className="mx-auto max-w-7xl">
-                <header className="mb-5 flex flex-wrap items-end justify-between gap-3">
-                    <div><p className="text-xs font-bold uppercase text-amber-700">Canvas Library</p><h1 className="text-2xl font-black text-stone-950 md:text-3xl">그림판 관리</h1><p className="text-sm text-stone-500">최근 작업과 폴더별 캔버스를 한곳에서 관리합니다.</p></div>
-                    <button type="button" onClick={() => void handleCreateCanvas()} disabled={isCreating} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-stone-900 px-4 py-2 text-sm font-bold text-white hover:bg-stone-700 disabled:opacity-60">{isCreating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} 새 캔버스</button>
-                </header>
-
-                <div className="mb-4 grid gap-2 rounded-lg border border-stone-200 p-3 md:grid-cols-[1fr_1fr_auto]">
-                    <input className="rounded-md border border-stone-300 px-3 py-2 text-sm" value={folderForm.category} onChange={(event) => setFolderForm((current) => ({ ...current, category: event.target.value }))} placeholder="카테고리" />
-                    <input className="rounded-md border border-stone-300 px-3 py-2 text-sm" value={folderForm.name} onChange={(event) => setFolderForm((current) => ({ ...current, name: event.target.value }))} placeholder="폴더 이름" />
-                    <button type="button" className="inline-flex min-h-10 items-center justify-center rounded-md bg-stone-900 px-3 text-white disabled:bg-stone-300" onClick={() => void handleCreateFolder()} disabled={!folderForm.name.trim() || isCreatingFolder} title="폴더 추가">{isCreatingFolder ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}</button>
-                </div>
-
-                {error && <p className="mb-4 rounded-md bg-red-50 p-3 text-sm font-semibold text-red-700" role="alert">{error}</p>}
-                {isLoading ? (
-                    <div className="flex items-center justify-center gap-2 border-y border-stone-200 py-16 text-sm font-semibold text-stone-400"><Loader2 size={18} className="animate-spin" /> 캔버스를 불러오는 중...</div>
-                ) : (
-                    <>
-                        <section data-testid="canvas-recent-section" className="mb-6 border-y border-stone-200 py-4"><div className="mb-3"><h2 className="text-base font-black">최근 캔버스</h2><p className="text-xs text-stone-500">최근 수정하거나 만든 순서</p></div><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{recentCanvases.length > 0 ? recentCanvases.map(canvasCard) : <p className="py-6 text-sm text-stone-500">아직 만든 캔버스가 없습니다.</p>}</div></section>
-                        <div className="space-y-7">
-                            {folderCategoryEntries.map(([category, categoryFolders]) => (
-                                <section key={category}>
-                                    <h2 className="mb-3 border-b border-stone-300 pb-2 text-xs font-bold uppercase text-stone-500">{category}</h2>
-                                    <div className="space-y-5">
-                                        {categoryFolders.map((folder) => {
-                                            const folderCanvasIds = new Set(folder.canvasIds);
-                                            const folderCanvases = sortLibraryItemsByRecent(documents.filter((document) => folderCanvasIds.has(document.id)), (document) => document.title);
-                                            const isEditing = editingFolderId === folder.id;
-                                            const isCollapsed = collapsedFolderIds.has(folder.id);
-                                            const isPending = isOptimisticFolder(folder.id);
-                                            return (
-                                                <div key={folder.id} data-pending={isPending ? "true" : "false"} className="border-l-2 border-amber-400 pl-3" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { if (!isPending) void handleDropOnFolder(event, folder.id); }}>
-                                                    <div className="mb-3 flex items-center gap-2">
-                                                        {isEditing ? <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2"><input className="rounded-md border border-stone-300 px-2 py-1 text-sm" value={editingFolderForm.category} onChange={(event) => setEditingFolderForm((current) => ({ ...current, category: event.target.value }))} placeholder="카테고리" /><input className="rounded-md border border-stone-300 px-2 py-1 text-sm" value={editingFolderForm.name} onChange={(event) => setEditingFolderForm((current) => ({ ...current, name: event.target.value }))} placeholder="폴더 이름" /></div> : <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => toggleFolder(folder.id)} title={isCollapsed ? "폴더 펼치기" : "폴더 접기"}><Folder size={17} className="text-amber-600" /><span className="truncate text-sm font-bold">{folder.name}</span>{isPending ? <Loader2 size={14} className="animate-spin text-amber-700" aria-label="폴더 만드는 중" /> : <span className="text-xs text-stone-400">{folderCanvases.length}</span>}</button>}
-                                                        {!isPending && (isEditing ? <><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => void handleUpdateFolder(folder.id)} title="폴더 저장"><Check size={15} /></button><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => setEditingFolderId(null)} title="폴더 수정 취소"><X size={15} /></button></> : <><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => void handleCreateCanvas(folder.id)} title="폴더에 캔버스 추가"><Plus size={15} /></button><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-stone-100" onClick={() => { setEditingFolderId(folder.id); setEditingFolderForm({ category: folder.category, name: folder.name }); }} title="폴더 수정"><Pencil size={15} /></button><button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-stone-500 hover:bg-red-50 hover:text-red-600" onClick={() => void handleDeleteFolder(folder.id)} title="폴더 삭제"><Trash2 size={15} /></button></>)}
-                                                    </div>
-                                                    {!isCollapsed && <div className="grid min-h-20 gap-2 rounded-md border border-dashed border-stone-300 p-2 sm:grid-cols-2 xl:grid-cols-3">{folderCanvases.length > 0 ? folderCanvases.map(canvasCard) : <p className="py-6 text-center text-xs text-stone-500 sm:col-span-2 xl:col-span-3">캔버스를 드래그해서 넣으세요</p>}</div>}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </section>
-                            ))}
-                            <section className="border-t border-stone-300 pt-4" onDragOver={(event) => event.preventDefault()} onDrop={handleDropOnUnfiled}><h2 className="mb-3 text-sm font-black">폴더 없음</h2><div className="grid min-h-20 gap-2 rounded-md border border-dashed border-stone-300 p-2 sm:grid-cols-2 xl:grid-cols-3">{unfiledCanvases.length > 0 ? unfiledCanvases.map(canvasCard) : <p className="py-6 text-center text-sm text-stone-500 sm:col-span-2 xl:col-span-3">폴더 밖 캔버스가 없습니다.</p>}</div></section>
-                        </div>
-                    </>
-                )}
+    return <section className="canvas-library workspace-surface" data-testid="canvas-explorer" aria-label="캔버스 작업 공간" onKeyDown={event => {
+        if (event.key !== 'Escape') return;
+        const menu = event.currentTarget.querySelector<HTMLDetailsElement>('details[open]');
+        if (menu) { menu.open = false; menu.querySelector('summary')?.focus(); }
+    }}>
+        <header className="canvas-library-topbar">
+            <button ref={explorerToggle} aria-label="캔버스 탐색기 토글" aria-expanded={explorerOpen} aria-controls="canvas-folder-explorer" onClick={() => setExplorerOpen(open => !open)}><PanelLeft size={19} /></button>
+            <h1>캔버스</h1><span className="canvas-path-divider">/</span><span className="canvas-path" title={locationName}>{locationName}</span>
+            <div className="canvas-topbar-actions">
+                <button className="canvas-new-document" onClick={() => void handleCreateCanvas(selectedFolder?.id)} disabled={isCreating}><Plus size={16} /><span>새 캔버스</span></button>
+                <button aria-label="새 캔버스 폴더" title="새 폴더" onClick={() => { setShowFolderForm(value => !value); setEditingFolderId(null); }}><FolderPlus size={18} /></button>
             </div>
+        </header>
+        <div className="canvas-library-body">
+            <aside id="canvas-folder-explorer" className={`canvas-explorer ${explorerOpen ? 'is-open' : ''}`} aria-label="캔버스 탐색기">
+                <div className="canvas-explorer-heading"><span>탐색기</span><button aria-label="캔버스 목록 새로고침" onClick={() => void loadLibrary()}><RefreshCw size={15} /></button></div>
+                <nav aria-label="캔버스 위치">
+                    {([['recent', '최근 항목', Clock3], ['all', '모든 캔버스', PanelsTopLeft], ['unfiled', '미분류', Files]] as const).map(([id, label, Icon]) =>
+                        <button key={id} aria-current={location === id ? 'page' : undefined} onClick={() => selectLocation(id)}><Icon size={17} /><span>{label}</span></button>)}
+                </nav>
+                <div role="tree" aria-label="캔버스 폴더" onKeyDown={event => {
+                    const target = event.target as HTMLElement;
+                    if (target.getAttribute('role') !== 'treeitem') return;
+                    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="treeitem"]'));
+                    const index = items.indexOf(target);
+                    if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+                        event.preventDefault();items[event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : Math.max(0, Math.min(items.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))]?.focus();
+                    }
+                    const id = target.dataset.folder;
+                    if (id && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+                        event.preventDefault(); setCollapsedFolderIds(current => { const next = new Set(current); if (event.key === 'ArrowLeft') next.add(id); else next.delete(id); return next; });
+                    }
+                }}>
+                    {folderCategoryEntries.map(([category, categoryFolders]) => <div key={category} role="group" aria-label={category}>
+                        <div className="canvas-tree-category">{category}</div>
+                        {categoryFolders.map(folder => <div key={folder.id} onDragOver={event => event.preventDefault()} onDrop={event => { if (!isOptimisticFolder(folder.id)) void handleDropOnFolder(event, folder.id); }}>
+                            <button role="treeitem" aria-level={1} aria-expanded={!collapsedFolderIds.has(folder.id)} aria-selected={location === folder.id}
+                                data-folder={folder.id} className="canvas-tree-folder" onClick={() => { selectLocation(folder.id); toggleFolder(folder.id); }} disabled={isOptimisticFolder(folder.id)}>
+                                {collapsedFolderIds.has(folder.id) ? <ChevronRight size={14} /> : <ChevronDown size={14} />}<Folder size={17} /><span title={folder.name}>{folder.name}</span><small>{folder.canvasIds.length}</small>
+                            </button>
+                            {!collapsedFolderIds.has(folder.id) && <div role="group" aria-label={`${folder.name} 캔버스`} className="canvas-tree-files">
+                                {documents.filter(document => folder.canvasIds.includes(document.id) && !isOptimisticCanvas(document.id)).map(document => <button key={document.id} role="treeitem" aria-level={2} onClick={() => navigate(`/canvas/${document.id}`)}><PanelsTopLeft size={14} /><span>{document.title}</span></button>)}
+                            </div>}
+                        </div>)}
+                    </div>)}
+                    {!isLoading && folders.length === 0 && <p className="canvas-tree-empty">새 폴더로 캔버스를 정리하세요.</p>}
+                </div>
+            </aside>
+            <main className="canvas-library-content" aria-label="캔버스 파일 목록" onDragOver={event => event.preventDefault()} onDrop={event => { if (location === 'unfiled') void handleDropOnUnfiled(event); }}>
+                <div className="canvas-location-toolbar">
+                    <div><h2>{locationName}</h2><p>{visibleDocuments.length}개 항목{location === 'recent' ? ' · 최근 수정한 순서' : ''}</p></div>
+                    <label className="canvas-search"><Search size={16} /><input aria-label="캔버스 검색" placeholder="캔버스 검색" value={search} onChange={event => setSearch(event.target.value)} /></label>
+                    {selectedFolder && <details className="canvas-folder-menu"><summary aria-label="현재 폴더 동작"><Ellipsis size={18} /></summary><div>
+                        <button onClick={event => { event.currentTarget.closest("details")?.removeAttribute("open"); setEditingFolderId(selectedFolder.id); setEditingFolderForm({ category: selectedFolder.category, name: selectedFolder.name }); setShowFolderForm(false); }}>폴더 이름·카테고리 변경</button>
+                        <button onClick={() => { if (window.confirm('폴더만 삭제할까요? 안의 캔버스는 미분류에 남습니다.')) void handleDeleteFolder(selectedFolder.id); }}>폴더만 삭제 (캔버스 유지)</button>
+                    </div></details>}
+                </div>
+                {(showFolderForm || editingFolderId) && <form className="canvas-folder-form" onSubmit={event => { event.preventDefault(); void (editingFolderId ? handleUpdateFolder(editingFolderId) : handleCreateFolder()); }}>
+                    <strong>{editingFolderId ? '폴더 수정' : '새 폴더'}</strong>
+                    <input aria-label="폴더 카테고리" placeholder="카테고리" value={editingFolderId ? editingFolderForm.category : folderForm.category} onChange={event => (editingFolderId ? setEditingFolderForm : setFolderForm)(current => ({ ...current, category: event.target.value }))} />
+                    <input aria-label="폴더 이름" placeholder="폴더 이름" autoFocus value={editingFolderId ? editingFolderForm.name : folderForm.name} onChange={event => (editingFolderId ? setEditingFolderForm : setFolderForm)(current => ({ ...current, name: event.target.value }))} />
+                    <button type="submit" disabled={isCreatingFolder || !(editingFolderId ? editingFolderForm.name : folderForm.name).trim()}>{editingFolderId ? '폴더 저장' : '폴더 만들기'}</button>
+                    <button type="button" onClick={() => { setShowFolderForm(false); setEditingFolderId(null); }}>취소</button>
+                </form>}
+                {selectedDocument && <div className="canvas-selection-toolbar"><span>{selectedDocument.title}</span><button onClick={() => navigate(`/canvas/${selectedDocument.id}`)}>열기</button><button onClick={() => beginRename(selectedDocument)}>이름 수정</button></div>}
+                {error && <div className="canvas-library-error" role="alert">{error}<button onClick={() => void loadLibrary()}>다시 시도</button></div>}
+                {isLoading ? <div className="canvas-library-empty" role="status"><Loader2 size={22} className="canvas-loading-icon" />캔버스를 불러오는 중…</div> : <section data-testid={location === 'recent' ? 'canvas-recent-section' : 'canvas-folder-section'}>
+                    <div role="table" aria-label={`${locationName} 캔버스`} className="canvas-files-table">
+                        <div role="row" className="canvas-files-heading"><span role="columnheader">이름</span><span role="columnheader" className="canvas-file-date">수정한 날짜</span><span role="columnheader" className="canvas-file-kind">유형</span><span role="columnheader">위치 · 동작</span></div>
+                        <div role="rowgroup">{visibleDocuments.map(canvasRow)}</div>
+                    </div>
+                    {visibleDocuments.length === 0 && <div className="canvas-library-empty"><Folder size={35} strokeWidth={1.2} /><h3>{search ? '일치하는 캔버스가 없습니다.' : '이 위치에 캔버스가 없습니다.'}</h3><p>{search ? '다른 이름으로 검색해 보세요.' : '새 캔버스를 만들거나 폴더로 이동해 보세요.'}</p></div>}
+                </section>}
+                <footer className="canvas-library-status">{locationName}<span>{visibleDocuments.length}개 항목</span></footer>
+            </main>
         </div>
-    );
+    </section>;
 }

@@ -31,6 +31,10 @@ const blockText = (block: unknown): string[] => {
 };
 
 export const noteContentToPlainText = (content: unknown) => {
+  if (content && typeof content === 'object' && !Array.isArray(content)) {
+    const doc = content as { format?: unknown; version?: unknown; markdown?: unknown };
+    if (doc.format === 'markdown' && doc.version === 1 && typeof doc.markdown === 'string') return doc.markdown;
+  }
   if (!Array.isArray(content)) return '';
   return content.flatMap(blockText).join('\n');
 };

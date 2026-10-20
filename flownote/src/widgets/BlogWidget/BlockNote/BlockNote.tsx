@@ -11,7 +11,7 @@ import {
 import { postNoteData } from "@/entities/blog";
 import type { BlockDataProps } from "@/entities/blog";
 import { useParams } from "react-router-dom";
-import { getNoteData } from "@/entities/blog";
+import { getNote } from "@/entities/blog";
 import { API_CORE_BASE_URL, authHeaders } from "@/shared/api";
 import axios from "axios";
 import { AlertCircle, Check, Loader2, Maximize2, Minimize2, RefreshCw, X } from "lucide-react";
@@ -81,7 +81,7 @@ const  BlockNote = () => {
   type EditorBlock = EditorDocument[number];
 
   const toEditorDocument = useCallback((content: BlockDataProps["content"]): EditorDocument => (
-    content as EditorDocument
+    Array.isArray(content) ? content as EditorDocument : (() => { throw new Error("Markdown 노트는 새 작업 공간에서 여세요."); })()
   ), []);
 
   const normalizeBlocksForSave = useCallback((blocks: EditorDocument): BlockDataProps["content"] => {
@@ -98,7 +98,7 @@ const  BlockNote = () => {
     return normalize(blocks);
   }, []);
   const [noteData,setNoteData] = useState<BlockDataProps | null>(null);
-  useDocumentTitle("게시글", noteData?.title || "문서");
+  useDocumentTitle("노트", noteData?.title || "문서");
   const [isLoading,setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -155,7 +155,7 @@ const  BlockNote = () => {
         try {
           setIsLoading(true);
           setLoadError(null);
-          const data: BlockDataProps[] = await getNoteData();
+          const data: BlockDataProps[] = [await getNote(noteId!)];
           if (cancelled) return;
           const targetData = data.find((note) => note.id === noteId);
           if (targetData){
@@ -222,8 +222,7 @@ const  BlockNote = () => {
     const currentNote = noteDataRef.current;
     if (!currentNote) return null;
 
-    const data = await getNoteData();
-    return data.find((note) => note.id === currentNote.id) ?? null;
+    return getNote(currentNote.id);
   }, []);
 
   const clearRetryTimer = useCallback(() => {
@@ -359,7 +358,7 @@ const  BlockNote = () => {
     if (!noteId) return;
 
     const refreshNote = async () => {
-      const data: BlockDataProps[] = await getNoteData();
+      const data: BlockDataProps[] = [await getNote(noteId!)];
       const targetData = data.find((note) => note.id === noteId);
       if (!targetData) return;
 

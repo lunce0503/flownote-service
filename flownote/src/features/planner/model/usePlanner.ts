@@ -15,7 +15,7 @@ import { parseDateKey, scheduleItemsOnDate } from "./calendarEvent";
 
 export type PlannerView = "day" | "week" | "month";
 
-// 요약 작업: 플래너에서는 작업의 부가 기능(노트·게시글 링크, 태그, 타임로그 등)을 쓰지 않고
+// 요약 작업: 플래너에서는 작업의 부가 기능(노트·노트 링크, 태그, 타임로그 등)을 쓰지 않고
 // 이름·마감일·상태만 다룬다. 상세 관리가 필요하면 백엔드 계약은 그대로이므로 확장 가능.
 export type PlannerTaskSummary = {
   id: string;

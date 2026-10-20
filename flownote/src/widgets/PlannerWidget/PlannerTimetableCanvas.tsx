@@ -150,7 +150,7 @@ const PlannerTimetableCanvas = ({
     }
     ctx.lineWidth = 1;
 
-    // 4) 그림판 필기(정규화 좌표 → 화면 좌표)
+    // 4) 캔버스 필기(정규화 좌표 → 화면 좌표)
     const renderStroke = (stroke: { color: string; width: number; points: Array<{ x: number; y: number }> }) => {
       if (stroke.points.length === 0) return;
       ctx.strokeStyle = stroke.color;
