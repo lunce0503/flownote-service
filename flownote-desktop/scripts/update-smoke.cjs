@@ -10,9 +10,10 @@ const { UpdateClient } = require('../updater.cjs');
       const application = await electron.launch({ executablePath, args: ['--staging'], timeout: 60000 });
       try {
         const result = await application.evaluate(async ({ app, net }, kind) => {
-          const path = require('node:path');
-          const fs = require('node:fs/promises');
-          const { UpdateClient } = require(path.join(app.getAppPath(), 'updater.cjs'));
+          const load = process.getBuiltinModule('node:module').createRequire(app.getAppPath() + '/package.json');
+          const path = load('node:path');
+          const fs = load('node:fs/promises');
+          const { UpdateClient } = load('./updater.cjs');
           const directory = await fs.mkdtemp(path.join(app.getPath('temp'), `flownote-native-${kind}-updates-`));
           let requests = 0;
           const fetcher = (url, options) => { if (!url.endsWith('.json')) requests++; return net.fetch(url, options); };
