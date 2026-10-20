@@ -1,0 +1,22 @@
+# EAS archives this monorepo from its Git root. Only upload the Expo client.
+/*
+!/flownote-mobile
+!/flownote-mobile/**
+/flownote-mobile/node_modules
+/flownote-mobile/.expo
+/flownote-mobile/dist
+/flownote-mobile/web-build
+/flownote-mobile/test-results
+/flownote-mobile/playwright-report
+/flownote-mobile/ios
+/flownote-mobile/android
+**/.env
+**/.env.*
+**/credentials.json
+**/*.p8
+**/*.p12
+**/*.pem
+**/*.key
+**/*.jks
+**/*.mobileprovision
+**/*.log

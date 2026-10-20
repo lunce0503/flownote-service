@@ -14,7 +14,9 @@
 
 검증은 웹의 cloud staging E2E와 Windows runner에서 실제 설치한 EXE 및 portable EXE의 staging 실행으로 구분한다. release 태그의 Windows 검증이 통과한 같은 artifact를 GitHub Release로 공개한다. 앱 UI·설치 안내는 `node scripts/deploy-cloud.mjs release web`으로 staging-first 배포한다. 설치 안내 `/windows.html` 및 release 파일명은 릴리즈 버전과 함께 갱신한다.
 
-## 1.1.0 자동 업데이트
+## 1.1.1 자동 업데이트
+
+초기 1.1.0의 Electron net.fetch manual redirect 취소 문제를 실제 Windows networking 시험에서 발견했다. 수정 버전 1.1.1은 Node fetch 기본 transport로 같은 redirect 정책을 집행한다. 공개한 1.1.0 파일을 덮어쓰지 않는다.
 
 - 시작·절전 복귀·창 활성화 시 확인하며 자동 확인 최소 간격은 15분, 실행 중 주기는 1시간이다. 실패는 다음 확인 또는 도움말 메뉴에서 재시도한다.
 - production/staging 고정 origin의 `/updates/<channel>/windows.json`을 읽는다. RSA SHA-256 서명 envelope와 채널·플랫폼·정확한 GitHub 저장소/tag/파일명·크기·SHA-256을 검증한다. 공개키는 앱에 고정하며 개인키는 저장소 밖에 둔다.
@@ -24,4 +26,4 @@
 - portable은 검증한 ZIP을 자동 다운로드하고 위치를 연다. 실행 중 디렉터리 자동 교체는 보장하지 않는다. 사용자가 새 폴더에 압축 해제한다. 로그인·초안은 기존 userData에 보존된다.
 - 웹 renderer에는 업데이트 API/IPC/JS bridge를 추가하지 않는다. staging은 별도 userData와 feed를 사용한다.
 - Windows Authenticode 게시자 서명은 여전히 없다. 업데이트 feed 서명은 Authenticode와 별개이며 최초 수동 설치는 배포 출처와 SHA256SUMS를 확인한다.
-- 기존 1.0.0에는 updater가 없으므로 1.1.0은 한 번 수동 설치해야 한다.
+- 기존 1.0.0에는 updater가 없고 초기 1.1.0에는 다운로드 오류가 있으므로 1.1.1을 한 번 수동 설치해야 한다.

@@ -14,7 +14,15 @@ async function waitFor(check, label, attempts = 30) {
   for (let i = 0; i < attempts; i++) { if (await check()) return; await pause(1000); }
   throw new Error(`Timed out: ${label}`);
 }
-function ui() { adb('shell', 'uiautomator', 'dump', '/sdcard/flownote-updater-test.xml'); return adb('shell', 'cat', '/sdcard/flownote-updater-test.xml'); }
+function ui() {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const output = adb('shell', 'uiautomator', 'dump', '--compressed', '/sdcard/flownote-updater-test.xml');
+      if (output.includes('dumped to:')) return adb('shell', 'cat', '/sdcard/flownote-updater-test.xml');
+    } catch (error) { if (error.status !== 137) throw error; }
+  }
+  throw new Error('Android UI snapshot unavailable; refusing to tap stale coordinates');
+}
 function tap(text) {
   const nodes = ui().match(/<node\b[^>]*>/g) || [];
   const node = nodes.find(value => value.includes(`text="${text}"`)); assert(node, `Missing native UI: ${text}`);
@@ -30,10 +38,29 @@ const payload = Buffer.from(envelope.payload, 'base64');
 assert(verify('sha256', payload, readFileSync(new URL('../../flownote-desktop/update-public.pem', import.meta.url)), Buffer.from(envelope.signature, 'base64')));
 const manifest = JSON.parse(payload); assert.equal(manifest.channel, 'staging');
 console.log('PASS signed staging feed');
+if (process.argv.includes('--post-install')) {
+  assert(adb('shell', 'dumpsys', 'package', packageName).includes(`versionCode=${manifest.versionCode}`));
+  forward();
+  const browser = await chromium.connectOverCDP('http://127.0.0.1:9223', { noDefaults: true });
+  const page = browser.contexts()[0].pages()[0]; page.setDefaultTimeout(30000);
+  await page.getByRole('navigation', { name: '앱 기능' }).waitFor();
+  assert(!page.url().includes('/login'));
+  assert.equal(await page.evaluate(() => localStorage.getItem('flownote-native-update-draft-probe')), 'preserved');
+  await waitFor(() => ui().includes('최신 버전'), 'same-version skip after OS upgrade');
+  await browser.close();
+  console.log('PASS Android 10001→11000 OS installation completed; login and draft preserved; native same-version skip confirmed');
+  process.exit(0);
+}
 assert(adb('shell', 'dumpsys', 'package', packageName).includes('versionCode=10001'), 'Install the updater-enabled 1.0.1 debug baseline first');
+adb('shell', 'appops', 'set', packageName, 'REQUEST_INSTALL_PACKAGES', 'default');
+adb('shell', 'input', 'keyevent', 'KEYCODE_HOME');
+adb('shell', 'am', 'force-stop', packageName);
+adb('shell', 'am', 'start', '-n', `${packageName}/com.flownote.mobile.MainActivity`);
+await pause(1000);
 forward();
 let browser = await chromium.connectOverCDP('http://127.0.0.1:9223', { noDefaults: true });
 let page = browser.contexts()[0].pages()[0]; page.setDefaultTimeout(30000);
+await page.waitForURL(`${staging}/**`);
 assert.equal(new URL(page.url()).origin, staging);
 const devtools = await page.context().newCDPSession(page);
 await devtools.send('Network.clearBrowserCookies');
@@ -61,6 +88,7 @@ assert(ui().includes('다운로드·서명 검증 완료'), 'Native history must
 tap('닫기');
 // Reopen the app without clearing data: cached verified APK must survive.
 await browser.close();
+adb('shell', 'input', 'keyevent', 'KEYCODE_HOME');
 adb('shell', 'am', 'force-stop', packageName); adb('shell', 'am', 'start', '-n', `${packageName}/com.flownote.mobile.MainActivity`);
 await waitFor(() => ui().includes('준비됨'), 'cached update on app restart');
 assert.equal(adb('shell', 'run-as', packageName, 'stat', '-c', '%Y', 'files/updates/update.apk'), modified, 'Cached APK must not be downloaded again');
@@ -82,15 +110,29 @@ if (switchNode) {
   adb('shell', 'appops', 'set', packageName, 'REQUEST_INSTALL_PACKAGES', 'allow');
   adb('shell', 'am', 'start', '-n', `${packageName}/com.flownote.mobile.MainActivity`);
 }
-await waitFor(() => ui().includes('준비됨'), 'return to app');
+await waitFor(() => ui().includes('text="설치"'), 'return to app with verified install action');
 tap('설치'); tap('설치');
-await waitFor(() => /packageinstaller/.test(adb('shell', 'dumpsys', 'activity', 'activities')), 'Android OS installer');
+await waitFor(() => /topResumedActivity=.*packageinstaller/.test(adb('shell', 'dumpsys', 'activity', 'activities')), 'Android OS installer');
 assert(adb('shell', 'dumpsys', 'package', packageName).includes('versionCode=10001'), 'Download must not silently install');
-const installUI = ui(); const label = installUI.includes('text="Update"') ? 'Update' : installUI.includes('text="업데이트"') ? '업데이트' : installUI.includes('text="Install"') ? 'Install' : '설치';
+const installUI = ui(); const label = installUI.includes('text="UPDATE"') ? 'UPDATE' : installUI.includes('text="Update"') ? 'Update' : installUI.includes('text="업데이트"') ? '업데이트' : installUI.includes('text="INSTALL"') ? 'INSTALL' : installUI.includes('text="Install"') ? 'Install' : '설치';
 tap(label);
 await waitFor(() => adb('shell', 'dumpsys', 'package', packageName).includes(`versionCode=${manifest.versionCode}`), 'user-confirmed version upgrade');
+await waitFor(() => /topResumedActivity=.*InstallSuccess/.test(adb('shell', 'dumpsys', 'activity', 'activities')), 'OS installation completion');
+const completion = ui();
+if (completion.includes('text="OPEN"')) tap('OPEN');
+else if (completion.includes('text="열기"')) tap('열기');
 adb('shell', 'am', 'start', '-n', `${packageName}/com.flownote.mobile.MainActivity`);
-await pause(1500); forward();
+await waitFor(() => {
+  try {
+    const pid = adb('shell', 'pidof', packageName).trim();
+    if (/^\d+$/.test(pid) && adb('shell', 'cat', '/proc/net/unix').includes(`webview_devtools_remote_${pid}`)) return true;
+  } catch { }
+  // Package replacement may still kill the old process after versionCode is
+  // visible. Reopen only this test package until its new WebView is ready.
+  adb('shell', 'am', 'start', '-n', `${packageName}/com.flownote.mobile.MainActivity`);
+  return false;
+}, 'updated application WebView process', 60);
+forward();
 browser = await chromium.connectOverCDP('http://127.0.0.1:9223', { noDefaults: true }); page = browser.contexts()[0].pages()[0]; page.setDefaultTimeout(30000);
 await page.getByRole('navigation', { name: '앱 기능' }).waitFor();
 assert.equal(await page.evaluate(() => localStorage.getItem('flownote-native-update-draft-probe')), 'preserved');

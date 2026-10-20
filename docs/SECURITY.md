@@ -20,13 +20,13 @@ Flownote는 로그인 세션을 기반으로 사용자 데이터를 분리한다
 - 문서에는 환경 변수 이름과 용도만 적고 실제 값을 적지 않는다.
 - 오류 로그는 원인 파악에 필요한 범위로 제한하고 비밀번호, 토큰, 개인 파일 내용을 포함하지 않는다.
 
-## 고위험 영역
-
-### Windows·Android 직접 배포 업데이트
+## Windows·Android 직접 배포 업데이트
 
 1.1.0부터 별도 RSA SHA-256 서명 feed를 앱의 고정 공개키로 검증한다. production/staging origin·payload 채널·플랫폼·정식 버전·허용된 정확한 artifact URL·크기·SHA-256을 확인한다. Windows GitHub artifact redirect는 HTTPS GitHub/release-assets/objects 호스트만 허용한다. Android APK는 고정 cloud origin에서 redirect 없이 받으며 현재 패키지·서명 인증서·상승 versionCode도 확인한다. 설치 직전 파일을 재검증한다.
 
 다운로드는 인증 쿠키·서버 토큰을 사용하지 않는다. native updater는 renderer의 IPC/JS bridge를 열지 않는다. Android content provider는 비공개이며 앱 내부 APK 한 파일만 OS installer에 read-only로 권한을 전달한다. 자동 다운로드와 사용자 승인 설치를 구분한다. Windows Authenticode가 없는 최초 설치는 HTTPS 출처·공개 SHA256SUMS 확인이 필요하다. feed 개인키와 Android 기존 운영 서명키는 저장소/보고서/artifact에 넣지 않고 외부 운영자 전용 저장소에서 보관한다.
+
+## 고위험 영역
 
 - 인증과 세션: `flownote-server`의 auth service와 session table.
 - 업로드: 파일 크기, MIME 타입, 저장 경로, 공개 URL 처리.

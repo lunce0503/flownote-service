@@ -10,6 +10,8 @@
 
 - [Android 설치 앱](android-app.md): 웹 전체 기능 공유, 아이보리·검정 앱 UI, 헤더 제거, APK 설치·배포.
 
+- [iOS/iPadOS TestFlight](ios-ipados-testflight.md): 기존 Expo 앱의 EAS 클라우드 빌드, Apple 서명 연결, TestFlight 내부 테스트와 iPad 설치.
+
 - `mobile-was-architecture.md`: Expo 네이티브 앱과 Railway 웹 테스트 클라이언트의 gateway 통신, 캔버스 저장, 실행 방식.
 - `expo-go-railway-access.md`: Railway production Metro를 통한 Expo Go 접속, iPhone·iPad·Android 사용 절차와 장애 대응.
 - `web-workspace-ux.md`: 웹 홈·인증·노트·캔버스의 상태 처리, 모바일 도구 배치, 키보드 접근성.

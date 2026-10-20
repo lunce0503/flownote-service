@@ -39,4 +39,4 @@ npm run verify
 
 ## 네이티브 배포
 
-`eas.json`의 development/preview는 staging, production은 운영 게이트웨이를 사용한다. Apple 서명·배포 조건은 사용하는 EAS 배포 방식에서 확인한다. 표준 절차는 [배포 기준](../docs/DEPLOYMENT.md)을 따른다.
+`eas.json`의 development/preview와 store 배포용 testflight는 staging, production은 운영 게이트웨이를 사용한다. EAS 프로젝트는 `@lunce02/flownote-mobile`에 연결되어 있고 iPhone/iPad를 지원한다. store 프로필은 SDK 54용 Xcode 26.0 이미지를 사용한다. Apple 최초 로그인·서명/제출 연결 후 `eas build --platform ios --profile production --auto-submit`으로 TestFlight 업로드를 요청한다. 공개 App Store 출시는 별도다. [iOS/iPadOS 설치 절차와 제한](../docs/product-specs/ios-ipados-testflight.md), [배포 기준](../docs/DEPLOYMENT.md)을 따른다.

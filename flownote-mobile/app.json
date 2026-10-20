@@ -10,7 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.flownote.mobile"
+      "bundleIdentifier": "com.flownote.mobile",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.flownote.mobile",
@@ -42,6 +45,12 @@
         }
       ]
     ],
+    "owner": "lunce02",
+    "extra": {
+      "eas": {
+        "projectId": "0026ed46-eac0-4368-88ec-51f945829eb0"
+      }
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

@@ -22,7 +22,7 @@ Android 설치 APK는 `flownote-android/`에서 서명 빌드하고 `flownote/pu
 
 ### Windows·Android 업데이트 feed (1.1.0 이상)
 
-앱 바이너리와 웹 기능 배포는 구분한다. 웹은 고정 cloud origin에서 공유하며 네이티브 셸은 서명된 `/updates/<channel>/<platform>.json`으로 새 버전을 자동 다운로드한다. Windows NSIS와 Android APK는 설치 확인이 필요하고 portable ZIP은 수동 압축 해제가 필요하다. 기존 1.0.0은 자동 업데이트가 없어 수동으로 1.1.0을 먼저 설치한다.
+앱 바이너리와 웹 기능 배포는 구분한다. 웹은 고정 cloud origin에서 공유하며 네이티브 셸은 서명된 `/updates/<channel>/<platform>.json`으로 새 버전을 자동 다운로드한다. Windows NSIS와 Android APK는 설치 확인이 필요하고 portable ZIP은 수동 압축 해제가 필요하다. Android는 1.1.0, Windows는 redirect 수정 버전 1.1.1을 최초 수동 설치한다. Windows 초기 1.1.0도 다운로드 오류가 있어 1.1.1로 직접 업데이트한다.
 
 1. 앱 버전/versionCode를 증가시키고 빌드·단위·서명 검증한다. Windows runner에서 실제 NSIS 설치/portable staging smoke가 통과한 정확한 artifact만 릴리스한다.
 2. Android APK는 기존 운영 서명키를 사용한다. debug는 `-staging.apk`, production은 `.apk`로 분리한다. 기존 설치와 서명 인증서가 같은지 확인한다.
@@ -85,6 +85,10 @@ node scripts/deploy-cloud.mjs production all
 - Vercel Git 직접 자동 배포는 `git.deploymentEnabled: false`로 차단한다. [공식 설정 기준](https://vercel.com/docs/project-configuration/git-configuration)을 따르며 release 스크립트의 CLI 배포만 사용한다.
 - 로컬 Ollama 전용 agent-note는 제거됐다. AI 서비스가 중지돼도 게이트웨이가 capability의 disabled/removed 상태와 기존 기능 경로의 410을 직접 반환한다. Gemini agent 소스는 명시적인 AI 단일 배포를 위해 유지한다.
 - 폐기한 로컬 컨테이너와 Docker 네트워크는 제거했지만 기존 DB·업로드·모델 볼륨은 삭제하지 않는다.
+
+## iOS/iPadOS EAS 배포
+
+`flownote-mobile`의 store 프로필은 `production`(운영 API)과 `testflight`(staging API)다. iPhone/iPad 공용 Expo 앱을 Xcode 26.0 macOS 클라우드에서 빌드한다. 최초 Apple 로그인·2FA·서명 인증서·App Store Connect 제출 권한 설정은 사용자가 EAS 터미널에서 직접 완료한다. `eas build --platform ios --profile production --auto-submit`은 TestFlight 제출을 요청하며 공개 App Store 출시가 아니다. [상세 절차](product-specs/ios-ipados-testflight.md)를 따른다. 서명/제출 연결 전에는 빌드·iPad 설치 완료로 보고하지 않는다. EAS 패키징 설정만 바뀌고 서버 런타임이 같으면 Railway 모바일 웹/Expo Go를 깨우거나 backend를 재배포하지 않는다.
 
 ## 운영 확인과 롤백
 

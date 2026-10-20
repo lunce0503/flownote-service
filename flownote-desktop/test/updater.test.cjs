@@ -70,3 +70,15 @@ test('HTTP downgrade, unknown hosts and oversized streams never produce an insta
   const client = new UpdateClient({ directory, channel: 'production', version: '1.0.0', kind: 'installer', publicKey, fetcher });
   await client.check(); assert.equal(client.state.status, 'error'); assert(!(await readdir(directory)).some(name => name.endsWith('.exe') || name.endsWith('.part')));
 });
+test('a permitted GitHub HTTPS CDN redirect is followed and still hash-verified', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'flownote-update-test-'));
+  let redirects = 0;
+  const fetcher = async url => {
+    if (url.endsWith('.json')) return new Response(envelope(manifest()));
+    if (url.startsWith('https://github.com/')) { redirects++; return new Response(null, { status: 302, headers: { location: 'https://release-assets.githubusercontent.com/verified-test.exe' } }); }
+    assert.equal(url, 'https://release-assets.githubusercontent.com/verified-test.exe');
+    return new Response(bytes);
+  };
+  const client = new UpdateClient({ directory, channel: 'production', version: '1.0.0', kind: 'installer', publicKey, fetcher });
+  await client.check(); assert.equal(client.state.status, 'ready', client.state.error); assert.equal(redirects, 1); await client.verifyReady();
+});
