@@ -10,7 +10,7 @@ export function installDeviceTransport() {
     if (isDeviceModeTransitioning()) throw new AxiosError('작업 공간을 전환 중입니다. 화면을 다시 열어주세요.', 'ERR_DEVICE_ONLY', config);
     const url = new URL(config.url ?? '', config.baseURL ?? window.location.origin);
     const deviceSyncRequest = isDeviceSyncNetworkRequest(config.headers);
-    if (deviceSyncRequest && 'delete' in config.headers && typeof config.headers.delete === 'function') config.headers.delete(DEVICE_SYNC_HEADER);
+    if ('delete' in config.headers && typeof config.headers.delete === 'function') config.headers.delete(DEVICE_SYNC_HEADER);
     let body: unknown = config.data;
     if (typeof body === 'string') { try { body = JSON.parse(body); } catch { /* Unsupported raw bodies are never forwarded in device mode. */ } }
     if (isDeviceOnly() && !deviceSyncRequest) {
