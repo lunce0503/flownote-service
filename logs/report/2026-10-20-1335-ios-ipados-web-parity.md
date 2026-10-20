@@ -29,7 +29,7 @@
 
 - 고정 웹 snapshot: `/dev/shm/flownote-ios-parity-release-20261020`. 여기에 기존 배포된 사용자 미커밋 소스도 포함하며 사용자 HEAD/index를 되돌리지 않았다.
 - cloud gate에 Chromium 기존 55개 + iOS 시나리오 4개 + WebKit iOS 시나리오 4개를 포함했다. 실제 cloud staging만 사용하고 운영 CRUD 시험은 하지 않는다. 로그인/세션 reload·기능 메뉴·한글 Markdown cloud 저장/정확한 export payload·ICS·Canvas pointer 저장/재조회가 대상이다.
-- 클라우드 fingerprint는 web/backend 실행 소스 범위다. mobile native 파일은 별도 EAS archive와 소스 snapshot으로 고정/검증한다. native 전용 ATS/SDK patch를 web gate 소스 변경으로 오인하지 않으며, production 웹은 staging과 같은 snapshot을 사용한다.
+- deploy-cloud의 full snapshot fingerprint에는 native 파일도 포함한다. 첫 web gate의 snapshot은 그대로 production에 사용했다. 이후 native 전용 ATS/SDK patch를 별도 고정 commit `e847e45b4e05919d83298b1845803363d253323d`로 보존하고 EAS에서 빌드한다. 이 최종 snapshot으로 같은 웹 artifact의 staging gate를 다시 검증해 최종 기록을 맞춘다. 두 snapshot의 web/backend source subset hash는 모두 `19bbc3fba84fd5665515e901de4f4c7aeb109ef9eeaed2f275d230134d7f7ea2`로 동일하다. 최종 검사에서 existing immutable web deployment를 재사용하는 이유는 실제 web 실행 소스가 바뀌지 않았기 때문이다.
 - 실제 iPad WKWebView 프로세스 재시작·시스템 파일 선택/공유 UI·Apple Pencil 압력/손바닥 거부는 자동화하지 못했다. WebKit 브라우저 pointer 시험을 실제 Pencil 시험으로 주장하지 않는다. TestFlight 실기기 확인이 남는다.
 - backend/API/DB 변경이 없어 Railway 바이너리를 재배포하지 않는다. staging-first web 배포는 배포 스크립트의 환경/Serverless 정책과 E2E를 유지한다. EAS store/TestFlight 업로드는 공개 App Store 심사/출시가 아니다.
 

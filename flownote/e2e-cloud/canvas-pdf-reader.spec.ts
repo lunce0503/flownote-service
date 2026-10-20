@@ -86,6 +86,9 @@ test('turns PDF pages beside an editable canvas, preserves notes, and releases t
   await expect(surface).toHaveAttribute('data-ready', 'true');
   await page.getByRole('button', { name: 'PDF 책 읽기', exact: true }).click();
   const reader = page.getByRole('complementary', { name: 'PDF 책 읽기' });
+  const installed = await page.evaluate(() => document.documentElement.dataset.installedApp === 'true');
+  const library = page.getByRole('link', { name: '캔버스 목록으로 돌아가기' });
+  if (installed) await expect(library).toBeHidden();
   const fileInput = reader.getByLabel('읽을 PDF 선택');
   await expect(fileInput).toBeFocused();
   await expect(reader.getByRole('status')).toContainText('PDF를 선택');
@@ -128,6 +131,7 @@ test('turns PDF pages beside an editable canvas, preserves notes, and releases t
   await expect.poll(async () => (await readCanvas()).lines.length, { timeout: 30000 }).toBe(before.lines.length + 1);
   await reader.getByRole('button', { name: 'PDF 책 읽기 닫기' }).click();
   await expect(reader).toHaveCount(0);
+  if (installed) await expect(library).toBeVisible();
   await expect(page.getByRole('button', { name: 'PDF 책 읽기', exact: true })).toBeFocused();
   await page.reload();
   await expect(surface).toHaveAttribute('data-ready', 'true');

@@ -17,6 +17,9 @@ export default defineConfig({
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'ios-webkit', testMatch: 'ios-app.spec.ts', use: { ...devices['iPad Pro 11'], browserName: 'webkit' } },
+    { name: 'ios-webkit', testMatch: ['ios-app.spec.ts', 'canvas-pdf-reader.spec.ts'], use: {
+      ...devices['iPad Pro 11'], browserName: 'webkit',
+      userAgent: 'Mozilla/5.0 (iPad; CPU OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 FlownoteIOS/1.1.0',
+    } },
   ],
 });
