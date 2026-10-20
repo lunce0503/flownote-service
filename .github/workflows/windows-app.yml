@@ -12,10 +12,15 @@ on:
         description: 'Download and verify the signed staging release feed and actual installer/portable assets'
         type: boolean
         default: false
+      update_only:
+        description: 'Verify exact published binaries without rebuilding or writing cloud test data'
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
   windows:
+    if: inputs.update_only != true
     runs-on: windows-latest
     timeout-minutes: 25
     defaults:
@@ -69,6 +74,44 @@ jobs:
           name: windows-app-screen
           path: flownote-desktop/test-output/*.png
           if-no-files-found: ignore
+  updates:
+    if: inputs.update_only == true
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: flownote-desktop
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: flownote-desktop/package-lock.json
+      - run: npm ci
+      - name: Download and install exact already-published release binaries
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid release version' }
+          New-Item -ItemType Directory -Path release -Force | Out-Null
+          $base = "https://github.com/lunce0503/flownote-service/releases/download/windows-v$version"
+          foreach ($name in @("Flownote-Setup-$version-x64.exe", "Flownote-Portable-$version-x64.zip", 'SHA256SUMS.txt')) {
+            Invoke-WebRequest "$base/$name" -OutFile "release/$name"
+          }
+          $lines = Get-Content release/SHA256SUMS.txt
+          if ($lines.Length -ne 2) { throw 'Expected exactly two verified release artifacts' }
+          foreach ($line in $lines) {
+            $hash, $name = $line -split '  ', 2
+            if ($name -notin @("Flownote-Setup-$version-x64.exe", "Flownote-Portable-$version-x64.zip")) { throw 'Unexpected artifact' }
+            if ((Get-FileHash "release/$name" -Algorithm SHA256).Hash.ToLower() -ne $hash) { throw 'Published checksum mismatch' }
+          }
+          $installDir = Join-Path $env:RUNNER_TEMP 'FlownoteInstalled'
+          $installer = Start-Process -FilePath "release/Flownote-Setup-$version-x64.exe" -ArgumentList '/S', "/D=$installDir" -Wait -PassThru
+          if ($installer.ExitCode -ne 0) { throw 'Installer failed' }
+          Expand-Archive "release/Flownote-Portable-$version-x64.zip" (Join-Path $env:RUNNER_TEMP 'FlownotePortable')
+      - name: Verify actual packaged Electron auto-download and cache
+        run: node scripts/update-smoke.cjs "$env:RUNNER_TEMP/FlownoteInstalled/Flownote.exe" "$env:RUNNER_TEMP/FlownotePortable/Flownote.exe"
   release:
     if: startsWith(github.ref, 'refs/tags/windows-v')
     needs: windows

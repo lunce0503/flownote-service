@@ -33,11 +33,9 @@ try {
   page.setDefaultTimeout(30000);
   await page.waitForURL('https://flownote-react-staging.vercel.app/**');
   await page.context().clearCookies();
-  // The installer and portable smoke share a dedicated staging profile; reset only this test session.
-  await page.evaluate(() => {
-    localStorage.removeItem('flownote_auth_token'); localStorage.removeItem('flownote_auth_user');
-  });
-  await page.goto('https://flownote-react-staging.vercel.app/');
+  // A full navigation after clearing only test cookies avoids racing the app's
+  // session-expiry redirect while evaluating in a destroyed page context.
+  await page.goto('https://flownote-react-staging.vercel.app/login');
   await page.waitForURL('**/login');
   await page.getByLabel('이메일').fill(email);
   await page.getByLabel('비밀번호', { exact: true }).fill(password);
