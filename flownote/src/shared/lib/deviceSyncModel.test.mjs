@@ -81,6 +81,23 @@ test('deletion conflicts are scored, the loser is recoverable, and ties prefer t
   assert.equal(result.conflicts[0].loser, null);
 });
 
+test('partial sync successes become the base for later offline edits without reusing the old edit score', () => {
+  const state = createDeviceWorkspace();
+  state.tasks.push({ id: 'device-task', task_name: 'first', status: 'TODO' });
+  const remote = createDeviceWorkspace();
+  const first = buildDeviceSyncPlan(state, remote, 'sync-first', () => 'task-cloud');
+  first.cursor = first.operations.length;
+  state.sync.pending = first;
+  remote.tasks.push({ ...first.desired.tasks[0], memo: null, time_logs: [], updated_at: '2026-10-22T00:00:00Z' });
+  state.tasks[0].task_name = 'next';
+  remote.tasks[0].status = 'DONE';
+  const retry = buildDeviceSyncPlan(state, remote, 'sync-retry');
+  assert.equal(retry.desired.tasks[0].id, 'task-cloud');
+  assert.equal(retry.desired.tasks[0].task_name, 'next');
+  assert.equal(retry.desired.tasks[0].status, 'DONE');
+  assert.equal(retry.conflicts.length, 0);
+});
+
 test('sync plans remap device ids consistently and keep a resumable ordered operation cursor', () => {
   const workspace = createDeviceWorkspace();
   workspace.sync.base = structuredClone(createDeviceWorkspace());

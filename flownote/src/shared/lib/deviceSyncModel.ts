@@ -260,7 +260,20 @@ export function buildDeviceSyncPlan(
     }
   }
   const remappedLocal = remapSnapshot(local, idMap);
-  const { workspace: desired, conflicts } = reconcileWorkspace(state.sync.base, remappedLocal, remote, syncId, createdAt);
+  const effectiveBase = workspaceSnapshot(state.sync.base);
+  // Successful steps of an earlier attempt are now common history. Comparing
+  // new edits against the pre-upload base would score the same work twice and
+  // could discard a smaller follow-up edit after a partial network failure.
+  state.sync.pending?.operations.forEach((operation, index) => {
+    const remoteItem = remote[operation.collection].find(item => itemKey(operation.collection, item) === operation.itemId);
+    const applied = index < state.sync.pending!.cursor
+      || (operation.action === 'upsert' && same(remoteItem, operation.value));
+    if (!applied) return;
+    const remaining = effectiveBase[operation.collection].filter(item => itemKey(operation.collection, item) !== operation.itemId);
+    if (operation.action === 'upsert' && operation.value) remaining.push(structuredClone(operation.value) as never);
+    effectiveBase[operation.collection] = remaining as never;
+  });
+  const { workspace: desired, conflicts } = reconcileWorkspace(effectiveBase, remappedLocal, remote, syncId, createdAt);
   const operations: DeviceSyncOperation[] = [];
   for (const collection of operationOrder) {
     const desiredMap = new Map(desired[collection].map(item => [itemKey(collection, item), item]));
