@@ -2,6 +2,7 @@ import axios from 'axios';
 import { API_BASE_URL, authHeaders } from '../api';
 import { withDeviceWorkspace } from './deviceStorage';
 import { deviceOwner } from './deviceMode';
+import { pendingDeviceDraftMessage, readDeviceDraftBackup } from './devicePendingDrafts';
 import { buildDeviceSyncPlan, prepareOfflineWorkspace } from './deviceSyncModel';
 import { DEVICE_SYNC_HEADER, runWithDeviceSyncNetwork } from './deviceSyncNetwork';
 import {
@@ -276,6 +277,9 @@ export async function reconcileDeviceToCloud(progress: Progress = () => {}) {
     const owner = deviceOwner();
     let plan: DeviceSyncPlan;
     try {
+      const drafts = await readDeviceDraftBackup();
+      const pendingDraft = await withDeviceWorkspace(false, state => pendingDeviceDraftMessage(state, drafts));
+      if (pendingDraft) throw new Error(pendingDraft);
       await withDeviceWorkspace(true, state => { state.sync.status = 'syncing'; });
       progress('서버의 최신 변경 확인 중');
       const remote = await fetchCloudWorkspace(progress);
@@ -303,7 +307,10 @@ export async function reconcileDeviceToCloud(progress: Progress = () => {}) {
       }
       progress('업로드 결과 확인 중');
       const finalCloud = await fetchCloudWorkspace(progress);
+      const finalDrafts = await readDeviceDraftBackup();
       await withDeviceWorkspace(true, state => {
+        const newerDraft = pendingDeviceDraftMessage(state, finalDrafts);
+        if (newerDraft) throw new Error(newerDraft);
         for (const [key, items] of Object.entries(finalCloud)) state[key as keyof WorkspaceSnapshot] = items as never;
         state.sync.base = structuredClone(finalCloud);
         state.sync.recovery = [...state.sync.recovery, ...plan!.conflicts].slice(-200);

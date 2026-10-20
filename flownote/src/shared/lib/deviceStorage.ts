@@ -1,5 +1,6 @@
 import { deviceOwner } from './deviceMode';
 import { createDeviceWorkspace, migrateDeviceWorkspace, type DeviceWorkspace } from './deviceWorkspace';
+import { readDeviceDraftBackup } from './devicePendingDrafts';
 
 const open = (): Promise<IDBDatabase> => new Promise((resolve, reject) => {
   const request = indexedDB.open('flownote-device-workspaces', 1);
@@ -38,4 +39,9 @@ export async function withDeviceWorkspace<T>(write: boolean, action: (state: Dev
     });
   } finally { db.close(); }
 }
-export const readDeviceBackup = () => withDeviceWorkspace(false, state => ({ format: 'flownote-device-workspace', version: 2, exportedAt: new Date().toISOString(), owner: deviceOwner(), workspace: state }));
+export const readDeviceBackup = async () => {
+  const backup = await withDeviceWorkspace(false, state => ({ format: 'flownote-device-workspace', version: 2, exportedAt: new Date().toISOString(), owner: deviceOwner(), workspace: state }));
+  const drafts = await readDeviceDraftBackup();
+  if (backup.owner !== deviceOwner()) throw new Error('계정이 변경되어 백업을 중단했습니다.');
+  return { ...backup, drafts };
+};

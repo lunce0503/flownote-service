@@ -86,6 +86,26 @@ test('cloud material is available offline and device edits reconcile on re-enabl
     expect(outgoing).toEqual([]);
     const beforeCloud = await (await request.get(`${api}/api/notes`, { headers })).json();
     expect(beforeCloud).toHaveLength(1); expect(beforeCloud[0].content.markdown).toBe(original.content.markdown);
+    await page.evaluate(async ({ owner }) => {
+      await new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open(`flownote-note-drafts-device:${owner}`);
+        open.onsuccess = () => {
+          const db = open.result, tx = db.transaction('drafts', 'readwrite');
+          tx.objectStore('drafts').put({ userId: owner, note: { id: 'device-uncommitted', title: 'Uncommitted', content: { format: 'markdown', markdown: 'must survive' } }, sequence: 'synthetic', baseRevision: 0 }, 'synthetic-draft');
+          tx.oncomplete = () => { db.close(); resolve(); }; tx.onerror = () => reject(tx.error);
+        }; open.onerror = () => reject(open.error);
+      });
+    }, { owner: user.id });
+    page.once('dialog', dialog => dialog.accept()); await page.getByRole('switch', { name: '앱 동기화', exact: true }).click();
+    await expect(page.getByRole('alert')).toContainText('미저장 초안');
+    await expect(page.getByRole('switch', { name: '앱 동기화', exact: true })).toHaveAttribute('aria-checked', 'false');
+    await page.evaluate(async ({ owner }) => {
+      await new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open(`flownote-note-drafts-device:${owner}`);
+        open.onsuccess = () => { const db = open.result, tx = db.transaction('drafts', 'readwrite'); tx.objectStore('drafts').delete('synthetic-draft'); tx.oncomplete = () => { db.close(); resolve(); }; tx.onerror = () => reject(tx.error); };
+        open.onerror = () => reject(open.error);
+      });
+    }, { owner: user.id });
     let interrupted = false;
     await page.route('**/web-api/api/notes', async route => {
       if (!interrupted && route.request().method() === 'POST') { interrupted = true; await route.abort('internetdisconnected'); return; }
