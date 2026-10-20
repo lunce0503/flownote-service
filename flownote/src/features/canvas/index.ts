@@ -10,6 +10,7 @@ export * from "./model/canvasViewportStorage";
 export * from "./model/useCanvasHistory";
 export * from "./model/useCanvasRendering";
 export * from "./model/useCanvasState";
+export * from "./model/applePencilTool";
 export * from "./model/useDrawing";
 export * from "./model/useElementManipulation";
 export * from "./model/canvasPersistenceModel";

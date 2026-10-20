@@ -1,5 +1,5 @@
 import { deviceOwner } from './deviceMode';
-import { createDeviceWorkspace, type DeviceWorkspace } from './deviceWorkspace';
+import { createDeviceWorkspace, migrateDeviceWorkspace, type DeviceWorkspace } from './deviceWorkspace';
 
 const open = (): Promise<IDBDatabase> => new Promise((resolve, reject) => {
   const request = indexedDB.open('flownote-device-workspaces', 1);
@@ -22,8 +22,9 @@ export async function withDeviceWorkspace<T>(write: boolean, action: (state: Dev
       request.onsuccess = () => {
         try {
           if (deviceOwner() !== owner) throw new Error('계정이 변경되어 기기 자료 요청을 중단했습니다.');
-          const state: DeviceWorkspace = request.result ?? createDeviceWorkspace();
-          if (state.version !== 1 || Object.entries(createDeviceWorkspace()).some(([key, value]) => Array.isArray(value) && !Array.isArray(state[key as keyof DeviceWorkspace]))) throw new Error('기기 자료 형식을 읽을 수 없습니다. 초기화하지 않았습니다.');
+          const state: DeviceWorkspace = request.result === undefined
+            ? createDeviceWorkspace()
+            : migrateDeviceWorkspace(request.result);
           result = action(state);
           if (write) store.put(state, owner);
         } catch (error) { failure = error; tx.abort(); }
@@ -37,4 +38,4 @@ export async function withDeviceWorkspace<T>(write: boolean, action: (state: Dev
     });
   } finally { db.close(); }
 }
-export const readDeviceBackup = () => withDeviceWorkspace(false, state => ({ format: 'flownote-device-workspace', version: 1, exportedAt: new Date().toISOString(), owner: deviceOwner(), workspace: state }));
+export const readDeviceBackup = () => withDeviceWorkspace(false, state => ({ format: 'flownote-device-workspace', version: 2, exportedAt: new Date().toISOString(), owner: deviceOwner(), workspace: state }));

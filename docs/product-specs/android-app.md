@@ -1,6 +1,6 @@
 # Android 설치 앱
 
-앱 **전체 → 설정 → 앱 동기화**에서 [기기 전용 작업 공간](device-only-workspace.md)으로 전환할 수 있다. 서버 저장·실시간 수신을 중지하고 독립 기기 자료를 사용하며 서버로 자동 업로드/병합하지 않는다. 공유 웹 기능이므로 이 설정만을 위해 APK를 다시 배포하지 않는다.
+앱 **전체 → 설정 → 앱 동기화**에서 [오프라인 작업 공간](device-only-workspace.md)으로 전환할 수 있다. 서버 자료·지원 이미지를 먼저 기기에 보관하고 서버 저장·실시간 수신을 중지한다. 다시 켜면 기준본 이후 로컬/서버 변경을 자동 조정하고 선택되지 않은 충돌본을 복구 기록에 남긴다.
 
 ## 목표
 
@@ -25,16 +25,16 @@
 - 파일 업로드는 시스템 문서 선택기를 사용하고 다중 이미지/PDF 선택을 전달한다.
 - HTTPS 다운로드는 시스템 다운로드 관리자를, 32MB 이하 blob/data 내보내기는 문서 저장 선택기를 사용한다.
 - 세션은 동일 origin의 WebView DOM 저장소에 유지한다. 기기 간 자료 동기화는 같은 계정과 기존 cloud API를 사용한다.
-- 오프라인 첫 로드 실패 시 재시도 화면을 표시한다. 오프라인 완전 편집은 보장하지 않는다.
+- 오프라인 첫 로드 실패 시 재시도 화면을 표시한다. 이전에 스냅샷한 개인 작업 자료는 앱 화면이 로드된 뒤 네트워크 없이 편집할 수 있지만, WebView 번들의 최초 로드와 스냅샷 계약 밖 기능까지 완전 오프라인으로 보장하지 않는다.
 - cleartext/file URL 및 혼합 콘텐츠를 차단하며 native JavaScript interface를 노출하지 않는다. 서명키/서버 비밀값은 앱에 포함하지 않는다.
 
 ## 배포와 검증
 
-Debug APK는 staging origin 및 별도 패키지 `.staging`을 사용하고 서명 release APK는 production origin을 사용한다. 배포는 `node scripts/deploy-cloud.mjs release web`으로 staging-first를 따른다. 설치 안내는 `/android.html`, 현재 APK는 `/downloads/flownote-1.1.0.apk`다. 1.0.0 다운로드는 이력과 기존 링크 호환을 위해 유지한다.
+Debug APK는 staging origin 및 별도 패키지 `.staging`을 사용하고 서명 release APK는 production origin을 사용한다. 배포는 `node scripts/deploy-cloud.mjs release web`으로 staging-first를 따른다. 설치 안내는 `/android.html`, 현재 APK는 `/downloads/flownote-1.2.0.apk`다. 이전 다운로드는 이력과 기존 링크 호환을 위해 유지한다.
 
 웹 E2E에는 Android UA의 최초 로그인·세션 유지·전체 기능 메뉴·헤더 제거·휴대폰/태블릿 overflow·캔버스 상세 탐색을 포함한다. Android 빌드/lint/서명 검증과 실제 기기 WebView 실행 검증은 구분하여 기록한다.
 
-## 1.1.0 자동 업데이트
+## 1.2.0 자동 업데이트
 
 - 시작·재개 시와 실행 중 1시간마다 확인한다. 자동 확인은 최소 15분 간격이며 하단 네이티브 업데이트 표시에서 수동 재시도·변경 내용·최근 이력·설치를 제공한다.
 - release는 production, debug는 staging 고정 HTTPS origin의 `/updates/<channel>/android.json`만 사용한다. 채널별 APK 이름과 패키지(`com.flownote.mobile` / `.staging`)를 분리한다.

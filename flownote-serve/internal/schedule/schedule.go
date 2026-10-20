@@ -23,21 +23,22 @@ import (
 var validDays = map[string]bool{"MON": true, "TUE": true, "WED": true, "THU": true, "FRI": true, "SAT": true, "SUN": true}
 
 type Item struct {
-	ID         string   `json:"id"`
-	Title      string   `json:"title"`
-	DaysOfWeek []string `json:"days_of_week"`
-	StartTime  string   `json:"start_time"`
-	EndTime    string   `json:"end_time"`
-	Category   *string  `json:"category,omitempty"`
-	Color      string   `json:"color"`
-	Memo       string   `json:"memo"`
-	IsActive   bool     `json:"is_active"`
+	ID         string    `json:"id"`
+	Title      string    `json:"title"`
+	DaysOfWeek []string  `json:"days_of_week"`
+	StartTime  string    `json:"start_time"`
+	EndTime    string    `json:"end_time"`
+	Category   *string   `json:"category,omitempty"`
+	Color      string    `json:"color"`
+	Memo       string    `json:"memo"`
+	IsActive   bool      `json:"is_active"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // 요청은 camelCase(프론트 정규화)와 snake_case(레거시) 키를 모두 받는다.
 type itemRequest struct {
+	ID          string   `json:"id"`
 	Title       string   `json:"title"`
 	DaysOfWeek  []string `json:"daysOfWeek"`
 	DaysSnake   []string `json:"days_of_week"`
@@ -128,7 +129,10 @@ func (r *Repo) storeMemo(ctx context.Context, userID, itemID, memo string) (stri
 }
 
 func (r *Repo) Create(ctx context.Context, userID string, req itemRequest) (Item, error) {
-	itemID := newUUID()
+	itemID := strings.TrimSpace(req.ID)
+	if itemID == "" {
+		itemID = newUUID()
+	}
 	memo := ""
 	if req.Memo != nil {
 		memo = strings.TrimSpace(*req.Memo)
@@ -153,6 +157,8 @@ func (r *Repo) Create(ctx context.Context, userID string, req itemRequest) (Item
 			category, color, memo, memo_object_key, memo_byte_size, memo_public_url, is_active
 		)
 		VALUES ($1::uuid, $2, $3, $4, $5::time, $6::time, $7, $8, '', $9, $10, $11, $12)
+		ON CONFLICT (id) DO UPDATE SET id = EXCLUDED.id
+		WHERE daily_schedule_items.user_id = EXCLUDED.user_id
 		RETURNING `+itemColumns+`
 	`, itemID, userID, strings.TrimSpace(req.Title), normalizeDaysOrPanic(req.days()),
 		req.start(), req.end(), category, color, objectKey, byteSize, publicURL, isActive))

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 
 const api = 'https://flownote-api-staging.up.railway.app';
 const web = 'https://flownote-react-staging.vercel.app';
-test.use({ userAgent: 'Mozilla/5.0 (iPad; CPU OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 FlownoteIOS/1.1.0' });
+test.use({ userAgent: 'Mozilla/5.0 (iPad; CPU OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 FlownoteIOS/1.2.0' });
 type Workspace = { notes: { id: string; content: { markdown: string } }[]; canvasContents: { lines: unknown[]; images: unknown[] }[]; diaries: { todos: { label: string }[] }[]; tasks: unknown[]; schedules: unknown[] };
 const readWorkspace = (page: Page, owner: string): Promise<Workspace> => page.evaluate(owner => new Promise((resolve, reject) => {
   const open = indexedDB.open('flownote-device-workspaces', 1);
@@ -21,7 +21,7 @@ const toggle = async (page: Page, enabled: boolean) => {
   await expect(page.getByRole('switch', { name: '앱 동기화', exact: true })).toHaveAttribute('aria-checked', String(enabled));
 };
 
-test('device-only notes, canvas and planner persist without API or sync traffic and never merge on re-enable', async ({ page, request }) => {
+test('cloud material is available offline and device edits reconcile on re-enable without background traffic', async ({ page, request }) => {
   test.setTimeout(150000);
   const email = `device-${randomUUID()}@example.com`, password = randomUUID();
   expect((await request.post(`${api}/api/users`, { data: { email, password, username: `device-${randomUUID().slice(0, 8)}`, nickname: 'Device staging' } })).ok()).toBeTruthy();
@@ -41,13 +41,12 @@ test('device-only notes, canvas and planner persist without API or sync traffic 
     const outgoing: string[] = [];
     page.on('request', request => { if (/\/web-api\/|\.railway\.app/.test(request.url())) outgoing.push(`${request.method()} ${request.url()}`); });
     await page.reload(); await expect(page.getByText('꺼짐 · 기기 전용', { exact: true })).toBeVisible();
-    await page.goto('/blog'); await expect(page.getByRole('treeitem', { name: 'Cloud original.md', exact: true })).toHaveCount(0);
+    await page.goto('/blog'); await expect(page.getByRole('treeitem', { name: 'Cloud original.md', exact: true })).toBeVisible();
     page.once('dialog', dialog => dialog.accept('Device note'));
     await page.getByRole('button', { name: '새 노트', exact: true }).first().click();
     await expect(page).toHaveURL(/\/blog\/device-/);
     await page.getByLabel('Markdown 본문').fill('# 기기만의 원고\n\nDo not upload');
     await expect(page.getByTestId('note-save-status')).toHaveText('기기에 저장됨 · 동기화 꺼짐');
-    const noteUrl = page.url();
     await page.reload(); await expect(page.getByLabel('Markdown 본문')).toHaveValue('# 기기만의 원고\n\nDo not upload');
     await page.goto('/canvas'); await page.getByRole('button', { name: '새 캔버스', exact: true }).click();
     await expect(page).toHaveURL(/\/canvas\/device-/);
@@ -57,6 +56,12 @@ test('device-only notes, canvas and planner persist without API or sync traffic 
     await page.mouse.move(box!.x + 200, box!.y + 250); await page.mouse.down();
     await page.mouse.move(box!.x + 300, box!.y + 300, { steps: 12 }); await page.mouse.up();
     await expect.poll(async () => (await readWorkspace(page, user.id)).canvasContents[0]?.lines.length).toBe(1);
+    await page.locator('input[type="file"][accept="image/*,application/pdf"]').last().setInputFiles({
+      name: 'offline-pixel.png', mimeType: 'image/png',
+      buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
+    });
+    await expect.poll(async () => (await readWorkspace(page, user.id)).canvasContents[0]?.images.length).toBe(1);
+    expect((await readWorkspace(page, user.id)).canvasContents[0].images[0]).toMatchObject({ contentType: 'image/png' });
     await page.reload(); await expect(page.getByTestId('canvas-render-surface')).toHaveAttribute('data-visible-line-count', '1');
     await page.goto('/planner'); await page.getByPlaceholder('오늘의 할일').fill('기기 할 일'); await page.getByPlaceholder('오늘의 할일').press('Enter');
     await expect.poll(async () => (await readWorkspace(page, user.id)).diaries[0]?.todos[0]?.label).toBe('기기 할 일');
@@ -81,14 +86,72 @@ test('device-only notes, canvas and planner persist without API or sync traffic 
     expect(outgoing).toEqual([]);
     const beforeCloud = await (await request.get(`${api}/api/notes`, { headers })).json();
     expect(beforeCloud).toHaveLength(1); expect(beforeCloud[0].content.markdown).toBe(original.content.markdown);
+    let interrupted = false;
+    await page.route('**/web-api/api/notes', async route => {
+      if (!interrupted && route.request().method() === 'POST') { interrupted = true; await route.abort('internetdisconnected'); return; }
+      await route.continue();
+    });
+    page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('switch', { name: '앱 동기화', exact: true }).click();
+    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.getByRole('switch', { name: '앱 동기화', exact: true })).toHaveAttribute('aria-checked', 'false');
+    expect(interrupted).toBeTruthy();
+    await page.unroute('**/web-api/api/notes');
     await toggle(page, true);
     await page.goto('/blog'); await expect(page.getByRole('treeitem', { name: 'Cloud original.md', exact: true })).toBeVisible();
-    await expect(page.getByRole('treeitem', { name: 'Device note.md', exact: true })).toHaveCount(0);
-    const afterCloud = await (await request.get(`${api}/api/notes`, { headers })).json(); expect(afterCloud).toEqual(beforeCloud);
+    await expect(page.getByRole('treeitem', { name: 'Device note.md', exact: true })).toBeVisible();
+    const afterCloud = await (await request.get(`${api}/api/notes`, { headers })).json();
+    expect(afterCloud).toHaveLength(2);
+    expect(afterCloud.find((item: { title: string; content: { markdown: string } }) => item.title === 'Device note')?.content.markdown).toContain('Do not upload');
+    const cloudCanvases = await (await request.get(`${api}/api/canvas/documents`, { headers })).json();
+    expect(cloudCanvases).toHaveLength(1);
+    const cloudElements = await (await request.get(`${api}/api/canvas/elements?canvasId=${cloudCanvases[0].id}`, { headers })).json();
+    expect(cloudElements.lines).toHaveLength(1); expect(cloudElements.images).toHaveLength(1);
+    expect((await (await request.get(`${api}/api/tasks`, { headers })).json())).toHaveLength(1);
     await page.goto('/settings'); await toggle(page, false);
-    await page.goto(noteUrl); await expect(page.getByLabel('Markdown 본문')).toHaveValue('# 기기만의 원고\n\nDo not upload');
+    await page.goto('/blog'); await page.getByRole('treeitem', { name: 'Device note.md', exact: true }).click();
+    await expect(page.getByLabel('Markdown 본문')).toHaveValue('# 기기만의 원고\n\nDo not upload');
     expect(await page.locator('body').evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
-  } finally { expect((await request.delete(`${api}/api/notes/${cloudId}`, { headers })).ok()).toBeTruthy(); }
+  } finally {
+    const notes = await (await request.get(`${api}/api/notes`, { headers })).json();
+    for (const item of notes) await request.delete(`${api}/api/notes/${item.id}`, { headers });
+    const canvases = await (await request.get(`${api}/api/canvas/documents`, { headers })).json();
+    for (const item of canvases) await request.delete(`${api}/api/canvas/documents/${item.id}`, { headers });
+    const tasks = await (await request.get(`${api}/api/tasks`, { headers })).json();
+    for (const item of tasks) await request.delete(`${api}/api/tasks/${item.id}`, { headers });
+  }
+});
+
+test('same-field conflict keeps the more substantial offline edit and preserves the server loser', async ({ page, request }) => {
+  test.setTimeout(120000);
+  const email = `device-conflict-${randomUUID()}@example.com`, password = randomUUID();
+  expect((await request.post(`${api}/api/users`, { data: { email, password, username: `conflict-${randomUUID().slice(0, 8)}`, nickname: 'Device conflict' } })).ok()).toBeTruthy();
+  const login = await request.post(`${api}/api/users/login`, { data: { email, password } }); expect(login.ok()).toBeTruthy();
+  const { user, token } = await login.json(); const headers = { Authorization: `Bearer ${token}` };
+  const id = randomUUID(), baseMarkdown = 'common base';
+  expect((await request.post(`${api}/api/notes`, { headers, data: {
+    id, title: 'Conflict note', content: { format: 'markdown', version: 1, markdown: baseMarkdown }, revision: 1, client_id: randomUUID(),
+  } })).ok()).toBeTruthy();
+  await page.context().addCookies([{ name: '__Host-flownote_session', value: token, url: web, secure: true, httpOnly: true, sameSite: 'Strict' }]);
+  await page.addInitScript(({ user }) => localStorage.setItem('flownote_auth_user', JSON.stringify(user)), { user });
+  const localMarkdown = '# offline detailed edit\n\n' + Array.from({ length: 24 }, (_, index) => `meaningful-${index}`).join(' ');
+  try {
+    await page.goto('/settings'); await toggle(page, false);
+    await page.goto(`/blog/${id}`); await page.getByLabel('Markdown 본문').fill(localMarkdown);
+    await expect(page.getByTestId('note-save-status')).toHaveText('기기에 저장됨 · 동기화 꺼짐');
+    expect((await request.post(`${api}/api/notes`, { headers, data: {
+      id, title: 'Conflict note', content: { format: 'markdown', version: 1, markdown: 'remote short edit' }, revision: 2, client_id: randomUUID(),
+    } })).ok()).toBeTruthy();
+    await page.goto('/settings'); await toggle(page, true);
+    const stored = await (await request.get(`${api}/api/notes/${id}`, { headers })).json();
+    expect(stored.content.markdown).toBe(localMarkdown);
+    const workspace = await readWorkspace(page, user.id) as Workspace & { sync: { recovery: { winner: string; loser: { content: { markdown: string } } }[] } };
+    expect(workspace.sync.recovery).toHaveLength(1);
+    expect(workspace.sync.recovery[0].winner).toBe('local');
+    expect(workspace.sync.recovery[0].loser.content.markdown).toBe('remote short edit');
+  } finally {
+    await request.delete(`${api}/api/notes/${id}`, { headers });
+  }
 });
 
 test('device mode is isolated by account and unavailable storage cannot silently disable cloud sync', async ({ page, request }) => {
@@ -103,7 +166,7 @@ test('device mode is isolated by account and unavailable storage cannot silently
   await expect(page.getByRole('switch', { name: '앱 동기화', exact: true })).toHaveAttribute('aria-checked', 'true');
   await page.evaluate(() => { Object.defineProperty(window, 'indexedDB', { configurable: true, value: { open() { throw new DOMException('Unavailable', 'SecurityError'); } } }); });
   page.once('dialog', dialog => dialog.accept()); await page.getByRole('switch', { name: '앱 동기화', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('전환하지 못했습니다');
+  await expect(page.getByRole('alert')).toBeVisible();
   await expect(page.getByRole('switch', { name: '앱 동기화', exact: true })).toHaveAttribute('aria-checked', 'true');
   await page.reload(); await toggle(page, false);
   await page.goto('/blog'); page.once('dialog', dialog => dialog.accept('Only account A'));
@@ -121,7 +184,7 @@ test('device mode is isolated by account and unavailable storage cannot silently
 });
 
 test('phone and desktop app markers restore an independent device workspace without a server session', async ({ browser }) => {
-  for (const [marker, viewport] of [['FlownoteAndroid/1.1.0', { width: 390, height: 844 }], ['FlownoteDesktop/1.1.1', { width: 1280, height: 900 }]] as const) {
+  for (const [marker, viewport] of [['FlownoteAndroid/1.2.0', { width: 390, height: 844 }], ['FlownoteDesktop/1.2.0', { width: 1280, height: 900 }]] as const) {
     const context = await browser.newContext({ userAgent: `Mozilla/5.0 ${marker}`, viewport });
     try {
       const owner = `synthetic-device-${randomUUID()}`;

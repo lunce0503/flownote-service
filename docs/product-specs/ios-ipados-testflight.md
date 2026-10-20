@@ -1,12 +1,12 @@
 # iOS/iPadOS TestFlight
 
-앱 설정에서 서버 저장과 실시간 수신을 모두 끄고 [기기 전용 작업 공간](device-only-workspace.md)을 사용할 수 있다. 서버/기기 자료는 자동 복제·병합하지 않으며, 기기 전용 기능은 같은 웹 소스로 제공해 네이티브 재설치 없이 반영한다.
+앱 설정에서 서버 저장과 실시간 수신을 모두 끄고 [오프라인 작업 공간](device-only-workspace.md)을 사용할 수 있다. OFF 전에 현재 서버 자료·지원 이미지를 기기에 저장하고 계속 편집하며, ON 때 기준본 이후 변경을 자동 조정·업로드한다. 공통 동기화 로직은 웹 소스로 제공되지만 Apple Pencil 본체 두 번 탭은 1.2.0 네이티브 빌드가 필요하다.
 
 ## 범위와 현재 상태
 
 기존 `flownote-mobile` Expo 네이티브 클라이언트를 EAS macOS 클라우드에서 빌드한다. Mac을 소유하지 않아도 빌드·업로드할 수 있다. Apple Developer 유료 멤버십과 App Store Connect 권한이 필요하다.
 
-1.0.0은 별도 Expo 네이티브 화면이었다. 1.1.0부터 iOS/iPadOS 진입점은 WKWebView로 같은 환경의 `flownote/` 웹 화면·API를 공유한다. Notes·Canvas·Planner·설정·소셜·AI 및 개발 중 기능의 공개/권한 상태도 웹을 따른다. 사용자 권한이나 중지된 AI 서버를 우회해 기능을 활성화하지 않는다. 기존 Expo Android/웹 테스트 클라이언트는 유지한다.
+1.0.0은 별도 Expo 네이티브 화면이었다. 1.1.0부터 iOS/iPadOS 진입점은 WKWebView로 같은 환경의 `flownote/` 웹 화면·API를 공유한다. 1.2.0은 이 구조를 유지하면서 오프라인 재동기화와 Apple Pencil 브리지를 추가한다. Notes·Canvas·Planner·설정·소셜·AI 및 개발 중 기능의 공개/권한 상태도 웹을 따른다. 사용자 권한이나 중지된 AI 서버를 우회해 기능을 활성화하지 않는다. 기존 Expo Android/웹 테스트 클라이언트는 유지한다.
 
 앱 UI는 `FlownoteIOS/<version>` UA로 식별한다. 원래 Flownote 헤더를 숨기고 아이보리·검정 테마와 앱 하단 탐색을 사용한다. 목록→상세/편집 라우터와 Canvas 전체 작업 영역은 웹과 같다. 일반 iPad Safari는 앱으로 식별하지 않는다. iOS safe area는 네이티브가 관리하고 강제 새로고침/뒤로 스와이프로 필기를 중단하지 않는다.
 
@@ -15,6 +15,12 @@ Canvas 목록 복귀 링크는 상단 파일 툴바를 가리지 않도록 우�
 PDF 페이지 내용은 focusable region으로 하드웨어 키보드의 PageDown 스크롤을 지원한다. 자동화의 Chromium touch 검사를 유지하고 mobile WebKit은 CDP/wheel 미지원이므로 키보드 스크롤을 검증한다. 실제 손가락·Pencil 동작은 기기 확인과 구분한다.
 
 WKWebView의 persistent website data store에 웹의 HttpOnly 세션 쿠키와 기기 초안을 보관한다. 기존 Expo Bearer 토큰을 읽거나 웹에 주입하지 않으므로 1.0.0→1.1.0 전환 시 한 번 다시 로그인해야 한다. 서버 저장 자료는 같은 계정으로 보이고, 기존 네이티브 로컬 초안은 삭제하지 않지만 웹에 자동 이관하지 않는다. 기기 전용 PDF도 웹/다른 기기에 자동 전송되지 않는다.
+
+## Apple Pencil 두 번 탭
+
+1.2.0은 로컬 Expo iOS 모듈에서 `UIPencilInteraction`을 활성 화면에 연결한다. 지원 Apple Pencil의 본체 두 번 탭을 받으면 시스템 선호 동작을 허용 목록 값으로 정규화하고, 현재 WKWebView URL이 환경별 고정 내부 origin일 때만 `flownote:apple-pencil-double-tap` 이벤트를 주입한다. 웹 캔버스는 이벤트마다 지우개와 직전 사용 도구를 전환한다. 화면 더블 탭·포인터 입력·압력 이벤트에는 이 동작을 연결하지 않는다.
+
+브리지는 임의 스크립트·URL·파일·토큰을 전달하지 않고 리스너 종료 시 native interaction을 제거한다. 지원 Pencil/iPad 조합과 설정에 따라 제스처가 제공되지 않을 수 있다. 자동화는 고정 이벤트 계약과 웹 도구 전환만 검증하며 실제 Pencil 본체 제스처, 손바닥 거부, 필기 중 전환은 TestFlight 실기기에서 별도로 확인한다.
 
 - Expo: `@lunce02/flownote-mobile`, project ID `0026ed46-eac0-4368-88ec-51f945829eb0`.
 - iPhone/iPad 공용 bundle ID: `com.flownote.mobile`, `supportsTablet: true`.

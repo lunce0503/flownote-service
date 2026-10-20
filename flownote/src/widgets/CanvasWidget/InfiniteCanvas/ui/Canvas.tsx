@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Loader2, X } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { useCanvasState } from "@/features/canvas";
+import { APPLE_PENCIL_DOUBLE_TAP_EVENT, nextApplePencilTool } from "@/features/canvas";
 import { useDrawing } from "@/features/canvas";
 import { useElementManipulation } from "@/features/canvas";
 import { usePersistence } from "@/features/canvas";
@@ -111,6 +112,19 @@ const Canvas = () => {
     const selectedCanvasId = routeCanvasId ?? null;
 
     const { offset, setOffset, scale, setScale, tool, setTool, getCanvasCoords } = useCanvasState(canvasRef);
+    const previousPencilToolRef = useRef<typeof tool>('pen');
+
+    useEffect(() => {
+        const handlePencilDoubleTap = () => {
+            setTool((current) => {
+                const next = nextApplePencilTool(current, previousPencilToolRef.current);
+                previousPencilToolRef.current = next.previous;
+                return next.tool;
+            });
+        };
+        window.addEventListener(APPLE_PENCIL_DOUBLE_TAP_EVENT, handlePencilDoubleTap);
+        return () => window.removeEventListener(APPLE_PENCIL_DOUBLE_TAP_EVENT, handlePencilDoubleTap);
+    }, [setTool]);
 
     const {
         isDrawing,

@@ -1,12 +1,14 @@
 import Constants from 'expo-constants';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
 import { navigationAction, parseExport, resolveWebOrigin, type WebExport } from '@/lib/web-shell-policy';
+import { pencilBridgeScript } from '@/lib/apple-pencil-bridge';
+import { addApplePencilDoubleTapListener } from '@/modules/apple-pencil-events';
 
 export default function InstalledWebApp() {
   const web = useRef<WebView>(null);
@@ -15,9 +17,20 @@ export default function InstalledWebApp() {
   const externalBusy = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  let origin: string;
+  let origin: string | null = null;
   try { origin = resolveWebOrigin(process.env.EXPO_PUBLIC_WEB_URL); }
-  catch { return <SafeAreaView style={styles.root}><Text style={styles.message}>앱 연결 설정을 확인할 수 없습니다. 새 버전을 설치해 주세요.</Text></SafeAreaView>; }
+  catch { /* Render the fixed configuration error after installing all hooks. */ }
+
+  useEffect(() => {
+    const subscription = addApplePencilDoubleTapListener(({ action }) => {
+      if (!origin || navigationAction(currentUrl.current, origin) !== 'internal') return;
+      try { web.current?.injectJavaScript(pencilBridgeScript(action)); }
+      catch { /* Native event payloads outside the fixed action list are ignored. */ }
+    });
+    return () => subscription.remove();
+  }, [origin]);
+
+  if (!origin) return <SafeAreaView style={styles.root}><Text style={styles.message}>앱 연결 설정을 확인할 수 없습니다. 새 버전을 설치해 주세요.</Text></SafeAreaView>;
 
   const openExternal = (url: string) => {
     if (navigationAction(url, origin) !== 'external' || externalBusy.current) return;
@@ -61,7 +74,7 @@ export default function InstalledWebApp() {
 
   return <SafeAreaView style={styles.root} edges={['top', 'bottom', 'left', 'right']}>
     <WebView ref={web} source={{ uri: origin }} style={styles.web}
-      applicationNameForUserAgent={`FlownoteIOS/${Constants.expoConfig?.version ?? '1.1.0'}`}
+      applicationNameForUserAgent={`FlownoteIOS/${Constants.expoConfig?.version ?? '1.2.0'}`}
       // All schemes reach our fail-closed policy instead of being opened by WebView's OS fallback.
       originWhitelist={['*']}
       onShouldStartLoadWithRequest={(request) => {

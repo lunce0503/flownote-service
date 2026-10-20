@@ -398,9 +398,11 @@ func (r *Repo) CreateFolder(ctx context.Context, userID string, req FolderCreate
 	}
 	return scanFolder(r.queryRow(ctx, `
 		INSERT INTO note_folders (id, user_id, category, name, note_ids)
-		VALUES (gen_random_uuid(), $1, $2, $3, $4::uuid[])
+		VALUES (COALESCE(NULLIF($1, '')::uuid, gen_random_uuid()), $2, $3, $4, $5::uuid[])
+		ON CONFLICT (id) DO UPDATE SET id = EXCLUDED.id
+		WHERE note_folders.user_id = EXCLUDED.user_id
 		RETURNING `+folderColumns+`
-	`, userID, normalizeCategory(req.Category), strings.TrimSpace(req.Name), owned))
+	`, strings.TrimSpace(req.ID), userID, normalizeCategory(req.Category), strings.TrimSpace(req.Name), owned))
 }
 
 func (r *Repo) UpdateFolder(ctx context.Context, userID, folderID string, req FolderUpdateRequest) (FolderResponse, error) {

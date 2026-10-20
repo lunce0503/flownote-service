@@ -33,6 +33,7 @@ type NoteResponse struct {
 }
 
 type FolderCreateRequest struct {
+	ID       string   `json:"id"`
 	Category *string  `json:"category"`
 	Name     string   `json:"name"`
 	NoteIDs  []string `json:"note_ids"`

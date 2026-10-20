@@ -1,8 +1,7 @@
-type Item = Record<string, unknown> & { id: string };
-type CanvasSnapshot = Item & { lines: Item[]; images: Item[]; textBoxes: Item[]; revision: number;
+export type Item = Record<string, unknown> & { id: string };
+export type CanvasSnapshot = Item & { lines: Item[]; images: Item[]; textBoxes: Item[]; revision: number;
   lastMutation?: { id: string; payload: string; revision: number } };
-export type DeviceWorkspace = {
-  version: 1;
+export type WorkspaceSnapshot = {
   notes: Item[];
   noteFolders: Item[];
   canvases: Item[];
@@ -12,7 +11,104 @@ export type DeviceWorkspace = {
   schedules: Item[];
   diaries: Item[];
 };
-export const createDeviceWorkspace = (): DeviceWorkspace => ({ version: 1, notes: [], noteFolders: [], canvases: [], canvasFolders: [], canvasContents: [], tasks: [], schedules: [], diaries: [] });
+export type DeviceConflict = {
+  id: string;
+  syncId: string;
+  collection: keyof WorkspaceSnapshot;
+  itemId: string;
+  winner: 'local' | 'remote';
+  base: Item | null;
+  local: Item | null;
+  remote: Item | null;
+  loser: Item | null;
+  localScore: number;
+  remoteScore: number;
+  createdAt: string;
+};
+export type DeviceSyncOperation = {
+  id: string;
+  collection: keyof WorkspaceSnapshot;
+  action: 'upsert' | 'delete';
+  itemId: string;
+  value?: Item;
+  remote?: Item;
+};
+export type DeviceSyncPlan = {
+  id: string;
+  createdAt: string;
+  cursor: number;
+  idMap: Record<string, string>;
+  desired: WorkspaceSnapshot;
+  operations: DeviceSyncOperation[];
+  conflicts: DeviceConflict[];
+};
+export type DeviceWorkspace = WorkspaceSnapshot & {
+  version: 2;
+  sync: {
+    status: 'idle' | 'offline' | 'syncing' | 'failed';
+    base: WorkspaceSnapshot;
+    preparedAt?: string;
+    lastSyncedAt?: string;
+    lastError?: string;
+    legacyImported?: boolean;
+    recovery: DeviceConflict[];
+    pending?: DeviceSyncPlan;
+  };
+};
+
+export const createWorkspaceSnapshot = (): WorkspaceSnapshot => ({
+  notes: [], noteFolders: [], canvases: [], canvasFolders: [], canvasContents: [],
+  tasks: [], schedules: [], diaries: [],
+});
+
+export const createDeviceWorkspace = (): DeviceWorkspace => ({
+  version: 2,
+  ...createWorkspaceSnapshot(),
+  sync: { status: 'idle', base: createWorkspaceSnapshot(), recovery: [] },
+});
+
+const snapshotKeys = [
+  'notes', 'noteFolders', 'canvases', 'canvasFolders', 'canvasContents', 'tasks', 'schedules', 'diaries',
+] as const satisfies readonly (keyof WorkspaceSnapshot)[];
+
+export const workspaceSnapshot = (value: Pick<DeviceWorkspace, keyof WorkspaceSnapshot>): WorkspaceSnapshot => (
+  Object.fromEntries(snapshotKeys.map(key => [key, structuredClone(value[key])])) as WorkspaceSnapshot
+);
+
+export function migrateDeviceWorkspace(value: unknown): DeviceWorkspace {
+  const source = record(value);
+  if (source.version !== 1 && source.version !== 2) throw new Error('기기 자료 형식을 읽을 수 없습니다. 초기화하지 않았습니다.');
+  for (const key of snapshotKeys) {
+    if (!Array.isArray(source[key])) throw new Error('기기 자료 형식을 읽을 수 없습니다. 초기화하지 않았습니다.');
+  }
+  const snapshot = Object.fromEntries(snapshotKeys.map(key => [key, structuredClone(source[key])])) as WorkspaceSnapshot;
+  if (source.version === 1) {
+    return {
+      version: 2,
+      ...snapshot,
+      sync: { status: 'idle', base: createWorkspaceSnapshot(), recovery: [], legacyImported: true },
+    };
+  }
+  const rawSync = record(source.sync);
+  const baseSource = record(rawSync.base);
+  const base = Object.fromEntries(snapshotKeys.map(key => [key, Array.isArray(baseSource[key]) ? structuredClone(baseSource[key]) : []])) as WorkspaceSnapshot;
+  const status = ['idle', 'offline', 'syncing', 'failed'].includes(String(rawSync.status))
+    ? rawSync.status as DeviceWorkspace['sync']['status'] : 'failed';
+  return {
+    version: 2,
+    ...snapshot,
+    sync: {
+      status,
+      base,
+      preparedAt: typeof rawSync.preparedAt === 'string' ? rawSync.preparedAt : undefined,
+      lastSyncedAt: typeof rawSync.lastSyncedAt === 'string' ? rawSync.lastSyncedAt : undefined,
+      lastError: typeof rawSync.lastError === 'string' ? rawSync.lastError : undefined,
+      legacyImported: rawSync.legacyImported === true,
+      recovery: Array.isArray(rawSync.recovery) ? structuredClone(rawSync.recovery) as DeviceConflict[] : [],
+      pending: rawSync.pending && typeof rawSync.pending === 'object' ? structuredClone(rawSync.pending) as DeviceSyncPlan : undefined,
+    },
+  };
+}
 const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const now = () => new Date().toISOString();
 const newId = () => `device-${crypto.randomUUID()}`;

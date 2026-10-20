@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 
 const api = 'https://flownote-api-staging.up.railway.app';
 const web = 'https://flownote-react-staging.vercel.app';
-const userAgent = 'Mozilla/5.0 (iPad; CPU OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 FlownoteIOS/1.1.0';
+const userAgent = 'Mozilla/5.0 (iPad; CPU OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 FlownoteIOS/1.2.0';
 test.use({ userAgent, hasTouch: true });
 
 for (const viewport of [{ width: 390, height: 844 }, { width: 1024, height: 1366 }]) {
@@ -81,6 +81,11 @@ test('iPad canvas keeps the full editor and persists pointer strokes across relo
     await expect(page.getByTestId('canvas-render-surface')).toHaveAttribute('data-visible-line-count', '0');
     await expect(page.locator('header')).toHaveCount(0);
     await expect(page.getByRole('navigation', { name: '앱 기능' })).toHaveCount(0);
+    await expect(page.getByTestId('canvas-current-tool')).toHaveAttribute('title', '현재 도구: 펜');
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('flownote:apple-pencil-double-tap', { detail: { action: 'switchEraser' } })));
+    await expect(page.getByTestId('canvas-current-tool')).toHaveAttribute('title', '현재 도구: 지우개');
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('flownote:apple-pencil-double-tap', { detail: { action: 'switchEraser' } })));
+    await expect(page.getByTestId('canvas-current-tool')).toHaveAttribute('title', '현재 도구: 펜');
     await page.waitForTimeout(1000);
     const box = await surface.boundingBox(); expect(box).not.toBeNull();
     await page.mouse.move(box!.x + 200, box!.y + 250); await page.mouse.down();

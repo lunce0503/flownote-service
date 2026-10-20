@@ -10,19 +10,19 @@ var emptyArray = json.RawMessage("[]")
 
 // SaveRequest는 캔버스 요소 증분 저장 요청(CanvasSaveRequest)과 동일한 형태다.
 type SaveRequest struct {
-	MutationID         string          `json:"mutationId"`
-	AddedLines         json.RawMessage `json:"addedLines"`
-	ModifiedLines      json.RawMessage `json:"modifiedLines"`
-	DeletedLines       json.RawMessage `json:"deletedLines"`
-	AddedImages        json.RawMessage `json:"addedImages"`
-	ModifiedImages     json.RawMessage `json:"modifiedImages"`
-	DeletedImages      json.RawMessage `json:"deletedImages"`
-	AddedTextBoxes     json.RawMessage `json:"addedTextBoxes"`
-	ModifiedTextBoxes  json.RawMessage `json:"modifiedTextBoxes"`
-	DeletedTextBoxes   json.RawMessage `json:"deletedTextBoxes"`
-	Trigger            string          `json:"trigger"`
-	OperationID        string          `json:"operationId"`
-	ClientCreatedAt    string          `json:"clientCreatedAt"`
+	MutationID        string          `json:"mutationId"`
+	AddedLines        json.RawMessage `json:"addedLines"`
+	ModifiedLines     json.RawMessage `json:"modifiedLines"`
+	DeletedLines      json.RawMessage `json:"deletedLines"`
+	AddedImages       json.RawMessage `json:"addedImages"`
+	ModifiedImages    json.RawMessage `json:"modifiedImages"`
+	DeletedImages     json.RawMessage `json:"deletedImages"`
+	AddedTextBoxes    json.RawMessage `json:"addedTextBoxes"`
+	ModifiedTextBoxes json.RawMessage `json:"modifiedTextBoxes"`
+	DeletedTextBoxes  json.RawMessage `json:"deletedTextBoxes"`
+	Trigger           string          `json:"trigger"`
+	OperationID       string          `json:"operationId"`
+	ClientCreatedAt   string          `json:"clientCreatedAt"`
 }
 
 // SaveResponse는 CanvasSaveResponse와 동일하다.
@@ -90,11 +90,13 @@ type SummaryResponse struct {
 
 // DocumentRequest는 문서 생성/수정 본문이다.
 type DocumentRequest struct {
+	ID    string `json:"id"`
 	Title string `json:"title"`
 }
 
 // FolderRequest는 폴더 생성/수정 본문이다(canvas_ids는 snake_case).
 type FolderRequest struct {
+	ID        string   `json:"id"`
 	Category  *string  `json:"category"`
 	Name      *string  `json:"name"`
 	CanvasIDs []string `json:"canvas_ids"`

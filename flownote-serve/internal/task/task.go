@@ -261,6 +261,8 @@ func (r *Repo) Create(ctx context.Context, userID string, req createRequest) (Ta
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::date, '', $10, $11, $12,
 			$13, ARRAY[]::TEXT[], $14, $15, $16, '[]'::jsonb, $17, $18, $19)
+		ON CONFLICT (id) DO UPDATE SET id = EXCLUDED.id
+		WHERE tasks.user_id = EXCLUDED.user_id
 		RETURNING `+taskColumns,
 		id, userID, taskName, req.Category, req.DifficultyLevel, req.Status,
 		req.EstimatedMinutes, req.ActualMinutes, req.DueDate,

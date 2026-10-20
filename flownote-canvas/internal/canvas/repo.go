@@ -480,9 +480,11 @@ func (r *Repo) CreateDocument(ctx context.Context, userID string, req DocumentRe
 	var s SummaryResponse
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO canvas_documents (id, user_id, title, lines, images, text_boxes)
-		VALUES (gen_random_uuid(), $1, $2, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb)
+		VALUES (COALESCE(NULLIF($1, '')::uuid, gen_random_uuid()), $2, $3, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb)
+		ON CONFLICT (id) DO UPDATE SET id = EXCLUDED.id
+		WHERE canvas_documents.user_id = EXCLUDED.user_id
 		RETURNING id::text, title, created_at, updated_at
-	`, userID, normalizeTitle(req.Title)).Scan(&s.ID, &s.Title, &s.CreatedAt, &s.UpdatedAt)
+	`, strings.TrimSpace(req.ID), userID, normalizeTitle(req.Title)).Scan(&s.ID, &s.Title, &s.CreatedAt, &s.UpdatedAt)
 	return s, err
 }
 
@@ -588,9 +590,11 @@ func (r *Repo) CreateFolder(ctx context.Context, userID string, req FolderReques
 	f := FolderResponse{CanvasIDs: []string{}}
 	err = r.pool.QueryRow(ctx, `
 		INSERT INTO canvas_folders (id, user_id, category, name, canvas_ids)
-		VALUES (gen_random_uuid(), $1, $2, $3, $4::uuid[])
+		VALUES (COALESCE(NULLIF($1, '')::uuid, gen_random_uuid()), $2, $3, $4, $5::uuid[])
+		ON CONFLICT (id) DO UPDATE SET id = EXCLUDED.id
+		WHERE canvas_folders.user_id = EXCLUDED.user_id
 		RETURNING id::text, category, name, canvas_ids::text[], created_at, updated_at
-	`, userID, normalizeCategory(deref(req.Category)), normalizeFolderName(deref(req.Name)), owned).
+	`, strings.TrimSpace(req.ID), userID, normalizeCategory(deref(req.Category)), normalizeFolderName(deref(req.Name)), owned).
 		Scan(&f.ID, &f.Category, &f.Name, &f.CanvasIDs, &f.CreatedAt, &f.UpdatedAt)
 	return f, err
 }

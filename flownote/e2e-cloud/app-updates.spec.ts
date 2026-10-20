@@ -16,14 +16,14 @@ test('app update feeds enforce signed platform/channel/artifact contracts', asyn
       expect(verify('sha256', payload, key, Buffer.from(envelope.signature, 'base64'))).toBeTruthy();
       const manifest = JSON.parse(payload.toString('utf8'));
       expect(manifest.schema).toBe(1); expect(manifest.platform).toBe(platform); expect(manifest.channel).toBe(channel);
-      expect(manifest.version).toBe(platform === 'windows' ? '1.1.1' : '1.1.0'); expect(manifest.notes.length).toBeGreaterThan(0);
+      expect(manifest.version).toBe('1.2.0'); expect(manifest.notes.length).toBeGreaterThan(0);
       if (platform === 'windows') {
-        expect(verifyEnvelope(await response.text(), channel).version).toBe('1.1.1');
+        expect(verifyEnvelope(await response.text(), channel).version).toBe('1.2.0');
         expect(() => verifyEnvelope(JSON.stringify(envelope), channel === 'staging' ? 'production' : 'staging')).toThrow();
       } else {
-        expect(manifest.versionCode).toBe(11000);
+        expect(manifest.versionCode).toBe(12000);
         const origin = channel === 'staging' ? 'https://flownote-react-staging.vercel.app' : 'https://flownote-react.vercel.app';
-        expect(manifest.artifacts.apk.url).toBe(`${origin}/downloads/flownote-1.1.0${channel === 'staging' ? '-staging' : ''}.apk`);
+        expect(manifest.artifacts.apk.url).toBe(`${origin}/downloads/flownote-1.2.0${channel === 'staging' ? '-staging' : ''}.apk`);
       }
     }
   }

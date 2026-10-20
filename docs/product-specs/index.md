@@ -4,7 +4,7 @@
 
 ## 기존 사양
 
-- [앱 기기 전용 작업 공간](device-only-workspace.md): 서버 저장·실시간 수신 끄기, 계정별 기기 저장과 클라우드 분리, 백업 및 제한.
+- [앱 오프라인 작업 공간과 재동기화](device-only-workspace.md): 서버 자료·자산 스냅샷, OFF 편집, 3-way 조정, 충돌 복구와 제한.
 
 - [노트 Markdown 작업 공간](blog-markdown-workspace.md): Markdown 편집·폴더 탐색·빠른 목록 로딩. 캔버스와 공통 색상 및 명칭 기준을 적용한다.
 

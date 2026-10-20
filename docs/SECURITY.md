@@ -16,7 +16,9 @@ Flownote는 로그인 세션을 기반으로 사용자 데이터를 분리한다
 
 ## 민감 데이터 규칙
 
-설치형 앱의 [기기 전용 모드](product-specs/device-only-workspace.md)는 개인 작업 API의 로컬 어댑터·Canvas 저장/이미지 처리·실시간 연결 경계에서 서버 전송을 차단한다. 미지원 기능은 실패하고 서버로 fallback하지 않는다. 기기 자료 ID와 초안/재시도 namespace를 분리하여 서버 모드 복귀 시 자동 업로드하지 않는다. IndexedDB는 계정별로 논리 구분하지만 기기 잠금/암호화 금고를 대체하지 않는다. 기기 모드 로그아웃은 서버 세션 폐기를 요청할 수 없고 로컬 표시만 지운다. 공유 기기 정리와 개인정보가 포함된 백업 보관에 주의한다.
+설치형 앱의 [오프라인 작업 공간](product-specs/device-only-workspace.md)은 OFF 전에 소유권 검사를 통과한 개인 작업 자료·지원 자산만 계정별 IndexedDB에 스냅샷한다. OFF 상태에서는 개인 작업 API의 로컬 어댑터·Canvas 저장/이미지 처리·실시간 연결 경계에서 서버 전송을 차단하고 미지원 기능을 서버로 fallback하지 않는다. ON 조정의 네트워크 예외는 메모리 sync scope와 내부 표식이 모두 있는 오케스트레이터 요청으로 제한하며 표식은 실제 송신 전에 제거한다. 기존 기기 ID는 새 UUID로 remap하고 클라이언트 ID 생성 API는 `user_id` 소유 조건으로만 멱등 처리한다.
+
+기준본·현재본·대기 연산·충돌 복구본에는 개인 작성 내용과 이미지가 포함될 수 있다. 인증 정보는 저장하지 않지만 IndexedDB는 기기 잠금/암호화 금고를 대체하지 않는다. 기기 모드 로그아웃은 서버 세션 폐기를 요청할 수 없고 로컬 표시만 지우므로 공유 기기 정리와 개인정보 백업 보관에 주의한다. 자동 조정이 끝나기 전에는 로컬 원본/cursor를 삭제하지 않는다.
 
 - `.env`, `.env.local`, 토큰, DB 덤프, 업로드 원본, 로컬 인증 정보는 문서나 Git 추적 대상에 넣지 않는다.
 - 문서에는 환경 변수 이름과 용도만 적고 실제 값을 적지 않는다.
@@ -30,7 +32,7 @@ Flownote는 로그인 세션을 기반으로 사용자 데이터를 분리한다
 
 ## 고위험 영역
 
-iOS/iPadOS 1.1.0 WKWebView는 환경별 고정 HTTPS origin에서만 내부 탐색하며 URL credential·HTTP/file/javascript/data/intent를 차단한다. 외부 HTTPS/mailto/tel은 사용자 동의 후 OS에서 연다. originWhitelist 전체 허용은 기본 OS fallback을 막고 모든 URL을 자체 fail-closed 검사로 보내기 위한 것으로, 내부 신뢰 origin을 늘리지 않는다. persistent WK 쿠키 저장소의 HttpOnly 세션을 사용하고 기존 Expo 토큰을 주입하지 않는다. 앱 JS bridge는 인증된 웹의 bounded export 데이터만 받고 정확한 schema·origin·base64·MIME·8MiB·파일명 제한 및 native 사용자 확인 후 cache→share→삭제 순서를 적용한다. 일반 네이티브 호출/쿠키·파일 읽기/임의 네트워크 요청은 없다. 세부 계약은 [iOS 사양](product-specs/ios-ipados-testflight.md)을 따른다.
+iOS/iPadOS 1.2.0 WKWebView는 환경별 고정 HTTPS origin에서만 내부 탐색하며 URL credential·HTTP/file/javascript/data/intent를 차단한다. 외부 HTTPS/mailto/tel은 사용자 동의 후 OS에서 연다. originWhitelist 전체 허용은 기본 OS fallback을 막고 모든 URL을 자체 fail-closed 검사로 보내기 위한 것으로, 내부 신뢰 origin을 늘리지 않는다. persistent WK 쿠키 저장소의 HttpOnly 세션을 사용하고 기존 Expo 토큰을 주입하지 않는다. 앱 JS bridge는 인증된 웹의 bounded export 데이터만 받고 정확한 schema·origin·base64·MIME·8MiB·파일명 제한 및 native 사용자 확인 후 cache→share→삭제 순서를 적용한다. Apple Pencil 브리지는 현재 URL이 같은 고정 origin일 때 허용 목록 native 값을 고정 DOM 이벤트로만 전달한다. 일반 네이티브 호출/쿠키·파일 읽기/임의 네트워크 요청은 없다. 세부 계약은 [iOS 사양](product-specs/ios-ipados-testflight.md)을 따른다.
 
 - 인증과 세션: `flownote-server`의 auth service와 session table.
 - 업로드: 파일 크기, MIME 타입, 저장 경로, 공개 URL 처리.
