@@ -197,9 +197,10 @@ test('mobile reader keeps the canvas visible and recovers from invalid and repla
     }
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   } else {
-    // WebKit has no CDP touch session. Exercise actual browser scrolling, not a scrollTop assignment.
-    await page.mouse.move(scrollBox.x + scrollBox.width / 2, scrollBox.y + scrollBox.height / 2);
-    await page.mouse.wheel(0, 150);
+    // Mobile WebKit cannot inject CDP touch/wheel. Verify real keyboard scrolling instead.
+    // Actual iPad finger gestures remain a physical-device check.
+    await scroller.focus();
+    await page.keyboard.press('PageDown');
   }
   await expect.poll(() => scroller.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();

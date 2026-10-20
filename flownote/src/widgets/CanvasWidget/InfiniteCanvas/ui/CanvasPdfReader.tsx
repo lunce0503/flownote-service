@@ -127,7 +127,8 @@ export const CanvasPdfReader = ({ onClose }: { onClose: () => void }) => {
             <p role="status" aria-live="polite" className="shrink-0 px-3 text-sm text-stone-600">
                 {!file && !error ? "PDF를 선택하고 캔버스에 함께 필기하세요." : error ? "다른 PDF를 선택해 다시 시도할 수 있습니다." : !pdf ? "PDF를 여는 중…" : !ready ? "페이지를 표시하는 중…" : `${pageNumber} / ${pdf.numPages} 페이지`}
             </p>
-            <div data-testid="canvas-pdf-scroll" className="min-h-0 flex-1 overflow-auto overscroll-contain p-2" style={{ touchAction: "pan-y" }} aria-busy={Boolean(file && !ready && !error)}>
+            <div data-testid="canvas-pdf-scroll" tabIndex={0} role="region" aria-label="PDF 페이지 내용"
+                className="min-h-0 flex-1 overflow-auto overscroll-contain p-2" style={{ touchAction: "pan-y" }} aria-busy={Boolean(file && !ready && !error)}>
                 <canvas
                     ref={canvasRef}
                     role="img"
