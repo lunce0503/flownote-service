@@ -3,6 +3,9 @@ import { v4 as uuidv4 } from 'uuid';
 import type { LineElement, CanvasSavePayload } from '@/entities/canvas';
 import { authHeaders } from '@/shared/api';
 import { isAbortError, type CanvasSaveTrigger } from './canvasPersistenceModel';
+import { isDeviceOnly } from '@/shared/lib/deviceMode';
+import { withDeviceWorkspace } from '@/shared/lib/deviceStorage';
+import { handleDeviceCanvas } from '@/shared/lib/deviceWorkspace';
 
 // 게이트웨이 저장 포워딩 타임아웃(CANVAS_SAVE_FORWARD_TIMEOUT_SECONDS=90s)보다 살짝 크게 잡는다.
 // 30s로 두면 대용량 필기·느린 백엔드(30~90s)에서 클라이언트가 먼저 포기→재시도하며,
@@ -100,8 +103,12 @@ export type CanvasStreamCallbacks = {
 
 let canvasSocket: Socket | null = null;
 let canvasSocketUrl: string | null = null;
+window.addEventListener('flownote-device-mode-changing', () => {
+  canvasSocket?.disconnect(); canvasSocket = null; canvasSocketUrl = null;
+});
 
 export const getCanvasSocket = (socketUrl: string) => {
+  if (isDeviceOnly()) { canvasSocket?.disconnect(); canvasSocket = null; throw new CanvasSocketError('기기 전용 모드에서는 실시간 연결을 사용하지 않습니다.', 503, false); }
   if (!canvasSocket || canvasSocketUrl !== socketUrl) {
     canvasSocket?.disconnect();
     canvasSocketUrl = socketUrl;
@@ -123,6 +130,8 @@ export const emitCanvasSocket = <T,>(
   payload: Record<string, unknown>,
   init?: Pick<RequestInit, "signal"> & { timeoutMs?: number },
 ): Promise<T> => (
+  isDeviceOnly() ? (init?.signal?.aborted ? Promise.reject(new DOMException('Aborted', 'AbortError'))
+    : withDeviceWorkspace(eventName !== 'canvas:load', state => handleDeviceCanvas(state, eventName, payload) as T)) :
   new Promise((resolve, reject) => {
     if (canvasMessageBytes(payload) > CANVAS_SOCKET_SAFE_BYTES) {
       reject(new CanvasSocketError("소켓 전송 크기를 초과했습니다.", 413, false));
@@ -169,6 +178,7 @@ export const emitCanvasSocket = <T,>(
 );
 
 export const emitCanvasStream = (socketUrl: string, event: string, payload: Record<string, unknown>) => {
+  if (isDeviceOnly()) return;
   const socket = getCanvasSocket(socketUrl);
   if (!socket.connected || canvasMessageBytes(payload) > CANVAS_SOCKET_SAFE_BYTES) return;
   // Transient previews are recoverable from the durable save; never buffer them offline.
@@ -183,6 +193,11 @@ export const saveCanvasPayload = async (
   trigger: CanvasSaveTrigger,
   init?: Pick<RequestInit, "keepalive" | "signal">,
 ): Promise<CanvasSaveResponse> => {
+  if (isDeviceOnly()) {
+    if (init?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    return await withDeviceWorkspace(true, state => handleDeviceCanvas(state, 'canvas:save', { canvasId, payload, mutationId }) as CanvasSaveResponse);
+  }
+  if (canvasId?.startsWith('device-')) throw new CanvasSocketError('기기 전용 자료를 서버에 전송하지 않습니다.', 403, false);
   try {
     const request = {
       authorization: authHeaders().Authorization,

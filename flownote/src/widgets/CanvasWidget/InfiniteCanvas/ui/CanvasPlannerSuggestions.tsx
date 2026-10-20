@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { X } from "lucide-react";
-import { v4 as uuidv4 } from "uuid";
+import { newWorkspaceId } from '@/shared/lib/deviceMode';
+import { v4 as uuidv4 } from 'uuid';
 import type { TextBoxElement } from "@/entities/canvas";
 import { getDiary, putDiary } from "@/entities/diary";
 import { postTaskData, type TaskProps } from "@/entities/task";
@@ -21,7 +22,7 @@ export const CanvasPlannerSuggestions = ({ canvasTitle, textBoxes, onClose }: { 
     setError("");
     try {
       if (item.kind === "task") {
-        await postTaskData({ id: uuidv4(), task_name: item.title.trim(), due_date: item.date, status: "TODO" } as TaskProps);
+        await postTaskData({ id: newWorkspaceId(), task_name: item.title.trim(), due_date: item.date, status: "TODO" } as TaskProps);
       } else {
         const existing = await getDiary(item.date);
         await putDiary(item.date, addSuggestedSchedule(existing, item, uuidv4()));

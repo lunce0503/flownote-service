@@ -1,5 +1,6 @@
 import type { BlockDataProps } from '../../../entities/blog/model/types';
 import { noteDrafts, type NoteDraft } from '../../../entities/blog/model/noteDrafts.ts';
+import { isDeviceOnly } from '../../../shared/lib/deviceMode.ts';
 
 type Queue = { pause: () => void; readonly settled: Promise<void> };
 const active = new Map<string, Queue>();
@@ -33,7 +34,7 @@ export function createNoteSaveQueue(owner: string, initial: BlockDataProps, save
         await drafts.ack(owner, saved.id, snapshot.draft.sequence);
         if (pending?.draft.sequence === snapshot.draft.sequence) pending = null;
         if (pending) await drafts.rebase(owner, initial.id, pending.draft.sequence, revision);
-        notify(pending?.draft.sequence === failedSequence ? '기기 보관 실패 — 내보내기 필요' : pending ? '기기에 보관됨' : '서버에 저장됨');
+        notify(pending?.draft.sequence === failedSequence ? '기기 보관 실패 — 내보내기 필요' : pending ? '기기에 보관됨' : isDeviceOnly() ? '기기에 저장됨 · 동기화 꺼짐' : '서버에 저장됨');
       } catch (error) {
         blocked = true;
         conflict = (error as { response?: { status?: number } }).response?.status === 409;

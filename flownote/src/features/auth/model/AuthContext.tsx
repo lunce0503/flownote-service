@@ -13,6 +13,7 @@ import {
 import type { AuthUser } from "@/shared/api";
 import { noteDrafts } from "@/entities/blog";
 import { AuthContext } from "./authContext";
+import { isDeviceOnly } from '@/shared/lib/deviceMode';
 
 // 스테이징 전용 게스트 자동 로그인 설정(빌드 타임 주입).
 // 프로덕션 빌드는 VITE_ALLOW_ANONYMOUS를 설정하지 않으므로 anonymousEnabled=false → 동작 무변화.
@@ -35,6 +36,10 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const logout = useCallback(async () => {
+    if (isDeviceOnly()) {
+      if (!window.confirm('기기 자료는 이 계정의 기기 저장소에 남습니다. 공유 기기라면 백업 후 앱/사이트 데이터를 별도로 정리하세요. 로그아웃할까요?')) return;
+      resetAuth(); window.location.assign('/login'); return;
+    }
     const owner = getAuthUser()?.id;
     const hasDrafts = owner ? await noteDrafts.hasUser(owner).catch(() => true) : false;
     if (hasDrafts && !window.confirm("로그아웃하면 이 계정의 기기 초안을 삭제합니다. 필요한 입력을 내보낸 뒤 계속할까요?")) return;
@@ -121,7 +126,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [resetAuth]);
 
   useEffect(() => {
-    if (!token || !API_CORE_BASE_URL) return;
+    if (!token || !API_CORE_BASE_URL || isDeviceOnly()) return;
     let active = true;
     void axios.get<AuthUser>(`${API_CORE_BASE_URL}/api/users/me`, { headers: authHeaders() })
       .then((response) => {

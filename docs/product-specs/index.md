@@ -4,13 +4,15 @@
 
 ## 기존 사양
 
+- [앱 기기 전용 작업 공간](device-only-workspace.md): 서버 저장·실시간 수신 끄기, 계정별 기기 저장과 클라우드 분리, 백업 및 제한.
+
 - [노트 Markdown 작업 공간](blog-markdown-workspace.md): Markdown 편집·폴더 탐색·빠른 목록 로딩. 캔버스와 공통 색상 및 명칭 기준을 적용한다.
 
 - [Windows 설치 앱](windows-app.md): 웹 기능 공유, 아이보리·검정 앱 UI, Windows 설치형/portable 배포와 실행 검증.
 
 - [Android 설치 앱](android-app.md): 웹 전체 기능 공유, 아이보리·검정 앱 UI, 헤더 제거, APK 설치·배포.
 
-- [iOS/iPadOS TestFlight](ios-ipados-testflight.md): 기존 Expo 앱의 EAS 클라우드 빌드, Apple 서명 연결, TestFlight 내부 테스트와 iPad 설치.
+- [iOS/iPadOS TestFlight](ios-ipados-testflight.md): WKWebView 웹 기능 공유, EAS 클라우드 빌드, Apple 서명 연결, TestFlight 내부 테스트와 iPad 설치.
 
 - `mobile-was-architecture.md`: Expo 네이티브 앱과 Railway 웹 테스트 클라이언트의 gateway 통신, 캔버스 저장, 실행 방식.
 - `expo-go-railway-access.md`: Railway production Metro를 통한 Expo Go 접속, iPhone·iPad·Android 사용 절차와 장애 대응.

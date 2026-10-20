@@ -1,5 +1,6 @@
 import axios from "axios";
 import { requireBrowserReachableUrl, resolveBrowserReachableUrl } from "./cloudUrl";
+import { installDeviceTransport } from '../lib/deviceTransport';
 
 const API_BASE_URL = requireBrowserReachableUrl("VITE_API_BASE_URL", import.meta.env.VITE_API_BASE_URL);
 const API_BASE_URL2 = resolveBrowserReachableUrl(import.meta.env.VITE_API_BASE_URL2) ?? API_BASE_URL;
@@ -10,6 +11,7 @@ const API_SYNC_BASE_URL = resolveBrowserReachableUrl(import.meta.env.VITE_CANVAS
 const AUTH_TOKEN_KEY = "flownote_auth_token";
 const AUTH_USER_KEY = "flownote_auth_user";
 axios.defaults.headers.common["X-Flownote-Web"] = "1";
+installDeviceTransport();
 
 type AuthUser = {
   id: string;

@@ -1,4 +1,6 @@
 /* App-only palette: artwork, status colours, and imported content keep their colours. */
+.device-mode-editor-badge { position: fixed; bottom: 72px; left: 12px; z-index: 700; max-width: calc(100vw - 84px); border: 1px solid #b9b0a1; border-radius: 999px; padding: 7px 12px; background: #f7f3e8; color: #211f1a; font-size: 12px; }
+html[data-installed-app="true"]:has(.canvas-pdf-reader) .device-mode-editor-badge { display: none; }
 html[data-installed-app="true"] {
   color-scheme: light;
   --color-amber-50: #f7f3e8;

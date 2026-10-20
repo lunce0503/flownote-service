@@ -1,4 +1,5 @@
-const DATABASE_NAME = "flownote-canvas";
+import { deviceNamespace } from '@/shared/lib/deviceMode';
+const DATABASE_NAME = deviceNamespace('flownote-canvas');
 const DATABASE_VERSION = 1;
 const OPERATIONS_STORE = "operations";
 const DRAFTS_STORE = "drafts";

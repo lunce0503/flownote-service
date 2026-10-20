@@ -35,4 +35,25 @@
 
 ## 마지막 상태
 
-진행 중: 최종 cloud staging gate, 동일 웹 소스 production 승격, 최종 native archive/EAS Xcode 빌드와 TestFlight 업로드. 완료 ID/상태는 이 절에 덧붙인다.
+네이티브 완료:
+
+- EAS build `927ad24d-927a-43f4-ab06-2359371e6b63`: FINISHED, iOS/iPadOS 1.1.0 build 4. source `e847e45b4e05919d83298b1845803363d253323d`.
+- TestFlight submission `bdf2a638-d95a-4774-9d32-7b47889eb27f`: FINISHED (2026-10-20 13:43:56 KST 조회). 원격 서명/제출 키를 재사용해 추가 사용자 비밀번호 없이 처리했다. Apple의 이후 처리/실제 기기 설치와 구분한다.
+- IPA 16,921,899 bytes, SHA-256 `29d46cf40d95910d7145fccea9bd0914fa850ad7f848f1bb2476eabe8509ce86`. 생성된 바이너리의 Info.plist를 직접 읽어 bundle ID·1.1.0(4)·UIDeviceFamily [1,2]·iphoneos26.0 SDK·ATS false/false/빈 예외·비면제 암호화 없음 확인. 다운로드는 임시 RAM 경로에만 보관했다.
+- [EAS 빌드](https://expo.dev/accounts/lunce02/projects/flownote-mobile/builds/927ad24d-927a-43f4-ab06-2359371e6b63), [제출](https://expo.dev/accounts/lunce02/projects/flownote-mobile/submissions/bdf2a638-d95a-4774-9d32-7b47889eb27f).
+
+웹 검증/배포 이력:
+
+- 최초 63/63 통과, staging `dpl_DYTAzpoQWugFiwQJDjbFNHh9L2SG`, `2026-10-20T04:37:22.719Z`, fingerprint `5aa6d01099499d2b03b75d0ba7a329d3eac943b57f1d4f3c1c7992c7aaa33ff5`.
+- 같은 snapshot production `dpl_92ijqN2BPwMRJ8QTKrEpAr1L2yYV`, `2026-10-20T04:38:41.062Z`, READY. 운영 HTML/asset의 iOS UI marker 및 비인증 API 401 read-back 통과. 운영 CRUD 없음.
+- 최종 native snapshot에서도 동일 web artifact로 전체 63/63 재확인 성공. 이후 추가 installed-iOS PDF suite에서 실제 겹침 2건을 발견했다: PDF 닫기 버튼, 모바일 파일 동작 버튼을 고정 목록 링크가 가렸다. 검사 강제 클릭/skip 없이 제품 CSS를 수정했다. [버그 기록](../bugs/2026-10-20-ios-pdf-close-overlay.md).
+- 수정 web source `f39bfecfa0d780790ed21c1c419ce12d9a1cd09e`, snapshot `/dev/shm/flownote-ios-pdf-release-20261020`. 65개 gate와 같은 소스 production 승격을 진행한다. 이 수정은 원격 웹만 바꾸므로 완료된 IPA를 다시 만들지 않는다.
+- WebKit PDF targeted 재시도: 닫기/캔버스 저장 시나리오는 수정 후 통과했고 모바일 시나리오는 기존 Chromium 전용 CDP 호출로 실패했다. wheel 방식도 mobile WebKit 미지원으로 실패했으므로 제품 오류와 분리해 검사 경로를 이식했다. Chromium의 실제 touch 검사는 유지하고 PDF scroll을 focusable region으로 만든 뒤 WebKit의 실제 PageDown 키 입력과 scrollTop 증가를 검사한다. 중간 두 full gate는 알려진 검사 도구 오류를 재현할 필요가 없어 해당 임시 브라우저 컨테이너만 중지했고 앱 서비스/DB/운영 자료는 중지하거나 삭제하지 않았다.
+- 최종 수정 source `761afcd2857f234becf729bcb81b8ec422f6c7cb`, snapshot `/dev/shm/flownote-ios-pdf-keyboard-release-20261020`. 새 immutable staging 배포에서 65개 전체 및 WebKit PDF 2개 targeted를 검증한다. 완료된 IPA native 소스와 설정은 바뀌지 않는다.
+- 최종 WebKit PDF targeted 2/2 통과(19.6초). 전체 gate의 첫 Android 로그인 화면이 한 번 빈 화면으로 멈춰 이메일 input 대기에서 timeout이 났다. 테스트를 완화하지 않고 같은 immutable staging에 새 Chromium 모바일 context를 10회 열어 `/login` input이 10/10 정상 표시되고 pageerror/requestfailed가 없음을 확인했다. 원인은 확정하지 않았다. 해당 실패 run의 임시 브라우저만 중지하고 같은 소스·같은 deployment로 전체 65개 gate를 재실행한다. 새 배포나 제품 코드 수정은 하지 않았다.
+
+최종 완료: 같은 immutable source `761afcd2857f234becf729bcb81b8ec422f6c7cb`로 전체 65/65 통과(5.2분), staging `dpl_FPS5g8DCQxncCU3yU1mQEG8pQ9Gb`, `2026-10-20T05:01:15.513Z`. fingerprint `7df0f0b38ce8ae25137a803b5b31d27c05818c6c4d3564f73d9ab22fe5861915`.
+
+같은 source production `dpl_5mVQNWa5x8mt6GUcDC9EhTSDdDM9`, `https://flownote-react-q2zldath7-flownote-service.vercel.app`, READY, `2026-10-20T05:03:56.483Z` (14:03:56 KST). deploy smoke 통과. 운영 `/` 200·메인 JS의 FlownoteIOS marker·비인증 same-origin users/me 401 read-back 통과. 운영 CRUD 없음. 기존 한 차례 빈 로그인 원인은 미확정이며 같은 소스 재검사에서 정상 통과했고 테스트를 완화하지 않았다.
+
+실제 iPad Pencil/시스템 파일 선택·공유 UI는 사용자 기기 확인 대상이다. 이후 사용자가 추가한 서버 저장/실시간 수신 모두 끄기 요청은 [기기 전용 계획](../../docs/exec-plan/active/2026-10-20-device-only-workspace.md)과 별도 보고서에서 추적한다. 완료된 IPA를 해당 웹 전용 후속 기능 때문에 다시 빌드하지 않는다.

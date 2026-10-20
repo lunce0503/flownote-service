@@ -1,5 +1,6 @@
 import { API_SYNC_BASE_URL, authHeaders, getAuthToken } from "../api";
 import { io, type Socket } from "socket.io-client";
+import { isDeviceOnly } from './deviceMode';
 
 export type SyncResource = "notes" | "canvas" | "tasks" | "schedule" | "all";
 
@@ -19,6 +20,9 @@ let socket: Socket | null = null;
 let socketToken: string | null = null;
 let publishing = 0;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+window.addEventListener('flownote-device-mode-changing', () => {
+  clearTimeout(reconnectTimer); socket?.disconnect(); socket = null; socketToken = null;
+});
 
 const releaseSocket = () => {
   if (listeners.size || publishing) return;
@@ -29,6 +33,7 @@ const releaseSocket = () => {
 };
 
 const getSyncSocket = () => {
+  if (isDeviceOnly()) { socket?.disconnect(); socket = null; socketToken = null; return null; }
   const token = getAuthToken();
   if (!API_SYNC_BASE_URL || !token) return null;
   if (!socket || socketToken !== token) {

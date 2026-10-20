@@ -1,5 +1,7 @@
 # iOS/iPadOS TestFlight
 
+앱 설정에서 서버 저장과 실시간 수신을 모두 끄고 [기기 전용 작업 공간](device-only-workspace.md)을 사용할 수 있다. 서버/기기 자료는 자동 복제·병합하지 않으며, 기기 전용 기능은 같은 웹 소스로 제공해 네이티브 재설치 없이 반영한다.
+
 ## 범위와 현재 상태
 
 기존 `flownote-mobile` Expo 네이티브 클라이언트를 EAS macOS 클라우드에서 빌드한다. Mac을 소유하지 않아도 빌드·업로드할 수 있다. Apple Developer 유료 멤버십과 App Store Connect 권한이 필요하다.
@@ -7,6 +9,10 @@
 1.0.0은 별도 Expo 네이티브 화면이었다. 1.1.0부터 iOS/iPadOS 진입점은 WKWebView로 같은 환경의 `flownote/` 웹 화면·API를 공유한다. Notes·Canvas·Planner·설정·소셜·AI 및 개발 중 기능의 공개/권한 상태도 웹을 따른다. 사용자 권한이나 중지된 AI 서버를 우회해 기능을 활성화하지 않는다. 기존 Expo Android/웹 테스트 클라이언트는 유지한다.
 
 앱 UI는 `FlownoteIOS/<version>` UA로 식별한다. 원래 Flownote 헤더를 숨기고 아이보리·검정 테마와 앱 하단 탐색을 사용한다. 목록→상세/편집 라우터와 Canvas 전체 작업 영역은 웹과 같다. 일반 iPad Safari는 앱으로 식별하지 않는다. iOS safe area는 네이티브가 관리하고 강제 새로고침/뒤로 스와이프로 필기를 중단하지 않는다.
+
+Canvas 목록 복귀 링크는 상단 파일 툴바를 가리지 않도록 우측 하단에 두고 PDF reader가 열리면 숨긴다. PDF를 닫으면 링크를 복원한다. 설치 앱 UA에서도 PDF 열기·페이지 전환·닫기·캔버스 동시 저장을 WebKit으로 회귀 검증한다.
+
+PDF 페이지 내용은 focusable region으로 하드웨어 키보드의 PageDown 스크롤을 지원한다. 자동화의 Chromium touch 검사를 유지하고 mobile WebKit은 CDP/wheel 미지원이므로 키보드 스크롤을 검증한다. 실제 손가락·Pencil 동작은 기기 확인과 구분한다.
 
 WKWebView의 persistent website data store에 웹의 HttpOnly 세션 쿠키와 기기 초안을 보관한다. 기존 Expo Bearer 토큰을 읽거나 웹에 주입하지 않으므로 1.0.0→1.1.0 전환 시 한 번 다시 로그인해야 한다. 서버 저장 자료는 같은 계정으로 보이고, 기존 네이티브 로컬 초안은 삭제하지 않지만 웹에 자동 이관하지 않는다. 기기 전용 PDF도 웹/다른 기기에 자동 전송되지 않는다.
 

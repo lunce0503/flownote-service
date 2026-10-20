@@ -5,6 +5,7 @@ import { addNoteToFolder, createNoteFolder, deleteNote, deleteNoteFolder, getNot
   noteDrafts, postNoteData, removeNoteFromFolder, updateNoteFolder, updateNoteTitle } from '@/entities/blog';
 import type { BlockDataProps, NoteFolder, NoteSummary } from '@/entities/blog';
 import { getAuthUser } from '@/shared/api';
+import { newWorkspaceId } from '@/shared/lib/deviceMode';
 import { getSyncClientId, subscribeSyncEvents } from '@/shared/lib/sync';
 import { workspaceTree } from '@/features/blog';
 import { pauseNoteSave, waitForNoteSave } from '@/features/blog';
@@ -111,7 +112,7 @@ function Workspace({ owner }: { owner: string }) {
   const toggleFolder = (id: string) => setCollapsed(ids => ids.includes(id) ? ids.filter(v => v !== id) : [...ids, id]);
   const newNote = () => void run(async () => {
     const title = window.prompt('새 노트 이름', '제목 없음'); if (!title?.trim()) return;
-    const saved = await postNoteData({ id: crypto.randomUUID(), title: title.trim(),
+    const saved = await postNoteData({ id: newWorkspaceId(), title: title.trim(),
       content: { format: 'markdown', version: 1, markdown: '' }, created_at: new Date().toISOString(), revision: 1, client_id: getSyncClientId() });
     if (activeFolder) {
       try { await addNoteToFolder(activeFolder.id, saved.id); }

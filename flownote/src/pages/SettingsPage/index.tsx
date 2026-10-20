@@ -20,6 +20,8 @@ import { isInstalledApp } from '@/shared/lib/androidApp';
 import { useAuth } from "@/features/auth";
 import { postFeedback, listMyFeedback, FEEDBACK_CATEGORIES, type FeedbackItem } from "@/entities/feedback";
 import { readPreferences, applyPreferences, defaultPreferences, PREF_STORAGE_KEY, type UserPreferences } from "@/shared/lib/userPreferences";
+import DeviceSyncSettings from './DeviceSyncSettings';
+import { isDeviceOnly } from '@/shared/lib/deviceMode';
 
 type Language = "ko" | "en";
 
@@ -128,6 +130,7 @@ const SettingsPage = () => {
 
   // 내가 보낸 피드백 목록을 서버에서 불러온다.
   useEffect(() => {
+    if (isDeviceOnly()) return;
     let active = true;
     const load = async () => {
       try {
@@ -174,6 +177,7 @@ const SettingsPage = () => {
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-4">
+            {isInstalledApp && user && <DeviceSyncSettings />}
             <section className="rounded-2xl border border-stone-200 bg-white p-4">
               <div className="mb-4 flex items-center gap-2">
                 <UserRound size={20} className="text-emerald-700" />
@@ -210,7 +214,7 @@ const SettingsPage = () => {
                       className="min-h-11 rounded-lg border border-stone-300 px-3 font-normal" />
                   </label>
                 )}
-                <button type="submit" disabled={!user || profileStatus === "saving" || !profile.username.trim() || !profile.nickname.trim()}
+                <button type="submit" disabled={isDeviceOnly() || !user || profileStatus === "saving" || !profile.username.trim() || !profile.nickname.trim()}
                   className="min-h-11 rounded-lg bg-emerald-600 px-4 font-bold text-white disabled:opacity-50">
                   {profileStatus === "saving" ? "저장 중…" : "프로필 저장"}
                 </button>
@@ -325,7 +329,7 @@ const SettingsPage = () => {
                   <button
                     type="button"
                     onClick={() => { void submitFeedback(); }}
-                    disabled={!feedback.message.trim() || feedbackStatus === "sending"}
+                    disabled={isDeviceOnly() || !feedback.message.trim() || feedbackStatus === "sending"}
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-stone-300"
                   >
                     <ClipboardList size={18} />

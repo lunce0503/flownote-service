@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LineElement, ImageElement, TextBoxElement, CanvasLoadData, CanvasSavePayload } from '@/entities/canvas';
 import { v4 as uuidv4 } from 'uuid';
+import { isDeviceOnly } from '@/shared/lib/deviceMode';
 import { API_BASE_URL, API_CORE_BASE_URL, authHeaders, resolveBrowserReachableUrl } from '@/shared/api';
 import { publishSyncEvent } from '@/shared/lib/sync';
 import { appendCanvasDeviceDiagnostic, readCanvasOperationQueue } from './canvasIndexedDb';
@@ -842,7 +843,7 @@ export const usePersistence = (
     }
     const requestId = activeLoadRequestIdRef.current;
     loadAbortControllerRef.current?.abort();
-    if (CANVAS_SOCKET_URL && requestId) {
+    if (CANVAS_SOCKET_URL && requestId && !isDeviceOnly()) {
       getCanvasSocket(CANVAS_SOCKET_URL).emit("canvas:load-cancel", { requestId });
     }
   }, [CANVAS_SOCKET_URL]);
@@ -903,7 +904,7 @@ export const usePersistence = (
   }, [handleLoad]);
 
   useEffect(() => {
-    if (!CANVAS_SOCKET_URL || !canvasId) return undefined;
+    if (!CANVAS_SOCKET_URL || !canvasId || isDeviceOnly()) return undefined;
 
     let isActive = true;
     const socket = getCanvasSocket(CANVAS_SOCKET_URL);

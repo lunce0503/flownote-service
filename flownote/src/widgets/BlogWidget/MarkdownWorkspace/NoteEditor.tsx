@@ -3,6 +3,7 @@ import { convertLegacy, isMarkdown, noteDrafts, recoveryState, getNote, postNote
 import type { BlockDataProps, NoteDraft } from '@/entities/blog';
 import { useDocumentTitle } from '@/shared/lib/useDocumentTitle';
 import { getAuthUser } from '@/shared/api';
+import { isDeviceOnly } from '@/shared/lib/deviceMode';
 import { getSyncClientId, subscribeSyncEvents } from '@/shared/lib/sync';
 import { createNoteSaveQueue, waitForNoteSave } from '@/features/blog';
 
@@ -56,7 +57,7 @@ function Editor({ owner, initial, draft, draftError, onSaved, reload, registerRe
   useDocumentTitle("노트", note.title);
   const noteRef = useRef(initial);
   const [recovery, setRecovery] = useState(state !== 'matched' ? draft : null);
-  const [status, setStatus] = useState(draftError ? '기기 초안 저장소를 사용할 수 없습니다 — 내보내기 필요' : state === 'matched' ? '서버에 저장됨' : '복구 확인 필요');
+  const [status, setStatus] = useState(draftError ? '기기 초안 저장소를 사용할 수 없습니다 — 내보내기 필요' : state === 'matched' ? isDeviceOnly() ? '기기에 저장됨 · 동기화 꺼짐' : '서버에 저장됨' : '복구 확인 필요');
   const [mode, setMode] = useState<'edit' | 'preview' | 'split'>('edit');
   const [original, setOriginal] = useState(false);
   const [remoteChanged, setRemoteChanged] = useState(false);

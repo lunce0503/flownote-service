@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { v4 as uuidv4 } from "uuid";
+import { newWorkspaceId } from '@/shared/lib/deviceMode';
 import { useDiary } from "./useDiary";
 import {
   listScheduleItems,
@@ -131,7 +131,7 @@ export const usePlanner = () => {
   // 오늘의 할일을 작업(tasks)으로도 올려 마감일 기준 캘린더에 표시되게 한다.
   const promoteTodoToTask = useCallback(async (label: string, dueDate: string) => {
     const draft = {
-      id: uuidv4(),
+      id: newWorkspaceId(),
       task_name: label,
       due_date: dueDate,
       status: "TODO",

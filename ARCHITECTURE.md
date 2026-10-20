@@ -6,6 +6,8 @@ Flownote는 캔버스와 텍스트 노트를 중심으로 일정, 작업, 주식
 
 # 시스템 구성 (조감도)
 
+설치형 앱의 동기화 끄기는 [기기 전용 작업 공간](docs/product-specs/device-only-workspace.md)을 연다. 이 경우 같은 웹 편집기를 사용하되 HTTP 어댑터와 Canvas 저장 경계가 IndexedDB로 전환되며 실시간 연결을 만들지 않는다. 클라우드 DB와 기기 자료는 별도 원본이고 자동 복제/업로드/병합하지 않는다. 초안·재시도 namespace와 기기 ID 전송 차단도 이 경계를 따른다.
+
 ```text
 Browser (flownote/)              Mobile (flownote-mobile/)
   | same-origin HttpOnly cookie    | REST + Bearer (native/Expo web)

@@ -1,5 +1,6 @@
 import type { ImageElement } from '@/entities/canvas';
 import { authHeaders } from '@/shared/api';
+import { isDeviceOnly } from '@/shared/lib/deviceMode';
 import { isAbortError, type SerializableImageElement } from './canvasPersistenceModel';
 import {
   CANVAS_SOCKET_UPLOAD_TIMEOUT_MS,
@@ -48,6 +49,10 @@ export const uploadCanvasAsset = async (
   socketUrl: string,
   file: File,
 ): Promise<CanvasAssetUploadResponse | null> => {
+  if (isDeviceOnly()) {
+    if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type) || file.size > 20 * 1024 * 1024) throw new Error('기기 이미지는 PNG/JPEG/WebP/GIF, 20MB 이하만 지원합니다.');
+    return { id: '', objectKey: '', url: await readFileAsDataUrl(file), contentType: file.type, byteSize: file.size };
+  }
   if (apiUrl) {
     try {
       return await uploadCanvasAssetViaHttp(apiUrl, file);
@@ -129,6 +134,7 @@ export const loadImage = (url: string, signal?: AbortSignal): Promise<HTMLImageE
     }
     signal?.addEventListener("abort", handleAbort, { once: true });
     if (!url.startsWith("data:") && !url.startsWith("blob:")) {
+      if (isDeviceOnly()) { reject(new Error('기기 전용 모드에서는 서버 이미지를 불러오지 않습니다.')); return; }
       image.crossOrigin = "anonymous";
     }
     image.onload = async () => {

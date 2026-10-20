@@ -1,4 +1,6 @@
 import type { BlockDataProps } from './types';
+import { deviceNamespace } from '../../../shared/lib/deviceMode.ts';
+const databaseName = deviceNamespace('flownote-note-drafts');
 
 export type NoteDraft = {
   userId: string;
@@ -90,7 +92,7 @@ export function recoveryState(draft: Pick<NoteDraft, 'note' | 'baseRevision'>, s
 
 const open = (): Promise<IDBDatabase> => new Promise((resolve, reject) => {
   if (typeof indexedDB === 'undefined') { reject(new Error('IndexedDB unavailable')); return; }
-  const request = indexedDB.open('flownote-note-drafts', 1);
+  const request = indexedDB.open(databaseName, 1);
   request.onupgradeneeded = () => request.result.createObjectStore('drafts');
   request.onsuccess = () => resolve(request.result);
   request.onerror = () => reject(request.error ?? new Error('Draft database unavailable'));
