@@ -9,13 +9,15 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_WAS_URL": "https://flownote-api-staging.up.railway.app"
+        "EXPO_PUBLIC_WAS_URL": "https://flownote-api-staging.up.railway.app",
+        "EXPO_PUBLIC_WEB_URL": "https://flownote-react-staging.vercel.app"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_WAS_URL": "https://flownote-api-staging.up.railway.app"
+        "EXPO_PUBLIC_WAS_URL": "https://flownote-api-staging.up.railway.app",
+        "EXPO_PUBLIC_WEB_URL": "https://flownote-react-staging.vercel.app"
       }
     },
     "testflight": {
@@ -25,7 +27,8 @@
         "image": "macos-sequoia-15.6-xcode-26.0"
       },
       "env": {
-        "EXPO_PUBLIC_WAS_URL": "https://flownote-api-staging.up.railway.app"
+        "EXPO_PUBLIC_WAS_URL": "https://flownote-api-staging.up.railway.app",
+        "EXPO_PUBLIC_WEB_URL": "https://flownote-react-staging.vercel.app"
       }
     },
     "production": {
@@ -35,12 +38,13 @@
         "image": "macos-sequoia-15.6-xcode-26.0"
       },
       "env": {
-        "EXPO_PUBLIC_WAS_URL": "https://flownote-api-production.up.railway.app"
+        "EXPO_PUBLIC_WAS_URL": "https://flownote-api-production.up.railway.app",
+        "EXPO_PUBLIC_WEB_URL": "https://flownote-react.vercel.app"
       }
     }
   },
   "submit": {
-    "production": {},
-    "testflight": {}
+    "production": { "ios": { "ascAppId": "6824777358" } },
+    "testflight": { "ios": { "ascAppId": "6824777358" } }
   }
 }

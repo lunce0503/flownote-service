@@ -28,6 +28,8 @@ Flownote는 로그인 세션을 기반으로 사용자 데이터를 분리한다
 
 ## 고위험 영역
 
+iOS/iPadOS 1.1.0 WKWebView는 환경별 고정 HTTPS origin에서만 내부 탐색하며 URL credential·HTTP/file/javascript/data/intent를 차단한다. 외부 HTTPS/mailto/tel은 사용자 동의 후 OS에서 연다. originWhitelist 전체 허용은 기본 OS fallback을 막고 모든 URL을 자체 fail-closed 검사로 보내기 위한 것으로, 내부 신뢰 origin을 늘리지 않는다. persistent WK 쿠키 저장소의 HttpOnly 세션을 사용하고 기존 Expo 토큰을 주입하지 않는다. 앱 JS bridge는 인증된 웹의 bounded export 데이터만 받고 정확한 schema·origin·base64·MIME·8MiB·파일명 제한 및 native 사용자 확인 후 cache→share→삭제 순서를 적용한다. 일반 네이티브 호출/쿠키·파일 읽기/임의 네트워크 요청은 없다. 세부 계약은 [iOS 사양](product-specs/ios-ipados-testflight.md)을 따른다.
+
 - 인증과 세션: `flownote-server`의 auth service와 session table.
 - 업로드: 파일 크기, MIME 타입, 저장 경로, 공개 URL 처리.
 - 외부 API: Yahoo Finance, Google GenAI, MCP 연동.

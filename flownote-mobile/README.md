@@ -1,8 +1,10 @@
 # Flownote Mobile
 
-Expo Router 기반 iOS/Android/Web 클라이언트다. 계정, 작업, 노트, AI, 캔버스 화면을 React Native로 직접 렌더링하며 `EXPO_PUBLIC_WAS_URL`의 Flownote FastAPI 게이트웨이를 단일 공개 API 진입점으로 사용한다.
+Expo Router 기반 iOS/Android/Web 클라이언트다. iOS/iPadOS 1.1.0은 `app/index.ios.tsx`에서 같은 환경의 Flownote 웹을 WKWebView로 열어 웹 전체 화면과 앱용 탐색을 공유한다. 기존 Android/Expo 웹 테스트 화면은 React Native 렌더링과 `EXPO_PUBLIC_WAS_URL` gateway 통신을 유지한다. iOS의 `EXPO_PUBLIC_WEB_URL`은 고정 staging/production HTTPS origin만 허용한다.
 
 ## 화면 구조
+
+아래 Expo 라우트는 Android/웹 테스트 클라이언트에 적용한다. iOS는 웹의 `/`, `/blog`, `/canvas`, `/planner` 및 하위 편집 경로를 사용하며 기존 Expo auth/app 라우트로 우회하지 않는다. iOS 1.0.0에서 전환할 때 한 번 다시 로그인한다. 기존 로컬 Expo 초안은 삭제하지 않지만 웹으로 자동 이관하지 않는다.
 
 앱은 최초 진입 시 세션을 확인해 로그인 또는 홈으로 이동한다. 로그인 이후에는 홈이 상위 기능 진입점이며, 목록과 상세/편집 라우트를 분리한다.
 

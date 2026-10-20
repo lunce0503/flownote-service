@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, CalendarDays, Download } from "lucide-react";
-import { isAndroidApp } from '@/shared/lib/androidApp';
+import { downloadBlob } from '@/shared/lib/downloadBlob';
 import type { ScheduleItem } from "@/entities/schedule";
 import {
   type PlannerTaskSummary,
@@ -73,16 +73,7 @@ const PlannerMonthlyCalendar = ({ selectedDate, scheduleItems, tasks, diaryDates
 
     const ics = eventsToIcs(events, `Flownote ${cursor.year}-${String(cursor.month + 1).padStart(2, "0")}`);
     const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `flownote-${cursor.year}-${String(cursor.month + 1).padStart(2, "0")}.ics`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    // Android receives the blob download asynchronously through WebView's listener.
-    if (isAndroidApp) window.setTimeout(() => URL.revokeObjectURL(url), 60000);
-    else URL.revokeObjectURL(url);
+    void downloadBlob(`flownote-${cursor.year}-${String(cursor.month + 1).padStart(2, "0")}.ics`, blob);
   };
 
   return (

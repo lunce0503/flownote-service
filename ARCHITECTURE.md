@@ -44,7 +44,7 @@ Flownote는 기획한 내용을 바탕으로 관련 필기를 텍스트와 그�
 | `flownote/` | Vite React SPA | `src/main.tsx`, `src/app/App.tsx`, `src/app/capabilityManifest.tsx` | 웹 화면, FSD 상태/기능 조합, REST/SSE/Socket.IO 클라이언트 |
 | `flownote-desktop/` | Electron Windows 설치 앱 | `main.cjs`, `policy.cjs`, `updater.cjs` | 고정 HTTPS 웹과 앱용 UI 공유, 격리된 renderer, native 파일 저장·서명 feed 기반 자동 다운로드 및 Windows 패키징 |
 | `flownote-android/` | Android 설치 APK | `app/src/main/java/com/flownote/mobile/MainActivity.java`, `AppUpdater.java` | HTTPS WebView로 웹 전체 기능 공유, 앱용 탐색·시스템 파일 선택/저장·기존 인증서 검증 후 APK 자동 다운로드 |
-| `flownote-mobile/` | Expo React Native | `app/_layout.tsx`, `app/canvas.tsx` | iOS/Android 네이티브 화면, 캔버스, Railway 정적 웹 테스트 배포 |
+| `flownote-mobile/` | Expo React Native | `app/_layout.tsx`, `app/index.ios.tsx`, `components/installed-web-app.tsx` | iOS 1.1.0은 고정 HTTPS 웹을 WKWebView로 공유하며 HttpOnly 세션/앱 탐색과 bounded 파일 export를 사용한다. 기존 Android/Expo 웹 화면과 Railway 테스트 배포는 유지한다. |
 | `flownote-API/` | FastAPI + Socket.IO | `app/main.py` | 공개 API 게이트웨이, 캔버스 실시간 허브, 요청 추적/콜드스타트 연결 재시도 |
 | `flownote-server/` | Spring Boot | `FlownoteServerApplication.java` | 인증·사용자·모바일 설정, 전체 PostgreSQL Flyway 스키마 소유 |
 | `flownote-canvas/` | Go HTTP 서버 | `main.go` | 캔버스, 노트, 폴더, 업로드, 캔버스 관리자 진단 |
@@ -65,6 +65,8 @@ Flownote는 기획한 내용을 바탕으로 관련 필기를 텍스트와 그�
 | `flownote-mobile/scripts/serve-static.mjs` | Expo 정적 결과와 `/health` 제공 | Railway public domain → iPad Safari | 확장자 없는 Expo Router 경로와 SPA fallback을 제공한다. |
 | `flownote-mobile/eas.json` | preview/production 공개 API 주소 | EAS iOS/Android build → Railway gateway | 향후 서명된 네이티브 빌드도 같은 운영 API를 사용한다. |
 | `flownote-mobile/railway.json` | Dockerfile builder와 healthcheck | Railway deployment | 모바일 웹 테스트 서비스의 배포 계약이다. |
+
+iOS 1.1.0의 WKWebView는 Browser와 같은 same-origin HttpOnly cookie → Vercel `/web-api` → Railway 경로를 사용한다. 위 Expo 직접 Bearer 경로는 기존 Android/Expo 웹 클라이언트에 해당하며 iOS entry에서는 사용하지 않는다. native export는 고정 origin의 bounded data만 사용자 확인 후 공유하는 단방향 계약이며 일반 네이티브 호출/파일 읽기/토큰 주입 브리지가 아니다.
 
 캔버스 타입의 실제 의존 흐름은 다음과 같다.
 

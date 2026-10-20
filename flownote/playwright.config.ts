@@ -15,5 +15,8 @@ export default defineConfig({
     trace: 'off',
     screenshot: 'only-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'ios-webkit', testMatch: 'ios-app.spec.ts', use: { ...devices['iPad Pro 11'], browserName: 'webkit' } },
+  ],
 });

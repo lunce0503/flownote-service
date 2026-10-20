@@ -2,7 +2,7 @@
   "expo": {
     "name": "Flownote",
     "slug": "flownote-mobile",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "flownotemobile",
@@ -11,6 +11,16 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.flownote.mobile",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSAllowsLocalNetworking": false,
+          "NSExceptionDomains": {}
+        },
+        "NSPhotoLibraryUsageDescription": "노트와 캔버스에 사용자가 선택한 사진을 첨부할 때 사진 보관함을 사용합니다.",
+        "NSCameraUsageDescription": "첨부할 사진이나 동영상을 사용자가 직접 촬영할 때 카메라를 사용합니다.",
+        "NSMicrophoneUsageDescription": "첨부 동영상을 사용자가 직접 촬영할 때 마이크를 사용합니다."
+      },
       "config": {
         "usesNonExemptEncryption": false
       }
