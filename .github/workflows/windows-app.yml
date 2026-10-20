@@ -110,7 +110,8 @@ jobs:
           $oldName = 'Flownote-Setup-1.0.0-x64.exe'
           $oldBase = 'https://github.com/lunce0503/flownote-service/releases/download/windows-v1.0.0'
           Invoke-WebRequest "$oldBase/$oldName" -OutFile "release/$oldName"
-          $oldSums = (Invoke-WebRequest "$oldBase/SHA256SUMS.txt").Content
+          Invoke-WebRequest "$oldBase/SHA256SUMS.txt" -OutFile 'release/previous-SHA256SUMS.txt'
+          $oldSums = Get-Content 'release/previous-SHA256SUMS.txt' -Raw
           $oldLine = ($oldSums -split "`n" | Where-Object { $_ -match '^[a-f0-9]{64}  Flownote-Setup-1\.0\.0-x64\.exe\s*$' })
           if (!$oldLine -or (Get-FileHash "release/$oldName" -Algorithm SHA256).Hash.ToLower() -ne ($oldLine -split '  ')[0]) { throw 'Previous installer checksum mismatch' }
           $oldInstaller = Start-Process -FilePath "release/$oldName" -ArgumentList '/S', "/D=$installDir" -Wait -PassThru
