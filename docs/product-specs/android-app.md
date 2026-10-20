@@ -1,5 +1,7 @@
 # Android 설치 앱
 
+앱 **전체 → 설정 → 앱 동기화**에서 [기기 전용 작업 공간](device-only-workspace.md)으로 전환할 수 있다. 서버 저장·실시간 수신을 중지하고 독립 기기 자료를 사용하며 서버로 자동 업로드/병합하지 않는다. 공유 웹 기능이므로 이 설정만을 위해 APK를 다시 배포하지 않는다.
+
 ## 목표
 
 현재 웹에서 동작하는 기능과 편집기를 독립 설치 APK로 제공한다. `flownote-android/`의 Android 시스템 WebView가 공개 HTTPS 웹을 실행하며, 기능/API/동기화는 `flownote/`가 소유한다. Expo Go 앱(`flownote-mobile/`) 및 PC 제어용 Remote 앱(`apps/android/`)과는 별개다.

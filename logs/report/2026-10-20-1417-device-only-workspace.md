@@ -15,11 +15,20 @@
 - TDD: 순수 로컬 모델 파일이 없을 때 실패 확인 후 구현. 현재 전체 src 단위 46개 통과, lint/typecheck/production build 통과. 새 fence 추가 후 다시 검사한다.
 - 첫 source `9e0b2972abb6ac87497f2f8e0c3b771857a62c0e`의 staging immutable URL `https://flownote-react-staging-r9mqrv5y4-flownote-service.vercel.app`에서 targeted Chromium/WebKit 실행. 노트/Canvas pointer/플래너 저장·reload, API 트래픽 0, 백업 JSON, 서버 모드 복귀 시 불변/기기 원본 재복원은 양 엔진 모두 통과했다.
 - 저장소 실패/계정 분리 시나리오는 제품이 올바른 오류를 표시했지만 테스트가 두 `role=alert`를 하나로 선택해 strict locator 오류가 났다. 기존 오류 표시를 약화하지 않고 작업 오류 컨테이너로 selector를 한정했다.
+  실행 명령은 진단용 Playwright 컨테이너 안의 `yarn e2e device-only.spec.ts --retries=0`였다. 수정 후 같은 명령 6/6으로 확인했다. 실패한 source를 production으로 승격하지 않았다.
 - 동시 source review에서 모드 전환 순간 남은 일기 저장 타이머가 반대 공간으로 향할 가능성을 확인했다. 페이지 수명에 고정된 모드·계정 fence를 추가하고 stale local page가 cloud diary PUT을 보내지 못하는 E2E를 추가했다. Android/Windows UA의 세션 없는 기기 재시작 검증도 추가했다.
 - 첫 full gate는 추가 수정 source로 대체해야 하므로 해당 diagnostic Playwright container `250b167c819f`만 중지했다. 앱/DB/기존 사용자 자료는 중지·삭제하지 않았다. 첫 source는 production으로 승격하지 않는다.
 
 ## 상태
 
-최종 source의 정적/단위 검사, 새 staging 배포·전체 71개 gate, 동일 source production 승격/read-back 진행 중. iOS TestFlight native 업로드와 이전 웹 기능 릴리스는 [별도 완료 보고](2026-10-20-1335-ios-ipados-web-parity.md)를 따른다. 실제 기기 OS 저장소 회수/강제 종료/공유 메뉴는 실기기 확인 대상이다.
+추가 확인: 최종 `1eba6df8de58dc8190976cb3ae8932550efdfe24`에서 targeted Chromium/WebKit 6/6(1분), 전체 source 단위 46/46, lint/typecheck/build 성공. 별도 staging 검사에서 기기 로그아웃→실제 재로그인→모드/노트 보존, PNG 파일 local 저장→reload, 두 반복 일정 저장→reload 및 API 트래픽 0을 확인했다. WebKit 390px/1024px 설정 화면을 직접 검토했고 가로 넘침이 없었다. 이것은 네이티브 OS 강제 종료/공유 시트 검증을 대체하지 않는다.
+
+최종 staging: 전체 71/71(6.1분), `2026-10-20T05:25:04.909Z`, `dpl_DQCn9zJfXDF6nPevJBHSMDCPjYhK`, `https://flownote-react-staging-g9wsfkywh-flownote-service.vercel.app`, READY. source fingerprint `1ada8ca607405055217ef91fcee8f664b2e54742098000e9615ccf460da4f8f6`. snapshot `/dev/shm/flownote-device-only-final-release-20261020`는 검증 중 수정하지 않았다.
+
+완료: 같은 fingerprint/source의 production `dpl_4ynCrQ8r42sah8WHpkmHVzYQiT9r`, `https://flownote-react-4m9swycse-flownote-service.vercel.app`, READY, `2026-10-20T05:26:01.692Z` (14:26 KST). `vercel inspect`로 운영 별칭 `flownote-react.vercel.app`의 ID 일치를 확인했다. `/` 200, 실제 배포 JS의 iOS/mode marker, 비인증 same-origin users/me 401 확인. 별도 운영 WebKit은 합성 캐시 사용자로 설정 화면만 열어 기기 전용 switch/서버 기능 비활성/헤더 없음/API 요청 0을 확인했다. 운영 계정 생성·CRUD·DB 변경은 하지 않았다.
+
+정적 명령: `flownote` 안에서 `yarn lint`, `yarn typecheck`, `yarn build`; 전체 src `.test.mjs`를 `node --experimental-strip-types --test`로 실행했다. 배포는 `FLOWNOTE_RELEASE_SOURCE_ROOT=/dev/shm/flownote-device-only-final-release-20261020 node scripts/deploy-cloud.mjs staging web`, 전체 통과 후 같은 root의 `production web` 순서였다. 새 로컬 앱 서버/Compose는 실행하지 않았다. 문서·계획·보고서의 후속 정리는 실행 artifact를 바꾸지 않는다.
+
+iOS TestFlight native 업로드와 이전 웹 기능 릴리스는 [별도 완료 보고](2026-10-20-1335-ios-ipados-web-parity.md)를 따른다. 제출 `bdf2a638-d95a-4774-9d32-7b47889eb27f` FINISHED를 다시 조회했다. Apple의 처리/테스터 그룹과 실제 기기 설치는 별도이며 OS 저장소 회수/강제 종료/공유 메뉴는 실기기 확인 대상이다. 이전 1.0.0 앱은 TestFlight에서 1.1.0(4)로 업데이트해야 새 웹 셸을 사용한다.
 
 제한·사용 흐름의 소유 기준은 [제품 사양](../../docs/product-specs/device-only-workspace.md)이며 API/DB 변경이 없어 Railway backend 바이너리 재배포는 불필요하다. 웹은 반드시 staging-first로 검증한다.

@@ -1,5 +1,7 @@
 # 앱 기기 전용 작업 공간
 
+상태: 완료. 2026-10-20 14:26 KST 운영 배포와 읽기 전용 확인을 마쳤다. [결과 보고](../../../logs/report/2026-10-20-1417-device-only-workspace.md), [제품 기준](../../product-specs/device-only-workspace.md).
+
 사용자는 서버 저장과 다른 기기 변경 수신을 모두 끄는 설정을 선택했다. 단순 Socket.IO 중단을 동기화 끄기로 표시하지 않는다.
 
 ## 범위와 결정
@@ -23,3 +25,11 @@
 ## 미포함
 
 서버 자료 전체 다운로드, 자동 양방향 병합, 네이티브 완전 오프라인 최초 실행, 서버 AI/소셜/계정 관리의 로컬 구현은 포함하지 않는다. 이 제한은 UI와 제품 기준에 표시한다.
+
+## 완료 근거
+
+- 단위 46/46, lint/typecheck/build, targeted Chromium/WebKit 6/6, 전체 cloud staging 71/71 통과.
+- 계정별 자료, 저장소 차단/quota 오류, 오래된 local page의 cloud PUT 차단, 서버 복귀 후 불변과 기기 원본 복원 검증.
+- 추가 staging 실 로그인 복원, local PNG 이미지/두 반복 일정 저장·reload/API 0, 390/1024px WebKit UI 확인.
+- source `1eba6df8de58dc8190976cb3ae8932550efdfe24`, fingerprint `1ada8ca607405055217ef91fcee8f664b2e54742098000e9615ccf460da4f8f6`. staging `dpl_DQCn9zJfXDF6nPevJBHSMDCPjYhK`, production `dpl_4ynCrQ8r42sah8WHpkmHVzYQiT9r` READY.
+- 운영 HTML 200/asset의 mode marker/비인증 API 401, 실제 WebKit 설정 표시와 서버 요청 0을 읽기 전용 확인. production CRUD 없음. native 변경과 backend API/DB 변경이 없어 재빌드/재배포하지 않았다.

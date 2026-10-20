@@ -1,5 +1,7 @@
 # Windows 설치 앱
 
+앱 **전체 → 설정 → 앱 동기화**에서 [기기 전용 작업 공간](device-only-workspace.md)으로 전환할 수 있다. 서버 저장·실시간 수신을 중지하고 독립 기기 자료를 사용하며 서버로 자동 업로드/병합하지 않는다. 공유 웹 기능이므로 이 설정만을 위해 설치 파일을 다시 배포하지 않는다.
+
 `flownote-desktop/`의 Electron 앱이 환경별 공개 HTTPS 웹을 실행한다. 기존 웹과 편집기/API를 공유하고 Android와 같은 계정의 자료를 사용한다. 로컬 앱 서버·DB·LAN 연결은 필요 없다.
 
 - Windows 10/11 x64 설치형 NSIS EXE와 portable ZIP을 제공한다.

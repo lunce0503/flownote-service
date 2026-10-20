@@ -56,4 +56,4 @@
 
 같은 source production `dpl_5mVQNWa5x8mt6GUcDC9EhTSDdDM9`, `https://flownote-react-q2zldath7-flownote-service.vercel.app`, READY, `2026-10-20T05:03:56.483Z` (14:03:56 KST). deploy smoke 통과. 운영 `/` 200·메인 JS의 FlownoteIOS marker·비인증 same-origin users/me 401 read-back 통과. 운영 CRUD 없음. 기존 한 차례 빈 로그인 원인은 미확정이며 같은 소스 재검사에서 정상 통과했고 테스트를 완화하지 않았다.
 
-실제 iPad Pencil/시스템 파일 선택·공유 UI는 사용자 기기 확인 대상이다. 이후 사용자가 추가한 서버 저장/실시간 수신 모두 끄기 요청은 [기기 전용 계획](../../docs/exec-plan/active/2026-10-20-device-only-workspace.md)과 별도 보고서에서 추적한다. 완료된 IPA를 해당 웹 전용 후속 기능 때문에 다시 빌드하지 않는다.
+실제 iPad Pencil/시스템 파일 선택·공유 UI는 사용자 기기 확인 대상이다. 이후 사용자가 추가한 서버 저장/실시간 수신 모두 끄기는 [기기 전용 완료 계획](../../docs/exec-plan/completed/2026-10-20-device-only-workspace.md)과 [별도 완료 보고](2026-10-20-1417-device-only-workspace.md)를 따른다. 완료된 IPA를 해당 웹 전용 후속 기능 때문에 다시 빌드하지 않는다.
