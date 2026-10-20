@@ -30,18 +30,20 @@ npm run smoke -- <설치한-Flownote.exe-경로>
 
 ## 자동 업데이트 배포
 
-현재 버전은 1.1.0이다. `updater.cjs`는 별도 RSA 서명된 고정 HTTPS feed를 검증해 설치형 EXE/portable ZIP을 자동 다운로드한다. 자동 설치나 portable 자동 교체는 하지 않는다. 상세 동작은 [소유 사양](../docs/product-specs/windows-app.md#110-자동-업데이트)을 따른다.
+현재 버전은 1.1.1이다. 초기 1.1.0의 Electron net.fetch redirect 취소 오류를 수정해 Node fetch로 같은 HTTPS allow-list를 검사한다. `updater.cjs`는 별도 RSA 서명된 고정 HTTPS feed를 검증해 설치형 EXE/portable ZIP을 자동 다운로드한다. 자동 설치나 portable 자동 교체는 하지 않는다. 상세 동작은 [소유 사양](../docs/product-specs/windows-app.md#111-자동-업데이트)을 따른다.
 
 Windows runner에서 검증한 artifact를 공개한 뒤 `scripts/sign-app-update.mjs`로 staging/production feed를 만든다. `FLOWNOTE_UPDATE_SIGNING_KEY`는 앱에 고정한 공개키와 짝인 저장소 밖 PEM 경로다. 개인키를 Actions artifact/소스/보고서에 넣지 않는다.
 
 ```bash
-node scripts/sign-app-update.mjs windows staging 1.1.0 <verified-artifact-directory>
-node scripts/sign-app-update.mjs windows production 1.1.0 <same-artifact-directory>
+node scripts/sign-app-update.mjs windows staging 1.1.1 <verified-artifact-directory>
+node scripts/sign-app-update.mjs windows production 1.1.1 <same-artifact-directory>
 ```
+
+이미 검증한 GitHub Release가 공개됐다면 directory 대신 `--github-release`를 사용해 GitHub가 업로드 때 계산한 SHA-256 digest와 크기로 같은 feed를 생성할 수 있다. 이후 실제 다운로드를 Windows runner에서 feed와 대조해야 한다.
 
 위 명령은 저장소 루트에서 실행한다. feed는 `flownote/public/updates/<channel>/windows.json`이다. 공개키 교체는 기존 앱이 새 키를 신뢰하지 않으므로 별도 키 이전 계획 없이 수행하면 안 된다. 새 버전마다 package version과 artifact/tag/feed version을 함께 증가시킨다.
 
-`windows-app.yml`의 수동 `verify_updates=true`는 서명된 cloud staging feed에서 실제 EXE/ZIP을 다운로드하고 해시·캐시·동일 버전 skip을 검사한다. 업데이트 feed를 staging-first 웹 배포로 검증한 뒤 같은 소스로 production에 승격한다. 1.0.0 사용자는 1.1.0을 한 번 직접 설치해야 한다.
+`windows-app.yml`의 수동 `verify_updates=true`는 서명된 cloud staging feed에서 실제 EXE/ZIP을 다운로드하고 해시·캐시·동일 버전 skip을 검사한다. `update_only=true`는 rebuild 없이 공개한 정확한 EXE/ZIP을 설치하고 동일한 packaged Node fetch transport로 시험한다. 업데이트 feed를 staging-first 웹 배포로 검증한 뒤 같은 소스로 production에 승격한다. 1.0.0/초기 1.1.0 사용자는 1.1.1을 한 번 직접 설치해야 한다.
 
 ## 보안
 

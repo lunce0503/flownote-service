@@ -9,14 +9,14 @@ const { UpdateClient } = require('../updater.cjs');
     for (const [kind, executablePath] of [['installer', process.argv[2]], ['portable', process.argv[3]]]) {
       const application = await electron.launch({ executablePath, args: ['--staging'], timeout: 60000 });
       try {
-        const result = await application.evaluate(async ({ app, net }, kind) => {
+        const result = await application.evaluate(async ({ app }, kind) => {
           const load = process.getBuiltinModule('node:module').createRequire(app.getAppPath() + '/package.json');
           const path = load('node:path');
           const fs = load('node:fs/promises');
           const { UpdateClient } = load('./updater.cjs');
           const directory = await fs.mkdtemp(path.join(app.getPath('temp'), `flownote-native-${kind}-updates-`));
           let requests = 0;
-          const fetcher = (url, options) => { if (!url.endsWith('.json')) requests++; return net.fetch(url, options); };
+          const fetcher = (url, options) => { if (!url.endsWith('.json')) requests++; return globalThis.fetch(url, options); };
           // Old-version fixture in the packaged main process, not a renderer/CLI override.
           const options = { directory, channel: 'staging', version: '1.0.0', kind, fetcher };
           const client = new UpdateClient(options);
@@ -31,7 +31,7 @@ const { UpdateClient } = require('../updater.cjs');
           if (await fs.readFile(path.join(directory, 'draft-preservation-probe.txt'), 'utf8') !== 'keep') throw new Error('Unrelated data changed');
           return { kind, version: client.state.version, status: client.state.status, firstRequests, requests };
         }, kind);
-        console.log('PASS exact packaged Windows updater with Electron net.fetch:', JSON.stringify(result));
+        console.log('PASS exact packaged Windows updater with its Node fetch transport:', JSON.stringify(result));
       } finally { await application.close(); }
     }
     return;

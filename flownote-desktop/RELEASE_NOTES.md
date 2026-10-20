@@ -1,4 +1,8 @@
-# Flownote Windows 1.1.0
+# Flownote Windows 1.1.1
+
+GitHub CDN의 수동 redirect 응답을 Electron net.fetch가 취소하던 자동 다운로드 오류를 수정했습니다. Node fetch로 응답을 검사하며 기존 HTTPS redirect allow-list와 서명/해시 검증은 유지합니다. 1.0.0 또는 초기 1.1.0 사용자는 이번 1.1.1을 직접 설치하세요.
+
+## 1.1.0
 
 - 캔버스·노트의 베이지·흰색·검정 디자인과 폴더 탐색을 웹과 함께 사용합니다.
 - 시작·재개·매시간 새 버전을 확인하고 서명과 SHA-256 검증 후 자동 다운로드합니다.

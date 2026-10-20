@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, Menu, shell, dialog, session, powerMonitor, net, Notification } = require('electron');
+const { app, BrowserWindow, Menu, shell, dialog, session, powerMonitor, Notification } = require('electron');
 const path = require('node:path');
 const { existsSync } = require('node:fs');
 const { spawn } = require('node:child_process');
@@ -42,7 +42,8 @@ function setupUpdates() {
   if (!app.isPackaged || process.platform !== 'win32') return;
   updater = new UpdateClient({ directory: path.join(app.getPath('userData'), 'updates'), channel: profile, version: app.getVersion(),
     kind: existsSync(path.join(process.resourcesPath, 'installed-by-nsis')) ? 'installer' : 'portable',
-    fetcher: (url, options) => net.fetch(url, options),
+    // Node fetch exposes manual 302 responses. Electron net.fetch cancels them
+    // before policy can inspect GitHub's release CDN redirect.
     onState(state) {
       const labels = { checking: '업데이트 확인 중…', downloading: `업데이트 다운로드 ${state.progress}%`, ready: '업데이트 준비됨 · 설치 확인', error: '업데이트 실패 · 재시도', current: '최신 버전 · 업데이트 이력' };
       if (updateStatusItem) updateStatusItem.label = labels[state.status] || '업데이트 상태 및 이력';
