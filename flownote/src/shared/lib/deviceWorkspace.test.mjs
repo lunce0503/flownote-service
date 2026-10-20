@@ -15,6 +15,15 @@ test('device notes and folders keep full content, revision and summaries without
   assert.equal(handleDeviceRequest(state, 'GET', '/api/notes/device-note').title, '기기 노트');
 });
 
+test('snapshotted cloud notes keep their UUID while edited offline', () => {
+  const state = createDeviceWorkspace();
+  const id = '11111111-1111-4111-8111-111111111111';
+  state.notes.push({ id, title: 'Cloud', content: { format: 'markdown', markdown: 'base' }, revision: 4 });
+  const saved = handleDeviceRequest(state, 'POST', '/api/notes', { id, title: 'Cloud', content: { format: 'markdown', markdown: 'offline' }, revision: 5 });
+  assert.equal(saved.id, id);
+  assert.equal(saved.content.markdown, 'offline');
+});
+
 test('planner contracts, unsupported cloud actions and foreign resource IDs fail closed', () => {
   const state = createDeviceWorkspace();
   const task = handleDeviceRequest(state, 'POST', '/api/tasks', { task_name: 'local' });

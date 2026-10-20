@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { execFileSync } from 'node:child_process';
 
 const read = (name) => JSON.parse(readFileSync(new URL(`../${name}`, import.meta.url), 'utf8'));
 
@@ -21,6 +22,10 @@ test('the iOS archive autolinks the native Apple Pencil event module', () => {
   const moduleConfig = read('modules/apple-pencil-events/expo-module.config.json');
   assert.deepEqual(moduleConfig.platforms, ['apple']);
   assert.deepEqual(moduleConfig.apple.modules, ['ApplePencilEventsModule']);
+  const resolved = JSON.parse(execFileSync(process.execPath, ['node_modules/expo-modules-autolinking/bin/expo-modules-autolinking.js', 'resolve', '--platform', 'apple', '--json'], { cwd: new URL('../', import.meta.url), encoding: 'utf8' }));
+  const pencil = resolved.modules.find(module => module.modules?.includes('ApplePencilEventsModule'));
+  assert.ok(pencil, 'native Pencil module must resolve into the actual iOS Pod graph');
+  assert.ok(pencil.pods.some(pod => pod.podName === 'ApplePencilEvents'));
 });
 
 test('TestFlight builds are store archives, use Xcode 26, and isolate staging from production', () => {

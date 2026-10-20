@@ -112,7 +112,7 @@ export function migrateDeviceWorkspace(value: unknown): DeviceWorkspace {
 const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const now = () => new Date().toISOString();
 const newId = () => `device-${crypto.randomUUID()}`;
-const missing = (): never => { throw new Error('기기 자료를 찾을 수 없습니다. 클라우드 자료는 기기 공간에 자동 복사되지 않습니다.'); };
+const missing = (): never => { throw new Error('기기 자료를 찾을 수 없습니다. 스냅샷과 현재 계정을 확인해주세요.'); };
 const find = <T extends Item>(items: T[], id?: string) => items.find(item => item.id === id) ?? missing();
 const allowedId = (id: unknown): id is string => typeof id === 'string' && /^device-[\w-]{1,100}$/.test(id);
 const idFor = (input: Record<string, unknown>) => {
@@ -135,7 +135,7 @@ export function handleDeviceRequest(state: DeviceWorkspace, method: string, path
       return state.notes;
     }
     if (verb === 'POST' || verb === 'PATCH') {
-      const noteId = id ?? idFor(body);
+      const noteId = id ?? (typeof body.id === 'string' && state.notes.some(note => note.id === body.id) ? body.id : idFor(body));
       const existing = state.notes.find(note => note.id === noteId);
       if (verb === 'PATCH' && !existing) missing();
       const revision = typeof body.revision === 'number' ? body.revision : Number(existing?.revision ?? 0) + 1;
