@@ -143,7 +143,7 @@ test('turns PDF pages beside an editable canvas, preserves notes, and releases t
   expect(after.lines).toHaveLength(before.lines.length + 1);
 });
 
-test('mobile reader keeps the canvas visible and recovers from invalid and replaced PDFs', async ({ page }) => {
+test('mobile reader keeps the canvas visible and recovers from invalid and replaced PDFs', async ({ page, browserName }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${web}/canvas/${canvasId}`);
   const surface = page.getByTestId('canvas-input-surface');
@@ -187,14 +187,20 @@ test('mobile reader keeps the canvas visible and recovers from invalid and repla
   expect(landscapeCanvas!.x + landscapeCanvas!.width).toBeLessThanOrEqual(landscapeReader!.x + 1);
   await expect(image).toBeInViewport();
   const scrollBox = (await scroller.boundingBox())!;
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
-  const finger = { x: scrollBox.x + scrollBox.width / 2, y: scrollBox.y + scrollBox.height - 10, id: 1 };
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [finger] });
-  for (let distance = 10; distance <= 70; distance += 10) {
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ ...finger, y: finger.y - distance }] });
+  if (browserName === 'chromium') {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+    const finger = { x: scrollBox.x + scrollBox.width / 2, y: scrollBox.y + scrollBox.height - 10, id: 1 };
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [finger] });
+    for (let distance = 10; distance <= 70; distance += 10) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ ...finger, y: finger.y - distance }] });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } else {
+    // WebKit has no CDP touch session. Exercise actual browser scrolling, not a scrollTop assignment.
+    await page.mouse.move(scrollBox.x + scrollBox.width / 2, scrollBox.y + scrollBox.height / 2);
+    await page.mouse.wheel(0, 150);
   }
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await expect.poll(() => scroller.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   await reader.getByRole('button', { name: 'PDF 책 읽기 닫기' }).click();
