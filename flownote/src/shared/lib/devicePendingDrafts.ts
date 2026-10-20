@@ -49,7 +49,7 @@ export const pendingDeviceDraftMessage = (workspace: DeviceWorkspace, backup: De
     if (!draft?.note?.id || draft.userId !== deviceOwner()) continue;
     const stored = workspace.notes.find(note => note.id === draft.note!.id);
     if (!stored || stored.title !== draft.note.title || JSON.stringify(stored.content) !== JSON.stringify(draft.note.content)) {
-      return `“${draft.note.title || '노트'}”에 미저장 초안이 있습니다. 해당 노트의 초안을 복구·저장하거나 내보낸 뒤 동기화를 켜주세요. 초안과 기기 원본은 보존했습니다.`;
+      return `“${draft.note.title || '노트'}”에 미저장 초안이 있습니다. 해당 노트의 초안을 복구·저장한 뒤 동기화를 켜주세요. 초안과 기기 원본은 보존했고 JSON 백업에도 포함됩니다.`;
     }
   }
   for (const entry of backup.canvases) {

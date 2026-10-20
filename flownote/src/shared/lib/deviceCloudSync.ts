@@ -288,7 +288,7 @@ export async function reconcileDeviceToCloud(progress: Progress = () => {}) {
         // A failed attempt may already have reached the server. Re-plan against
         // its latest state, keeping stable ID mappings and earlier recovery copies.
         if (state.sync.pending) {
-          state.sync.recovery = [...state.sync.recovery, ...state.sync.pending.conflicts].slice(-200);
+          state.sync.recovery = [...state.sync.recovery, ...state.sync.pending.conflicts];
         }
         state.sync.status = 'syncing';
         state.sync.pending = created;
@@ -313,7 +313,7 @@ export async function reconcileDeviceToCloud(progress: Progress = () => {}) {
         if (newerDraft) throw new Error(newerDraft);
         for (const [key, items] of Object.entries(finalCloud)) state[key as keyof WorkspaceSnapshot] = items as never;
         state.sync.base = structuredClone(finalCloud);
-        state.sync.recovery = [...state.sync.recovery, ...plan!.conflicts].slice(-200);
+        state.sync.recovery = [...state.sync.recovery, ...plan!.conflicts];
         state.sync.status = 'idle';
         state.sync.pending = undefined;
         state.sync.lastError = undefined;
