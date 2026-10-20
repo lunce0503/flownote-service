@@ -1,7 +1,7 @@
 {
   "name": "flownote-desktop",
   "productName": "Flownote",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Flownote Windows desktop application",
   "author": "Flownote",
   "license": "UNLICENSED",
@@ -11,7 +11,7 @@
     "start": "electron .",
     "start:staging": "electron . --staging",
     "test": "node --test test/*.test.cjs",
-    "check": "node --check main.cjs && node --check policy.cjs && npm test",
+    "check": "node --check main.cjs && node --check policy.cjs && node --check updater.cjs && npm test",
     "icons": "node scripts/create-icon.cjs",
     "package:win": "npm run check && npm run icons && electron-builder --win --x64 --publish never && node scripts/checksums.cjs",
     "smoke": "node scripts/smoke.mjs"
@@ -25,7 +25,7 @@
     "appId": "com.flownote.desktop",
     "asar": true,
     "directories": { "output": "release" },
-    "files": ["main.cjs", "policy.cjs", "package.json", "build/icon.png"],
+    "files": ["main.cjs", "policy.cjs", "updater.cjs", "update-public.pem", "package.json", "build/icon.png"],
     "win": {
       "target": ["nsis", "zip"],
       "icon": "build/icon.ico",
@@ -33,6 +33,7 @@
       "executableName": "Flownote"
     },
     "nsis": {
+      "include": "installer.nsh",
       "artifactName": "Flownote-Setup-${version}-${arch}.${ext}",
       "oneClick": false,
       "perMachine": false,

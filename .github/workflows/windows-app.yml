@@ -7,6 +7,11 @@ on:
   pull_request:
     paths: ['flownote-desktop/**', '.github/workflows/windows-app.yml']
   workflow_dispatch:
+    inputs:
+      verify_updates:
+        description: 'Download and verify the signed staging release feed and actual installer/portable assets'
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -38,12 +43,16 @@ jobs:
           if ($installer.ExitCode -ne 0) { throw "Installer failed: $($installer.ExitCode)" }
           $app = Join-Path $installDir 'Flownote.exe'
           if (!(Test-Path $app)) { throw 'Installed executable missing' }
+          if (!(Test-Path (Join-Path $installDir 'resources/installed-by-nsis'))) { throw 'NSIS update mode marker missing' }
           npm run smoke -- "$app"
           if ($LASTEXITCODE -ne 0) { throw 'Installed app smoke failed' }
           $portableDir = Join-Path $env:RUNNER_TEMP 'FlownotePortable'
           Expand-Archive "release/Flownote-Portable-$version-x64.zip" $portableDir
           npm run smoke -- (Join-Path $portableDir 'Flownote.exe')
           if ($LASTEXITCODE -ne 0) { throw 'Portable app smoke failed' }
+      - name: Verify automatic downloads from the signed staging feed
+        if: inputs.verify_updates == true
+        run: node scripts/update-smoke.cjs
       - name: Upload tested binaries
         uses: actions/upload-artifact@v4
         with:
