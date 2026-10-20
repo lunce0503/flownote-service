@@ -21,6 +21,7 @@ export async function withDeviceWorkspace<T>(write: boolean, action: (state: Dev
       let failure: unknown;
       request.onsuccess = () => {
         try {
+          if (deviceOwner() !== owner) throw new Error('계정이 변경되어 기기 자료 요청을 중단했습니다.');
           const state: DeviceWorkspace = request.result ?? createDeviceWorkspace();
           if (state.version !== 1 || Object.entries(createDeviceWorkspace()).some(([key, value]) => Array.isArray(value) && !Array.isArray(state[key as keyof DeviceWorkspace]))) throw new Error('기기 자료 형식을 읽을 수 없습니다. 초기화하지 않았습니다.');
           result = action(state);
@@ -28,7 +29,10 @@ export async function withDeviceWorkspace<T>(write: boolean, action: (state: Dev
         } catch (error) { failure = error; tx.abort(); }
       };
       // Success means durable transaction completion, NOT just request.onsuccess.
-      tx.oncomplete = () => resolve(structuredClone(result));
+      tx.oncomplete = () => {
+        if (deviceOwner() !== owner) { reject(new Error('계정이 변경되어 기기 자료 응답을 중단했습니다.')); return; }
+        resolve(structuredClone(result));
+      };
       tx.onerror = tx.onabort = () => reject(failure ?? tx.error ?? new Error('기기에 저장하지 못했습니다. 저장 공간을 확인하고 내보내기를 이용하세요.'));
     });
   } finally { db.close(); }

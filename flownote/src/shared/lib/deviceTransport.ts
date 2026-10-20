@@ -1,11 +1,12 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
-import { isDeviceOnly } from './deviceMode';
+import { isDeviceOnly, isDeviceModeTransitioning } from './deviceMode';
 import { withDeviceWorkspace } from './deviceStorage';
 import { handleDeviceRequest } from './deviceWorkspace';
 
 const blockedMessage = '기기 전용 모드에서는 서버 기능을 사용할 수 없습니다. 설정에서 동기화를 켜주세요.';
 export function installDeviceTransport() {
   axios.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+    if (isDeviceModeTransitioning()) throw new AxiosError('작업 공간을 전환 중입니다. 화면을 다시 열어주세요.', 'ERR_DEVICE_ONLY', config);
     const url = new URL(config.url ?? '', config.baseURL ?? window.location.origin);
     let body: unknown = config.data;
     if (typeof body === 'string') { try { body = JSON.parse(body); } catch { /* Unsupported raw bodies are never forwarded in device mode. */ } }
@@ -32,6 +33,7 @@ export function installDeviceTransport() {
   });
   const originalFetch = window.fetch.bind(window);
   window.fetch = (input, init) => {
+    if (isDeviceModeTransitioning()) return Promise.reject(new Error('작업 공간 전환 중에는 서버 요청을 보내지 않습니다.'));
     const url = new URL(input instanceof Request ? input.url : String(input), window.location.href);
     const method = init?.method ?? (input instanceof Request ? input.method : 'GET');
     const staticAsset = url.origin === location.origin && url.pathname.startsWith('/assets/') && method.toUpperCase() === 'GET';

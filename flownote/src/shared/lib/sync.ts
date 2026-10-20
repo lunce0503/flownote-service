@@ -1,6 +1,6 @@
 import { API_SYNC_BASE_URL, authHeaders, getAuthToken } from "../api";
 import { io, type Socket } from "socket.io-client";
-import { isDeviceOnly } from './deviceMode';
+import { isDeviceOnly, isDeviceModeTransitioning } from './deviceMode';
 
 export type SyncResource = "notes" | "canvas" | "tasks" | "schedule" | "all";
 
@@ -33,7 +33,7 @@ const releaseSocket = () => {
 };
 
 const getSyncSocket = () => {
-  if (isDeviceOnly()) { socket?.disconnect(); socket = null; socketToken = null; return null; }
+  if (isDeviceOnly() || isDeviceModeTransitioning()) { socket?.disconnect(); socket = null; socketToken = null; return null; }
   const token = getAuthToken();
   if (!API_SYNC_BASE_URL || !token) return null;
   if (!socket || socketToken !== token) {

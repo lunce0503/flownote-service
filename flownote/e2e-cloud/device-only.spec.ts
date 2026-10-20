@@ -69,6 +69,15 @@ test('device-only notes, canvas and planner persist without API or sync traffic 
     const exported = await page.evaluate(() => JSON.parse((window as Window & { deviceExports: string[] }).deviceExports[0]));
     const backup = JSON.parse(Buffer.from(exported.base64, 'base64').toString('utf8'));
     expect(backup.workspace.notes[0].content.markdown).toContain('Do not upload'); expect(backup).not.toHaveProperty('token');
+    const stalePageBlocked = await page.evaluate(async ({ owner }) => {
+      localStorage.setItem(`flownote.device-mode:${owner}`, 'cloud');
+      try {
+        await fetch('/web-api/api/diary/2026-10-20', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Flownote-Web': '1' }, body: JSON.stringify({ todos: [], grid: {}, journal: [{ text: 'Must never upload from stale local page' }] }) });
+        return false;
+      } catch { return true; }
+      finally { localStorage.setItem(`flownote.device-mode:${owner}`, 'device'); }
+    }, { owner: user.id });
+    expect(stalePageBlocked).toBeTruthy();
     expect(outgoing).toEqual([]);
     const beforeCloud = await (await request.get(`${api}/api/notes`, { headers })).json();
     expect(beforeCloud).toHaveLength(1); expect(beforeCloud[0].content.markdown).toBe(original.content.markdown);
@@ -106,7 +115,33 @@ test('device mode is isolated by account and unavailable storage cannot silently
   await page.evaluate(() => { IDBObjectStore.prototype.put = function () { throw new DOMException('Synthetic quota', 'QuotaExceededError'); }; });
   page.once('dialog', dialog => dialog.accept('Must not be called saved'));
   await page.getByRole('button', { name: '새 노트', exact: true }).first().click();
-  await expect(page.getByRole('alert')).toContainText('파일 작업에 실패');
+  await expect(page.locator('div[role="alert"]')).toContainText('파일 작업에 실패');
   await page.reload(); await expect(page.getByRole('treeitem', { name: 'Must not be called saved.md', exact: true })).toHaveCount(0);
   expect((await (await request.get(`${api}/api/notes`, { headers: { Authorization: `Bearer ${token}` } })).json())).toEqual([]);
+});
+
+test('phone and desktop app markers restore an independent device workspace without a server session', async ({ browser }) => {
+  for (const [marker, viewport] of [['FlownoteAndroid/1.1.0', { width: 390, height: 844 }], ['FlownoteDesktop/1.1.1', { width: 1280, height: 900 }]] as const) {
+    const context = await browser.newContext({ userAgent: `Mozilla/5.0 ${marker}`, viewport });
+    try {
+      const owner = `synthetic-device-${randomUUID()}`;
+      await context.addInitScript(({ owner }) => {
+        localStorage.setItem('flownote_auth_user', JSON.stringify({ id: owner, username: 'Device', nickname: 'Device', email: 'device@example.com', role: 'USER' }));
+        localStorage.setItem(`flownote.device-mode:${owner}`, 'device');
+      }, { owner });
+      const page = await context.newPage(); const outgoing: string[] = [];
+      page.on('request', request => { if (/\/web-api\/|\.railway\.app/.test(request.url())) outgoing.push(request.url()); });
+      await page.goto(`${web}/settings`);
+      await expect(page.getByRole('switch', { name: '앱 동기화', exact: true })).toHaveAttribute('aria-checked', 'false');
+      await expect(page.getByRole('button', { name: '프로필 저장', exact: true })).toBeDisabled();
+      await expect(page.locator('header')).toHaveCount(0);
+      await page.goto(`${web}/blog`); page.once('dialog', dialog => dialog.accept('Device restore'));
+      await page.getByRole('button', { name: '새 노트', exact: true }).first().click();
+      await page.getByLabel('Markdown 본문').fill('Stored only on this device');
+      await expect(page.getByTestId('note-save-status')).toHaveText('기기에 저장됨 · 동기화 꺼짐');
+      await page.reload(); await expect(page.getByLabel('Markdown 본문')).toHaveValue('Stored only on this device');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+      expect(outgoing).toEqual([]);
+    } finally { await context.close(); }
+  }
 });

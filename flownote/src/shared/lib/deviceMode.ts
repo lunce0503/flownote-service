@@ -24,3 +24,9 @@ export const setDeviceOnly = (enabled: boolean) => {
 };
 export const newWorkspaceId = () => `${isDeviceOnly() ? 'device-' : ''}${crypto.randomUUID()}`;
 export const deviceNamespace = (base: string) => isDeviceOnly() ? `${base}-device:${deviceOwner()}` : base;
+
+// A page's drafts and timers belong to its original workspace for its entire lifetime.
+const pageDeviceOnly = isDeviceOnly();
+const pageOwner = deviceOwner();
+export const isDeviceModeTransitioning = () => isDeviceOnly() !== pageDeviceOnly
+  || ((pageDeviceOnly || isDeviceOnly()) && deviceOwner() !== pageOwner);

@@ -56,6 +56,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAuthUser(nextUser);
     setToken(nextToken);
     setUser(nextUser);
+    if (isDeviceOnly()) window.location.replace('/');
   };
 
   const updateProfile = async (input: { username: string; email: string; nickname: string; currentPassword?: string }) => {

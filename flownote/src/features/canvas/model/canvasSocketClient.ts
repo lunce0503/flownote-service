@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { LineElement, CanvasSavePayload } from '@/entities/canvas';
 import { authHeaders } from '@/shared/api';
 import { isAbortError, type CanvasSaveTrigger } from './canvasPersistenceModel';
-import { isDeviceOnly } from '@/shared/lib/deviceMode';
+import { isDeviceOnly, isDeviceModeTransitioning } from '@/shared/lib/deviceMode';
 import { withDeviceWorkspace } from '@/shared/lib/deviceStorage';
 import { handleDeviceCanvas } from '@/shared/lib/deviceWorkspace';
 
@@ -108,6 +108,7 @@ window.addEventListener('flownote-device-mode-changing', () => {
 });
 
 export const getCanvasSocket = (socketUrl: string) => {
+  if (isDeviceModeTransitioning()) throw new CanvasSocketError('작업 공간 전환 중입니다.', 503, false);
   if (isDeviceOnly()) { canvasSocket?.disconnect(); canvasSocket = null; throw new CanvasSocketError('기기 전용 모드에서는 실시간 연결을 사용하지 않습니다.', 503, false); }
   if (!canvasSocket || canvasSocketUrl !== socketUrl) {
     canvasSocket?.disconnect();
@@ -130,6 +131,8 @@ export const emitCanvasSocket = <T,>(
   payload: Record<string, unknown>,
   init?: Pick<RequestInit, "signal"> & { timeoutMs?: number },
 ): Promise<T> => (
+  isDeviceModeTransitioning() ? Promise.reject(new CanvasSocketError('작업 공간 전환 중입니다.', 503, false)) :
+  (!isDeviceOnly() && typeof payload.canvasId === 'string' && payload.canvasId.startsWith('device-')) ? Promise.reject(new CanvasSocketError('기기 전용 자료를 서버로 전송하지 않습니다.', 403, false)) :
   isDeviceOnly() ? (init?.signal?.aborted ? Promise.reject(new DOMException('Aborted', 'AbortError'))
     : withDeviceWorkspace(eventName !== 'canvas:load', state => handleDeviceCanvas(state, eventName, payload) as T)) :
   new Promise((resolve, reject) => {
@@ -178,7 +181,7 @@ export const emitCanvasSocket = <T,>(
 );
 
 export const emitCanvasStream = (socketUrl: string, event: string, payload: Record<string, unknown>) => {
-  if (isDeviceOnly()) return;
+  if (isDeviceOnly() || isDeviceModeTransitioning() || (typeof payload.canvasId === 'string' && payload.canvasId.startsWith('device-'))) return;
   const socket = getCanvasSocket(socketUrl);
   if (!socket.connected || canvasMessageBytes(payload) > CANVAS_SOCKET_SAFE_BYTES) return;
   // Transient previews are recoverable from the durable save; never buffer them offline.
@@ -193,6 +196,7 @@ export const saveCanvasPayload = async (
   trigger: CanvasSaveTrigger,
   init?: Pick<RequestInit, "keepalive" | "signal">,
 ): Promise<CanvasSaveResponse> => {
+  if (isDeviceModeTransitioning()) throw new CanvasSocketError('작업 공간 전환 중입니다.', 503, false);
   if (isDeviceOnly()) {
     if (init?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     return await withDeviceWorkspace(true, state => handleDeviceCanvas(state, 'canvas:save', { canvasId, payload, mutationId }) as CanvasSaveResponse);
