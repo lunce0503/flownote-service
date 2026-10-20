@@ -4,6 +4,37 @@ const path = require('node:path');
 const os = require('node:os');
 const { UpdateClient } = require('../updater.cjs');
 (async () => {
+  if (process.argv[2] && process.argv[3]) {
+    const { _electron: electron } = require('playwright');
+    for (const [kind, executablePath] of [['installer', process.argv[2]], ['portable', process.argv[3]]]) {
+      const application = await electron.launch({ executablePath, args: ['--staging'], timeout: 60000 });
+      try {
+        const result = await application.evaluate(async ({ app, net }, kind) => {
+          const path = require('node:path');
+          const fs = require('node:fs/promises');
+          const { UpdateClient } = require(path.join(app.getAppPath(), 'updater.cjs'));
+          const directory = await fs.mkdtemp(path.join(app.getPath('temp'), `flownote-native-${kind}-updates-`));
+          let requests = 0;
+          const fetcher = (url, options) => { if (!url.endsWith('.json')) requests++; return net.fetch(url, options); };
+          // Old-version fixture in the packaged main process, not a renderer/CLI override.
+          const options = { directory, channel: 'staging', version: '1.0.0', kind, fetcher };
+          const client = new UpdateClient(options);
+          await Promise.all([client.check(), client.check()]);
+          if (client.state.status !== 'ready') throw new Error(client.state.error || client.state.status);
+          await client.verifyReady(); const firstRequests = requests;
+          const again = new UpdateClient(options); await again.check();
+          if (again.state.status !== 'ready' || requests !== firstRequests) throw new Error('Verified restart cache was not reused');
+          const current = new UpdateClient({ ...options, version: client.state.version }); await current.check();
+          if (current.state.status !== 'current' || requests !== firstRequests) throw new Error('Same version was downloaded');
+          await fs.writeFile(path.join(directory, 'draft-preservation-probe.txt'), 'keep'); await client.check();
+          if (await fs.readFile(path.join(directory, 'draft-preservation-probe.txt'), 'utf8') !== 'keep') throw new Error('Unrelated data changed');
+          return { kind, version: client.state.version, status: client.state.status, firstRequests, requests };
+        }, kind);
+        console.log('PASS exact packaged Windows updater with Electron net.fetch:', JSON.stringify(result));
+      } finally { await application.close(); }
+    }
+    return;
+  }
   // Public staging only; signature + exact release URL remain enforced.
   for (const kind of ['installer', 'portable']) {
     const directory = await mkdtemp(path.join(os.tmpdir(), `flownote-${kind}-update-`));

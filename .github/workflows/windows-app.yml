@@ -52,7 +52,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Portable app smoke failed' }
       - name: Verify automatic downloads from the signed staging feed
         if: inputs.verify_updates == true
-        run: node scripts/update-smoke.cjs
+        run: node scripts/update-smoke.cjs "$env:RUNNER_TEMP/FlownoteInstalled/Flownote.exe" "$env:RUNNER_TEMP/FlownotePortable/Flownote.exe"
       - name: Upload tested binaries
         uses: actions/upload-artifact@v4
         with:
