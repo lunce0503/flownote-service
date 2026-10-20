@@ -28,6 +28,21 @@ npm run smoke -- <설치한-Flownote.exe-경로>
 
 앱 전용 UI와 설치 안내는 `node scripts/deploy-cloud.mjs release web`으로 staging-first 배포한다. 네이티브 바이너리는 GitHub Release, 설치 안내는 `/windows.html`에서 제공한다.
 
+## 자동 업데이트 배포
+
+현재 버전은 1.1.0이다. `updater.cjs`는 별도 RSA 서명된 고정 HTTPS feed를 검증해 설치형 EXE/portable ZIP을 자동 다운로드한다. 자동 설치나 portable 자동 교체는 하지 않는다. 상세 동작은 [소유 사양](../docs/product-specs/windows-app.md#110-자동-업데이트)을 따른다.
+
+Windows runner에서 검증한 artifact를 공개한 뒤 `scripts/sign-app-update.mjs`로 staging/production feed를 만든다. `FLOWNOTE_UPDATE_SIGNING_KEY`는 앱에 고정한 공개키와 짝인 저장소 밖 PEM 경로다. 개인키를 Actions artifact/소스/보고서에 넣지 않는다.
+
+```bash
+node scripts/sign-app-update.mjs windows staging 1.1.0 <verified-artifact-directory>
+node scripts/sign-app-update.mjs windows production 1.1.0 <same-artifact-directory>
+```
+
+위 명령은 저장소 루트에서 실행한다. feed는 `flownote/public/updates/<channel>/windows.json`이다. 공개키 교체는 기존 앱이 새 키를 신뢰하지 않으므로 별도 키 이전 계획 없이 수행하면 안 된다. 새 버전마다 package version과 artifact/tag/feed version을 함께 증가시킨다.
+
+`windows-app.yml`의 수동 `verify_updates=true`는 서명된 cloud staging feed에서 실제 EXE/ZIP을 다운로드하고 해시·캐시·동일 버전 skip을 검사한다. 업데이트 feed를 staging-first 웹 배포로 검증한 뒤 같은 소스로 production에 승격한다. 1.0.0 사용자는 1.1.0을 한 번 직접 설치해야 한다.
+
 ## 보안
 
 웹 renderer에는 Node.js, preload/IPC bridge, webviewTag를 노출하지 않는다. sandbox/contextIsolation/webSecurity를 활성화하고 내부 이동은 환경별 고정 HTTPS origin에 제한한다. 외부 링크는 HTTPS/mailto/tel만 허용하며 시스템 브라우저로 연다. 파일 다운로드는 native 저장 대화상자를 사용한다. 서명키·서버 credential·테스트 계정을 패키지에 넣지 않는다.

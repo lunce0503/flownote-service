@@ -8,6 +8,15 @@ const executablePath = process.argv[2];
 if (!executablePath) throw new Error('Usage: npm run smoke -- <installed-or-portable-Flownote.exe>');
 const api = 'https://flownote-api-staging.up.railway.app';
 const email = `windows-${randomUUID()}@example.com`, password = randomUUID();
+// Cloud staging is serverless. Warm read-only auth routes before creating test data.
+for (const route of ['/api/users/me', '/api/canvas/documents']) {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const response = await fetch(`${api}${route}`, { signal: AbortSignal.timeout(30000) }).catch(() => null);
+    if (response?.status === 401) break;
+    assert(attempt < 7, `Staging auth service did not become ready: ${route} (${response?.status})`);
+    await new Promise(resolve => setTimeout(resolve, 3000));
+  }
+}
 async function request(route, method, body, token) {
   const response = await fetch(`${api}${route}`, { method,
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
