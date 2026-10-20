@@ -107,9 +107,24 @@ jobs:
             if ((Get-FileHash "release/$name" -Algorithm SHA256).Hash.ToLower() -ne $hash) { throw 'Published checksum mismatch' }
           }
           $installDir = Join-Path $env:RUNNER_TEMP 'FlownoteInstalled'
+          $oldName = 'Flownote-Setup-1.0.0-x64.exe'
+          $oldBase = 'https://github.com/lunce0503/flownote-service/releases/download/windows-v1.0.0'
+          Invoke-WebRequest "$oldBase/$oldName" -OutFile "release/$oldName"
+          $oldSums = (Invoke-WebRequest "$oldBase/SHA256SUMS.txt").Content
+          $oldLine = ($oldSums -split "`n" | Where-Object { $_ -match '^[a-f0-9]{64}  Flownote-Setup-1\.0\.0-x64\.exe\s*$' })
+          if (!$oldLine -or (Get-FileHash "release/$oldName" -Algorithm SHA256).Hash.ToLower() -ne ($oldLine -split '  ')[0]) { throw 'Previous installer checksum mismatch' }
+          $oldInstaller = Start-Process -FilePath "release/$oldName" -ArgumentList '/S', "/D=$installDir" -Wait -PassThru
+          if ($oldInstaller.ExitCode -ne 0) { throw 'Previous installer failed' }
+          $profileDir = Join-Path $env:APPDATA 'Flownote-Staging'
+          New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
+          $probe = Join-Path $profileDir 'native-upgrade-preservation-probe.txt'
+          Set-Content $probe 'preserved'
           $installer = Start-Process -FilePath "release/Flownote-Setup-$version-x64.exe" -ArgumentList '/S', "/D=$installDir" -Wait -PassThru
           if ($installer.ExitCode -ne 0) { throw 'Installer failed' }
+          if ((Get-Content $probe) -ne 'preserved') { throw 'Existing staging profile was changed during installer upgrade' }
+          if (!(Test-Path (Join-Path $installDir 'resources/installed-by-nsis'))) { throw 'Installed update mode marker missing' }
           Expand-Archive "release/Flownote-Portable-$version-x64.zip" (Join-Path $env:RUNNER_TEMP 'FlownotePortable')
+          if (Test-Path (Join-Path $env:RUNNER_TEMP 'FlownotePortable/resources/installed-by-nsis')) { throw 'Portable package must not use NSIS update mode' }
       - name: Verify actual packaged Electron auto-download and cache
         run: node scripts/update-smoke.cjs "$env:RUNNER_TEMP/FlownoteInstalled/Flownote.exe" "$env:RUNNER_TEMP/FlownotePortable/Flownote.exe"
   release:
