@@ -107,7 +107,9 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
     const interceptorId = axios.interceptors.response.use(
       (response) => response,
       (error) => {
-        if (error.response?.status === 401) {
+        // An expired cloud session during offline reconciliation must not erase
+        // the cached device owner or navigate away from recoverable local work.
+        if (error.response?.status === 401 && !isDeviceOnly()) {
           resetAuth();
           if (guestConfigured) {
             // 스테이징: /login 대신 게스트로 다시 로그인한다(막다른 로그인 화면 방지).

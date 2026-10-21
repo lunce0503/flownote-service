@@ -323,9 +323,11 @@ export async function reconcileDeviceToCloud(progress: Progress = () => {}) {
       });
       return { conflicts: plan.conflicts.length, workspace: workspaceSnapshot(finalCloud as never) };
     } catch (error) {
-      const message = error instanceof Error ? error.message : '동기화하지 못했습니다.';
+      const message = axios.isAxiosError(error) && error.response?.status === 401
+        ? '서버 로그인이 만료되었습니다. 기기 자료는 보존했습니다. 기기 모드에서 로그아웃한 뒤 같은 계정으로 다시 로그인하고 동기화를 켜주세요.'
+        : error instanceof Error ? error.message : '동기화하지 못했습니다.';
       await withDeviceWorkspace(true, state => { state.sync.status = 'failed'; state.sync.lastError = message.slice(0, 500); });
-      throw error;
+      throw new Error(message, { cause: error });
     }
   });
 }
