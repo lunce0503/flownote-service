@@ -1,6 +1,6 @@
 # Apple Pencil·오프라인 재동기화 1.2.0 릴리스
 
-기록 시작: 2026-10-21 08:41 Asia/Seoul. 09:17 기준 기능·앱 릴리스 및 staging-first production 배포 완료. 문서 마감의 동일 실행 소스 Vercel 재배포와 최종 read-back을 이어 기록한다. 물리 iPad Pencil 검증은 아래 제한대로 남는다.
+기록 시작: 2026-10-21 08:41 Asia/Seoul. 최종 갱신: 09:20 Asia/Seoul. 상태: 기능·검증·staging-first production·세 앱 채널 릴리스 완료. 물리 iPad Pencil 검증은 아래 제한대로 남는다.
 
 ## 소스와 보존
 
@@ -72,6 +72,8 @@
 | gateway/api | `1cf2b63e-24a5-4784-bf10-a0e4ad8304d2` | SUCCESS, 변경 없는 기존 코드 재개 |
 
 - staging/production 네 개 feed 모두 RSA 서명·채널·플랫폼·1.2.0·`no-store` 검증. 두 APK 실제 GET 크기/SHA-256, Windows 실제 artifact HEAD/크기, 두 설치 안내 버전과 링크 확인. Windows 전체 파일 해시는 위 exact published binary runner가 검증했다.
+- 문서 마감 source `9233a36851e774ff2ffb0bd5c73e199315d11ed0`은 계획·버그·보고서 Markdown만 변경했다. 실행 소스 fingerprint는 staging과 같은 `df6ddad551a80d64683749df868e20203c2be2f278be349e4999491c9889ed6e`로 확인하고 같은 통과 receipt로 production Vercel 배포를 수행했다. backend Docker 재빌드는 실행 산출물이 없으므로 생략하고 위 SUCCESS ID를 재개했다.
+- 최종 운영 웹: `dpl_F2bWWQQeCqoFu7sXNXTYRaPZTPEN`, `https://flownote-react-hd7xvw6tf-flownote-service.vercel.app`, 2026-10-21 09:19:50 KST. READY·운영 alias 일치. 최종 배포 후 네 feed·APK 해시·Windows artifact 크기·설치 안내·gateway/인증 경계 read-back을 다시 통과했다. GitHub Android APK GET도 200/55068 bytes 및 표의 SHA-256과 일치했다.
 - Windows 설치 안내: https://flownote-react.vercel.app/windows.html · Android 설치 안내: https://flownote-react.vercel.app/android.html · 운영 APK: https://flownote-react.vercel.app/downloads/flownote-1.2.0.apk.
 
 ## 사용 방법과 남은 기기 확인
@@ -79,3 +81,5 @@
 iPad/iPhone은 기존 TestFlight에서 **1.2.0(7)**을 업데이트한다. 앱을 다시 열고 캔버스에서 지원 Pencil 본체를 두 번 탭하면 지우개/직전 도구가 전환된다. 전체 → 설정 → 앱 동기화 OFF는 현재 지원 자료를 기기에 저장하고, ON은 변경을 조정·업로드한다. 미저장 편집 초안이 남았으면 먼저 해당 편집기의 복구·저장을 완료한다. 충돌 복구본과 별도 초안은 기기 JSON 백업에 포함한다.
 
 실제 Pencil 본체 제스처·압력·손바닥 거부, iPad OS 강제 종료/저장소 회수 및 공유 시트, Android 제조사별 설치 허용 화면은 물리 기기 확인이 필요하다. 완전 오프라인 최초 WebView 로드, JSON 백업 자동 가져오기, Windows Authenticode는 이번 릴리스가 보장하지 않는다. 기능·정적/단위·staging gate·production·세 앱 채널 릴리스 완료와 이 항목을 구분한다.
+
+마지막 상태 갱신은 이 `logs/report/` 보고서만 변경한다. 파일 존재·완료 상태·배포 ID/교차 링크를 확인하고 추가 Docker 빌드와 클라우드 배포는 보고서 전용 예외로 생략한다. 원래 공유 작업 트리 HEAD/index는 유지하고 릴리스 branch에 source와 기록을 보존했다.
