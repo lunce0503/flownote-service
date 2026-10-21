@@ -3,7 +3,7 @@
 - 요청일: 2026-10-21 (Asia/Seoul)
 - 실행 담당: `application manage` / `flownote 앱 관리`
 - 세션: `01a04858-b6df-7613-91da-c92a37955657`
-- 상태: 구현·정적 검증 완료. cloud staging·production과 네이티브 앱 릴리스 검증 진행 중이며 최종 ID는 `logs/report/`에 기록한다.
+- 상태: 구현 완료. 검증·배포의 실제 완료 상태, 최종 ID와 하드웨어 미확인 항목은 [릴리스 보고서](../../../logs/report/2026-10-21-0841-pencil-offline-sync-release.md)가 소유한다.
 
 ## 현재 동작과 목표
 
