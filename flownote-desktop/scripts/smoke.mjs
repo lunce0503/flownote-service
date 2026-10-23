@@ -100,7 +100,7 @@ try {
   await page.goto('https://flownote-react-staging.vercel.app/library');
   await page.getByRole('button', { name: '책 추가', exact: true }).click();
   await page.getByLabel('PDF 파일').setInputFiles(inputPath);
-  await page.getByLabel('책 제목').fill('Native 100MiB textbook');
+  await page.getByLabel('책 제목', { exact: true }).fill('Native 100MiB textbook');
   await page.getByRole('button', { name: '책장에 추가', exact: true }).click();
   await page.getByRole('dialog', { name: '책 펼쳐 보기' }).getByRole('img').waitFor();
   assert.equal(await page.getByTestId('library-pdf-page').count(), 0);
