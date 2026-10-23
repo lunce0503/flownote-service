@@ -80,7 +80,7 @@ final class RemoteLink implements AutoCloseable {
     private final AtomicBoolean ended=new AtomicBoolean();
     private final LinkedHashSet<String> applied=new LinkedHashSet<>(),alerts=new LinkedHashSet<>();
     private WebSocket socket;
-    private volatile boolean connected,intentional;
+    private volatile boolean connected,intentional,enabled=true,speakAlerts=true;
     private float volume;
     RemoteLink(Context context,JSONObject connection,Listener listener)throws Exception {
         this.context=context.getApplicationContext();this.connection=connection;this.listener=listener;
@@ -88,6 +88,15 @@ final class RemoteLink implements AutoCloseable {
         int max=audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);volume=max>0?audio.getStreamVolume(AudioManager.STREAM_MUSIC)/(float)max:0;
     }
     boolean connected(){return connected;}
+    boolean enabled(){return enabled;}
+    String deviceId(){return connection.optString("deviceId");}
+    void setVoiceAlerts(boolean value){speakAlerts=value;}
+    void setEnabled(boolean value)throws Exception {send(new JSONObject().put("type","device.enabled").put("enabled",value));}
+    private void readState(JSONObject state)throws Exception {
+        enabled=false;var devices=state.getJSONArray("devices");
+        for(int i=0;i<devices.length();i++){var device=devices.getJSONObject(i);if(device.optString("id").equals(deviceId()))enabled=device.optBoolean("enabled",true);}
+        listener.state(state);
+    }
     void connect()throws Exception {
         String token=connection.getString("token");if(!token.matches("[0-9A-Fa-f]{64}"))throw new IllegalArgumentException("등록 자격 증명 오류");
         Request request=new Request.Builder().url(address(connection.getString("address")).resolve("/v1/session"))
@@ -98,9 +107,9 @@ final class RemoteLink implements AutoCloseable {
                 try{
                     JSONObject message=new JSONObject(text);String type=message.getString("type");
                     switch(type){
-                        case "welcome":connected=true;listener.connected();listener.state(message.getJSONObject("state"));
+                        case "welcome":connected=true;listener.connected();readState(message.getJSONObject("state"));
                             timer.scheduleWithFixedDelay(RemoteLink.this::heartbeat,0,3,TimeUnit.SECONDS);break;
-                        case "state":listener.state(message.getJSONObject("state"));break;
+                        case "state":readState(message.getJSONObject("state"));break;
                         case "frame.result":String expectedFrame=pendingFrame.get();if(expectedFrame!=null&&expectedFrame.equals(message.getString("frameId"))&&pendingFrame.compareAndSet(expectedFrame,null))listener.gesture(message.optString("gesture","None"),message.optDouble("confidence",0));break;
                         case "alert":
                             JSONObject alert=message.getJSONObject("alert");if(alert.optString("message").length()>256||alert.optString("english").length()>256)throw new IllegalArgumentException();
@@ -120,7 +129,7 @@ final class RemoteLink implements AutoCloseable {
     private void heartbeat(){try{
         int max=audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);boolean muted=audio.isStreamMute(AudioManager.STREAM_MUSIC);
         if(!muted&&max>0)volume=audio.getStreamVolume(AudioManager.STREAM_MUSIC)/(float)max;
-        JSONObject sample=new JSONObject().put("volume",volume).put("muted",muted).put("outputReady",max>0&&!audio.isVolumeFixed());
+        JSONObject sample=new JSONObject().put("volume",volume).put("muted",muted).put("outputReady",max>0&&!audio.isVolumeFixed()).put("speakAlerts",speakAlerts).put("platform","Android");
         Intent battery=context.registerReceiver(null,new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         if(battery!=null){int level=battery.getIntExtra(BatteryManager.EXTRA_LEVEL,-1),scale=battery.getIntExtra(BatteryManager.EXTRA_SCALE,-1);if(level>=0&&scale>0)sample.put("batteryPercent",level*100/scale);}
         send(new JSONObject().put("type","heartbeat").put("health",sample));
@@ -130,6 +139,7 @@ final class RemoteLink implements AutoCloseable {
         double requested=command.getDouble("volume");boolean muted=command.getBoolean("muted"),success=false;
         if(!Double.isFinite(requested)||requested<0||requested>1)throw new IllegalArgumentException();
         try{
+            if(!enabled)throw new IllegalStateException();
             if(audio.isVolumeFixed())throw new IllegalStateException();
             if(!applied.contains(id)){
                 int max=audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);if(max<=0)throw new IllegalStateException();int index=(int)Math.round(requested*max);
@@ -146,11 +156,12 @@ final class RemoteLink implements AutoCloseable {
         send(new JSONObject().put("type","output.result").put("commandId",id).put("result",new JSONObject().put("applied",success).put("volume",volume).put("muted",audio.isStreamMute(AudioManager.STREAM_MUSIC))));
     }
     void command(String target,String action)throws Exception {
+        if(!connected||!enabled)throw new IllegalStateException();
         if(!java.util.Arrays.asList("volume_up","volume_down","mute","unmute").contains(action))throw new IllegalArgumentException();UUID.fromString(target);
         send(new JSONObject().put("type","command").put("commandId",UUID.randomUUID().toString()).put("targetId",target).put("action",action));
     }
     void frame(byte[] jpeg){
-        String id=UUID.randomUUID().toString();if(!connected||jpeg.length>131072||!pendingFrame.compareAndSet(null,id))return;
+        String id=UUID.randomUUID().toString();if(!connected||!enabled||jpeg.length>131072||!pendingFrame.compareAndSet(null,id))return;
         try{send(new JSONObject().put("type","camera.frame").put("frameId",id).put("jpeg",Base64.encodeToString(jpeg,Base64.NO_WRAP)));timer.schedule(()->pendingFrame.compareAndSet(id,null),6,TimeUnit.SECONDS);}
         catch(Exception e){pendingFrame.compareAndSet(id,null);listener.error("영상 전송 실패");}
     }

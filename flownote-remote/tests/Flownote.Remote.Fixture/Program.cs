@@ -36,7 +36,7 @@ try
     await hub.StartAsync(IPAddress.Loopback, Protocol.Port, cert);
     Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(configFile))!);
     await File.WriteAllTextAsync(configFile, JsonSerializer.Serialize(new { address = $"https://10.0.2.2:{Protocol.Port}/", pin = Protocol.Pin(cert), code = hub.PairingCode,
-        certificate = Convert.ToBase64String(cert.RawData) }, Protocol.Json));
+        certificate = Convert.ToBase64String(cert.RawData), invitation = hub.Invitation(Protocol.Pin(cert)).Encode() }, Protocol.Json));
     Console.WriteLine("READY: private TLS device fixture and real MediaPipe worker");
     try { await Task.Delay(Timeout.Infinite, shutdown.Token); } catch (OperationCanceledException) { }
 }

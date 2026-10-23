@@ -17,6 +17,7 @@ public sealed class RemoteClient : IAsyncDisposable
     private readonly TaskCompletionSource<bool> welcome = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private Task receiver = Task.CompletedTask, heartbeat = Task.CompletedTask;
     private bool intentional;
+    public bool Enabled { get; private set; } = true;
     public Guid DeviceId { get; private set; }
     public bool Connected => socket.State == WebSocketState.Open;
     public event Action<HubState>? StateChanged;
@@ -74,6 +75,13 @@ public sealed class RemoteClient : IAsyncDisposable
         finally { frameAck = null; frameGate.Release(); }
     }
     public Task StopCameraAsync() => SendAsync(new { type = "camera.stop" });
+    public Task SetEnabledAsync(bool enabled) => SendAsync(new { type = "device.enabled", enabled });
+    private void ReadState(JsonElement message)
+    {
+        var state = message.GetProperty("state").Deserialize<HubState>(Protocol.Json) ?? throw new ArgumentException();
+        Enabled = state.Devices.FirstOrDefault(d => d.Id == DeviceId)?.Enabled == true;
+        StateChanged?.Invoke(state);
+    }
     private Task SendAsync(object message) => SocketJson.SendAsync(socket, writer, message, stop.Token);
 
     private async Task ReceiveAsync()
@@ -89,8 +97,8 @@ public sealed class RemoteClient : IAsyncDisposable
                 {
                     case "welcome":
                         welcome.TrySetResult(true); Activity?.Invoke("서버 연결됨");
-                        StateChanged?.Invoke(message.GetProperty("state").Deserialize<HubState>(Protocol.Json)!); break;
-                    case "state": StateChanged?.Invoke(message.GetProperty("state").Deserialize<HubState>(Protocol.Json)!); break;
+                        ReadState(message); break;
+                    case "state": ReadState(message); break;
                     case "frame.result":
                         if (message.GetProperty("frameId").GetGuid() != pendingFrame) break;
                         Gesture?.Invoke(new(message.GetProperty("gesture").GetString(), message.GetProperty("confidence").GetDouble()));
@@ -99,7 +107,8 @@ public sealed class RemoteClient : IAsyncDisposable
                         var command = message.GetProperty("command").Deserialize<OutputCommand>(Protocol.Json) ?? throw new ArgumentException();
                         if (!float.IsFinite(command.Volume) || command.Volume is < 0 or > 1) throw new ArgumentException();
                         OutputResult result;
-                        if (applied.Contains(command.CommandId))
+                        if (!Enabled) result = new(false, health().Volume, health().Muted, "device_paused");
+                        else if (applied.Contains(command.CommandId))
                         { var current = health(); result = new(true, current.Volume, current.Muted); }
                         else
                         {

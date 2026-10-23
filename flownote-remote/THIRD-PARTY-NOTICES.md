@@ -43,7 +43,16 @@ are embedded in the EXE. The Evergreen WebView2 Runtime is a separate Microsoft
 component and must be installed on the Windows device; the .NET runtime and
 gesture model are included in the EXE.
 
-## Android network client
+## QR generation and reading
+
+Windows uses ZXing.Net 0.16.11 (https://github.com/micjahn/ZXing.Net),
+and Android uses ZXing Core 3.5.4 (https://github.com/zxing/zxing).
+ZXing authors and contributors. Licensed under Apache 2.0; the complete
+license is included in [config/Apache-2.0.txt](config/Apache-2.0.txt),
+embedded in the Windows license viewer and bundled in the Android assets.
+QR images are generated and decoded locally without a third-party QR service.
+
+## Android network client license
 
 OkHttp 4.12.0 and Okio are licensed under Apache 2.0:
 https://github.com/square/okhttp/blob/parent-4.12.0/LICENSE.txt and

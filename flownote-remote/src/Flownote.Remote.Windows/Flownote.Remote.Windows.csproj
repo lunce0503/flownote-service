@@ -12,6 +12,7 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="System.Speech" Version="10.0.0" />
+    <PackageReference Include="ZXing.Net" Version="0.16.11" />
     <EmbeddedResource Include="../../artifacts/vision/**/*" LogicalName="Vision.%(RecursiveDir)%(Filename)%(Extension)" />
     <EmbeddedResource Include="../../vendor/sound-manager/LICENSE" LogicalName="SoundManagerLicense" />
     <EmbeddedResource Include="../../packaging/dotnet-LICENSE.txt" LogicalName="DotnetLicense" />

@@ -92,7 +92,7 @@ public sealed class VisionHost : IDisposable
     public async Task StartCameraAsync()
     {
         cameraAllowed = true;
-        await View.CoreWebView2.ExecuteScriptAsync("window.remoteVision.startCamera().catch(()=>window.chrome.webview.postMessage({type:'camera.error'}))");
+        await View.CoreWebView2.ExecuteScriptAsync("window.remoteVision.startCamera().catch(()=>{window.remoteVision.stopCamera();window.chrome.webview.postMessage({type:'camera.error'})})");
     }
     public async Task StopCameraAsync()
     { cameraAllowed = false; if (View.CoreWebView2 is not null) await View.CoreWebView2.ExecuteScriptAsync("window.remoteVision.stopCamera()"); }

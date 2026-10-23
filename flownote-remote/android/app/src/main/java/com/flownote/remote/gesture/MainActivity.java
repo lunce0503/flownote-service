@@ -29,6 +29,10 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        if (!getIntent().getBooleanExtra("settings", false)) {
+            startActivity(new android.content.Intent(this, NetworkActivity.class).setData(getIntent().getData()));
+            finish(); return;
+        }
         preferences = getSharedPreferences("remote-settings-v1", MODE_PRIVATE);
         ScrollView scroll = new ScrollView(this);
         content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL);
@@ -46,9 +50,8 @@ public final class MainActivity extends Activity {
             return insets;
         });
         label("Flownote Remote").setTextSize(28);
-        label("Android · 소리와 제스처 설정");
-        label("연결 화면에서 서버에 등록하고 카메라·소리 제어·상태 음성 알림을 사용합니다. 아래 합성 테스트는 실제 명령을 실행하지 않습니다.");
-        button("서버 · 클라이언트 연결", () -> startActivity(new android.content.Intent(this, NetworkActivity.class)));
+        label("제스처 세부 설정 · 테스트용");
+        label("이 기기의 합성 테스트 설정입니다. 실제 인식 기준과 동작은 서버 PC에서 설정합니다.");
         facing = spinner("카메라 방향 (인식 연결 시 사용)", new String[]{"front", "back"});
         enabled = new Switch(this); enabled.setText("제스처 사용 설정 (현재 테스트 입력만 사용)"); content.addView(enabled);
         confidence = slider("최소 인식 신뢰도 (%)", 50, 100, 1);

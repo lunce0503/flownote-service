@@ -6,15 +6,22 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <queries><intent><action android:name="android.intent.action.TTS_SERVICE" /></intent></queries>
-    <application android:label="Flownote Remote" android:theme="@android:style/Theme.Material.Light.NoActionBar"
+    <application android:label="Flownote Remote" android:theme="@style/RemoteTheme"
         android:icon="@drawable/ic_remote" android:allowBackup="false" android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:supportsRtl="true" android:usesCleartextTraffic="false">
         <activity android:name=".NetworkActivity" android:exported="false" />
+        <activity android:name=".QrScannerActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="flownote-remote" android:host="pair" />
             </intent-filter>
         </activity>
     </application>

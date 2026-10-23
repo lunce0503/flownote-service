@@ -23,6 +23,9 @@ internal static class Program
     private static void Check(bool value, string name) { if (!value) throw new InvalidOperationException(name); }
     private static async Task RunAsync(VisionHost vision, string imagePath)
     {
+        string invitation = new PairingLink("https://192.168.1.10:17843/", new string('A', 64), "123456", DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 120).Encode();
+        Check(QrCode.Decode(QrCode.Render(invitation)) == invitation, "Displayed connection QR could not be decoded");
+        Console.WriteLine("PASS: actual displayed QR pixels round-trip through the QR decoder");
         await vision.InitializeAsync(); await vision.LoadModelAsync();
         byte[] image = await File.ReadAllBytesAsync(imagePath); Protocol.ValidateJpeg(image);
         var recognized = await vision.InferAsync(image);

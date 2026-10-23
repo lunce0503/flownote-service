@@ -7,8 +7,8 @@ android {
         applicationId = "com.flownote.remote.gesture"
         minSdk = 29
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.2.0"
+        versionCode = 4
+        versionName = "0.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
@@ -35,11 +35,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     sourceSets.getByName("main").assets.srcDir("../../config")
+    sourceSets.getByName("test").resources.srcDir("../../tests/fixtures")
     testOptions { unitTests.isReturnDefaultValues = false }
 }
 
 dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.zxing:core:3.5.4")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

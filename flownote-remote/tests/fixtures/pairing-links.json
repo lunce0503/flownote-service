@@ -1,0 +1,17 @@
+[
+  {"name":"valid invitation","valid":true,"text":"flownote-remote://pair?v=1&address=https%3A%2F%2F192.168.1.10%3A17843%2F&pin=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=123456&expires=EXPIRES"},
+  {"name":"HTTP forbidden","valid":false,"text":"flownote-remote://pair?v=1&address=http%3A%2F%2F192.168.1.10%3A17843%2F&pin=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=123456&expires=EXPIRES"},
+  {"name":"public IP forbidden","valid":false,"text":"flownote-remote://pair?v=1&address=https%3A%2F%2F8.8.8.8%2F&pin=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=123456&expires=EXPIRES"},
+  {"name":"credentials forbidden","valid":false,"text":"flownote-remote://pair?v=1&address=https%3A%2F%2Fu%3Ap%40192.168.1.10%2F&pin=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=123456&expires=EXPIRES"},
+  {"name":"non pairing QR","valid":false,"text":"https://example.com/"},
+  {"name":"expired invitation","valid":false,"text":"flownote-remote://pair?v=1&address=https%3A%2F%2F192.168.1.10%2F&pin=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=123456&expires=1"},
+  {"name":"long lived invitation forbidden","valid":false,"text":"flownote-remote://pair?v=1&address=https%3A%2F%2F192.168.1.10%2F&pin=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=123456&expires=9999999999"},
+  {"name":"invalid pin","valid":false,"text":"flownote-remote://pair?v=1&address=https%3A%2F%2F192.168.1.10%2F&pin=invalid&code=123456&expires=EXPIRES"},
+  {"name":"unknown version","valid":false,"text":"flownote-remote://pair?v=2&address=https%3A%2F%2F192.168.1.10%2F&pin=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=123456&expires=EXPIRES"},
+  {"name":"duplicated code","valid":false,"text":"flownote-remote://pair?v=1&address=https%3A%2F%2F192.168.1.10%2F&pin=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=123456&code=654321&expires=EXPIRES"},
+  {"name":"token field forbidden","valid":false,"text":"flownote-remote://pair?v=1&address=https%3A%2F%2F192.168.1.10%2F&pin=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=123456&expires=EXPIRES&token=should-not-exist"},
+  {"name":"invalid code","valid":false,"text":"flownote-remote://pair?v=1&address=https%3A%2F%2F192.168.1.10%2F&pin=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=abcdef&expires=EXPIRES"},
+  {"name":"DNS name forbidden","valid":false,"text":"flownote-remote://pair?v=1&address=https%3A%2F%2Flocalhost%2F&pin=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=123456&expires=EXPIRES"},
+  {"name":"zero port forbidden","valid":false,"text":"flownote-remote://pair?v=1&address=https%3A%2F%2F192.168.1.10%3A0%2F&pin=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=123456&expires=EXPIRES"},
+  {"name":"fragment forbidden","valid":false,"text":"flownote-remote://pair?v=1&address=https%3A%2F%2F192.168.1.10%2F&pin=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code=123456&expires=EXPIRES#secret"}
+]

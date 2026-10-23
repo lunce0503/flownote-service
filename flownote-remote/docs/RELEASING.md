@@ -23,9 +23,11 @@
 
 태그 workflow는 다음을 모두 통과해야 draft를 만들고 prerelease로 게시한다.
 
-1. Windows: Core/Network와 실제 WebView2 모델/TTS 검사 → win-x64 self-contained single-file publish → EXE 하나만 있는 빈 폴더에서 시작·내장 라이선스·설정 재시작 복원·모델/TLS 서버 시작 검사.
+1. Windows: Core/Network·공통 QR 벡터·실제 QR 픽셀/WebView2 모델/TTS 검사 → win-x64 self-contained single-file publish → EXE 하나만 있는 폴더에서 대시보드·`⋯` 설정/라이선스·재시작 복원·TLS 서버·클라이언트 토글·QR 패널 검사.
 2. Android: 단위 테스트/lintRelease → 동일 release 키 서명 → `apksigner verify` → 그 APK를 Android 10 에뮬레이터에 설치·실행하고 카메라 권한 자동 미요청 확인 → androidTest에서 실제 Camera2·고정 지문 TLS·동일 실제 모델·AudioManager 음량·배터리/연결 알림 검사. Linux fixture는 CI에서만 실행한다. 공개 시험 이미지의 판정에 맞춰 테스트 서버만 70%를 사용하며 제품 기본 80%는 유지한다.
 3. 통과한 정확한 두 artifact를 다운로드해 `SHA256SUMS.txt`를 생성·재확인한 뒤 APK/Windows EXE/checksum 3개만 게시한다. release 명령은 EXE 이름을 명시하므로 ZIP만 생성되면 게시 단계가 실패한다.
+
+0.3.0부터 Windows 넓은/좁은 화면과 Android 320dp·font scale 1.3의 대시보드 screenshot을 `windows-ux`, `android-ux` Actions artifact로 남긴다. QR·등록 코드·토큰 화면은 캡처하지 않는다. 이 검증 이미지는 공개 Release에 포함하지 않고 `windows`, `android` 앱 artifact만 이름으로 다운로드해 게시한다. Android에서는 실제 QR Bitmap 판독, 저장된 서버 재접속, 메뉴와 자기 기기 토글, 확인 없는 등록 차단도 검사한다.
 
 개별 실행은 `gh workflow run release.yml --repo lunce0503/flownote-remote-service --ref main`으로 검증할 수 있다. main 참조의 수동 실행은 GitHub Release를 게시하지 않는다. 최초 태그 push에서 실행이 등록되지 않았다면 같은 소스 태그에 `--ref v<version>`으로 수동 실행해 검증 후 게시할 수 있다. 이미 게시한 태그/기존 파일을 덮어쓰지 않는다. 실패는 job 로그에서 원인을 확인하고 수정 버전으로 배포한다.
 

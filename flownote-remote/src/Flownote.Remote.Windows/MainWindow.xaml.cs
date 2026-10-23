@@ -86,6 +86,9 @@ public partial class MainWindow : Window
     }
 
     private void Licenses_Click(object sender, RoutedEventArgs e)
+        => OpenLicenses(this);
+
+    public static void OpenLicenses(Window owner)
     {
         static string ReadNotice(string name)
         {
@@ -103,7 +106,7 @@ public partial class MainWindow : Window
         System.Windows.Automation.AutomationProperties.SetAutomationId(text, "LicenseText");
         var window = new Window
         {
-            Title = "Flownote Remote · 오픈소스 라이선스", Owner = this,
+            Title = "Flownote Remote · 오픈소스 라이선스", Owner = owner,
             Width = 640, Height = 520, MinWidth = 360, MinHeight = 320,
             WindowStartupLocation = WindowStartupLocation.CenterOwner, Content = text
         };

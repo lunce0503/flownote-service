@@ -3,10 +3,12 @@
 Windows PC 서버가 제스처·명령·상태 알림을 관리하고 Android·Windows 클라이언트가 카메라·소리·조작 화면을 담당하는 원격 앱이다. 프로젝트 폴더는 `flownote-remote/`다.
 
 독립 배포 저장소: [lunce0503/flownote-remote-service](https://github.com/lunce0503/flownote-remote-service).
-[v0.2.0 시험판 다운로드](https://github.com/lunce0503/flownote-remote-service/releases/tag/v0.2.0).
+[v0.3.0 시험판 다운로드](https://github.com/lunce0503/flownote-remote-service/releases/tag/v0.3.0).
 
 ## 현재 가능한 것
 
+- 소리·카메라·제스처·음성 알림 대시보드, 클라이언트 사용 토글/이름/실제 연결 기능 요약, `⋯` 세부 메뉴.
+- 2분·일회용 QR 표시/카메라 읽기, 연결 코드 복사/붙여넣기, 저장된 서버 재연결. 서버 확인 후에만 등록하며 기기별 일시 중지와 서버 사용 허용을 구분한다.
 - Windows HTTPS/WSS 서버, 기기별 인증·일회용 코드·인증서 지문 대조, 등록 해제.
 - Android/Windows 클라이언트의 실제 카메라 프레임 전송, 서버 MediaPipe 제스처 판정, 클라이언트 OS 음량·음소거 제어와 적용 결과 확인.
 - 기기 상태와 배터리/메모리/출력/연결 경고의 화면 및 OS TTS 음성 알림.
@@ -16,6 +18,8 @@ Windows PC 서버가 제스처·명령·상태 알림을 관리하고 Android·W
 역할·연결 순서·보안·메시지 계약은 [네트워크 문서](docs/NETWORK.md)를 따른다. 원격 앱에 한해 사용자 요구에 따른 PC 서버와 사설/VPN 직접 연결을 사용한다. 기존 Flownote 웹/백엔드 cloud 통신 규칙은 바꾸지 않는다. 카메라와 서버 제스처 명령은 자동 시작하지 않는다. 음원 스트리밍·분리/합성, 화면 배치·프로젝터 출력, 대화형 AI 비서는 미연결이며 기능 목록에도 false로 표시한다. 알림 음성은 실제 상태 규칙과 OS TTS다.
 
 ## 개발
+
+화면 구성과 QR 사용 순서는 [UX 명세](docs/UX.md)를 따른다.
 
 Windows는 .NET 10 SDK와 WPF를 사용한다. Windows에서:
 
@@ -65,4 +69,4 @@ cd android
 3. 대화형 비서 제공자와 권한 있는 작업 도구를 연결한다. 위험 알림은 대화형 AI 응답과 독립적으로 즉시 처리한다.
 4. 공개 인터넷 연결이 필요하면 별도 인증·중계·지연/비용 설계를 먼저 수행한다. 현재는 신뢰하는 사설망/VPN만 지원한다.
 
-앱 바이너리는 독립 GitHub 저장소의 시험 릴리스로 배포한다. Windows는 항상 단일 EXE이며 .NET·인식 모델·라이선스를 포함한다. Android는 같은 키로 서명한 APK다. 연결 방법과 제한은 [릴리스 노트](release-notes/v0.2.0.md)를 따른다. Vercel/Railway 서비스는 이 PC 앱 서버와 별개이며 변경하지 않는다. 웹 다운로드 자산이나 cloud API를 바꾸는 작업은 본 서비스 저장소의 staging-first 배포를 따른다.
+앱 바이너리는 독립 GitHub 저장소의 시험 릴리스로 배포한다. Windows는 항상 단일 EXE이며 .NET·인식 모델·라이선스를 포함한다. Android는 같은 키로 서명한 APK다. 연결 방법과 제한은 [릴리스 노트](release-notes/v0.3.0.md)를 따른다. Vercel/Railway 서비스는 이 PC 앱 서버와 별개이며 변경하지 않는다. 웹 다운로드 자산이나 cloud API를 바꾸는 작업은 본 서비스 저장소의 staging-first 배포를 따른다.

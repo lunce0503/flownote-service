@@ -6,19 +6,21 @@ using System.Text.Json;
 
 namespace Flownote.Remote.Network;
 
-public sealed record DeviceGrant(Guid Id, string Name, string TokenHash);
+public sealed record DeviceGrant(Guid Id, string Name, string TokenHash, bool Allowed = true);
 public sealed record PairRequest(string Code, string Name);
 public sealed record PairResult(Guid DeviceId, string Token);
 public sealed record GestureSample(string? Gesture, double Confidence);
-public sealed record DeviceState(Guid Id, string Name, bool Connected, bool CameraActive, float Volume, bool Muted, int? BatteryPercent, long LastSeenMs);
+public sealed record DeviceState(Guid Id, string Name, bool Connected, bool CameraActive, float Volume, bool Muted, int? BatteryPercent, long LastSeenMs,
+    bool Enabled = true, bool Allowed = true, bool OutputReady = true, bool SpeakAlerts = true, string Platform = "클라이언트");
 public sealed record HubCapabilities(bool CameraFrames = true, bool GestureRecognition = true, bool OutputVolume = true,
     bool HealthVoiceAlerts = true, bool AudioTransport = false, bool AudioSeparation = false, bool ScreenLayout = false,
-    bool ProjectorOutput = false, bool ConversationalAssistant = false);
+    bool ProjectorOutput = false, bool ConversationalAssistant = false, bool ClientParticipation = false);
 public sealed record HubState(DeviceState[] Devices, Guid? GestureTarget, Guid? VoiceTarget, bool GesturesEnabled, HubCapabilities? Capabilities = null);
 public sealed record OutputCommand(Guid CommandId, float Volume, bool Muted);
 public sealed record OutputResult(bool Applied, float Volume, bool Muted, string? Error = null);
 public sealed record AlertNotice(Guid Id, string Code, string Severity, string Message, string English, bool Speak);
-public sealed record HealthSample(float Volume, bool Muted, int? BatteryPercent = null, bool OutputReady = true, int? MemoryLoadPercent = null);
+public sealed record HealthSample(float Volume, bool Muted, int? BatteryPercent = null, bool OutputReady = true, int? MemoryLoadPercent = null,
+    bool SpeakAlerts = true, string Platform = "클라이언트");
 
 public static class Protocol
 {
@@ -34,7 +36,7 @@ public static class Protocol
     {
         if (!Uri.TryCreate(address, UriKind.Absolute, out var uri) || uri.Scheme != "https" ||
             uri.UserInfo.Length != 0 || uri.AbsolutePath != "/" || uri.Query.Length != 0 || uri.Fragment.Length != 0 ||
-            !IPAddress.TryParse(uri.Host, out var ip) || !IsPrivate(ip))
+            !IPAddress.TryParse(uri.Host, out var ip) || ip.GetAddressBytes().Length != 4 || !IsPrivate(ip) || uri.Port == 0)
             throw new ArgumentException("서버의 사설/VPN IPv4 HTTPS 주소를 입력하세요. 예: https://192.168.0.10:17843");
         return uri;
     }

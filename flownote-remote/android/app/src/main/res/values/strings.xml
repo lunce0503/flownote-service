@@ -1,0 +1,9 @@
+<resources>
+    <string name="confirm_server">내 서버 PC의 QR 또는 주소·지문을 확인했습니다.</string>
+    <string name="invitation_summary">%1$s\n지문 …%2$s</string>
+    <string name="invitation_clipboard_error">연결 코드를 가져오지 못했어요. 새 QR을 읽거나 직접 입력해 주세요.</string>
+    <string name="invitation_needs_confirmation">내 서버의 QR 또는 지문인지 확인해 주세요.</string>
+    <string name="invitation_expired">QR이 만료됐어요. 서버에서 새 QR을 만들어 주세요.</string>
+    <string name="qr_scan_prompt">서버 PC의 연결 QR을 화면 가운데에 보여 주세요.</string>
+    <string name="qr_camera_error">%1$s · 취소 후 연결 코드를 붙여넣을 수도 있어요.</string>
+</resources>

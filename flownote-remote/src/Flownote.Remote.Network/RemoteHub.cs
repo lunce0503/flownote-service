@@ -23,7 +23,8 @@ public sealed class RemoteHub : IAsyncDisposable
         public GestureGate Gate { get; } = new(750);
         public long LastSeen = Environment.TickCount64, LastFrame;
         public float Volume = 0.7f;
-        public bool Muted, CameraActive, Leaving;
+        public bool Muted, CameraActive, Leaving, Participating = true, OutputReady = true, SpeakAlerts = true;
+        public string Platform = "클라이언트";
         public int BatteryWarning, MemoryWarning;
         public float? DesiredVolume;
         public bool DesiredMuted;
@@ -42,7 +43,7 @@ public sealed class RemoteHub : IAsyncDisposable
     private RemoteSettings settings;
     private WebApplication? app;
     private string pairCode = "";
-    private long pairExpires;
+    private long pairExpires, pairExpiresUtc;
     private Guid? gestureTarget, voiceTarget;
     public event Action? Changed;
     public event Action<IReadOnlyList<DeviceGrant>>? GrantsChanged;
@@ -59,8 +60,29 @@ public sealed class RemoteHub : IAsyncDisposable
 
     public void RenewPairing()
     {
-        lock (gate) { pairCode = RandomNumberGenerator.GetInt32(100000, 1000000).ToString(); pairExpires = Environment.TickCount64 + 120000; }
+        lock (gate) { pairCode = RandomNumberGenerator.GetInt32(100000, 1000000).ToString(); pairExpires = Environment.TickCount64 + 120000; pairExpiresUtc = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 120; }
         Changed?.Invoke();
+    }
+    public PairingLink Invitation(string pin)
+    { lock (gate) return new(Address, Protocol.NormalizePin(pin), pairCode, pairExpiresUtc); }
+    public async Task SetDeviceAllowedAsync(Guid id, bool allowed)
+    {
+        lock (gate)
+        {
+            if (!grants.TryGetValue(id, out var grant)) return;
+            grants[id] = grant with { Allowed = allowed };
+            if (peers.TryGetValue(id, out var peer)) { peer.Gate.Reset(); if (!allowed) peer.CameraActive = false; }
+            GrantsChanged?.Invoke(grants.Values.ToArray());
+        }
+        Changed?.Invoke(); await BroadcastStateAsync();
+    }
+    private bool Enabled(Peer peer) => grants.TryGetValue(peer.Grant.Id, out var grant) && grant.Allowed && peer.Participating;
+    private async Task BroadcastStateAsync()
+    {
+        Peer[] clients; lock (gate) clients = peers.Values.ToArray();
+        foreach (var peer in clients)
+            try { await SendAsync(peer, new { type = "state", state = Snapshot() }); }
+            catch (Exception e) when (e is WebSocketException or OperationCanceledException) { }
     }
     public void Configure(RemoteSettings value)
     {
@@ -72,18 +94,22 @@ public sealed class RemoteHub : IAsyncDisposable
     { lock (gate) { gestureTarget = commandTarget; voiceTarget = speechTarget; } Changed?.Invoke(); }
     public HubState Snapshot()
     {
-        lock (gate) return new(peers.Values.Select(p => new DeviceState(p.Grant.Id, p.Grant.Name, true, p.CameraActive,
-            p.Volume, p.Muted, p.Battery, p.LastSeen)).ToArray(), gestureTarget, voiceTarget, settings.GesturesEnabled, new());
+        lock (gate) return new(grants.Values.Select(g => peers.TryGetValue(g.Id, out var p)
+            ? new DeviceState(g.Id, g.Name, true, p.CameraActive && Enabled(p), p.Volume, p.Muted, p.Battery, p.LastSeen,
+                Enabled(p), g.Allowed, p.OutputReady, p.SpeakAlerts, p.Platform)
+            : new DeviceState(g.Id, g.Name, false, false, 0, false, null, 0, false, g.Allowed, false, false)).ToArray(),
+            gestureTarget, voiceTarget, settings.GesturesEnabled, new(ClientParticipation: true));
     }
     public PairResult RegisterLocal(string name, Guid? deviceId = null)
     {
         PairResult result;
         lock (gate)
         {
+            bool allowed = !deviceId.HasValue || !grants.TryGetValue(deviceId.Value, out var previous) || previous.Allowed;
             if (deviceId.HasValue) grants.Remove(deviceId.Value);
             if (grants.Count >= 8) throw new InvalidOperationException("등록된 기기는 최대 8대입니다. 사용하지 않는 기기를 해제하세요.");
             string token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-            var record = new DeviceGrant(deviceId ?? Guid.NewGuid(), CleanName(name), Protocol.Hash(token));
+            var record = new DeviceGrant(deviceId ?? Guid.NewGuid(), CleanName(name), Protocol.Hash(token), allowed);
             grants.Add(record.Id, record); result = new(record.Id, token);
             GrantsChanged?.Invoke(grants.Values.ToArray());
         }
@@ -197,6 +223,9 @@ public sealed class RemoteHub : IAsyncDisposable
         string? type = message.GetProperty("type").GetString();
         switch (type)
         {
+            case "device.enabled":
+                lock (gate) { peer.Participating = message.GetProperty("enabled").GetBoolean(); peer.Gate.Reset(); if (!Enabled(peer)) peer.CameraActive = false; }
+                await BroadcastStateAsync(); Changed?.Invoke(); break;
             case "heartbeat":
                 var health = message.GetProperty("health").Deserialize<HealthSample>(Protocol.Json) ?? throw new ArgumentException();
                 if (!float.IsFinite(health.Volume) || health.Volume is < 0 or > 1 || health.BatteryPercent is < 0 or > 100 || health.MemoryLoadPercent is < 0 or > 100) throw new ArgumentException();
@@ -204,6 +233,8 @@ public sealed class RemoteHub : IAsyncDisposable
                 lock (gate)
                 {
                     peer.Volume = health.Volume; peer.Muted = health.Muted; peer.Battery = health.BatteryPercent;
+                    peer.OutputReady = health.OutputReady; peer.SpeakAlerts = health.SpeakAlerts;
+                    peer.Platform = health.Platform is "Windows" or "Android" ? health.Platform : "클라이언트";
                     int batteryLevel = health.BatteryPercent is <= 5 ? 2 : health.BatteryPercent is <= 15 ? 1 : 0;
                     int memoryLevel = health.MemoryLoadPercent is >= 97 ? 2 : health.MemoryLoadPercent is >= 90 ? 1 : 0;
                     warn = batteryLevel > peer.BatteryWarning;
@@ -219,6 +250,7 @@ public sealed class RemoteHub : IAsyncDisposable
                 var id = message.GetProperty("commandId").GetGuid();
                 lock (gate)
                 {
+                    if (!Enabled(peer)) return;
                     if (!peer.Commands.Add(id)) return;
                     peer.CommandOrder.Enqueue(id);
                     if (peer.CommandOrder.Count > 128) peer.Commands.Remove(peer.CommandOrder.Dequeue());
@@ -237,6 +269,8 @@ public sealed class RemoteHub : IAsyncDisposable
                 Activity?.Invoke(output.Applied ? $"{peer.Grant.Name} 소리 제어 적용됨" : $"{peer.Grant.Name} 소리 제어 실패"); Changed?.Invoke(); break;
             case "camera.frame":
                 Guid frameId = message.GetProperty("frameId").GetGuid();
+                bool enabled; lock (gate) enabled = Enabled(peer);
+                if (!enabled) { await SendAsync(peer, new { type = "frame.result", frameId, gesture = "None", confidence = 0 }); return; }
                 if (Environment.TickCount64 - peer.LastFrame < 180) { await SendAsync(peer, new { type = "frame.result", frameId, gesture = "None", confidence = 0 }); return; }
                 peer.LastFrame = Environment.TickCount64; peer.CameraActive = true;
                 string encoded = message.GetProperty("jpeg").GetString() ?? "";
@@ -250,7 +284,7 @@ public sealed class RemoteHub : IAsyncDisposable
                     sample = new(null, 0);
                 }
                 string? action; Guid? target;
-                lock (gate) { action = peer.Gate.Observe(settings, sample.Gesture, sample.Confidence, Environment.TickCount64); target = gestureTarget; }
+                lock (gate) { action = Enabled(peer) ? peer.Gate.Observe(settings, sample.Gesture, sample.Confidence, Environment.TickCount64) : null; target = gestureTarget; }
                 await SendAsync(peer, new { type = "frame.result", frameId, gesture = sample.Gesture, confidence = sample.Confidence });
                 if (action is not null && target.HasValue && action != "assistant_open") await ExecuteAsync(target.Value, action, Guid.NewGuid());
                 if (action == "assistant_open") await AnnounceAsync("assistant.pending", "info", "자연어 비서는 아직 연결되지 않았습니다.", "The conversational assistant is not connected yet.");
@@ -267,6 +301,7 @@ public sealed class RemoteHub : IAsyncDisposable
         lock (gate)
         {
             if (!peers.TryGetValue(target, out peer)) return;
+            if (!Enabled(peer)) return;
             if (peer.PendingOutputs.Count >= 128) throw new InvalidOperationException("출력 응답을 기다리고 있습니다.");
             volume = peer.DesiredVolume ?? peer.Volume; muted = peer.DesiredVolume.HasValue ? peer.DesiredMuted : peer.Muted;
             switch (action)
@@ -290,7 +325,7 @@ public sealed class RemoteHub : IAsyncDisposable
             long now = Environment.TickCount64;
             if (alerts.TryGetValue(code, out long previous) && now - previous < 30000) return;
             if (alerts.Count > 128) alerts.Clear(); alerts[code] = now;
-            clients = peers.Values.ToArray(); voice = voiceTarget;
+            clients = peers.Values.ToArray(); voice = voiceTarget is Guid voiceId && peers.TryGetValue(voiceId, out var target) && Enabled(target) && target.SpeakAlerts ? voiceTarget : null;
         }
         Guid id = Guid.NewGuid();
         foreach (var client in clients)
