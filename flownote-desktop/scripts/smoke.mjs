@@ -1,7 +1,7 @@
 import { _electron as electron } from 'playwright';
 import { strict as assert } from 'node:assert';
 import { randomUUID, createHash } from 'node:crypto';
-import { readFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { textbookPdf } from './library-fixture.mjs';
 
@@ -95,9 +95,11 @@ try {
   const directory = path.resolve('test-output');
   await mkdir(directory, { recursive: true });
   const original = textbookPdf(100 * 1024 * 1024);
+  const inputPath = path.join(directory, 'native-textbook.pdf');
+  await writeFile(inputPath, original);
   await page.goto('https://flownote-react-staging.vercel.app/library');
   await page.getByRole('button', { name: '책 추가', exact: true }).click();
-  await page.getByLabel('PDF 파일').setInputFiles({ name: 'native-textbook.pdf', mimeType: 'application/pdf', buffer: original });
+  await page.getByLabel('PDF 파일').setInputFiles(inputPath);
   await page.getByLabel('책 제목').fill('Native 100MiB textbook');
   await page.getByRole('button', { name: '책장에 추가', exact: true }).click();
   await page.getByRole('dialog', { name: '책 펼쳐 보기' }).getByRole('img').waitFor();
@@ -109,7 +111,7 @@ try {
   page = await application.firstWindow(); page.setDefaultTimeout(60000);
   await page.goto('https://flownote-react-staging.vercel.app/library');
   await page.getByRole('button', { name: 'Native 100MiB textbook 표지 보기' }).click();
-  const pdfPath = path.join(directory, 'native-textbook.pdf');
+  const pdfPath = path.join(directory, 'native-textbook-export.pdf');
   await application.evaluate(({ session }, savePath) => session.defaultSession.once('will-download', (_event, item) => item.setSavePath(savePath)), pdfPath);
   await page.getByRole('button', { name: '원본 PDF 내보내기' }).click();
   for (let attempt = 0; attempt < 90; attempt++) {
