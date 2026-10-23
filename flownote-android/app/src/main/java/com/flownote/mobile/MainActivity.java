@@ -44,6 +44,10 @@ public final class MainActivity extends Activity {
     private LinearLayout errorPanel;
     private ValueCallback<Uri[]> fileCallback;
     private byte[] pendingDownload;
+    private PdfExportFile pdfExport;
+    private String pdfKey;
+    private boolean pdfPicking;
+    private final java.util.concurrent.ExecutorService pdfIO = java.util.concurrent.Executors.newSingleThreadExecutor();
     private View fullscreenView;
     private WebChromeClient.CustomViewCallback fullscreenCallback;
     private AppUpdater updater;
@@ -112,6 +116,7 @@ public final class MainActivity extends Activity {
                 return true;
             }
             @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap icon) {
+                if (!pdfPicking) cancelPdf();
                 progress.setVisibility(View.VISIBLE);
                 errorPanel.setVisibility(View.GONE);
             }
@@ -175,6 +180,7 @@ public final class MainActivity extends Activity {
 
     private boolean trusted(Uri uri) {
         return "https".equals(uri.getScheme()) && Uri.parse(BuildConfig.WEB_URL).getHost().equals(uri.getHost())
+            && uri.getUserInfo() == null
             && (uri.getPort() == -1 || uri.getPort() == 443);
     }
 
@@ -185,9 +191,10 @@ public final class MainActivity extends Activity {
     }
 
     private void download(String url, String userAgent, String disposition, String mime, long length) {
-        if (pendingDownload != null) { toast("진행 중인 파일 저장을 먼저 완료해 주세요."); return; }
+        if (pendingDownload != null || pdfKey != null || pdfExport != null) { toast("진행 중인 파일 저장을 먼저 완료해 주세요."); return; }
         if (url.startsWith("blob:") || url.startsWith("data:")) {
             if (!trusted(Uri.parse(web.getUrl() == null ? "" : web.getUrl()))) return;
+            if ("application/pdf".equals(mime == null ? "" : mime.split(";")[0])) { startPdf(url); return; }
             // Read the selected browser download through a one-shot callback, never a JS bridge.
             String script = "(async()=>{try{const b=await(await fetch(" + JSONObject.quote(url) + ")).blob();"
                 + "if(b.size>33554432)return '';return await new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result);f.readAsDataURL(b)})}catch(e){return ''}})()";
@@ -218,6 +225,84 @@ public final class MainActivity extends Activity {
             ((DownloadManager) getSystemService(DOWNLOAD_SERVICE)).enqueue(request);
             toast("다운로드를 시작했습니다.");
         } catch (RuntimeException error) { toast("다운로드를 시작할 수 없습니다."); }
+    }
+
+    private boolean pdfActive(String key) {
+        return key.equals(pdfKey) && !isFinishing() && !isDestroyed() && trusted(Uri.parse(web.getUrl() == null ? "" : web.getUrl()));
+    }
+    private void cancelPdf() {
+        String key = pdfKey; pdfKey = null; pdfPicking = false;
+        if (key != null && web != null && !isDestroyed()) web.evaluateJavascript("delete window[" + JSONObject.quote(key) + "]", null);
+        PdfExportFile file = pdfExport; pdfExport = null;
+        if (file != null) pdfIO.execute(file::close);
+    }
+    private void failPdf() { cancelPdf(); toast("PDF를 저장하지 못했습니다. 100MiB 이하 파일과 저장 공간을 확인해 주세요."); }
+    private void startPdf(String url) {
+        final String key = "__flownotePdf" + java.util.UUID.randomUUID().toString().replace("-", "");
+        pdfKey = key;
+        String quoted = JSONObject.quote(key);
+        web.evaluateJavascript("window[" + quoted + "]={ready:false};(async()=>{try{const b=await(await fetch(" + JSONObject.quote(url)
+            + ")).blob();if(b.size<5||b.size>104857600||b.type.split(';')[0]!=='application/pdf')throw 0;"
+            + "const n=window.__flownoteDownloadFile;const s=window[" + quoted + "];if(s){s.blob=b;s.size=b.size;s.name=n?.url===" + JSONObject.quote(url)
+            + "?n.name:'book.pdf';s.ready=true}}catch{const s=window[" + quoted + "];if(s)s.error=true}})();", ignored -> pollPdf(key, true, 0, 0));
+    }
+    private void pollPdf(String key, boolean metadata, long offset, int attempt) {
+        if (!pdfActive(key)) { cancelPdf(); return; }
+        String q = JSONObject.quote(key);
+        String query = metadata ? "(()=>{const s=window[" + q + "];return s?.error?'error':s?.ready?{size:s.size,name:s.name}:null})()"
+            : "(()=>{const s=window[" + q + "];return s?.error?'error':s?.data??null})()";
+        web.evaluateJavascript(query, value -> {
+            if (!pdfActive(key)) return;
+            if ("null".equals(value) && attempt < 600) { web.postDelayed(() -> pollPdf(key, metadata, offset, attempt + 1), 50); return; }
+            try {
+                if (metadata) {
+                    JSONObject data = new JSONObject(value);
+                    long size = data.getLong("size");
+                    String name = data.getString("name").replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_");
+                    if (!name.toLowerCase(java.util.Locale.ROOT).endsWith(".pdf")) throw new IllegalArgumentException();
+                    final String safeName = name.length() > 100 ? name.substring(0, 96) + ".pdf" : name;
+                    pdfIO.execute(() -> {
+                        try {
+                            PdfExportFile file = new PdfExportFile(getCacheDir(), size);
+                            runOnUiThread(() -> { if (!pdfActive(key)) file.close(); else { pdfExport = file; pullPdf(key, 0, safeName); } });
+                        } catch (Exception error) { runOnUiThread(this::failPdf); }
+                    });
+                } else {
+                    Object parsed = new org.json.JSONTokener(value).nextValue();
+                    if (!(parsed instanceof String)) throw new IllegalArgumentException();
+                    String base64 = (String) parsed;
+                    if (base64.length() > 349528 || base64.length() % 4 != 0 || !base64.matches("[A-Za-z0-9+/]+={0,2}")) throw new IllegalArgumentException();
+                    byte[] bytes = Base64.decode(base64, Base64.NO_WRAP);
+                    PdfExportFile file = pdfExport;
+                    pdfIO.execute(() -> {
+                        try {
+                            file.append(offset, bytes);
+                            long next = offset + bytes.length;
+                            if (next == file.size) file.finish();
+                            runOnUiThread(() -> {
+                                if (!pdfActive(key)) return;
+                                if (next < file.size) pullPdf(key, next, pdfName);
+                                else {
+                                    web.evaluateJavascript("delete window[" + q + "]", null);
+                                    pdfPicking = true;
+                                    try { startActivityForResult(new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                                        .setType("application/pdf").putExtra(Intent.EXTRA_TITLE, pdfName), SAVE_FILE); }
+                                    catch (ActivityNotFoundException error) { failPdf(); }
+                                }
+                            });
+                        } catch (Exception error) { runOnUiThread(this::failPdf); }
+                    });
+                }
+            } catch (Exception error) { failPdf(); }
+        });
+    }
+    private String pdfName;
+    private void pullPdf(String key, long offset, String name) {
+        pdfName = name;
+        String q = JSONObject.quote(key);
+        web.evaluateJavascript("(()=>{const s=window[" + q + "];if(!s)return;s.data=null;const r=new FileReader();r.onload=()=>{if(window[" + q
+            + "]===s)s.data=String(r.result).split(',')[1]};r.onerror=()=>s.error=true;r.readAsDataURL(s.blob.slice(" + offset + "," + (offset + PdfExportFile.CHUNK) + "))})()",
+            ignored -> pollPdf(key, false, offset, 0));
     }
 
     private void readDownload(String key, String name, String mime, int attempt) {
@@ -253,6 +338,24 @@ public final class MainActivity extends Activity {
             fileCallback = null;
         }
         if (request == SAVE_FILE) {
+            if (pdfExport != null) {
+                PdfExportFile file = pdfExport; pdfExport = null; pdfKey = null; pdfPicking = false;
+                Uri destination = data == null ? null : data.getData();
+                pdfIO.execute(() -> {
+                    try {
+                        if (result == RESULT_OK && destination != null && "content".equals(destination.getScheme())) {
+                            try (var input = new java.io.FileInputStream(file.file); OutputStream output = getContentResolver().openOutputStream(destination)) {
+                                if (output == null) throw new java.io.IOException();
+                                byte[] buffer = new byte[65536]; int count;
+                                while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+                            }
+                            runOnUiThread(() -> toast("PDF를 저장했습니다."));
+                        }
+                    } catch (Exception error) { runOnUiThread(() -> toast("PDF 저장에 실패했습니다.")); }
+                    finally { file.close(); }
+                });
+                return;
+            }
             byte[] bytes = pendingDownload;
             pendingDownload = null;
             if (result == RESULT_OK && data != null && data.getData() != null && bytes != null) {
@@ -290,6 +393,7 @@ public final class MainActivity extends Activity {
     @Override protected void onPause() { CookieManager.getInstance().flush(); web.onPause(); super.onPause(); }
     @Override protected void onResume() { super.onResume(); if (web != null) web.onResume(); if (updater != null) updater.resume(); }
     @Override protected void onDestroy() {
+        cancelPdf(); pdfIO.shutdown();
         if (updater != null) updater.close();
         if (fileCallback != null) fileCallback.onReceiveValue(null);
         pendingDownload = null;

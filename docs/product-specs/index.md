@@ -4,6 +4,8 @@
 
 ## 기존 사양
 
+- [카메라 제스처 원격 앱](gesture-remote-app.md): Android·Windows 설정 골격, 제스처 매핑·합성 입력 검사, Sound Manager 코어 재사용과 후속 카메라 연결 경계.
+
 - [앱 오프라인 작업 공간과 재동기화](device-only-workspace.md): 서버 자료·자산 스냅샷, OFF 편집, 3-way 조정, 충돌 복구와 제한.
 
 - [노트 Markdown 작업 공간](blog-markdown-workspace.md): Markdown 편집·폴더 탐색·빠른 목록 로딩. 캔버스와 공통 색상 및 명칭 기준을 적용한다.
@@ -53,3 +55,5 @@
 
 ## 검증
 ```
+
+- [전공서 책장](textbook-library.md): 웹 PDF 책장·표지·분야 분류·작은 화면 읽기.

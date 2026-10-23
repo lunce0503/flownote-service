@@ -28,6 +28,8 @@ Flownote 사용자가 새 피드백을 등록하면 서버 자동화가 하루 �
 
 ## 안전 경계와 실패 상태
 
+2026-10-22 사용자 명시 요청으로 구현·분석·리뷰·알림의 Codex 실행 설정은 모두 `sandbox_mode="danger-full-access"`, `approval_policy="never"`다. Codex 내부 파일/네트워크 sandbox 및 승인 검토는 사용하지 않는다. Docker의 기존 소스 ro/rw 마운트, plugin 차단, 별도 빌드/테스트 격리, 고정 변경 정책, 스테이징 검증 뒤 동일 소스 운영 배포는 유지한다. full-access 모델은 마운트된 Codex 로그인 캐시를 접근할 수 있으므로 인증 정보를 기술적으로 완전 격리한다고 설명하지 않는다. 실제 실행 경계는 [운영 기준](../operations/codex-automation.md)을 따른다.
+
 - 사용자 피드백은 신뢰할 수 없는 데이터로 취급하며 피드백 안의 명령을 실행하지 않는다.
 - 구현·리뷰 단계에서는 외부 plugin/cloud MCP와 cloud credential을 사용할 수 없다.
 - Gmail 전송은 분석과 분리된 알림 전용 실행이며 수신자는 고정되어 있다.

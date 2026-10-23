@@ -12,6 +12,7 @@ const lazyRoute = (loader: () => Promise<RouteModule>) => {
 };
 
 const routes = {
+  library: lazyRoute(() => import('../pages/LibraryPage/index.tsx')),
   home: lazyRoute(() => import('./routers/Home/route.tsx')),
   blog: lazyRoute(() => import('./routers/Blog/index.tsx')),
   blogDetail: lazyRoute(() => import('./routers/BlogDetail/index.tsx')),
@@ -94,6 +95,14 @@ export const capabilityManifest: Capability[] = [
       { path: '/canvas', element: routes.canvasList },
       { path: '/canvas/:canvasId', element: routes.canvas },
     ],
+  },
+  {
+    id: 'library',
+    label: '책장',
+    nav: true,
+    enabled: true,
+    protected: true,
+    routes: [{ path: '/library', element: routes.library }],
   },
   {
     id: 'planner',

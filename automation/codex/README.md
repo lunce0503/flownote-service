@@ -4,14 +4,16 @@
 
 ## 제공 작업
 
-| 작업 | 권한 | 입력 | 결과 |
+| 작업 | Docker 소스 마운트 | 입력 | 결과 |
 | --- | --- | --- | --- |
-| `weekly-review` | `read-only` | 없음 | 구조화된 리뷰 결과 |
-| `ci-fix` | `workspace-write` | CI 실패 로그 | 검증 결과와 적용 전 patch |
-| `staging-triage` | `read-only` | staging 실패 로그 | 원인 분류와 다음 조치 |
-| `feedback-triage` | `read-only` | 개인정보를 제거한 사용자 피드백 이벤트 | 관련 코드 위치와 검토 항목 |
-| `feedback-implement` | `workspace-write` | 사용자 피드백 이벤트 | 별도 snapshot의 구현·회귀 테스트 후보 |
-| `feedback-release-review` | `read-only` | 구현 후보·실제 검증 결과 | 독립 배포 리뷰 |
+| `weekly-review` | `ro` | 없음 | 구조화된 리뷰 결과 |
+| `ci-fix` | `rw` | CI 실패 로그 | 검증 결과와 적용 전 patch |
+| `staging-triage` | `ro` | staging 실패 로그 | 원인 분류와 다음 조치 |
+| `feedback-triage` | `ro` | 개인정보를 제거한 사용자 피드백 이벤트 | 관련 코드 위치와 검토 항목 |
+| `feedback-implement` | `rw` | 사용자 피드백 이벤트 | 별도 snapshot의 구현·회귀 테스트 후보 |
+| `feedback-release-review` | `ro` | 구현 후보·실제 검증 결과 | 독립 배포 리뷰 |
+
+2026-10-22 사용자 명시 요청으로 위 6종과 메일 알림은 모두 `--config 'sandbox_mode="danger-full-access"' --config 'approval_policy="never"'`를 사용한다. 기본 config에도 같은 값이 있음을 확인했으며 runner는 이를 명시적으로 고정한다. named permission profile과 알림의 `--approve-for-me`는 제거했다. 표의 ro/rw는 Codex sandbox가 아니라 기존 Docker bind mount 설정이다. host runtime은 이 마운트 경계도 없으므로 서버 사용자 권한으로 실행되며 사용에 주의한다.
 
 모든 저장소 작업은 `--profile`을 지정하지 않고 기본 `~/.codex/config.toml`과 Codex 로그인 캐시를 사용한다. 자동화 모델은 `--model gpt-6.1-sol`로 고정한다. 모델 실행은 commit, push, PR, 배포를 직접 수행하지 않는다. **2026-10-14부터 피드백 서비스는 아래의 별도 신뢰 컨트롤러를 통해 검증된 변경을 자동 배포한다.** 주간 리뷰·CI·staging 분석의 기존 경계는 유지한다.
 
@@ -29,7 +31,7 @@
 
 일간 수집 시간과 `gpt-6.1-sol`은 그대로 유지한다. 의도가 불명확하거나 고위험인 요청은 자동으로 제품 결정을 만들지 않는다. production 배포 도중 실패하면 일부 서비스가 이미 변경됐을 수 있으므로 이전 성공 ID와 실패 단계 확인 후 [클라우드 롤백 절차](../../docs/DEPLOYMENT.md)를 따른다. DB rollback이나 임의 서비스 삭제는 자동 실행하지 않는다.
 
-저장소 작업은 모든 plugin/app/MCP를 끈다. Docker에는 소스 snapshot, 결과 디렉터리, 기본 config, 로그인 캐시, config가 참조하는 model catalog만 mount한다. config와 catalog는 read-only이고 로그인 캐시는 Codex의 토큰 갱신을 위해 파일 단위로 writable하다. 모델 하위 명령에는 named permission profile을 적용해 `/codex-home` 전체 읽기·쓰기를 차단하고, 작업별 저장소 권한과 shell network 차단을 유지한다. shell environment policy는 모델이 실행하는 명령에서 `*KEY`, `*SECRET`, `*TOKEN` 환경 변수를 제외한다.
+저장소 작업은 모든 plugin/app/MCP를 끈다. Docker에는 소스 snapshot, 결과 디렉터리, 기본 config, 로그인 캐시, config가 참조하는 model catalog만 mount한다. config와 catalog는 read-only이고 로그인 캐시는 토큰 갱신을 위해 파일 단위로 writable하다. 현재 full-access 설정에서는 모델 명령의 `/codex-home` 읽기 차단이나 shell network 차단을 보장하지 않으며 인증 파일 접근·변조 가능성도 있다. 이는 사용자 승인으로 넓힌 권한이며 강한 비밀 격리로 설명하지 않는다. 기존 Docker root read-only, 소스 ro/rw, cloud credential 환경 제거, 별도 검증 컨테이너의 network=none은 유지한다. shell environment policy는 모델이 실행하는 명령에서 `*KEY`, `*SECRET`, `*TOKEN` 환경 변수를 제외한다.
 
 ## 설치
 
@@ -68,7 +70,7 @@ automation/codex/install.sh --repository-url <repository-url>
 기본 config와 Codex CLI에 저장된 인증 상태를 확인한 다음 읽기 전용 작업부터 실행한다. 컨테이너 실행은 파일 기반 로그인 캐시 `~/.codex/auth.json`이 필요하다. runner는 FactChat·OpenAI·cloud credential 환경 변수를 명시적으로 제거하고 로그인 캐시만 파일 단위로 mount한다. 저장소 `.env`는 사용하지 않는다.
 
 ```bash
-codex --version # named permission profile을 지원하는 0.160.0 이상
+codex --version # 현재 고정 실행 정책을 지원하는 CLI 확인
 codex login status
 test -f ~/.codex/config.toml
 test -f ~/.codex/auth.json
@@ -88,7 +90,7 @@ change.patch     사람이 검토하고 적용할 후보 patch
 metadata.txt     기준 commit과 종료 코드
 ```
 
-`metadata.txt`에는 실제 고정 모델인 `model=gpt-6.1-sol`을 기록한다.
+`metadata.txt`에는 `model=gpt-6.1-sol`, `sandbox_mode=danger-full-access`, `approval_policy=never`를 기록한다.
 
 `ci-fix`의 patch를 적용하기 전에 `final.json`, `git-status.txt`, `change.patch`를 모두 검토한다.
 
@@ -189,4 +191,4 @@ systemd-analyze --user verify automation/codex/systemd/*
 
 테스트는 임시 Git 원격과 가짜 Codex 실행기를 사용하므로 API 호출, cloud 배포, 현재 작업 트리 수정이 발생하지 않는다.
 
-호스트가 중첩 user namespace를 허용하지 않아도 shell sandbox가 동작하도록 runner는 Docker 안에서 `bubblewrap`을 실행한다. 컨테이너에는 Codex 실행 파일, 기본 config 입력, 실행별 worktree와 결과 디렉터리만 mount하며, 모델 하위 명령은 Codex home을 읽을 수 없다. Codex CLI를 갱신하거나 container 패키지를 바꾼 뒤에는 위 `docker build` 명령으로 이미지를 다시 만든다.
+이미지에는 과거 sandbox 실행용 bubblewrap이 남아 있지만 현재 full-access 실행의 접근 차단 근거로 사용하지 않는다. 컨테이너의 SYS_ADMIN 추가와 seccomp/AppArmor 해제도 기존 그대로이며 완전한 호스트 격리를 보장하지 않는다. Codex CLI를 갱신하거나 container 패키지를 바꾼 뒤에는 위 `docker build` 명령으로 이미지를 다시 만든다. 실행 스크립트만 변경한 이번 적용에는 이미지 재빌드나 앱 클라우드 재배포가 필요하지 않다.

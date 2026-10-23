@@ -1,8 +1,9 @@
 import { _electron as electron } from 'playwright';
 import { strict as assert } from 'node:assert';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { readFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import { textbookPdf } from './library-fixture.mjs';
 
 const executablePath = process.argv[2];
 if (!executablePath) throw new Error('Usage: npm run smoke -- <installed-or-portable-Flownote.exe>');
@@ -66,7 +67,7 @@ try {
   await page.getByRole('heading', { name: '작업을 선택하세요' }).waitFor();
   await page.getByRole('button', { name: '전체 기능', exact: true }).click();
   const menu = page.getByRole('dialog', { name: '전체 기능' });
-  for (const href of ['/blog', '/canvas', '/planner', '/social', '/agent', '/settings']) assert.equal(await menu.locator(`a[href="${href}"]`).count(), 1);
+  for (const href of ['/library', '/blog', '/canvas', '/planner', '/social', '/agent', '/settings']) assert.equal(await menu.locator(`a[href="${href}"]`).count(), 1);
   await page.keyboard.press('Escape');
   await menu.waitFor({ state: 'hidden' });
   assert.equal(await page.evaluate(() => localStorage.getItem('flownote_auth_token')), null);
@@ -93,6 +94,30 @@ try {
 
   const directory = path.resolve('test-output');
   await mkdir(directory, { recursive: true });
+  const original = textbookPdf(100 * 1024 * 1024);
+  await page.goto('https://flownote-react-staging.vercel.app/library');
+  await page.getByRole('button', { name: '책 추가', exact: true }).click();
+  await page.getByLabel('PDF 파일').setInputFiles({ name: 'native-textbook.pdf', mimeType: 'application/pdf', buffer: original });
+  await page.getByLabel('책 제목').fill('Native 100MiB textbook');
+  await page.getByRole('button', { name: '책장에 추가', exact: true }).click();
+  await page.getByRole('dialog', { name: '책 펼쳐 보기' }).getByRole('img').waitFor();
+  assert.equal(await page.getByTestId('library-pdf-page').count(), 0);
+  await page.getByRole('button', { name: '책 읽기', exact: true }).click();
+  await page.getByTestId('library-pdf-page').waitFor();
+  await application.close();
+  application = await electron.launch({ executablePath, args: ['--staging'], timeout: 60000 });
+  page = await application.firstWindow(); page.setDefaultTimeout(60000);
+  await page.goto('https://flownote-react-staging.vercel.app/library');
+  await page.getByRole('button', { name: 'Native 100MiB textbook 표지 보기' }).click();
+  const pdfPath = path.join(directory, 'native-textbook.pdf');
+  await application.evaluate(({ session }, savePath) => session.defaultSession.once('will-download', (_event, item) => item.setSavePath(savePath)), pdfPath);
+  await page.getByRole('button', { name: '원본 PDF 내보내기' }).click();
+  for (let attempt = 0; attempt < 90; attempt++) {
+    const bytes = await readFile(pdfPath).catch(() => Buffer.alloc(0));
+    if (bytes.length === original.length) { assert.equal(createHash('sha256').update(bytes).digest('hex'), createHash('sha256').update(original).digest('hex')); break; }
+    assert(attempt < 89, '100MiB native export missing'); await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  console.log('PASS native library: import 100MiB, cover, reader, process restart and exact original PDF export');
   const downloadPath = path.join(directory, 'windows-smoke.ics');
   await application.evaluate(({ session }, savePath) => {
     session.defaultSession.once('will-download', (_event, item) => item.setSavePath(savePath));

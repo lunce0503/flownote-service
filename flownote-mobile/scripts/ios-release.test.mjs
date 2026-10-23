@@ -12,7 +12,7 @@ test('iOS and iPadOS use the linked EAS project and exempt system HTTPS encrypti
   assert.equal(expo.ios.config.usesNonExemptEncryption, false);
   assert.equal(expo.extra.eas.projectId, '0026ed46-eac0-4368-88ec-51f945829eb0');
   assert.equal(expo.owner, 'lunce02');
-  assert.equal(expo.version, '1.2.0');
+  assert.equal(expo.version, '1.3.0');
   assert.equal(expo.ios.infoPlist.NSAppTransportSecurity.NSAllowsArbitraryLoads, false);
   assert.equal(expo.ios.infoPlist.NSAppTransportSecurity.NSAllowsLocalNetworking, false);
   assert.deepEqual(expo.ios.infoPlist.NSAppTransportSecurity.NSExceptionDomains, {});

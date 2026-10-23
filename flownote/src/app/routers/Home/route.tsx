@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { Bot, CheckSquare, Palette, PenLine, Search } from "lucide-react";
+import { BookOpen, Bot, CheckSquare, Palette, PenLine, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const destinations = [
+    { label: "전공서 책장", description: "분야별로 꽂아 두는 나의 PDF 서재", keywords: "책 PDF 전공서 수학 과학 도서관", href: "/library", icon: BookOpen },
     {
         label: "노트 관리",
         description: "노트 작성과 폴더 정리",

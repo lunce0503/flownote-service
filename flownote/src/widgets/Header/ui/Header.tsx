@@ -6,6 +6,7 @@ import {
   LogOut,
   CheckSquare, 
   BookOpen, 
+  Library,
   Users, 
   X,
   User,
@@ -47,6 +48,7 @@ export default function Header({ isCapabilityVisible }: HeaderProps) {
   const { user, isAuthenticated, logout } = useAuth();
   const labels = {
     ko: {
+      library: "책장",
       blog: "노트",
       social: "소셜",
       agent: "에이전트",
@@ -67,6 +69,7 @@ export default function Header({ isCapabilityVisible }: HeaderProps) {
       adminFeedback: "피드백 관리",
     },
     en: {
+      library: "Library",
       blog: "Notes",
       social: "Social",
       agent: "Agent",
@@ -193,6 +196,7 @@ export default function Header({ isCapabilityVisible }: HeaderProps) {
   const primaryNavLinks = [
     { capabilityId: "canvas", name: labels.canvas, href: "/canvas", icon: <Palette size={22} /> },
     { capabilityId: "blog", name: labels.blog, href: "/blog", icon: <BookOpen size={22} /> },
+    { capabilityId: "library", name: labels.library, href: "/library", icon: <Library size={22} /> },
   ].filter((link) => isCapabilityVisible(link.capabilityId));
 
   const extraNavLinks = [
@@ -215,6 +219,7 @@ export default function Header({ isCapabilityVisible }: HeaderProps) {
 
   const profileLinks = [
     { capabilityId: "canvas", name: labels.canvas, href: "/canvas", icon: <Palette size={18} /> },
+    { capabilityId: "library", name: labels.library, href: "/library", icon: <Library size={18} /> },
     { capabilityId: "social", name: labels.social, href: "/social", icon: <Users size={18} /> },
     { capabilityId: "agent", name: labels.agent, href: "/agent", icon: <Bot size={18} /> },
     { capabilityId: "planner", name: labels.task, href: "/planner", icon: <CheckSquare size={18} /> },

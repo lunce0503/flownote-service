@@ -1,7 +1,7 @@
 {
   "name": "flownote-mobile",
   "main": "expo-router/entry",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "scripts": {
     "start": "node scripts/start-expo-go.mjs",
     "start:expo-go": "node scripts/start-expo-go.mjs",

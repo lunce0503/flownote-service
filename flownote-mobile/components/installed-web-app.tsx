@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import * as FileSystem from 'expo-file-system/legacy';
+import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -9,6 +10,7 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { navigationAction, parseExport, resolveWebOrigin, type WebExport } from '@/lib/web-shell-policy';
 import { pencilBridgeScript } from '@/lib/apple-pencil-bridge';
 import { addApplePencilDoubleTapListener } from '@/modules/apple-pencil-events';
+import { createPdfExportReceiver, isPdfExportMessage, pdfStatusScript } from '@/lib/pdf-export-protocol';
 
 export default function InstalledWebApp() {
   const web = useRef<WebView>(null);
@@ -20,6 +22,36 @@ export default function InstalledWebApp() {
   let origin: string | null = null;
   try { origin = resolveWebOrigin(process.env.EXPO_PUBLIC_WEB_URL); }
   catch { /* Render the fixed configuration error after installing all hooks. */ }
+
+  const pdfReceiver = useRef<ReturnType<typeof createPdfExportReceiver> | null>(null);
+  if (!pdfReceiver.current) pdfReceiver.current = createPdfExportReceiver({
+    confirm: (name, bytes) => new Promise(resolve => {
+      if (exportBusy.current) { resolve(false); return; }
+      Alert.alert('PDF 내보내기', `${name} (${(bytes / 1024 / 1024).toFixed(1)}MiB)\n공유 메뉴에서 ‘파일에 저장’을 선택하세요.`, [
+        { text: '취소', style: 'cancel', onPress: () => resolve(false) },
+        { text: '공유 / 저장', onPress: () => resolve(true) },
+      ], { cancelable: true, onDismiss: () => resolve(false) });
+    }),
+    open: (name, id) => {
+      const directory = new Directory(Paths.cache, `flownote-pdf-${id}`);
+      directory.create({ intermediates: true, idempotent: true });
+      try {
+        const file = new File(directory, name); file.create();
+        const handle = file.open(); let closed = false;
+        return { uri: file.uri, append: bytes => handle.writeBytes(bytes),
+          close: () => { if (!closed) { closed = true; handle.close(); } },
+          remove: () => { if (directory.exists) directory.delete(); } };
+      } catch (error) { if (directory.exists) directory.delete(); throw error; }
+    },
+    share: async (uri, name) => {
+      if (!await Sharing.isAvailableAsync()) throw new Error('Sharing unavailable');
+      await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf', dialogTitle: name });
+    },
+    notify: status => {
+      if (navigationAction(currentUrl.current, resolveWebOrigin(process.env.EXPO_PUBLIC_WEB_URL)) === 'internal') web.current?.injectJavaScript(pdfStatusScript(status));
+    },
+  });
+  useEffect(() => () => { pdfReceiver.current?.cancel(); }, []);
 
   useEffect(() => {
     const subscription = addApplePencilDoubleTapListener(({ action }) => {
@@ -61,7 +93,13 @@ export default function InstalledWebApp() {
   };
 
   const onMessage = (event: WebViewMessageEvent) => {
-    if (exportBusy.current || navigationAction(currentUrl.current, origin) !== 'internal') return;
+    if (navigationAction(currentUrl.current, origin) !== 'internal') return;
+    if (isPdfExportMessage(event.nativeEvent.data)) {
+      void pdfReceiver.current!.receive(event.nativeEvent.data, event.nativeEvent.url, origin).catch(() => {
+        pdfReceiver.current?.cancel(); Alert.alert('PDF 저장 실패', '저장 공간을 확인한 뒤 다시 시도해 주세요.');
+      }); return;
+    }
+    if (exportBusy.current || pdfReceiver.current?.busy) return;
     try {
       const file = parseExport(event.nativeEvent.data, event.nativeEvent.url, origin);
       exportBusy.current = true;
@@ -74,6 +112,8 @@ export default function InstalledWebApp() {
 
   return <SafeAreaView style={styles.root} edges={['top', 'bottom', 'left', 'right']}>
     <WebView ref={web} source={{ uri: origin }} style={styles.web}
+      injectedJavaScriptBeforeContentLoaded="window.__flownotePdfExportV1=true;true;"
+      injectedJavaScriptBeforeContentLoadedForMainFrameOnly
       applicationNameForUserAgent={`FlownoteIOS/${Constants.expoConfig?.version ?? '1.2.0'}`}
       // All schemes reach our fail-closed policy instead of being opened by WebView's OS fallback.
       originWhitelist={['*']}
@@ -90,6 +130,7 @@ export default function InstalledWebApp() {
       }}
       onNavigationStateChange={(state) => { currentUrl.current = state.url; }}
       onLoadStart={(event) => {
+        pdfReceiver.current?.cancel();
         currentUrl.current = event.nativeEvent.url; setLoading(true); setError(null);
       }}
       onLoadEnd={() => setLoading(false)}
@@ -102,7 +143,7 @@ export default function InstalledWebApp() {
           setLoading(false); setError('서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.');
         }
       }}
-      onContentProcessDidTerminate={() => { setLoading(false); setError('앱 화면이 중지되었습니다. 다시 연결해 주세요.'); }}
+      onContentProcessDidTerminate={() => { pdfReceiver.current?.cancel(); setLoading(false); setError('앱 화면이 중지되었습니다. 다시 연결해 주세요.'); }}
       onMessage={onMessage}
       onFileDownload={() => Alert.alert('파일 저장', '노트·플래너의 내보내기 버튼을 이용해 파일을 저장해 주세요.')}
       incognito={false} cacheEnabled sharedCookiesEnabled={false}

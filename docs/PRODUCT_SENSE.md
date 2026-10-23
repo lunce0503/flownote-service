@@ -39,3 +39,7 @@ Flownote는 작업, 노트, 캔버스, 에이전트, 소셜, 주식 관리를 �
 - 모바일에서 운영 게이트웨이 URL, Expo 실행, Railway 웹 테스트 흐름이 문서와 일치한다.
 
 - 핵심 작업 공간의 사용자 명칭은 캔버스·노트이며, 베이지/흰색/검정 팔레트와 폴더 탐색 방식으로 일관성을 유지한다. 상세 기준은 [작업 공간 디자인](design-docs/canvas/workspace-explorer-design.md)을 따른다.
+
+## 전공서 책장
+
+사용자 PDF를 분야별 세로 책등으로 정리하고 표지부터 펼쳐 보는 웹 책장을 추가한다. 원본 배치를 보존하는 작은 화면 읽기와 기기 보관 범위는 [전공서 책장 사양](product-specs/textbook-library.md)이 소유한다. Android·iOS·Windows 앱 검증과 서버 동기화는 후속 단계다.

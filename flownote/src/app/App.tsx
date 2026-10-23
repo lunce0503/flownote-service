@@ -34,7 +34,7 @@ const renderRoute = (route: CapabilityRoute, key: string, isProtected?: boolean)
 const AppRoutes = () => {
   const location = useLocation();
   const local = isDeviceOnly();
-  const localRoute = /^\/(?:$|blog(?:\/|$)|canvas(?:\/|$)|planner(?:\/|$)|settings(?:\/|$))/.test(location.pathname);
+  const localRoute = /^\/(?:$|blog(?:\/|$)|canvas(?:\/|$)|planner(?:\/|$)|library(?:\/|$)|settings(?:\/|$))/.test(location.pathname);
   useEffect(() => {
     const changed = (event: StorageEvent) => {
       if (event.key === null || event.key === `${DEVICE_MODE_PREFIX}${deviceOwner()}` || event.key === 'flownote_auth_user') {

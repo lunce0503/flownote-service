@@ -1,4 +1,5 @@
 import { isIOSApp } from './androidApp';
+import { exportNativePdf } from './pdfNativeExport';
 
 declare global {
   interface Window { ReactNativeWebView?: { postMessage: (message: string) => void } }
@@ -8,6 +9,9 @@ declare global {
 export async function downloadBlob(name: string, blob: Blob): Promise<void> {
   try {
     if (isIOSApp) {
+      if (blob.type.split(';')[0] === 'application/pdf' && /\.pdf$/i.test(name) && window.__flownotePdfExportV1) {
+        await exportNativePdf(name, blob); return;
+      }
       if (!window.ReactNativeWebView || blob.size > 8 * 1024 * 1024) throw new Error('Export unavailable');
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader(); reader.onload = () => resolve(String(reader.result));
@@ -22,5 +26,5 @@ export async function downloadBlob(name: string, blob: Blob): Promise<void> {
     document.body.appendChild(link); link.click(); link.remove();
     // Native Android downloads read the selected blob asynchronously.
     window.setTimeout(() => URL.revokeObjectURL(url), 60000);
-  } catch { window.alert('파일을 내보내지 못했습니다. iOS 앱에서는 8MB 이하 파일을 저장할 수 있습니다.'); }
+  } catch { window.alert('파일을 내보내지 못했습니다. 저장 공간과 앱 버전을 확인해 주세요. PDF는 최신 앱에서 100MiB까지 저장할 수 있습니다.'); }
 }

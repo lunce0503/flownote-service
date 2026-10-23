@@ -45,6 +45,7 @@ Flownote는 기획한 내용을 바탕으로 관련 필기를 텍스트와 그�
 | --- | --- | --- | --- |
 | `flownote/` | Vite React SPA | `src/main.tsx`, `src/app/App.tsx`, `src/app/capabilityManifest.tsx` | 웹 화면, FSD 상태/기능 조합, REST/SSE/Socket.IO 클라이언트 |
 | `flownote-desktop/` | Electron Windows 설치 앱 | `main.cjs`, `policy.cjs`, `updater.cjs` | 고정 HTTPS 웹과 앱용 UI 공유, 격리된 renderer, native 파일 저장·서명 feed 기반 자동 다운로드 및 Windows 패키징 |
+| `flownote-remote/` | Windows PC 서버 + Android/Windows 입출력 클라이언트 | `src/Flownote.Remote.Network/`, `src/Flownote.Remote.Windows/`, `android/app/` | [카메라 제스처 원격 앱](docs/product-specs/gesture-remote-app.md): 사설/VPN TLS 기기 등록, 실제 카메라·서버 제스처 판정·OS 음량 제어·상태 음성 알림. 음원 분리/합성·화면 배치·대화형 비서는 후속 |
 | `flownote-android/` | Android 설치 APK | `app/src/main/java/com/flownote/mobile/MainActivity.java`, `AppUpdater.java` | HTTPS WebView로 웹 전체 기능 공유, 앱용 탐색·시스템 파일 선택/저장·기존 인증서 검증 후 APK 자동 다운로드 |
 | `flownote-mobile/` | Expo React Native | `app/_layout.tsx`, `app/index.ios.tsx`, `components/installed-web-app.tsx`, `modules/apple-pencil-events/` | iOS 1.2.0은 고정 HTTPS 웹을 WKWebView로 공유하며 HttpOnly 세션/앱 탐색, bounded 파일 export와 허용 목록 Apple Pencil 이벤트 브리지를 사용한다. 기존 Android/Expo 웹 화면과 Railway 테스트 배포는 유지한다. |
 | `flownote-API/` | FastAPI + Socket.IO | `app/main.py` | 공개 API 게이트웨이, 캔버스 실시간 허브, 요청 추적/콜드스타트 연결 재시도 |

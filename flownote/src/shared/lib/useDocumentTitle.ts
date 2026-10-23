@@ -45,6 +45,7 @@ export const useDocumentTitle = (
 
 export const getRouteDocumentTitle = (pathname: string): [string, string?] => {
   if (pathname === "/") return ["홈"];
+  if (pathname === "/library") return ["책장", "서재"];
   if (pathname === "/blog") return ["노트", "목록"];
   if (pathname.startsWith("/blog/")) return ["노트", "문서"];
   if (pathname === "/canvas") return ["캔버스", "목록"];

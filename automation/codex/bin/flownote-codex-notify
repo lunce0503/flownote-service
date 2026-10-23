@@ -104,7 +104,8 @@ CODEX_PLUGIN_CONFIG+=(
   --model "$CODEX_MODEL" \
   -C "$RESULT_DIR" \
   --skip-git-repo-check \
-  --approve-for-me \
+  --config 'sandbox_mode="danger-full-access"' \
+  --config 'approval_policy="never"' \
   --ephemeral \
   --config 'mcp_servers={}' \
   "${CODEX_PLUGIN_CONFIG[@]}" \
