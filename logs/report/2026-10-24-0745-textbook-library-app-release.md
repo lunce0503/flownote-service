@@ -1,6 +1,6 @@
 # 전공서 책장 앱 릴리스
 
-작성: 2026-10-24 07:45 Asia/Seoul. 상태: 네이티브 릴리스 완료, 최종 웹 staging gate 진행 중. 완료 시각·운영 배포 결과는 아래에 갱신한다.
+작성: 2026-10-24 07:45 Asia/Seoul. 완료: 07:48:49 Asia/Seoul. 상태: Android·Windows 릴리스, iOS/iPadOS TestFlight, 최종 staging gate·운영 웹 배포·사후 확인 완료.
 
 ## 요청과 소스 보존
 
@@ -43,15 +43,20 @@ Windows installer 111,835,289 bytes, SHA-256 `750bc3b1d9e5d569beb374805e8e271492
 - Android updater: staging signed feed, 실제 APK 자동 다운로드·해시·native signer, 프로세스 재시작 후 캐시 재사용을 확인했다. 일반 이미지의 Settings가 Compose checkable view, 완료 버튼이 `Open`이어서 기존 ATD 전용 selector 가정이 실패했다. 새 native UI의 실제 권한 토글과 OS UPDATE/Open을 직접 구동해 12000→13000 설치를 완료했다. 이어 `device-update-smoke.mjs --post-install`이 로그인·초안 보존·같은 버전 재다운로드 생략을 통과했다. 앱 실패로 기록하지 않으며 자동 검사와 보완 구동을 구분한다.
 - Windows [build/release run 40034122132](https://github.com/lunce0503/flownote-service/actions/runs/40034122132): 설치형·포터블 각각 sandbox·로그인·프로필/초안 복원·메뉴·캔버스 클라우드 저장·100MiB 책장/원본 출력 통과 후 게시했다.
 - Windows [공개 파일 updater run 40034919266](https://github.com/lunce0503/flownote-service/actions/runs/40034919266): 이전 1.0.0 installer에서 프로필 보존 업그레이드, 정확한 게시물의 installer/portable 다운로드·서명·해시·재시작 캐시·동일 버전 skip 통과. updater 실행 결과는 version=1.3.1, status=ready, artifact 요청 2회이며 중복 요청이 없다.
-- 첫 85개 staging gate는 83 pass / 2 fail이었다. 원인은 Playwright의 50MiB 메모리 입력 제한이며 디스크 파일 입력으로 수정했다. Windows 제목 selector도 exact로 수정했다. 미통과 소스는 운영 배포하지 않았다. 수정 후 별도 대용량 2/2와 최종 전체 gate를 확인한다.
+- 첫 85개 staging gate는 83 pass / 2 fail이었다. 원인은 Playwright의 50MiB 메모리 입력 제한이며 디스크 파일 입력으로 수정했다. Windows 제목 selector도 exact로 수정했다. 미통과 소스는 운영 배포하지 않았다. 수정 후 별도 대용량 2/2와 최종 전체 85/85가 통과했다.
+- 격리 소스 첫 preflight의 `EISDIR`는 임시 node_modules symlink를 제거한 뒤 재실행해 해결했다. Node PDF.js 단독 점검은 optional `canvas.node`가 없어 실행하지 못했지만, 동일 100MiB 유효 PDF를 Chromium·WebKit·Windows·Android에서 실제 등록/읽기 검증했다. 앱 의존성에 불필요한 node-canvas를 추가하지 않았다. Android staging 계정 준비의 초기 502는 Serverless auth GET warm-up 후 재시도해 해결했다.
 
 ## 웹 배포
 
-최종 staging: `dpl_Eu9saFqhrZb6mmhhqKgieUUwnf9v`, [immutable URL](https://flownote-react-staging-i1w9gscr2-flownote-service.vercel.app), READY. 현재 최종 85개 gate 진행 중이다.
+최종 staging: `dpl_Eu9saFqhrZb6mmhhqKgieUUwnf9v`, [immutable URL](https://flownote-react-staging-i1w9gscr2-flownote-service.vercel.app), READY. 85/85 통과(8.7분), receipt 검증 시각 07:46:54 Asia/Seoul.
 
 `node scripts/deploy-cloud.mjs staging web` → 네이티브 updater 검증 → 같은 receipt/source로 `production web`의 분리 단계 release 절차를 사용한다. backend 실행 코드 변경이 없어 Railway backend, 모바일 정적 웹, Expo Go 재배포는 생략한다. release 스크립트의 환경별 URL/정책 확인은 실행한다. 로컬 앱 서버·Compose는 실행하지 않았다. Docker는 cloud Playwright 및 Android 에뮬레이터 도구로만 사용했고 이 작업의 에뮬레이터를 종료했다.
 
-운영 배포 ID·fingerprint·read-back: 최종 gate 완료 후 기록 예정.
+운영: `dpl_9M6a2ZcG7ppYqPLQg2a1z5qKz2Ph`, [immutable URL](https://flownote-react-ny7khko5s-flownote-service.vercel.app), READY, 배포·smoke 완료 07:48:36 Asia/Seoul. staging과 production receipt의 fingerprint가 모두 `dade7d5bf7467055c90cc140a3cf62b7850eec1e98d414ffcf6a08cb0ba62684`로 일치한다. 실행 소스는 a2f55d7이며 배포 전 문서 기록 commit d6e88c8은 실행 fingerprint를 바꾸지 않았다.
+
+07:48:49 Asia/Seoul 사후 확인: 양 도메인에서 양 채널·양 플랫폼 총 8개 feed가 로컬 검증 소스와 byte-for-byte 같고, RSA 서명·버전·채널·no-store 정책이 일치했다. Android 실제 응답의 크기/SHA-256, Windows 공개 파일의 HEAD 크기를 확인했다. Windows 전체 파일 해시는 위 packaged updater에서 검증했다. `/library`, `/android.html`, `/windows.html`은 새 버전으로 응답하고 gateway 200, 비인증 `/api/users/me` 401, 환경별 mobile config의 웹 주소 일치도 통과했다. production에는 테스트 계정/문서를 쓰지 않았다.
+
+설치 안내: [Android](https://flownote-react.vercel.app/android.html), [Windows](https://flownote-react.vercel.app/windows.html). iPad/iPhone은 기존 TestFlight의 Flownote에서 1.3.0(8) 업데이트 후 앱을 다시 연다. 최종 보고서 상태 갱신은 `logs/report/`만 변경하므로 추가 Docker 빌드·클라우드 재배포를 생략한다.
 
 ## 남은 실기기 확인과 보관 범위
 
