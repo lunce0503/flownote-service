@@ -37,6 +37,11 @@ Check(executions == 1 && Math.Abs(volume - 0.45f) < 0.001, "Command deduplicatio
 await client.CommandAsync(grant.DeviceId, "mute"); await Until(() => muted);
 Check(hub.Snapshot().Devices.Length == 1, "Authenticated peer missing");
 hub.Revoke(grant.DeviceId); await Until(() => !client.Connected);
+await using (var revoked = new RemoteClient(_ => throw new Exception("Revoked device received an output command"), () => new(0, false)))
+{
+    try { await revoked.ConnectAsync(hub.Address, pin, grant); throw new Exception("Revoked credential reconnected"); }
+    catch (System.Net.WebSockets.WebSocketException) { }
+}
 Check(!Protocol.IsPrivate(IPAddress.Parse("8.8.8.8")), "Public address accepted");
 foreach (string uri in new[] { "http://127.0.0.1:17843", "https://user:pass@127.0.0.1:17843", "https://8.8.8.8", "https://127.0.0.1/path" })
 { try { Protocol.ServerUri(uri); throw new Exception("Unsafe address accepted"); } catch (ArgumentException) { } }

@@ -67,7 +67,7 @@ public static class Protocol
         request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, true));
         using var generated = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddYears(2));
         return X509CertificateLoader.LoadPkcs12(generated.Export(X509ContentType.Pfx), null,
-            X509KeyStorageFlags.EphemeralKeySet | X509KeyStorageFlags.Exportable);
+            X509KeyStorageFlags.Exportable);
     }
 
     public static void ValidateJpeg(byte[] jpeg)

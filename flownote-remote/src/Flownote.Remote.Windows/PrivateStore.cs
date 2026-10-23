@@ -33,7 +33,7 @@ internal static class PrivateStore
         if (previous?.Address == address)
         {
             var cert = X509CertificateLoader.LoadPkcs12(Convert.FromBase64String(previous.Pfx), null,
-                X509KeyStorageFlags.EphemeralKeySet | X509KeyStorageFlags.Exportable);
+                X509KeyStorageFlags.Exportable);
             if (DateTime.UtcNow < cert.NotAfter.ToUniversalTime()) return cert;
             cert.Dispose();
         }

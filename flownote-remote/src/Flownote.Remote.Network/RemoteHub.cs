@@ -85,14 +85,14 @@ public sealed class RemoteHub : IAsyncDisposable
             string token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
             var record = new DeviceGrant(deviceId ?? Guid.NewGuid(), CleanName(name), Protocol.Hash(token));
             grants.Add(record.Id, record); result = new(record.Id, token);
+            GrantsChanged?.Invoke(grants.Values.ToArray());
         }
-        GrantsChanged?.Invoke(RegisteredDevices()); return result;
+        return result;
     }
     public void Revoke(Guid id)
     {
         Peer? peer;
-        lock (gate) { grants.Remove(id); peers.TryGetValue(id, out peer); peer?.Socket.Abort(); }
-        GrantsChanged?.Invoke(RegisteredDevices());
+        lock (gate) { grants.Remove(id); peers.TryGetValue(id, out peer); peer?.Socket.Abort(); GrantsChanged?.Invoke(grants.Values.ToArray()); }
     }
     public DeviceGrant[] RegisteredDevices() { lock (gate) return grants.Values.ToArray(); }
 
@@ -160,6 +160,7 @@ public sealed class RemoteHub : IAsyncDisposable
         var peer = new Peer(grant, socket);
         lock (gate)
         {
+            if (!grants.TryGetValue(grant.Id, out var active) || active.TokenHash != grant.TokenHash) { socket.Abort(); return; }
             if (peers.TryGetValue(grant.Id, out var old)) old.Socket.Abort();
             peers[grant.Id] = peer; gestureTarget ??= grant.Id; voiceTarget ??= grant.Id;
         }
