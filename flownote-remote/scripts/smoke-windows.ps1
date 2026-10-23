@@ -23,6 +23,17 @@ function Find-ProcessControl($processId, $id) {
 }
 function Invoke-Control($control) { $control.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() }
 function Close-Window($control) { $control.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern).Close() }
+function Close-App($app) {
+    $requested=$false
+    for ($attempt=0; $attempt -lt 40; $attempt++) {
+        $app.Process.Refresh()
+        if ($app.Process.HasExited) { return }
+        if ($app.Root.Current.IsEnabled -and $app.Process.CloseMainWindow()) { $requested=$true; break }
+        Start-Sleep -Milliseconds 250
+    }
+    if (!$requested) { throw 'Dashboard remained disabled after closing its modal settings window' }
+    if (!$app.Process.WaitForExit(15000)) { throw 'Dashboard did not close after a confirmed close request' }
+}
 function Read-Text($root, $id) { return (Find-Control $root $id).Current.Name }
 function Open-App {
     $process = Start-Process -FilePath $Executable -PassThru
@@ -79,8 +90,7 @@ try {
     $licenseText=(Find-Control $notices 'LicenseText').GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
     if (!$licenseText.Contains('Copyright (c) 2026 Lunce') -or !$licenseText.Contains('ZXing')) { throw 'Embedded notices are missing' }
     Close-Window $notices; Close-Window $settings
-    $app.Process.CloseMainWindow() | Out-Null
-    if (!$app.Process.WaitForExit(10000)) { throw 'Dashboard did not close' }
+    Close-App $app
     $app=Open-App; $settings=Open-Settings $app
     if ((Find-Control $settings 'Confidence').GetCurrentPattern([System.Windows.Automation.RangeValuePattern]::Pattern).Current.Value -ne 90) { throw 'Settings did not restore' }
     Close-Window $settings
