@@ -45,7 +45,7 @@ public final class NetworkActivity extends Activity {
             else view.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());return insets;
         });
         var header=row();var heading=column();text(heading,"Flownote Remote",26,INK);text(heading,"연결된 기기로, 손쉽게 제어하세요.",14,MUTED);header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
-        Button more=button(header,"⋯",()->{});more.setTextSize(26);more.setContentDescription("더 보기");more.setOnClickListener(v->showMore(more));content.addView(header);
+        Button more=button(header,"⋯",()->{});more.setTextSize(26);iconButton(more);more.setContentDescription("더 보기");more.setOnClickListener(v->showMore(more));content.addView(header);
         connectionStatus=text(content,"서버 PC의 QR로 연결을 시작하세요.",15,INK);connectionStatus.setPadding(dp(14),dp(12),dp(14),dp(12));connectionStatus.setBackground(shape(0xffe4ece6,12));connectionStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         var join=row();button(join,"QR로 연결",this::scanQr,1);button(join,"연결 코드",()->showConnection(null),1);content.addView(join);
         reconnect=button(content,"저장된 서버에 다시 연결",this::reconnect);reconnect.setVisibility(View.GONE);
@@ -71,9 +71,11 @@ public final class NetworkActivity extends Activity {
     private LinearLayout card(){var view=column();view.setPadding(dp(16),dp(12),dp(16),dp(14));view.setBackground(shape(Color.WHITE,16));var params=new LinearLayout.LayoutParams(-1,-2);params.setMargins(0,dp(10),0,dp(6));content.addView(view,params);return view;}
     private Button button(LinearLayout parent,String title,Runnable action){return button(parent,title,action,0);}
     private Button button(LinearLayout parent,String title,Runnable action,int weight){
-        var button=new Button(this);button.setText(title);button.setTextColor(ACCENT);button.setTextSize(14);button.setAllCaps(false);button.setMinHeight(dp(48));button.setMinimumWidth(dp(48));button.setOnClickListener(v->action.run());
+        var button=new Button(this);button.setText(title);button.setTextColor(ACCENT);button.setTextSize(14);button.setAllCaps(false);button.setMinHeight(dp(48));button.setMinWidth(dp(48));button.setMinimumWidth(dp(48));button.setPadding(dp(8),dp(6),dp(8),dp(6));button.setElevation(0);
+        button.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33276254),shape(0xffe8efE7,10),null));button.setOnClickListener(v->action.run());
         var params=new LinearLayout.LayoutParams(weight==0?-2:0,-2,weight);params.setMargins(0,dp(4),dp(4),dp(4));parent.addView(button,params);return button;
     }
+    private void iconButton(Button button){var params=(LinearLayout.LayoutParams)button.getLayoutParams();params.width=dp(48);params.height=dp(48);params.setMargins(0,0,0,0);button.setLayoutParams(params);button.setPadding(0,0,0,0);button.setIncludeFontPadding(false);}
     private Switch toggle(LinearLayout parent,String title,boolean checked){var view=new Switch(this);view.setText(title);view.setTextSize(18);view.setTextColor(INK);view.setChecked(checked);view.setMinHeight(dp(48));view.setPadding(0,dp(4),0,dp(4));parent.addView(view,new LinearLayout.LayoutParams(-1,-2));return view;}
     private void log(String message){runOnUiThread(()->{if(isDestroyed()||notice==null)return;if(history.length()>6000)history=history.substring(history.length()-3000);history+=message+"\n";notice.setText(message);});}
     private void showMore(View anchor){
@@ -169,7 +171,7 @@ public final class NetworkActivity extends Activity {
             this.id=id;root=row();root.setPadding(dp(12),dp(10),dp(8),dp(10));root.setBackground(shape(Color.WHITE,14));var params=new LinearLayout.LayoutParams(-1,-2);params.setMargins(0,0,0,dp(10));root.setLayoutParams(params);
             enabled=new Switch(NetworkActivity.this);enabled.setMinHeight(dp(48));root.addView(enabled,new LinearLayout.LayoutParams(dp(56),-2));
             var body=column();body.setPadding(dp(12),0,dp(4),0);root.addView(body,new LinearLayout.LayoutParams(0,-2,1));name=text(body,"",17,INK);name.setMaxLines(2);name.setEllipsize(TextUtils.TruncateAt.END);summary=text(body,"",13,MUTED);
-            more=button(root,"⋯",()->{});more.setTextSize(24);more.setOnClickListener(v->menu(more));
+            more=button(root,"⋯",()->{});more.setTextSize(24);iconButton(more);more.setOnClickListener(v->menu(more));
             enabled.setOnCheckedChangeListener((v,on)->{if(updating)return;try{if(link!=null&&link.deviceId().equals(id))link.setEnabled(on);}catch(Exception e){log("기기 사용 여부를 바꾸지 못했어요.");}});
         }
         void update(JSONObject value,JSONObject state){

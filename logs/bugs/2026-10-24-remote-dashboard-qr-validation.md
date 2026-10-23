@@ -17,6 +17,7 @@
 - 후속 EXE 검사 39979087663은 모달 설정 창을 닫은 직후 CloseMainWindow 반환값을 무시해 재시작 단계에서 대기 시간 초과가 났다. 부모 창이 다시 활성화됐는지와 실제 닫기 요청 성공 여부를 기다린 뒤 종료를 검사한다. 제품 검증을 생략하지 않고 같은 EXE의 재시작·토글·QR·화면 캡처까지 다시 실행한다.
 - 같은 실행의 Android instrumentation 1개는 QR/TLS/모델/오디오와 320dp·font1.3 UI를 모두 통과했다. 이후 adb pull은 Gradle이 테스트 앱을 정리한 뒤 앱 전용 외부 경로에서 PNG를 찾지 못해 실패했다. 테스트 안에서 민감한 연결 화면이 아닌 대시보드 캡처만 전용 공용 시험 경로로 먼저 복사하고, 종료 후 그 파일을 수집한다. release 앱에 저장소 권한이나 shell 실행 코드를 추가하지 않는다.
 - 39980667119는 캡처 복사의 `&& echo`를 UiAutomation.executeShellCommand에 넘겨 성공 문자열을 받지 못했다. [Android의 실제 구현](https://android.googlesource.com/platform/frameworks/base/+/330dc32a01316b5e31c4ea5afdf834cb0497f057/core/java/android/app/UiAutomationConnection.java)은 Runtime.exec로 직접 실행하므로 shell 연산자·따옴표에 의존하지 않는다. 단일 screencap 명령으로 shell 전용 `/data/local/tmp/`에 상단/목록 화면을 저장하고 별도 ls로 완료를 확인한 뒤 adb로 수집한다. 연결 확인/QR 화면은 캡처하지 않는다.
+- 39982408964에서 Windows/Android 검사는 모두 통과했고 화면 자료도 수집했다. 실제 Android 320dp·font1.3 이미지에서 `⋯`의 기본 Button 최소 너비가 커 이름/기능 요약 공간이 좁았다. 아이콘 버튼은 48dp 고정·내부 여백 0으로 설정하고 일반 버튼도 최소 너비와 여백을 명시한다. 최종 장치 검사와 캡처로 다시 확인한다.
 
 ## 검증과 다음 조치
 
