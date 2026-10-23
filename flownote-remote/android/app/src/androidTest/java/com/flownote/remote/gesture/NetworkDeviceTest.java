@@ -102,7 +102,14 @@ public class NetworkDeviceTest {
             assertTrue("Client did not resume",visible("Android real I/O acceptance 사용").isChecked());
             for(int i=0;i<7;i++)scroll(false);
             var screenshot=instrumentation.getUiAutomation().takeScreenshot();assertNotNull(screenshot);
-            try(var output=new java.io.FileOutputStream(new java.io.File(context.getExternalFilesDir(null),"dashboard-android.png"))){screenshot.compress(Bitmap.CompressFormat.PNG,100,output);}screenshot.recycle();
+            var capture=new java.io.File(context.getExternalFilesDir(null),"dashboard-android.png");
+            try(var output=new java.io.FileOutputStream(capture)){screenshot.compress(Bitmap.CompressFormat.PNG,100,output);}screenshot.recycle();
+            // Gradle may uninstall the test app after the run, so export the safe dashboard capture first.
+            String sourcePath="'"+capture.getAbsolutePath().replace("'","'\\''")+"'";
+            try(var descriptor=instrumentation.getUiAutomation().executeShellCommand("cp "+sourcePath+" /sdcard/flownote-remote-dashboard.png && echo saved");
+                var input=new java.io.BufferedReader(new java.io.InputStreamReader(new android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor),StandardCharsets.UTF_8))){
+                assertEquals("Dashboard capture export failed","saved",input.readLine());
+            }
             click("연결 코드");click("확인하고 연결");assertNotNull("Pairing must require explicit server confirmation",visible("내 서버의 QR 또는 지문인지 확인해 주세요."));click("닫기");
             System.out.println("PASS: actual QR pixels/parser, Android Camera2, pinned TLS/WSS, real MediaPipe, AudioManager, alerts, overflow dashboard at 320dp/font1.3, saved reconnect, accessible client pause/resume and required pairing confirmation");
         }finally{
