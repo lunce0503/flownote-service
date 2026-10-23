@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+**/build/
+**/.gradle/
+**/local.properties
+.idea/
+.vs/
+artifacts/
+*.user
+*.keystore
+*.jks
+.env
+.env.*
+*.password
+*.p12

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "cameraFacing": "front",
+  "gesturesEnabled": false,
+  "confidenceThreshold": 0.8,
+  "holdMs": 400,
+  "cooldownMs": 1200,
+  "masterVolume": 0.7,
+  "volumeStep": 0.05,
+  "eqPreset": "flat",
+  "assistantEnabled": false,
+  "assistantRequiresConfirmation": true,
+  "bindings": {
+    "Thumb_Up": "volume_up",
+    "Thumb_Down": "volume_down",
+    "Closed_Fist": "mute",
+    "Open_Palm": "none",
+    "Victory": "assistant_open",
+    "Pointing_Up": "none",
+    "ILoveYou": "none"
+  }
+}

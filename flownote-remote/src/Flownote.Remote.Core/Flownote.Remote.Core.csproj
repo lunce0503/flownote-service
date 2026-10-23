@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../vendor/sound-manager/src/SoundManager.Core/SoundManager.Core.csproj" />
+    <EmbeddedResource Include="../../config/default-settings.json" LogicalName="default-settings.json" />
+  </ItemGroup>
+</Project>

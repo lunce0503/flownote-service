@@ -4,6 +4,8 @@
 
 ## 기존 사양
 
+- [카메라 제스처 원격 앱](gesture-remote-app.md): Android·Windows 설정 골격, 제스처 매핑·합성 입력 검사, Sound Manager 코어 재사용과 후속 카메라 연결 경계.
+
 - [Windows 설치 앱](windows-app.md): 웹 기능 공유, 아이보리·검정 앱 UI, Windows 설치형/portable 배포와 실행 검증.
 
 - [Android 설치 앱](android-app.md): 웹 전체 기능 공유, 아이보리·검정 앱 UI, 헤더 제거, APK 설치·배포.

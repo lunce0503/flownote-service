@@ -1,0 +1,124 @@
+name: Build and Release Apps
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: Build tested Windows portable package
+        shell: pwsh
+        run: ./scripts/package-windows.ps1
+      - name: Exercise the exact packaged executable
+        shell: pwsh
+        run: |
+          $version = node scripts/check-release.mjs
+          $package = "artifacts/Flownote-Remote-$version-windows-x64.zip"
+          $testDir = Join-Path $env:RUNNER_TEMP 'FlownoteRemotePackage'
+          Expand-Archive $package $testDir
+          ./scripts/smoke-windows.ps1 -Executable (Join-Path $testDir 'Flownote.Remote.exe')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: artifacts/Flownote-Remote-*-windows-x64.zip
+          if-no-files-found: error
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          log-accepted-android-sdk-licenses: false
+      - name: Validate versions and signing configuration
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.FLOWNOTE_REMOTE_KEYSTORE_BASE64 }}
+          SIGNING_PASSWORD: ${{ secrets.FLOWNOTE_REMOTE_SIGNING_PASSWORD }}
+        run: |
+          node scripts/check-release.mjs
+          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+            test -n "$KEYSTORE_BASE64"
+            test -n "$SIGNING_PASSWORD"
+            umask 077
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/flownote-remote.p12"
+          fi
+      - name: Unit tests, lint and release build
+        working-directory: android
+        shell: bash
+        env:
+          FLOWNOTE_REMOTE_SIGNING_PASSWORD: ${{ secrets.FLOWNOTE_REMOTE_SIGNING_PASSWORD }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+            export FLOWNOTE_REMOTE_KEYSTORE="$RUNNER_TEMP/flownote-remote.p12"
+          fi
+          ./gradlew testDebugUnitTest lintRelease assembleRelease
+      - name: Verify and stage exact signed APK
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          version=$(node scripts/check-release.mjs)
+          mkdir -p artifacts
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk
+          cp android/app/build/outputs/apk/release/app-release.apk "artifacts/Flownote-Remote-$version-android.apk"
+      - name: Enable KVM for Android acceptance check
+        if: github.event_name != 'pull_request'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install and open exact signed APK on Android 10
+        if: github.event_name != 'pull_request'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          disable-animations: true
+          script: bash scripts/smoke-android.sh "artifacts/Flownote-Remote-$(node scripts/check-release.mjs)-android.apk"
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: android
+          path: artifacts/Flownote-Remote-*-android.apk
+          if-no-files-found: error
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/release
+          merge-multiple: true
+      - name: Publish verified initial prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node scripts/check-release.mjs)
+          cd artifacts/release
+          sha256sum "Flownote-Remote-$version-android.apk" "Flownote-Remote-$version-windows-x64.zip" > SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" "Flownote-Remote-$version-android.apk" "Flownote-Remote-$version-windows-x64.zip" SHA256SUMS.txt --verify-tag --draft --prerelease --title "Flownote Remote $version · 초기 설정 시험판" --notes-file "../../release-notes/v$version.md"
+          test "$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets | length')" = 3
+          gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease --latest=false
