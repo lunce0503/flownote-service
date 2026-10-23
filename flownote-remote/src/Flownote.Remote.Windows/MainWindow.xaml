@@ -32,6 +32,7 @@
    <ComboBox x:Name="TestGesture" AutomationProperties.Name="테스트할 제스처"/>
    <Button Content="제스처 유지 테스트" Click="Test_Click" HorizontalAlignment="Left"/>
    <TextBlock x:Name="Status" AutomationProperties.LiveSetting="Polite"/>
+   <Button x:Name="ShowLicenses" Content="오픈소스 라이선스" Click="Licenses_Click" HorizontalAlignment="Left"/>
   </StackPanel>
  </ScrollViewer>
 </Window>

@@ -8,6 +8,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Flownote.Remote.Core/Flownote.Remote.Core.csproj" />
-    <Content Include="../../vendor/sound-manager/LICENSE" Link="licenses/SoundManager-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+    <EmbeddedResource Include="../../vendor/sound-manager/LICENSE" LogicalName="SoundManagerLicense" />
+    <EmbeddedResource Include="../../packaging/dotnet-LICENSE.txt" LogicalName="DotnetLicense" />
+    <EmbeddedResource Include="../../THIRD-PARTY-NOTICES.md" LogicalName="ThirdPartyNotices" />
   </ItemGroup>
 </Project>

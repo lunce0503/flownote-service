@@ -56,6 +56,6 @@
 - `cd flownote-remote && dotnet run --project tests/Flownote.Remote.Checks -c Release`
 - `cd flownote-remote && dotnet build src/Flownote.Remote.Windows -c Release`
 - `cd flownote-remote/android && ./gradlew testDebugUnitTest lintDebug assembleDebug`
-- 본 서비스의 `.github/workflows/gesture-remote-apps.yml`은 Windows/Android 빌드·정책 검사만 수행한다. 독립 배포 저장소 `lunce0503/flownote-remote-service`에서는 [`flownote-remote/.github/workflows/release.yml`](../../flownote-remote/.github/workflows/release.yml)이 서명 APK와 Windows portable ZIP을 검사한 뒤 태그 기반 시험 릴리스를 게시한다. 절차는 [릴리스 문서](../../flownote-remote/docs/RELEASING.md)를 따른다.
+- 본 서비스의 `.github/workflows/gesture-remote-apps.yml`은 Windows/Android 빌드·정책 검사만 수행한다. 독립 배포 저장소 `lunce0503/flownote-remote-service`에서는 [`flownote-remote/.github/workflows/release.yml`](../../flownote-remote/.github/workflows/release.yml)이 서명 APK와 Windows 단일 EXE를 검사한 뒤 태그 기반 시험 릴리스를 게시한다. Windows는 v0.1.1부터 항상 EXE로 공개하며 .NET 런타임과 라이선스 원문을 파일 안에 포함한다. 앱에서 라이선스를 읽을 수 있고 EXE 하나만 있는 폴더에서 시작·라이선스 표시·설정 복원을 검증한다. 절차는 [릴리스 문서](../../flownote-remote/docs/RELEASING.md)를 따른다.
 
 시험 릴리스는 Windows runner에서 실제 WPF 실행·설정 저장/재시작 복원, Android 10 에뮬레이터에서 서명 APK 설치/실행을 검증한다. 카메라 실기기·오디오 출력·기기 간 cloud E2E는 후속 기능 연결 뒤 검증한다. 앱 전용 release 키는 저장소 밖에 보관하며 GitHub Actions secrets로만 빌드에 제공한다. 현재 cloud 실행 산출물과 배포 target이 없어 Vercel/Railway staging/production 배포는 적용하지 않는다. 웹 다운로드 페이지/자산을 변경할 때 `node scripts/deploy-cloud.mjs release web`으로 staging 검증 후 같은 소스를 production에 반영한다.

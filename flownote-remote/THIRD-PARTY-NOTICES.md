@@ -8,7 +8,7 @@ https://github.com/lunce0503/sound_manger at commit
 
 Copyright (c) 2026 Lunce. Licensed under the MIT License. The full text is
 in [vendor/sound-manager/LICENSE](vendor/sound-manager/LICENSE) in source
-and `licenses/SoundManager-LICENSE.txt` in the Windows package.
+and embedded in the Windows EXE, available in the app's Open-source licenses window.
 
 ## .NET / Windows Desktop runtime
 
@@ -17,8 +17,8 @@ runtime published by Microsoft. Their license and notices are available at
 https://github.com/dotnet/runtime/blob/main/LICENSE.TXT and
 https://github.com/dotnet/runtime/blob/main/THIRD-PARTY-NOTICES.TXT,
 and https://github.com/dotnet/wpf/blob/main/LICENSE.TXT.
-The MIT text is also included in `licenses/dotnet-LICENSE.txt` in the Windows
-package and [packaging/dotnet-LICENSE.txt](packaging/dotnet-LICENSE.txt) in source.
+The MIT text is also embedded in the Windows EXE's Open-source licenses window
+and available in [packaging/dotnet-LICENSE.txt](packaging/dotnet-LICENSE.txt) in source.
 
 ## Gradle Wrapper
 

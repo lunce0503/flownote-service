@@ -76,6 +76,32 @@ public partial class MainWindow : Window
     private void Reset_Click(object sender, RoutedEventArgs e)
     { ShowSettings(RemoteSettings.Defaults()); Status.Text = "기본값을 표시합니다. 저장 버튼을 눌러 적용하세요."; }
 
+    private void Licenses_Click(object sender, RoutedEventArgs e)
+    {
+        static string ReadNotice(string name)
+        {
+            using var stream = typeof(MainWindow).Assembly.GetManifestResourceStream(name)
+                ?? throw new InvalidOperationException("포함된 라이선스를 찾을 수 없습니다.");
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+        var text = new TextBox
+        {
+            Text = string.Join("\n\n", ReadNotice("ThirdPartyNotices"), ReadNotice("SoundManagerLicense"), ReadNotice("DotnetLicense")),
+            IsReadOnly = true, TextWrapping = TextWrapping.Wrap,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(16), FontSize = 13
+        };
+        System.Windows.Automation.AutomationProperties.SetAutomationId(text, "LicenseText");
+        var window = new Window
+        {
+            Title = "Flownote Remote · 오픈소스 라이선스", Owner = this,
+            Width = 640, Height = 520, MinWidth = 360, MinHeight = 320,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, Content = text
+        };
+        System.Windows.Automation.AutomationProperties.SetAutomationId(window, "LicensesWindow");
+        window.Show();
+    }
+
     private void Test_Click(object sender, RoutedEventArgs e)
     {
         var s = ReadSettings(); var gate = new GestureGate(); string? result = null;

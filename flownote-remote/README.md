@@ -3,7 +3,7 @@
 카메라 제스처로 소리와 비서 기능을 제어하기 위한 **Android·Windows 전용 앱의 초기 설정**이다. 프로젝트 폴더는 `flownote-remote/`다.
 
 독립 배포 저장소: [lunce0503/flownote-remote-service](https://github.com/lunce0503/flownote-remote-service).
-[v0.1.0 시험판 다운로드](https://github.com/lunce0503/flownote-remote-service/releases/tag/v0.1.0).
+[v0.1.1 시험판 다운로드](https://github.com/lunce0503/flownote-remote-service/releases/tag/v0.1.1).
 
 ## 현재 가능한 것
 
@@ -58,4 +58,4 @@ cd android
 3. 소리 장치 제어와 비서 제공자를 연결한다. 테스트 입력은 실제 실행과 분리해서 유지한다. 비서 실행에는 사용자 확인이 필요하다.
 4. 기기 간 제어는 Flownote cloud 인증·권한 계약을 먼저 정한다. LAN/loopback 서버·임시 터널은 추가하지 않는다.
 
-앱 바이너리는 독립 GitHub 저장소의 시험 릴리스로 배포한다. Windows ZIP은 .NET 런타임을 포함하며 압축을 모두 푼 뒤 `Flownote.Remote.exe`를 실행한다. Android는 서명된 APK를 설치한다. 기능 제한과 설치 방법은 [릴리스 노트](release-notes/v0.1.0.md)에 있다. 이 앱에는 cloud 실행 산출물이 없고 Vercel/Railway 서비스도 변경하지 않는다. Flownote 웹 다운로드 페이지나 cloud API를 바꾸는 후속 작업에서는 본 서비스 저장소의 staging-first 배포 절차를 적용한다.
+앱 바이너리는 독립 GitHub 저장소의 시험 릴리스로 배포한다. Windows는 앞으로 항상 `Flownote-Remote-<version>-windows-x64.exe` 단일 파일로 배포하며 .NET 런타임·오픈소스 라이선스를 포함한다. 내려받은 EXE를 바로 실행하고 라이선스는 앱 안에서 확인한다. Android는 서명된 APK를 설치한다. 기능 제한과 설치 방법은 [릴리스 노트](release-notes/v0.1.1.md)에 있다. 이 앱에는 cloud 실행 산출물이 없고 Vercel/Railway 서비스도 변경하지 않는다. Flownote 웹 다운로드 페이지나 cloud API를 바꾸는 후속 작업에서는 본 서비스 저장소의 staging-first 배포 절차를 적용한다.

@@ -8,7 +8,7 @@
 - GitHub Actions secrets: `FLOWNOTE_REMOTE_KEYSTORE_BASE64`, `FLOWNOTE_REMOTE_SIGNING_PASSWORD`.
 - 로컬 복구 사본: 운영자 전용 저장소 밖 경로에 keystore/password를 보관한다. 키나 비밀번호를 Git·보고서·release artifact에 넣지 않는다. 같은 키를 유지해야 기존 설치를 업데이트할 수 있다.
 - Gradle은 `FLOWNOTE_REMOTE_KEYSTORE`(파일 경로), `FLOWNOTE_REMOTE_SIGNING_PASSWORD` 환경 변수가 있을 때만 release 서명을 설정한다. 공개 릴리스 workflow는 secret 누락·서명 검증 실패 시 게시하지 않는다.
-- Windows는 자체 포함 portable ZIP이며 현재 Authenticode 서명·설치 프로그램·자동 업데이트는 없다.
+- Windows 공개 릴리스는 항상 `Flownote-Remote-<version>-windows-x64.exe` 단일 파일이다. .NET 런타임·라이선스는 EXE에 포함하고 별도 ZIP·DLL·런타임 설치를 요구하지 않는다. 라이선스 원문은 앱의 **오픈소스 라이선스**에서 확인할 수 있다. 현재 Authenticode 서명·설치 프로그램·자동 업데이트는 없다. v0.1.0의 ZIP은 과거 배포 이력이며 v0.1.1부터 EXE 정책을 적용한다.
 
 ## 소스 검증
 
@@ -23,9 +23,9 @@
 
 태그 workflow는 다음을 모두 통과해야 draft를 만들고 prerelease로 게시한다.
 
-1. Windows: 코어 검사 → win-x64 self-contained publish → ZIP 생성 → 그 ZIP에서 꺼낸 실행 파일 시작·설정 저장·재시작 복원 검사.
+1. Windows: 코어 검사 → win-x64 self-contained single-file publish → 버전이 붙은 EXE 생성 → EXE 하나만 있는 빈 폴더에서 시작·내장 라이선스 표시·설정 저장·재시작 복원 검사.
 2. Android: 단위 테스트/lintRelease → 동일 release 키 서명 → `apksigner verify` → 그 APK를 Android 10 에뮬레이터에 설치·실행하고 카메라 권한 미요청 확인.
-3. 통과한 정확한 두 artifact를 다운로드해 `SHA256SUMS.txt`를 생성·재확인한 뒤 APK/Windows ZIP/checksum 3개를 게시한다.
+3. 통과한 정확한 두 artifact를 다운로드해 `SHA256SUMS.txt`를 생성·재확인한 뒤 APK/Windows EXE/checksum 3개만 게시한다. release 명령은 EXE 이름을 명시하므로 ZIP만 생성되면 게시 단계가 실패한다.
 
 개별 실행은 `gh workflow run release.yml --repo lunce0503/flownote-remote-service --ref main`으로 검증할 수 있다. main 참조의 수동 실행은 GitHub Release를 게시하지 않는다. 최초 태그 push에서 실행이 등록되지 않았다면 같은 소스 태그에 `--ref v<version>`으로 수동 실행해 검증 후 게시할 수 있다. 이미 게시한 태그/기존 파일을 덮어쓰지 않는다. 실패는 job 로그에서 원인을 확인하고 수정 버전으로 배포한다.
 

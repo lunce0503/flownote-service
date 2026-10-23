@@ -30,6 +30,20 @@ function Open-App {
 $app = $null
 try {
     $app = Open-App
+    $showNotices = Find-Control $app.Root 'ShowLicenses'
+    $showNotices.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    $noticeCondition = [System.Windows.Automation.AndCondition]::new(
+        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $app.Process.Id),
+        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'LicensesWindow'))
+    $noticeWindow = $null
+    for ($attempt = 0; $attempt -lt 20 -and !$noticeWindow; $attempt++) {
+        $noticeWindow = [System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $noticeCondition)
+        if (!$noticeWindow) { Start-Sleep -Milliseconds 250 }
+    }
+    if (!$noticeWindow) { throw 'Embedded license window did not open' }
+    $noticeText = (Find-Control $noticeWindow 'LicenseText').GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+    if (!$noticeText.Contains('Copyright (c) 2026 Lunce') -or !$noticeText.Contains('.NET Foundation and Contributors')) { throw 'Required embedded licenses are missing' }
+    $noticeWindow.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern).Close()
     $enabled = (Find-Control $app.Root 'Enabled').GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
     if ($enabled.Current.ToggleState -ne [System.Windows.Automation.ToggleState]::Off) { throw 'Gestures must start disabled' }
     $enabled.Toggle()
@@ -48,7 +62,7 @@ try {
     $enabled = (Find-Control $app.Root 'Enabled').GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
     $confidence = (Find-Control $app.Root 'Confidence').GetCurrentPattern([System.Windows.Automation.RangeValuePattern]::Pattern)
     if ($enabled.Current.ToggleState -ne [System.Windows.Automation.ToggleState]::On -or $confidence.Current.Value -ne 90) { throw 'Settings were not restored' }
-    Write-Output 'PASS: packaged Windows app starts, saves settings and restores them after restart'
+    Write-Output 'PASS: standalone release EXE starts, displays embedded licenses, saves settings and restores them after restart'
 } finally {
     if ($app -and !$app.Process.HasExited) {
         $app.Process.CloseMainWindow() | Out-Null
