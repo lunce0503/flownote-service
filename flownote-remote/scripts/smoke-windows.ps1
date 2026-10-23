@@ -85,7 +85,7 @@ try {
     for ($attempt = 0; $attempt -lt 120; $attempt++) {
         $events = (Find-Control $network 'Events').GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
         if ($events.Contains('서버 시작됨')) { $started = $true; break }
-        if ($events.Contains('요청 실패')) { throw 'Packaged MediaPipe/TLS server startup failed' }
+        if ($events.Contains('요청 실패')) { throw "Packaged MediaPipe/TLS server startup failed: $events" }
         Start-Sleep -Milliseconds 500
     }
     if (!$started) { throw 'Packaged MediaPipe/TLS server startup timed out' }

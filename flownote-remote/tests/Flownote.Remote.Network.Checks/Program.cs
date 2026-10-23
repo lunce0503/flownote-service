@@ -9,6 +9,9 @@ static async Task Until(Func<bool> condition)
     throw new InvalidOperationException("Timed out waiting for protocol result");
 }
 using var certificate = Protocol.CreateCertificate(IPAddress.Loopback);
+using var restoredCertificate = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12(
+    certificate.Export(System.Security.Cryptography.X509Certificates.X509ContentType.Pfx), null);
+Check(restoredCertificate.HasPrivateKey && Protocol.Pin(restoredCertificate) == Protocol.Pin(certificate), "Server certificate cannot be exported for encrypted profile persistence");
 var settings = RemoteSettings.Defaults(); settings.GesturesEnabled = true;
 await using var hub = new RemoteHub(settings, _ => Task.FromResult(new GestureSample("Thumb_Up", 0.99)));
 await hub.StartAsync(IPAddress.Loopback, 0, certificate);

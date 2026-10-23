@@ -60,20 +60,25 @@ public partial class NetworkWindow : Window
     {
         if (!loaded || hub is not null || BindAddress.SelectedItem is not string address) { Log("카메라 분석 준비 및 서버 IP 선택을 확인하세요."); return; }
         StartServer.IsEnabled = false;
+        string stage = "인식 모델 준비";
         try
         {
             await DisconnectAsync(); await vision.LoadModelAsync();
+            stage = "서버 인증서 저장";
             certificate = PrivateStore.Certificate(address);
+            stage = "서버 설정 및 등록 기기 복원";
             hub = new RemoteHub(ServerSettings(), vision.InferAsync, PrivateStore.Load<DeviceGrant[]>("devices"));
             hub.Activity += Log;
             hub.Changed += () => Dispatcher.BeginInvoke(RefreshServer);
             hub.GrantsChanged += grants => PrivateStore.Save("devices", grants);
+            stage = "서버 포트 열기";
             await hub.StartAsync(IPAddress.Parse(address), Protocol.Port, certificate);
+            stage = "서버 PC 입출력 연결";
             var local = hub.RegisterLocal("서버 PC", Guid.Empty);
             await AttachAsync(hub.Address, Protocol.Pin(certificate), local);
             RefreshServer(); Log("서버 시작됨 · 로컬 카메라도 클라이언트 입력으로 연결했습니다.");
         }
-        catch { if (hub is not null) { await hub.DisposeAsync(); hub = null; } StartServer.IsEnabled = true; throw; }
+        catch (Exception error) { Log($"서버 시작 실패: {stage} ({error.GetType().Name})"); if (hub is not null) { await hub.DisposeAsync(); hub = null; } StartServer.IsEnabled = true; throw; }
     });
     private void RefreshServer()
     {
