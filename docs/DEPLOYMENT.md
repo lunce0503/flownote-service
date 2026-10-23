@@ -20,9 +20,11 @@ Windows 앱은 `flownote-desktop/`와 `.github/workflows/windows-app.yml`이 소
 
 Android 설치 APK는 `flownote-android/`에서 서명 빌드하고 `flownote/public/downloads/`에 배치한 뒤 `release web`의 staging 검증과 production 배포로 전달한다. `/android.html`이 설치 안내다. Debug는 staging, release는 production HTTPS 웹에 연결하며 빌드·키 관리 기준은 `flownote-android/README.md`를 따른다.
 
-### Windows·Android 업데이트 feed (1.1.0 이상, 현재 1.2.0)
+### Windows·Android 업데이트 feed (1.1.0 이상, Windows 1.3.1·Android 1.3.0)
 
 앱 바이너리와 웹 기능 배포는 구분한다. 웹은 고정 cloud origin에서 공유하며 네이티브 셸은 서명된 `/updates/<channel>/<platform>.json`으로 새 버전을 자동 다운로드한다. 1.2.0은 오프라인 재동기화 웹 기능을 공통 제공하고 iOS에는 Pencil native bridge를 추가한다. Windows NSIS와 Android APK는 설치 확인이 필요하고 portable ZIP은 수동 압축 해제가 필요하다. Android 1.1.0, Windows 1.1.1 이전 버전은 각 기준 버전을 한 번 직접 설치해야 updater 경로를 사용할 수 있다.
+
+책장 릴리스는 Android 1.3.0(13000), iOS/iPadOS 1.3.0(8), Windows 1.3.1이다. PDF 100MiB 원본 내보내기와 계정별 기기 보관을 검증한다. iOS PDF는 256KiB native 확인 응답 기반 전송을 사용하고 다른 내보내기 형식의 기존 제한은 유지한다. 세부 계약은 [전공서 책장](product-specs/textbook-library.md)과 앱별 릴리스 기록이 소유한다.
 
 1. 앱 버전/versionCode를 증가시키고 빌드·단위·서명 검증한다. Windows runner에서 실제 NSIS 설치/portable staging smoke가 통과한 정확한 artifact만 릴리스한다.
 2. Android APK는 기존 운영 서명키를 사용한다. debug는 `-staging.apk`, production은 `.apk`로 분리한다. 기존 설치와 서명 인증서가 같은지 확인한다.

@@ -52,3 +52,21 @@ test('PDF cancellation and incomplete finish retain no partial export and never 
   await f.send({ type: 'flownote.pdf-export.start', id, name: 'a.pdf', bytes: 9 });
   f.receiver.cancel(); assert.equal(f.receiver.busy, false); assert.equal(f.deleted, 2);
 });
+test('navigation during confirmation cannot create a late export; sharing remains single-flight', async () => {
+  let approve, opened = 0;
+  const receiver = createPdfExportReceiver({ confirm: () => new Promise(resolve => { approve = resolve; }),
+    open: () => { opened++; throw new Error('Must not open after navigation'); }, share: async () => {}, notify: () => {} });
+  const pending = receiver.receive(JSON.stringify({ type: 'flownote.pdf-export.start', id, name: 'a.pdf', bytes: 9 }), origin, origin);
+  receiver.cancel(); approve(true); await pending;
+  assert.equal(opened, 0); assert.equal(receiver.busy, false);
+  let finishSharing, deleted = false;
+  const sharing = createPdfExportReceiver({ confirm: async () => true,
+    open: () => ({ uri: 'cache.pdf', append: () => {}, close: () => {}, remove: () => { deleted = true; } }),
+    share: () => new Promise(resolve => { finishSharing = resolve; }), notify: () => {} });
+  const send = data => sharing.receive(JSON.stringify(data), origin, origin);
+  await send({ type: 'flownote.pdf-export.start', id, name: 'a.pdf', bytes: 9 });
+  await send({ type: 'flownote.pdf-export.chunk', id, index: 0, base64: Buffer.from('%PDF-test').toString('base64') });
+  const finishing = send({ type: 'flownote.pdf-export.finish', id });
+  sharing.cancel(); assert.equal(deleted, false); assert.equal(sharing.busy, true);
+  finishSharing(); await finishing; assert.equal(deleted, true); assert.equal(sharing.busy, false);
+});

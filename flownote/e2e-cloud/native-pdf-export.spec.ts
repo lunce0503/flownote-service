@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { randomUUID, createHash } from 'node:crypto';
+import { writeFile } from 'node:fs/promises';
 import { createPdfExportReceiver } from '../../flownote-mobile/lib/pdf-export-protocol';
 import { textbookPdf } from '../../flownote-desktop/scripts/library-fixture.mjs';
 
@@ -14,6 +15,7 @@ test('iOS web PDF sender and native receiver preserve a 100MiB book with backpre
   await page.context().addCookies([{ name: '__Host-flownote_session', value: account.token, url: web, secure: true, httpOnly: true, sameSite: 'Strict' }]);
   await page.addInitScript(user => localStorage.setItem('flownote_auth_user', JSON.stringify(user)), account.user);
   const original = textbookPdf(100 * 1024 * 1024), hash = createHash('sha256');
+  const inputPath = test.info().outputPath('ios-100mib.pdf'); await writeFile(inputPath, original);
   let bytes = 0, closed = false, shared = false, removed = false, chunks = 0;
   const receiver = createPdfExportReceiver({
     confirm: async () => true,
@@ -28,8 +30,8 @@ test('iOS web PDF sender and native receiver preserve a 100MiB book with backpre
   try {
     await page.goto(`${web}/library`);
     await page.getByRole('button', { name: '책 추가', exact: true }).click();
-    await page.getByLabel('PDF 파일').setInputFiles({ name: 'ios-100mib.pdf', mimeType: 'application/pdf', buffer: original });
-    await page.getByLabel('책 제목').fill('Native bridge textbook');
+    await page.getByLabel('PDF 파일').setInputFiles(inputPath);
+    await page.getByLabel('책 제목', { exact: true }).fill('Native bridge textbook');
     await page.getByRole('button', { name: '책장에 추가', exact: true }).click();
     await expect(page.getByRole('dialog', { name: '책 펼쳐 보기' })).toBeVisible({ timeout: 60000 });
     await page.getByRole('button', { name: '원본 PDF 내보내기' }).click();

@@ -38,7 +38,9 @@ WKWebView의 persistent website data store에 웹의 HttpOnly 세션 쿠키와 �
 
 iOS Info.plist의 ATS는 임의 HTTP·로컬 네트워킹을 허용하지 않고 예외 도메인은 비워 둔다. 시스템 사진/카메라/동영상 마이크 권한 설명을 명시하며, WebView의 웹 API 미디어 캡처는 자동 허용하지 않는다. SDK 54 범위의 권장 패치를 적용하고 `expo install --check`를 통과시킨다.
 
-파일 입력은 WKWebView 시스템 선택기를 사용한다. 노트 Markdown·원본/초안 JSON·플래너 ICS는 공유 웹의 내보내기 경로에서 bounded data 메시지로 전달한다. native는 메시지 origin·정확한 schema·MIME allowlist·base64·8MiB 한도·정리된 파일명을 검증하고, 사용자가 확인해야 앱 cache에 쓰고 iOS 공유 메뉴를 연다. ‘파일에 저장’으로 저장하며 끝나면 임시 파일을 삭제한다. 다른 메시지·네트워크 URL 다운로드·임의 경로 쓰기는 허용하지 않는다. 추가 형식은 계약/테스트를 함께 확장한다.
+파일 입력은 WKWebView 시스템 선택기를 사용한다. 노트 Markdown·원본/초안 JSON·플래너 ICS는 공유 웹의 내보내기 경로에서 bounded data 메시지로 전달한다. native는 메시지 origin·정확한 schema·MIME allowlist·base64·8MiB 한도·정리된 파일명을 검증하고, 사용자가 확인해야 앱 cache에 쓰고 iOS 공유 메뉴를 연다. ‘파일에 저장’으로 저장하며 끝나면 임시 파일을 삭제한다. 다른 메시지·네트워크 URL 다운로드·임의 경로 쓰기는 허용하지 않는다.
+
+1.3.0은 [전공서 책장](textbook-library.md#앱-130-저장-계약)의 PDF만 별도의 256KiB 확인 응답 기반 프로토콜로 최대 100MiB까지 확장한다. 나머지 형식의 8MiB 제한은 유지한다. Expo FileHandle에 순서대로 쓰고 공유 전 파일을 닫으며, 취소·오류·이동 시 정리한다. 임의 파일 경로/서버 다운로드 권한을 추가하지 않는다. 앱 업데이트는 WKWebView 프로필과 계정별 책장 IndexedDB를 삭제하지 않는다.
 
 ## 최초 빌드와 제출
 
