@@ -2,7 +2,7 @@ namespace Flownote.Remote.Core;
 
 // Detector adapters feed monotonic milliseconds, including no-hand/low-confidence samples.
 // A held gesture fires once; release is required before the same gesture can fire again.
-public sealed class GestureGate
+public sealed class GestureGate(int maxGapMs = 250)
 {
     private string? candidate;
     private long since, lastSample = -1, lastAction = -1;
@@ -17,7 +17,7 @@ public sealed class GestureGate
     {
         settings.Validate();
         if (timestampMs < 0 || timestampMs < lastSample) { Reset(); return null; }
-        bool gap = lastSample >= 0 && timestampMs - lastSample > 250;
+        bool gap = lastSample >= 0 && timestampMs - lastSample > maxGapMs;
         lastSample = timestampMs;
         if (!settings.GesturesEnabled || !double.IsFinite(confidence) || confidence < settings.ConfidenceThreshold ||
             confidence > 1 || gesture is null || !settings.Bindings.TryGetValue(gesture, out var action) || action == "none")

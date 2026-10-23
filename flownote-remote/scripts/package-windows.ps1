@@ -2,8 +2,14 @@ $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
 $version = node scripts/check-release.mjs
 if ($LASTEXITCODE -ne 0) { throw 'Version validation failed' }
+node scripts/prepare-vision.mjs
+if ($LASTEXITCODE -ne 0) { throw 'Pinned vision assets failed validation' }
 dotnet run --project tests/Flownote.Remote.Checks -c Release
 if ($LASTEXITCODE -ne 0) { throw 'Core checks failed' }
+dotnet run --project tests/Flownote.Remote.Network.Checks -c Release
+if ($LASTEXITCODE -ne 0) { throw 'TLS/WSS protocol checks failed' }
+dotnet run --project tests/Flownote.Remote.Windows.Checks -c Release
+if ($LASTEXITCODE -ne 0) { throw 'Real vision and speech acceptance failed' }
 $publishDir = Join-Path $PWD 'artifacts/windows'
 dotnet publish src/Flownote.Remote.Windows -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false -o $publishDir
 if ($LASTEXITCODE -ne 0) { throw 'Windows publish failed' }

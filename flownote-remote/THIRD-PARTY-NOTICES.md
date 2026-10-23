@@ -20,7 +20,36 @@ and https://github.com/dotnet/wpf/blob/main/LICENSE.TXT.
 The MIT text is also embedded in the Windows EXE's Open-source licenses window
 and available in [packaging/dotnet-LICENSE.txt](packaging/dotnet-LICENSE.txt) in source.
 
-## Gradle Wrapper
+## MediaPipe Tasks Vision
+
+The Windows EXE embeds @mediapipe/tasks-vision 1.1.1 and Google's gesture
+recognizer model. Exact download URLs, npm integrity and model SHA-256 are
+recorded in [vision.lock.json](vision.lock.json). Licensed under Apache 2.0;
+the full text is [licenses/MediaPipe-LICENSE.txt](licenses/MediaPipe-LICENSE.txt)
+and is embedded in the EXE. The public thumb-up test image is downloaded only
+for acceptance tests and is not bundled in the production EXE/APK.
+
+## NAudio
+
+Windows output volume uses NAudio 2.2.1, Copyright Mark Heath and contributors,
+under the MIT License. Full text: [licenses/NAudio-LICENSE.txt](licenses/NAudio-LICENSE.txt),
+also embedded in the EXE.
+
+## Microsoft Edge WebView2
+
+The app includes the Microsoft.Web.WebView2 SDK 1.0.4314.35 loader.
+Its [license](licenses/WebView2-LICENSE.txt) and [notices](licenses/WebView2-NOTICE.txt)
+are embedded in the EXE. The Evergreen WebView2 Runtime is a separate Microsoft
+component and must be installed on the Windows device; the .NET runtime and
+gesture model are included in the EXE.
+
+## Android network client
+
+OkHttp 4.12.0 and Okio are licensed under Apache 2.0:
+https://github.com/square/okhttp/blob/parent-4.12.0/LICENSE.txt and
+https://github.com/square/okio/blob/master/LICENSE.txt.
+
+## Gradle Wrapper license
 
 The source distribution includes the Gradle Wrapper, licensed under Apache 2.0.
 https://github.com/gradle/gradle/blob/master/LICENSE

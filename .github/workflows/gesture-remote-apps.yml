@@ -19,7 +19,13 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           global-json-file: flownote-remote/global.json
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - run: node scripts/prepare-vision.mjs
       - run: dotnet run --project tests/Flownote.Remote.Checks -c Release
+      - run: dotnet run --project tests/Flownote.Remote.Network.Checks -c Release
+      - run: dotnet run --project tests/Flownote.Remote.Windows.Checks -c Release
       - run: dotnet build src/Flownote.Remote.Windows -c Release
   android:
     runs-on: ubuntu-latest

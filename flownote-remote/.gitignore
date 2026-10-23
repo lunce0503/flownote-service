@@ -13,3 +13,6 @@ artifacts/
 .env.*
 *.password
 *.p12
+node_modules/
+android/app/src/androidTest/assets/session.json
+android/app/src/androidTest/assets/thumb_up.jpg

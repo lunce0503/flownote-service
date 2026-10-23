@@ -1,30 +1,36 @@
 # Flownote Remote
 
-카메라 제스처로 소리와 비서 기능을 제어하기 위한 **Android·Windows 전용 앱의 초기 설정**이다. 프로젝트 폴더는 `flownote-remote/`다.
+Windows PC 서버가 제스처·명령·상태 알림을 관리하고 Android·Windows 클라이언트가 카메라·소리·조작 화면을 담당하는 원격 앱이다. 프로젝트 폴더는 `flownote-remote/`다.
 
 독립 배포 저장소: [lunce0503/flownote-remote-service](https://github.com/lunce0503/flownote-remote-service).
-[v0.1.1 시험판 다운로드](https://github.com/lunce0503/flownote-remote-service/releases/tag/v0.1.1).
+[v0.2.0 시험판 다운로드](https://github.com/lunce0503/flownote-remote-service/releases/tag/v0.2.0).
 
 ## 현재 가능한 것
 
-- 두 앱의 네이티브 설정 화면, 기기별 설정 저장·복원, 기본값 복원.
-- 제스처별 동작 선택, 신뢰도·유지 시간·재실행 간격, 카메라 방향, 음량·EQ 설정.
-- 합성 제스처 입력으로 실행 후보 이름 확인. 실제 장치 명령은 실행하지 않는다.
-- Windows에서 [sound_manger](https://github.com/lunce0503/sound_manger)의 MIT 소리 코어 참조와 EQ 설정 적용.
+- Windows HTTPS/WSS 서버, 기기별 인증·일회용 코드·인증서 지문 대조, 등록 해제.
+- Android/Windows 클라이언트의 실제 카메라 프레임 전송, 서버 MediaPipe 제스처 판정, 클라이언트 OS 음량·음소거 제어와 적용 결과 확인.
+- 기기 상태와 배터리/메모리/출력/연결 경고의 화면 및 OS TTS 음성 알림.
+- 기존 제스처 설정 저장/복원과 합성 입력 테스트. 합성 테스트는 실제 장치 명령을 실행하지 않는다.
+- Windows의 [sound_manger](https://github.com/lunce0503/sound_manger) DSP 코어. EQ·음원 믹싱의 실제 입출력 경로는 아직 연결 전이다.
 
-카메라 프리뷰·실제 인식 모델, PCM 캡처/재생, 시스템 음량 제어, 기기 간 연결, 비서 제공자는 아직 연결하지 않았다. 앱 화면에도 준비 상태를 표시한다. 제스처 사용은 기본 OFF이고 비서는 비활성 상태다. 카메라 권한은 Android manifest에만 준비했으며 앱에서 요청하거나 사용하지 않는다. 마이크 권한과 네트워크 권한은 없다.
+역할·연결 순서·보안·메시지 계약은 [네트워크 문서](docs/NETWORK.md)를 따른다. 원격 앱에 한해 사용자 요구에 따른 PC 서버와 사설/VPN 직접 연결을 사용한다. 기존 Flownote 웹/백엔드 cloud 통신 규칙은 바꾸지 않는다. 카메라와 서버 제스처 명령은 자동 시작하지 않는다. 음원 스트리밍·분리/합성, 화면 배치·프로젝터 출력, 대화형 AI 비서는 미연결이며 기능 목록에도 false로 표시한다. 알림 음성은 실제 상태 규칙과 OS TTS다.
 
 ## 개발
 
 Windows는 .NET 10 SDK와 WPF를 사용한다. Windows에서:
 
 ```powershell
+node scripts/prepare-vision.mjs
 dotnet run --project tests/Flownote.Remote.Checks -c Release
+dotnet run --project tests/Flownote.Remote.Network.Checks -c Release
+dotnet run --project tests/Flownote.Remote.Windows.Checks -c Release
 dotnet build src/Flownote.Remote.Windows -c Release
 dotnet run --project src/Flownote.Remote.Windows
 ```
 
 설정은 `%LOCALAPPDATA%/Flownote/Remote/settings.json`에 저장한다. 잘못된 저장값은 기본값으로 표시하고 저장 전까지 기존 파일을 보존한다. .NET 코어 검사는 Linux에서도 실행할 수 있고 Windows 프로젝트는 교차 컴파일할 수 있다. WPF 실행 확인에는 Windows가 필요하다.
+
+Windows 카메라/서버 인식에는 WebView2 Runtime이 필요하다. 모델은 `vision.lock.json`으로 검증해 EXE에 포함하고 런타임 영상은 외부 AI 서비스에 보내지 않는다. 인터넷 권한은 서버 통신에 사용하며 마이크 녹음 권한은 없다.
 
 Android는 JDK 17, SDK 35, Build Tools 35.0.0을 사용한다. Android Studio에서 `android/`를 열거나:
 
@@ -42,8 +48,9 @@ cd android
 | --- | --- |
 | `config/default-settings.json` | 두 플랫폼이 사용하는 기본 설정 계약 v1 |
 | `src/Flownote.Remote.Core/` | 설정 검증, 제스처 실행 후보 필터, Sound Manager 연결 |
-| `src/Flownote.Remote.Windows/` | WPF 설정 화면·저장·테스트 입력 |
-| `android/app/` | Android Java 설정 화면·저장·제스처 필터 |
+| `src/Flownote.Remote.Network/` | HTTPS/WSS 등록·기기 상태·제스처/출력 명령·위험 알림 |
+| `src/Flownote.Remote.Windows/` | WPF 서버/클라이언트, WebView2/MediaPipe, WASAPI 음량 API·TTS |
+| `android/app/` | Android 설정·클라이언트, Camera2, Keystore, AudioManager·TTS |
 | `vendor/sound-manager/` | 커밋 고정한 원본 소리 코어 및 MIT 라이선스 |
 | `tests/Flownote.Remote.Checks/` | .NET 실행 검사: 설정·제스처 정책·소리 코어 |
 | `.github/workflows/release.yml` | 독립 저장소의 Android·Windows 빌드/실행 검사와 태그 기반 시험 릴리스 |
@@ -53,9 +60,9 @@ cd android
 
 ## 다음 연결 단계
 
-1. 온디바이스 손 제스처 모델·라이선스·카메라 프레임 입력을 결정하고 각 OS의 프리뷰/권한/백그라운드 중지를 구현한다. 현재 제스처 ID는 예약된 설정값이며 모델 설치를 의미하지 않는다.
-2. 실제 인식 결과를 `GestureGate`에 단조 증가 밀리초로 공급한다. 손 없음/신뢰도 미달 프레임도 공급하고 세션 종료·설정 변경 시 `Reset/reset`한다.
-3. 소리 장치 제어와 비서 제공자를 연결한다. 테스트 입력은 실제 실행과 분리해서 유지한다. 비서 실행에는 사용자 확인이 필요하다.
-4. 기기 간 제어는 Flownote cloud 인증·권한 계약을 먼저 정한다. LAN/loopback 서버·임시 터널은 추가하지 않는다.
+1. 실제 음원 캡처/전송·재생 버퍼를 Sound Manager DSP에 연결한다.
+2. 음원 분리 모델·화면 합성/배치·프로젝터 출력 모듈을 구현한다.
+3. 대화형 비서 제공자와 권한 있는 작업 도구를 연결한다. 위험 알림은 대화형 AI 응답과 독립적으로 즉시 처리한다.
+4. 공개 인터넷 연결이 필요하면 별도 인증·중계·지연/비용 설계를 먼저 수행한다. 현재는 신뢰하는 사설망/VPN만 지원한다.
 
-앱 바이너리는 독립 GitHub 저장소의 시험 릴리스로 배포한다. Windows는 앞으로 항상 `Flownote-Remote-<version>-windows-x64.exe` 단일 파일로 배포하며 .NET 런타임·오픈소스 라이선스를 포함한다. 내려받은 EXE를 바로 실행하고 라이선스는 앱 안에서 확인한다. Android는 서명된 APK를 설치한다. 기능 제한과 설치 방법은 [릴리스 노트](release-notes/v0.1.1.md)에 있다. 이 앱에는 cloud 실행 산출물이 없고 Vercel/Railway 서비스도 변경하지 않는다. Flownote 웹 다운로드 페이지나 cloud API를 바꾸는 후속 작업에서는 본 서비스 저장소의 staging-first 배포 절차를 적용한다.
+앱 바이너리는 독립 GitHub 저장소의 시험 릴리스로 배포한다. Windows는 항상 단일 EXE이며 .NET·인식 모델·라이선스를 포함한다. Android는 같은 키로 서명한 APK다. 연결 방법과 제한은 [릴리스 노트](release-notes/v0.2.0.md)를 따른다. Vercel/Railway 서비스는 이 PC 앱 서버와 별개이며 변경하지 않는다. 웹 다운로드 자산이나 cloud API를 바꾸는 작업은 본 서비스 저장소의 staging-first 배포를 따른다.

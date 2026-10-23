@@ -62,7 +62,35 @@ try {
     $enabled = (Find-Control $app.Root 'Enabled').GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
     $confidence = (Find-Control $app.Root 'Confidence').GetCurrentPattern([System.Windows.Automation.RangeValuePattern]::Pattern)
     if ($enabled.Current.ToggleState -ne [System.Windows.Automation.ToggleState]::On -or $confidence.Current.Value -ne 90) { throw 'Settings were not restored' }
-    Write-Output 'PASS: standalone release EXE starts, displays embedded licenses, saves settings and restores them after restart'
+    (Find-Control $app.Root 'OpenNetwork').GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    $networkCondition = [System.Windows.Automation.AndCondition]::new(
+        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $app.Process.Id),
+        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'NetworkPanel'))
+    $network = $null
+    for ($attempt = 0; $attempt -lt 60 -and !$network; $attempt++) {
+        $network = [System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $networkCondition)
+        if (!$network) { Start-Sleep -Milliseconds 500 }
+    }
+    if (!$network) { throw 'Packaged network panel did not open' }
+    $ready = $false
+    for ($attempt = 0; $attempt -lt 120; $attempt++) {
+        $events = (Find-Control $network 'Events').GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+        if ($events.Contains('카메라 입력 준비됨')) { $ready = $true; break }
+        if ($events.Contains('준비 실패')) { throw 'Packaged WebView2 camera/vision initialization failed' }
+        Start-Sleep -Milliseconds 500
+    }
+    if (!$ready) { throw 'Packaged WebView2 initialization timed out' }
+    (Find-Control $network 'StartServer').GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    $started = $false
+    for ($attempt = 0; $attempt -lt 120; $attempt++) {
+        $events = (Find-Control $network 'Events').GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+        if ($events.Contains('서버 시작됨')) { $started = $true; break }
+        if ($events.Contains('요청 실패')) { throw 'Packaged MediaPipe/TLS server startup failed' }
+        Start-Sleep -Milliseconds 500
+    }
+    if (!$started) { throw 'Packaged MediaPipe/TLS server startup timed out' }
+    $network.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern).Close()
+    Write-Output 'PASS: standalone EXE licenses, settings restart, embedded WebView2/model, TLS server and authenticated local client'
 } finally {
     if ($app -and !$app.Process.HasExited) {
         $app.Process.CloseMainWindow() | Out-Null

@@ -43,7 +43,7 @@ Flownote는 기획한 내용을 바탕으로 관련 필기를 텍스트와 그�
 | --- | --- | --- | --- |
 | `flownote/` | Vite React SPA | `src/main.tsx`, `src/app/App.tsx`, `src/app/capabilityManifest.tsx` | 웹 화면, FSD 상태/기능 조합, REST/SSE/Socket.IO 클라이언트 |
 | `flownote-desktop/` | Electron Windows 설치 앱 | `main.cjs`, `policy.cjs` | 고정 HTTPS 웹과 앱용 UI 공유, 격리된 renderer, native 파일 저장 및 Windows 패키징 |
-| `flownote-remote/` | WPF Windows + Java Android 초기 앱 | `src/Flownote.Remote.Windows/`, `android/app/` | [카메라 제스처 원격 앱](docs/product-specs/gesture-remote-app.md)의 설정·제스처 실행 후보 검사, MIT Sound Manager DSP 코어 참조. 카메라·실제 장치 제어·cloud 연결 전 |
+| `flownote-remote/` | Windows PC 서버 + Android/Windows 입출력 클라이언트 | `src/Flownote.Remote.Network/`, `src/Flownote.Remote.Windows/`, `android/app/` | [카메라 제스처 원격 앱](docs/product-specs/gesture-remote-app.md): 사설/VPN TLS 기기 등록, 실제 카메라·서버 제스처 판정·OS 음량 제어·상태 음성 알림. 음원 분리/합성·화면 배치·대화형 비서는 후속 |
 | `flownote-android/` | Android 설치 APK | `app/src/main/java/com/flownote/mobile/MainActivity.java` | HTTPS WebView로 웹 전체 기능 공유, 앱용 헤더 제거·아이보리/검정 탐색, 시스템 파일 선택·저장 |
 | `flownote-mobile/` | Expo React Native | `app/_layout.tsx`, `app/canvas.tsx` | iOS/Android 네이티브 화면, 캔버스, Railway 정적 웹 테스트 배포 |
 | `flownote-API/` | FastAPI + Socket.IO | `app/main.py` | 공개 API 게이트웨이, 캔버스 실시간 허브, 요청 추적/콜드스타트 연결 재시도 |

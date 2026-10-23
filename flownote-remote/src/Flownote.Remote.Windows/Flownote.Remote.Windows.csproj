@@ -8,8 +8,17 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Flownote.Remote.Core/Flownote.Remote.Core.csproj" />
+    <ProjectReference Include="../Flownote.Remote.Network/Flownote.Remote.Network.csproj" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="System.Speech" Version="10.0.0" />
+    <EmbeddedResource Include="../../artifacts/vision/**/*" LogicalName="Vision.%(RecursiveDir)%(Filename)%(Extension)" />
     <EmbeddedResource Include="../../vendor/sound-manager/LICENSE" LogicalName="SoundManagerLicense" />
     <EmbeddedResource Include="../../packaging/dotnet-LICENSE.txt" LogicalName="DotnetLicense" />
     <EmbeddedResource Include="../../THIRD-PARTY-NOTICES.md" LogicalName="ThirdPartyNotices" />
+    <EmbeddedResource Include="../../licenses/MediaPipe-LICENSE.txt" LogicalName="MediaPipeLicense" />
+    <EmbeddedResource Include="../../licenses/NAudio-LICENSE.txt" LogicalName="NAudioLicense" />
+    <EmbeddedResource Include="../../licenses/WebView2-LICENSE.txt" LogicalName="WebViewLicense" />
+    <EmbeddedResource Include="../../licenses/WebView2-NOTICE.txt" LogicalName="WebViewNotice" />
   </ItemGroup>
 </Project>

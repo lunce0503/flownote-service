@@ -10,6 +10,7 @@ public partial class MainWindow : Window
     private readonly string settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Flownote", "Remote", "settings.json");
     private readonly Dictionary<string, ComboBox> bindings = [];
     private readonly SoundController sound = new();
+    private NetworkWindow? network;
 
     public MainWindow()
     {
@@ -76,6 +77,14 @@ public partial class MainWindow : Window
     private void Reset_Click(object sender, RoutedEventArgs e)
     { ShowSettings(RemoteSettings.Defaults()); Status.Text = "기본값을 표시합니다. 저장 버튼을 눌러 적용하세요."; }
 
+    private void Network_Click(object sender, RoutedEventArgs e)
+    {
+        if (network is not null) { network.Activate(); return; }
+        network = new NetworkWindow(ReadSettings) { Owner = this };
+        network.Closed += (_, _) => network = null;
+        network.Show();
+    }
+
     private void Licenses_Click(object sender, RoutedEventArgs e)
     {
         static string ReadNotice(string name)
@@ -87,7 +96,7 @@ public partial class MainWindow : Window
         }
         var text = new TextBox
         {
-            Text = string.Join("\n\n", ReadNotice("ThirdPartyNotices"), ReadNotice("SoundManagerLicense"), ReadNotice("DotnetLicense")),
+            Text = string.Join("\n\n", ReadNotice("ThirdPartyNotices"), ReadNotice("SoundManagerLicense"), ReadNotice("DotnetLicense"), ReadNotice("MediaPipeLicense"), ReadNotice("NAudioLicense"), ReadNotice("WebViewLicense"), ReadNotice("WebViewNotice")),
             IsReadOnly = true, TextWrapping = TextWrapping.Wrap,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(16), FontSize = 13
         };

@@ -15,6 +15,9 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
       - name: Build tested standalone Windows EXE
         shell: pwsh
         run: ./scripts/package-windows.ps1
@@ -42,10 +45,22 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
       - uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
           log-accepted-android-sdk-licenses: false
+      - name: Prepare real server vision worker for device acceptance
+        if: github.event_name != 'pull_request'
+        run: |
+          npm ci --ignore-scripts
+          node scripts/prepare-vision.mjs
+          npx playwright install --with-deps chromium
       - name: Validate versions and signing configuration
         shell: bash
         env:
@@ -91,9 +106,11 @@ jobs:
           arch: x86_64
           target: google_apis
           profile: pixel_2
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front emulated
           disable-animations: true
-          script: bash scripts/smoke-android.sh "artifacts/Flownote-Remote-$(node scripts/check-release.mjs)-android.apk"
+          script: |
+            bash scripts/smoke-android.sh "artifacts/Flownote-Remote-$(node scripts/check-release.mjs)-android.apk"
+            bash scripts/run-network-device-checks.sh
       - uses: actions/upload-artifact@v4
         if: github.event_name != 'pull_request'
         with:
