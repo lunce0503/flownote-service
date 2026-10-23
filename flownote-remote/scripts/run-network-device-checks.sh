@@ -22,4 +22,5 @@ test -s android/app/src/androidTest/assets/session.json
 cd android
 ./gradlew connectedDebugAndroidTest
 mkdir -p ../artifacts/ux
-adb pull /sdcard/flownote-remote-dashboard.png ../artifacts/ux/dashboard-android.png
+adb pull /data/local/tmp/flownote-remote-dashboard.png ../artifacts/ux/dashboard-android.png
+adb pull /data/local/tmp/flownote-remote-clients.png ../artifacts/ux/clients-android.png

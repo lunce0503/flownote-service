@@ -39,6 +39,13 @@ public class NetworkDeviceTest {
     }
     private void click(String text){var value=visible(text);assertNotNull("Missing accessible control: "+text,value);assertTrue("Control was not clickable: "+text,value.performAction(AccessibilityNodeInfo.ACTION_CLICK));SystemClock.sleep(200);}
     private void scroll(boolean forward){var value=scrollable(InstrumentationRegistry.getInstrumentation().getUiAutomation().getRootInActiveWindow());if(value!=null)value.performAction(forward?AccessibilityNodeInfo.ACTION_SCROLL_FORWARD:AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);SystemClock.sleep(200);}
+    private void capture(String name)throws Exception {
+        String path="/data/local/tmp/flownote-remote-"+name+".png";
+        var automation=InstrumentationRegistry.getInstrumentation().getUiAutomation();
+        // executeShellCommand uses direct argv execution; do not pass shell quotes, pipes or &&.
+        try(var input=new android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand("screencap -p "+path))){byte[] buffer=new byte[4096];while(input.read(buffer)!=-1){}}
+        try(var input=new java.io.BufferedReader(new java.io.InputStreamReader(new android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand("ls "+path)),StandardCharsets.UTF_8))){assertEquals("Dashboard capture export failed",path,input.readLine());}
+    }
     private byte[] asset(String name)throws Exception {
         try(InputStream input=InstrumentationRegistry.getInstrumentation().getContext().getAssets().open(name)){
             ByteArrayOutputStream output=new ByteArrayOutputStream();byte[] buffer=new byte[4096];int count;while((count=input.read(buffer))!=-1)output.write(buffer,0,count);return output.toByteArray();
@@ -100,16 +107,9 @@ public class NetworkDeviceTest {
             click("Android real I/O acceptance 사용");assertNotNull("Client pause was not reflected in the real dashboard",visible("사용 일시 중지"));
             click("Android real I/O acceptance 사용");SystemClock.sleep(600);
             assertTrue("Client did not resume",visible("Android real I/O acceptance 사용").isChecked());
+            capture("clients");
             for(int i=0;i<7;i++)scroll(false);
-            var screenshot=instrumentation.getUiAutomation().takeScreenshot();assertNotNull(screenshot);
-            var capture=new java.io.File(context.getExternalFilesDir(null),"dashboard-android.png");
-            try(var output=new java.io.FileOutputStream(capture)){screenshot.compress(Bitmap.CompressFormat.PNG,100,output);}screenshot.recycle();
-            // Gradle may uninstall the test app after the run, so export the safe dashboard capture first.
-            String sourcePath="'"+capture.getAbsolutePath().replace("'","'\\''")+"'";
-            try(var descriptor=instrumentation.getUiAutomation().executeShellCommand("cp "+sourcePath+" /sdcard/flownote-remote-dashboard.png && echo saved");
-                var input=new java.io.BufferedReader(new java.io.InputStreamReader(new android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor),StandardCharsets.UTF_8))){
-                assertEquals("Dashboard capture export failed","saved",input.readLine());
-            }
+            capture("dashboard");
             click("연결 코드");click("확인하고 연결");assertNotNull("Pairing must require explicit server confirmation",visible("내 서버의 QR 또는 지문인지 확인해 주세요."));click("닫기");
             System.out.println("PASS: actual QR pixels/parser, Android Camera2, pinned TLS/WSS, real MediaPipe, AudioManager, alerts, overflow dashboard at 320dp/font1.3, saved reconnect, accessible client pause/resume and required pairing confirmation");
         }finally{
