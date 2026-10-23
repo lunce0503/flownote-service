@@ -43,9 +43,13 @@ public partial class NetworkWindow : Window
     public NetworkWindow(Func<RemoteSettings>? settings)
     {
         InitializeComponent();
+        var work = SystemParameters.WorkArea;
+        MinWidth = Math.Min(MinWidth, work.Width); MinHeight = Math.Min(MinHeight, work.Height);
+        Width = Math.Min(Width, work.Width); Height = Math.Min(Height, work.Height); WindowStartupLocation = WindowStartupLocation.CenterScreen;
         SizeChanged += (_, _) => FeatureGrid.Columns = ActualWidth >= 740 ? 2 : 1;
         readSettings = settings ?? (() => File.Exists(settingsPath) ? RemoteSettings.Parse(File.ReadAllText(settingsPath)) : RemoteSettings.Defaults());
         CameraHost.Content = vision.View; ClientList.ItemsSource = rows; StartServer.IsEnabled = false;
+        RecentNotice.Text = "카메라 입력을 준비하고 있어요…";
         addresses = NetworkInterface.GetAllNetworkInterfaces().Where(n => n.OperationalStatus == OperationalStatus.Up)
             .SelectMany(n => n.GetIPProperties().UnicastAddresses).Select(a => a.Address)
             .Where(a => a.AddressFamily == AddressFamily.InterNetwork && Protocol.IsPrivate(a) && !IPAddress.IsLoopback(a))
@@ -142,7 +146,7 @@ public partial class NetworkWindow : Window
             target = value.Devices.FirstOrDefault(d => d.Id == value.GestureTarget && d.Connected && d.Enabled)?.Id
                 ?? value.Devices.FirstOrDefault(d => d.Connected && d.Enabled)?.Id;
         var output = value.Devices.FirstOrDefault(d => d.Id == target && d.Connected);
-        SoundSummary.Text = output is null ? "목록의 더 보기에서 제어할 기기를 선택하세요." : $"{output.Name} · {(output.Muted ? "음소거" : output.Volume.ToString("P0"))}";
+        SoundSummary.Text = output is null ? "목록의 더 보기에서 제어할 기기를 선택하세요." : $"{output.Name} · {(!output.OutputReady ? "출력 장치 확인 필요" : output.Muted ? "음소거" : output.Volume.ToString("P0"))}";
         MuteControl.Content = output?.Muted == true ? "음소거 해제" : "음소거";
         int count = value.Devices.Count(d => d.Connected); ClientsTitle.Text = $"클라이언트 · {count}대 연결";
         EmptyClients.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -245,7 +249,8 @@ public partial class NetworkWindow : Window
     { if (hub is not null) Log("서버 모드입니다. 서버 중지 후 다른 PC에 연결할 수 있어요."); else if (client?.Connected == true) await Guard(DisconnectAsync); else OpenConnection(); }
     private Window Panel(string title, StackPanel content, int width = 480)
     {
-        var dialog = new Window { Title = title, Owner = this, Width = width, Height = 680, MinWidth = 360, MinHeight = 400, Background = Background, FontSize = 15,
+        var work = SystemParameters.WorkArea;
+        var dialog = new Window { Title = title, Owner = this, Width = Math.Min(width, work.Width), Height = Math.Min(680, work.Height), MinWidth = Math.Min(360, work.Width), MinHeight = Math.Min(400, work.Height), Background = Background, FontSize = 15,
             WindowStartupLocation = WindowStartupLocation.CenterOwner, Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = content } };
         content.Margin = new Thickness(24); return dialog;
     }

@@ -116,13 +116,14 @@ public final class NetworkActivity extends Activity {
             }catch(Exception e){error.setText(R.string.invitation_clipboard_error);}
         });
         var scroll=new ScrollView(this);scroll.addView(form);
+        java.util.function.Consumer<String> showError=message->{error.setText(message);error.post(()->scroll.smoothScrollTo(0,error.getTop()));};
         var dialog=new AlertDialog.Builder(this).setTitle("서버에 연결").setView(scroll).setNegativeButton("닫기",null).setPositiveButton("확인하고 연결",null).create();
         activeConnectionDialog=dialog;final int[] requested={-1};final boolean[] pending={false};
         dialog.setOnShowListener(ignored->{var connect=dialog.getButton(AlertDialog.BUTTON_POSITIVE);connect.setOnClickListener(v->{
-            if(!confirmed.isChecked()){error.setText(R.string.invitation_needs_confirmation);return;}
-            if(ticket[0]!=null&&ticket[0].expires<=System.currentTimeMillis()/1000){error.setText(R.string.invitation_expired);return;}
+            if(!confirmed.isChecked()){showError.accept(getString(R.string.invitation_needs_confirmation));return;}
+            if(ticket[0]!=null&&ticket[0].expires<=System.currentTimeMillis()/1000){showError.accept(getString(R.string.invitation_expired));return;}
             connect.setEnabled(false);connect.setText("연결 중…");
-            pending[0]=true;requested[0]=connect(address.getText().toString(),pin.getText().toString(),code.getText().toString(),name.getText().toString(),()->{pending[0]=false;code.setText("");dialog.dismiss();},message->{pending[0]=false;error.setText(message);connect.setEnabled(true);connect.setText("확인하고 연결");});
+            pending[0]=true;requested[0]=connect(address.getText().toString(),pin.getText().toString(),code.getText().toString(),name.getText().toString(),()->{pending[0]=false;code.setText("");dialog.dismiss();},message->{pending[0]=false;showError.accept(message);connect.setEnabled(true);connect.setText("확인하고 연결");});
         });});dialog.setOnDismissListener(ignored->{code.setText("");if(activeConnectionDialog==dialog)activeConnectionDialog=null;if(pending[0]&&requested[0]==generation)disconnect();});dialog.show();
     }
     private void reconnect(){if(saved==null){showConnection(null);return;}connect(saved.optString("address"),saved.optString("pin"),"",Build.MODEL,()->{},this::log);}

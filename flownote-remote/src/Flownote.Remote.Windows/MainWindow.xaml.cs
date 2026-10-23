@@ -15,6 +15,9 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        var work = SystemParameters.WorkArea;
+        MinWidth = Math.Min(MinWidth, work.Width); MinHeight = Math.Min(MinHeight, work.Height);
+        Width = Math.Min(Width, work.Width); Height = Math.Min(Height, work.Height);
         Facing.ItemsSource = new[] { "front", "back" };
         Preset.ItemsSource = RemoteSettings.Presets;
         TestGesture.ItemsSource = RemoteSettings.Gestures;

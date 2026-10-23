@@ -12,6 +12,8 @@
 - 카메라 시작 오류 뒤 토글만 꺼지고 스트림이 남을 수 있어 WebView2 JavaScript 오류 경로에서도 tracks를 중지한다. QR 취소·서버 해제·Activity onStop에서도 캡처를 중지한다.
 - Android 연결 확인 창을 닫은 뒤 늦게 등록 응답이 와도 자동 연결하지 않도록 진행 중 요청의 generation을 취소한다. QR 스캔으로 이동할 때 기존 확인 창과 임시 코드를 정리한다.
 - QR 코드 2분 유효 시간이 기기 테스트의 전체 컴파일 시간을 포함하지 않도록 debug/instrumentation APK를 먼저 컴파일하고 fixture를 시작한다. 이후 실제 초대 asset만 다시 패키징한다. 제품 유효 시간은 늘리지 않는다.
+- 첫 EXE 검사(39977681494)의 UI 동작은 통과했으나 screenshot에서 runner의 1024×768 작업 영역보다 초기 창이 커 가장자리와 아래쪽이 잘렸다. 초기 대시보드/설정/세부 창을 실제 작업 영역 안으로 제한한다. screenshot은 상단 카드와 아래 클라이언트 목록을 별도로 스크롤해 기록하고 QR 창을 캡처하지 않는다.
+- 같은 실행의 Android `connectedDebugAndroidTest`는 QR에 담긴 fixture 서버 주소가 호스트 loopback이라 에뮬레이터 자신의 127.0.0.1로 접속해 ConnectException으로 실패했다. 시험 초대에만 에뮬레이터가 호스트로 연결하는 기존 10.0.2.2 별칭을 사용한다. 실제 앱의 QR은 선택한 PC 사설 IPv4를 그대로 사용하며 HTTP/로컬 fallback을 추가하지 않는다. 후속 장치 검사에서 QR→TLS→UI 연결을 다시 검증한다.
 
 ## 검증과 다음 조치
 

@@ -54,7 +54,7 @@ public class NetworkDeviceTest {
         String invitation=config.getString("invitation");var parsed=PairingLink.parse(invitation);
         var matrix=new com.google.zxing.qrcode.QRCodeWriter().encode(invitation,com.google.zxing.BarcodeFormat.QR_CODE,480,480);
         int[] qrPixels=new int[480*480];for(int y=0;y<480;y++)for(int x=0;x<480;x++)qrPixels[y*480+x]=matrix.get(x,y)?0xff000000:0xffffffff;
-        var qr=Bitmap.createBitmap(qrPixels,480,480,Bitmap.Config.ARGB_8888);assertEquals("Actual Android QR bitmap reader failed",invitation,QrReader.decode(qr));qr.recycle();
+        var qr=Bitmap.createBitmap(qrPixels,480,480,Bitmap.Config.ARGB_8888);assertTrue("Actual Android QR bitmap reader failed",invitation.equals(QrReader.decode(qr)));qr.recycle();
         JSONObject connection=RemoteLink.pair(parsed.address,parsed.pin,parsed.code,"Android real I/O acceptance");
         try{RemoteLink.pair(address,pin,code,"Replay");fail("Pairing code replay accepted");}catch(java.io.IOException expected){}
         CountDownLatch connected=new CountDownLatch(1),gesture=new CountDownLatch(1),alert=new CountDownLatch(1),lost=new CountDownLatch(1),frames=new CountDownLatch(3);

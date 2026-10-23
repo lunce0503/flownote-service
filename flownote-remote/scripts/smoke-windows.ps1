@@ -52,6 +52,11 @@ function Save-Screenshot($root, $name) {
         $bitmap.Save((Join-Path $PWD "artifacts/ux/$name.png"),[System.Drawing.Imaging.ImageFormat]::Png)
     } finally { $graphics.Dispose(); $bitmap.Dispose() }
 }
+function Scroll-Dashboard($root, $vertical) {
+    $scroll=(Find-Control $root 'DashboardScroll').GetCurrentPattern([System.Windows.Automation.ScrollPattern]::Pattern)
+    $scroll.SetScrollPercent([System.Windows.Automation.ScrollPattern]::NoScroll,$vertical)
+    Start-Sleep -Milliseconds 400
+}
 $app=$null
 try {
     $app=Open-App
@@ -111,10 +116,17 @@ try {
     Find-Control $pairing 'RenewPairing' | Out-Null
     Close-Window $pairing
     # Capture only the dashboard: invitation QR/code dialogs must never be uploaded.
+    Scroll-Dashboard $app.Root 0
     Save-Screenshot $app.Root 'dashboard-windows'
+    Scroll-Dashboard $app.Root 100
+    Save-Screenshot $app.Root 'clients-windows'
     $transform=$app.Root.GetCurrentPattern([System.Windows.Automation.TransformPattern]::Pattern)
-    $transform.Resize(420,850); Start-Sleep -Seconds 1
+    $height=[Math]::Min(720,$app.Root.Current.BoundingRectangle.Height)
+    $transform.Resize(420,$height); Start-Sleep -Seconds 1
+    Scroll-Dashboard $app.Root 0
     Save-Screenshot $app.Root 'dashboard-windows-narrow'
+    Scroll-Dashboard $app.Root 100
+    Save-Screenshot $app.Root 'clients-windows-narrow'
     Write-Output 'PASS: exact EXE dashboard, overflow settings/licenses, restart restore, offline model/TLS server, accessible client pause/resume and invitation panel'
 } finally {
     if ($app -and !$app.Process.HasExited) {
