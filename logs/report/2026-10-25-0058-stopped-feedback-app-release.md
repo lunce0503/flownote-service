@@ -1,6 +1,6 @@
 # 중단 피드백 3건 공유 웹·앱 반영
 
-작성: 2026-10-25 00:58 Asia/Seoul. 상태: 최종 전체 staging gate 진행 중. production 영수증·완료 시각은 성공 확인 후 갱신한다.
+작성: 2026-10-25 00:58 Asia/Seoul. 완료: 01:08:08 Asia/Seoul. 상태: 최종 전체 staging 97/97, 동일 소스 production 배포·설치 앱 반영 검증·사후 확인 완료.
 
 ## 범위와 판단
 
@@ -40,7 +40,12 @@
 - 최종 실행 commit `4072d87a71c14f23cb8f1788e0ef97ba37d65857`. 앱 실행 소스의 마지막 수정은 형제 key 구분이며 그 뒤에는 테스트·문서만 보완했다.
 - 인계 source-snapshot 지문 `c889808d612bdeefb0b329cc32dba19bea02fa2101cfbe44b5a84fccb1e543d8`, 담당 보완 후 guard `0779d93f8ab3828e808027547444864f81c65b06d9a2652c2c5607228220b610`. frozen 원본 트리 guard도 배포 중 확인한다.
 - 실행 명령: `FLOWNOTE_RELEASE_SOURCE_ROOT=/tmp/flownote-feedback-release-20261024 node scripts/deploy-cloud.mjs release web` (guard 포함). 모든 gate는 실제 cloud staging과 합성 계정만 사용한다. production 데이터로 기능 테스트하지 않는다.
-- 최종 staging URL: https://flownote-react-staging-5lykghoht-flownote-service.vercel.app. 전체 97개 gate·production ID·동일 지문·사후 확인은 완료 후 기록한다.
+- 최종 staging: `dpl_Dfm8VD8xFRhSswwYnzKwqsW4uRfJ`, [immutable URL](https://flownote-react-staging-5lykghoht-flownote-service.vercel.app), READY. 전체 97/97 통과(10.2분), receipt 검증 시각 2026-10-25 01:06:28 Asia/Seoul.
+- production: `dpl_B6ro9y6THTGH8XVHkgdUnyxtnJ65`, [immutable URL](https://flownote-react-4ncw21y0n-flownote-service.vercel.app), READY. 배포·smoke 완료 01:07:33 Asia/Seoul. 실제 별칭은 [운영 웹](https://flownote-react.vercel.app)이다.
+- 두 receipt의 실행 지문이 `06ff936319a0f83e45d2c25bca99728338214948b62e6f52ed34515f33c7a28c`로 같다. 문서 기록 commit 816e418은 실행 지문을 바꾸지 않았고 공유 원본 guard도 유지됐다.
+- 01:08:08 Asia/Seoul 사후 확인: 두 alias의 실제 deployment ID/READY와 실행 entry 응답을 확인했다. 양 환경·양 채널·양 플랫폼의 8개 feed가 검증 소스와 byte-for-byte 일치하고 RSA 서명·버전·채널·no-store가 유지됐다. Android 실제 파일 크기/해시, Windows 공개 파일 HEAD 크기를 확인했다. Windows 전체 파일 서명/해시는 위 실제 packaged updater 실행에서 검증했다. gateway 200, 비인증 me 401, 설치 앱 설정의 환경별 웹 origin 일치도 통과했다.
 - backend 실행 산출물 변경이 없어 Railway backend/Expo Go/모바일 정적 웹 재배포는 생략한다. 로컬 앱 서버·Compose는 실행하지 않았으며 Docker는 cloud browser/Android 진단에만 사용했다.
 
 원본 failed 입력 3건은 그대로 보존했다. 성공 영수증 확인 후 자동화 관리 담당이 이력 연결·결과 통지를 수행하며 이 세션은 중복 메일을 보내지 않는다.
+
+마지막 완료 상태·영수증 기록은 logs/report/만 변경한다. 실행 산출물이 바뀌지 않아 추가 Docker 빌드/클라우드 배포는 생략하고 파일 내용·연결을 검증한다. 물리 iPad/Pencil의 호버 지원·손바닥 거부 확인은 남은 실기기 범위이며 자동화 검증으로 위장하지 않는다.
