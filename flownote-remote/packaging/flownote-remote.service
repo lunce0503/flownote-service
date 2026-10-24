@@ -1,0 +1,18 @@
+# Copy to ~/.config/systemd/user/flownote-remote.service and edit the paths/IP.
+# Keep the state directory separate from the installation when updating versions.
+[Unit]
+Description=Flownote Remote private HTTPS/WSS server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.local/opt/flownote-remote
+ExecStart=%h/.local/opt/flownote-remote/flownote-remote server --listen 100.64.0.1
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

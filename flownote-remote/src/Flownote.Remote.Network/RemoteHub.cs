@@ -39,6 +39,7 @@ public sealed class RemoteHub : IAsyncDisposable
     private readonly Dictionary<string, (long Window, int Count)> attempts = [];
     private readonly Dictionary<string, long> alerts = [];
     private readonly Func<byte[], Task<GestureSample>> infer;
+    private readonly HubCapabilities capabilities;
     private readonly CancellationTokenSource stop = new();
     private RemoteSettings settings;
     private WebApplication? app;
@@ -51,9 +52,11 @@ public sealed class RemoteHub : IAsyncDisposable
     public string PairingCode { get { lock (gate) return pairCode; } }
     public string Address { get; private set; } = "";
 
-    public RemoteHub(RemoteSettings settings, Func<byte[], Task<GestureSample>> infer, IEnumerable<DeviceGrant>? knownDevices = null)
+    public RemoteHub(RemoteSettings settings, Func<byte[], Task<GestureSample>> infer, IEnumerable<DeviceGrant>? knownDevices = null,
+        HubCapabilities? capabilities = null)
     {
         this.settings = RemoteSettings.Parse(settings.ToJson()); this.infer = infer;
+        this.capabilities = (capabilities ?? new()) with { ClientParticipation = true };
         grants = (knownDevices ?? []).Take(8).ToDictionary(g => g.Id);
         RenewPairing();
     }
@@ -98,7 +101,7 @@ public sealed class RemoteHub : IAsyncDisposable
             ? new DeviceState(g.Id, g.Name, true, p.CameraActive && Enabled(p), p.Volume, p.Muted, p.Battery, p.LastSeen,
                 Enabled(p), g.Allowed, p.OutputReady, p.SpeakAlerts, p.Platform)
             : new DeviceState(g.Id, g.Name, false, false, 0, false, null, 0, false, g.Allowed, false, false)).ToArray(),
-            gestureTarget, voiceTarget, settings.GesturesEnabled, new(ClientParticipation: true));
+            gestureTarget, voiceTarget, settings.GesturesEnabled, capabilities);
     }
     public PairResult RegisterLocal(string name, Guid? deviceId = null)
     {

@@ -1,6 +1,6 @@
 # 카메라 제스처 원격 앱
 
-소유 코드: [`flownote-remote/`](../../flownote-remote/README.md). 기존 웹 설치 앱과 원격 터미널과 별개이며 Windows PC 서버와 Android/Windows 입출력 클라이언트를 제공한다. 상세 사용자 흐름·메시지 계약·보안·현재 기능의 단일 소유 문서는 [네트워크 명세](../../flownote-remote/docs/NETWORK.md)다.
+소유 코드: [`flownote-remote/`](../../flownote-remote/README.md). 기존 웹 설치 앱과 원격 터미널과 별개이며 Windows PC/Linux CLI 서버와 Android/Windows 입출력 클라이언트를 제공한다. 상세 사용자 흐름·메시지 계약·보안·현재 기능의 단일 소유 문서는 [네트워크 명세](../../flownote-remote/docs/NETWORK.md)다.
 
 ## 역할과 현재 범위
 
@@ -25,6 +25,12 @@
 - Windows 검사: 실제 WebView2/MediaPipe 모델과 OS TTS WAV 합성. 패키징된 EXE 하나로 시작·라이선스·설정 복원·모델 및 TLS 서버 시작 검사. 출력 시험 어댑터 검사는 물리 스피커 검증과 구별한다.
 - Android: 단위/lint/build, 동일 release 키 서명 검증, Android 10 에뮬레이터에서 APK 실행 및 Camera2·실제 모델·AudioManager 음량·배터리/연결 알림 검사.
 
-독립 저장소 `lunce0503/flownote-remote-service`의 태그 기반 시험 릴리스는 항상 Windows 단일 EXE와 서명 APK, 체크섬만 배포한다. WebView2 Runtime은 Windows에 필요하며 .NET·모델·라이선스는 EXE에 포함한다. 절차는 [릴리스 문서](../../flownote-remote/docs/RELEASING.md)를 따른다. 물리 카메라·스피커·Bluetooth·원거리 VPN 지연은 별도 실기기 수용 항목이다.
+독립 저장소 `lunce0503/flownote-remote-service`의 태그 기반 시험 릴리스는 항상 Windows 단일 EXE와 서명 APK, 체크섬을 배포하며 0.4.0부터 Linux x64 CLI tar.gz도 포함한다. WebView2 Runtime은 Windows에 필요하며 .NET·모델·라이선스는 EXE에 포함한다. 절차는 [릴리스 문서](../../flownote-remote/docs/RELEASING.md)를 따른다. 물리 카메라·스피커·Bluetooth·원거리 VPN 지연은 별도 실기기 수용 항목이다.
 
 이 PC 앱에는 Vercel/Railway 실행 산출물이나 배포 target이 없다. 웹 다운로드 페이지/클라우드 API를 바꿀 때만 `node scripts/deploy-cloud.mjs release <target>`으로 staging 검증 후 production에 반영한다.
+
+## 2026-10-24 Linux CLI와 Codex 음성
+
+사용자 요구로 Linux x64 서버를 추가했다. 동일 사설/VPN HTTPS/WSS 인증·카메라/제스처·미디어 제어 규약을 재사용하며 서버 관리만 소유자 전용 Unix 소켓으로 제공한다. 서버 재시작 시 제스처는 OFF다. Linux 상태 디렉터리는 0700, 인증서/등록 해시/설정/소켓은 0600으로 보호하며 Windows/Android 저장 방식과 구분한다.
+
+CLI의 Codex 네이티브 TUI 실행과 실험적 실시간 PCM 음성 브리지는 별도 기능이다. 현재 Codex 0.164.0 계정 실측에서 WebSocket 음성 시작은 API-key 인증 필요로 거부됐다. 오프라인 PCM 검증과 실제 음성 통화 성공을 구분한다. 앱 마이크 전송·대화형 AI 역량은 아직 false다. 설치·systemd·SSH·정확한 인증 제한과 검증은 [CLI 소유 문서](../../flownote-remote/docs/CLI.md)를 따른다. Linux CLI tar.gz를 릴리스에 추가하며 Windows는 계속 단일 EXE, Android는 기존 키의 APK다. Vercel/Railway 실행 target은 없다.

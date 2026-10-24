@@ -30,7 +30,7 @@
 - 사용자가 설계, 리뷰, 분석만 요청하면 파일을 수정하지 않는다.
 - 의미 있는 수정을 하기 전에는 주변 코드와 의존성 스크립트를 확인한다.
 - 수정 후에는 가능하면 해당 하위 프로젝트에 맞는 가장 작은 유효성 검증 명령을 실행한다.
-- 웹/API의 LAN/loopback 통신과 로컬 Compose 실행은 폐기했다. 웹/API용 PC 서버나 로컬 URL fallback을 추가하지 않는다. Railway 서비스 간 private networking은 유지한다. 단, `flownote-remote/`는 2026-10-23 사용자 요구로 Windows PC 서버와 사설/VPN HTTPS/WSS 직접 연결을 사용한다. 이 네이티브 앱에 한한 역할·검증·배포는 `docs/product-specs/gesture-remote-app.md`를 따른다.
+- 웹/API의 LAN/loopback 통신과 로컬 Compose 실행은 폐기했다. 웹/API용 PC 서버나 로컬 URL fallback을 추가하지 않는다. Railway 서비스 간 private networking은 유지한다. 단, `flownote-remote/`는 2026-10-23 사용자 요구로 Windows PC 서버와 사설/VPN HTTPS/WSS 직접 연결을 사용한다. 2026-10-24 요구로 Linux CLI 서버와 Codex 음성 CLI도 이 예외에 포함한다. 이 네이티브 앱에 한한 역할·검증·배포는 `docs/product-specs/gesture-remote-app.md`를 따른다.
 - 변경은 스테이징 배포와 클라우드 기능 검증 후 같은 소스를 production에 배포한다. `node scripts/deploy-cloud.mjs release <target>`을 사용한다. 직접 production으로 건너뛰지 않는다.
 - 단, `logs/report/` 아래 보고서만 작성하거나 수정하는 작업은 Docker 빌드와 클라우드 배포를 진행하지 않는다. 이 경우 파일 존재, 주요 내용 확인 같은 문서 검증만 수행하고 배포 생략 사유를 최종 응답에 남긴다.
 - `logs/report/` 외 문서만 수정한 경우에는 Vercel production 배포와 영향받는 Railway 서비스 배포 여부를 확인한다. 클라우드에 반영할 실행 산출물이 없는 문서 전용 변경이면 Vercel production 배포를 기본으로 수행하고, 백엔드 배포 생략 사유를 기록한다.

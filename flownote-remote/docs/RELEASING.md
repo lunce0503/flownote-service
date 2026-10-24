@@ -25,16 +25,21 @@
 
 1. Windows: Core/Network·공통 QR 벡터·실제 QR 픽셀/WebView2 모델/TTS 검사 → win-x64 self-contained single-file publish → EXE 하나만 있는 폴더에서 대시보드·`⋯` 설정/라이선스·재시작 복원·TLS 서버·클라이언트 토글·QR 패널 검사.
 2. Android: 단위 테스트/lintRelease → 동일 release 키 서명 → `apksigner verify` → 그 APK를 Android 10 에뮬레이터에 설치·실행하고 카메라 권한 자동 미요청 확인 → androidTest에서 실제 Camera2·고정 지문 TLS·동일 실제 모델·AudioManager 음량·배터리/연결 알림 검사. Linux fixture는 CI에서만 실행한다. 공개 시험 이미지의 판정에 맞춰 테스트 서버만 70%를 사용하며 제품 기본 80%는 유지한다.
-3. 통과한 정확한 두 artifact를 다운로드해 `SHA256SUMS.txt`를 생성·재확인한 뒤 APK/Windows EXE/checksum 3개만 게시한다. release 명령은 EXE 이름을 명시하므로 ZIP만 생성되면 게시 단계가 실패한다.
+3. Linux: 실제 CLI/TLS/MediaPipe와 음성 규약 검사 후 tar.gz를 만들고 새 디렉터리에 추출한 실행 파일을 다시 검사한다.
+4. 통과한 정확한 세 플랫폼 artifact를 다운로드해 `SHA256SUMS.txt`를 생성·재확인한 뒤 APK/Windows EXE/Linux tar.gz/checksum 4개만 게시한다. release 명령은 EXE 이름을 명시하므로 ZIP만 생성되면 게시 단계가 실패한다.
 
-0.3.0부터 Windows 넓은/좁은 화면과 Android 320dp·font scale 1.3의 대시보드 screenshot을 `windows-ux`, `android-ux` Actions artifact로 남긴다. QR·등록 코드·토큰 화면은 캡처하지 않는다. 이 검증 이미지는 공개 Release에 포함하지 않고 `windows`, `android` 앱 artifact만 이름으로 다운로드해 게시한다. Android에서는 실제 QR Bitmap 판독, 저장된 서버 재접속, 메뉴와 자기 기기 토글, 확인 없는 등록 차단도 검사한다.
+0.3.0부터 Windows 넓은/좁은 화면과 Android 320dp·font scale 1.3의 대시보드 screenshot을 `windows-ux`, `android-ux` Actions artifact로 남긴다. QR·등록 코드·토큰 화면은 캡처하지 않는다. 이 검증 이미지는 공개 Release에 포함하지 않고 `windows`, `android`, `linux` 앱 artifact만 이름으로 다운로드해 게시한다. Android에서는 실제 QR Bitmap 판독, 저장된 서버 재접속, 메뉴와 자기 기기 토글, 확인 없는 등록 차단도 검사한다.
 
 개별 실행은 `gh workflow run release.yml --repo lunce0503/flownote-remote-service --ref main`으로 검증할 수 있다. main 참조의 수동 실행은 GitHub Release를 게시하지 않는다. 최초 태그 push에서 실행이 등록되지 않았다면 같은 소스 태그에 `--ref v<version>`으로 수동 실행해 검증 후 게시할 수 있다. 이미 게시한 태그/기존 파일을 덮어쓰지 않는다. 실패는 job 로그에서 원인을 확인하고 수정 버전으로 배포한다.
 
 ## 확인·복구
 
-`gh release view v<version> --repo lunce0503/flownote-remote-service --json url,isDraft,isPrerelease,assets`로 공개 상태와 파일 3개를 확인하고, 다운로드한 파일의 SHA-256을 비교한다. 소스 태그와 workflow head SHA도 일치해야 한다. 실제 카메라·오디오·Bluetooth 검증은 아직 없는 기능을 검증한 것으로 간주하지 않는다.
+`gh release view v<version> --repo lunce0503/flownote-remote-service --json url,isDraft,isPrerelease,assets`로 공개 상태와 파일 4개(0.4.0부터)를 확인하고, 다운로드한 파일의 SHA-256을 비교한다. 소스 태그와 workflow head SHA도 일치해야 한다. 실제 카메라·오디오·Bluetooth 검증은 아직 없는 기능을 검증한 것으로 간주하지 않는다.
 
 문제가 있으면 해당 시험 릴리스를 draft로 돌려 신규 다운로드를 중지하고 원인을 기록한다. 이미 설치된 앱의 데이터·서명키를 삭제하거나 다른 키로 동일 패키지를 교체하지 않는다. 수정 버전은 같은 release 키와 더 높은 versionCode를 사용한다.
 
 이 작업에는 Vercel/Railway 런타임 배포가 없다. Flownote 웹 다운로드 페이지/서버를 변경할 때만 서비스 저장소의 `node scripts/deploy-cloud.mjs release <target>`으로 staging 검증 후 production을 반영한다.
+
+## Linux CLI (0.4.0+)
+
+`linux` 작업은 Core/Network/CLI·오프라인 음성 규약·실제 Chromium 모델 경로를 검사하고 `scripts/package-linux.sh`로 .NET 포함 tar.gz를 만든다. 압축을 새 디렉터리에 풀어 정확한 실행 파일을 다시 검사한다. 태그 릴리스는 Windows EXE·서명 APK·Linux x64 CLI tar.gz·SHA256SUMS.txt의 4개 파일로 공개한다. Codex 음성 fixture 통과를 실제 계정 음성 성공으로 대신하지 않는다. 현재 API 인증 제한과 설치 조건은 [CLI 문서](CLI.md)에 명시한다.

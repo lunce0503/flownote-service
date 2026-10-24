@@ -65,3 +65,7 @@ https://github.com/gradle/gradle/blob/master/LICENSE
 
 No license grant for the original Flownote application code is implied by
 these third-party notices.
+
+## Linux CLI runtime
+
+The Linux archive includes the self-contained .NET/ASP.NET runtime and pinned Playwright 1.62.1 JavaScript packages (Apache 2.0, package license files included). Node.js and the matching Playwright Chromium browser are installed separately; their distribution licenses apply. The offline gesture model uses the MediaPipe notices above. Codex CLI and ALSA utilities are external prerequisites, not redistributed in the archive.

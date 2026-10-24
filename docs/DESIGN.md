@@ -13,7 +13,7 @@ Flownote는 Vite 웹과 Expo 모바일이 FastAPI 게이트웨이를 통해 Spri
 | `flownote-canvas/` | 캔버스, 노트, 폴더, 업로드 | Go, pgx, Redis, S3 |
 | `flownote-serve/` (`flownote-sub` 서비스) | 일기, 일정, 작업, 주식, 소셜, 채팅, 피드백 | Go, pgx, Redis, S3 |
 | `flownote-ai/` | 에이전트, 시장 데이터 | FastAPI, uv, Google GenAI |
-| `flownote-remote/` | PC 서버와 Android/Windows 카메라·미디어 입출력 클라이언트 | .NET 10 WPF, HTTPS/WSS, MediaPipe, Camera2 |
+| `flownote-remote/` | Windows/Linux 서버와 Android/Windows 카메라·미디어 입출력 클라이언트 | .NET 10 WPF/CLI, HTTPS/WSS, MediaPipe, Camera2, Codex stdio |
 | `scripts/deploy-cloud.mjs` | staging-first 클라우드 배포 | Railway, Vercel, Playwright |
 
 ## 서비스 경계
@@ -42,7 +42,7 @@ Flownote는 Vite 웹과 Expo 모바일이 FastAPI 게이트웨이를 통해 Spri
 ## 실행과 배포
 
 - 웹/API의 LAN/loopback 앱 통신과 Compose는 폐기됐다. staging 배포와 검증을 먼저 진행한다.
-- `flownote-remote`는 2026-10-23 사용자 요구에 따른 예외로 PC 서버와 사설/VPN TLS 직접 연결을 사용한다. 클라우드 서비스의 로컬 fallback을 추가하지 않는다. 이 네이티브 앱은 GitHub의 APK/단일 EXE 릴리스로 배포한다. [제품 사양](product-specs/gesture-remote-app.md)을 따른다.
+- `flownote-remote`는 2026-10-23 사용자 요구에 따른 예외로 PC 서버와 사설/VPN TLS 직접 연결을 사용한다. 클라우드 서비스의 로컬 fallback을 추가하지 않는다. 2026-10-24부터 Linux CLI 서버와 별도 Codex 음성 CLI도 제공한다. 이 네이티브 앱은 GitHub의 APK/단일 EXE/Linux CLI tar.gz 릴리스로 배포한다. [제품 사양](product-specs/gesture-remote-app.md)을 따른다.
 - 웹 production: Vercel `flownote-react`
 - 백엔드와 모바일 웹 테스트: Railway production의 `flownote-api`, `flownote-main`, `flownote-canvas`, `flownote-sub`, `flownote-ai`, `flownote-mobile-production`
 - 표준 검증: `scripts/verify-services.sh`

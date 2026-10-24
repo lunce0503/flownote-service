@@ -7,6 +7,40 @@ on:
 permissions:
   contents: read
 jobs:
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts
+      - run: node scripts/prepare-vision.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: dotnet run --project tests/Flownote.Remote.Checks -c Release
+      - run: dotnet run --project tests/Flownote.Remote.Network.Checks -c Release
+      - run: dotnet build src/Flownote.Remote.Cli -c Release
+      - run: dotnet run --project tests/Flownote.Remote.Cli.Checks -c Release -- --vision
+      - run: python3 tests/cli-voice-checks.py
+      - run: bash scripts/package-linux.sh
+      - name: Check exact extracted Linux package
+        shell: bash
+        run: |
+          version=$(node scripts/check-release.mjs)
+          mkdir -p "$RUNNER_TEMP/flownote-linux"
+          tar -xzf "artifacts/Flownote-Remote-$version-linux-x64.tar.gz" -C "$RUNNER_TEMP/flownote-linux"
+          export FLOWNOTE_REMOTE_CLI="$RUNNER_TEMP/flownote-linux/Flownote-Remote-$version-linux-x64/flownote-remote"
+          dotnet run --project tests/Flownote.Remote.Cli.Checks -c Release -- --vision
+          python3 tests/cli-voice-checks.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: artifacts/Flownote-Remote-*-linux-x64.tar.gz
+          if-no-files-found: error
   windows:
     runs-on: windows-latest
     timeout-minutes: 20
@@ -131,7 +165,7 @@ jobs:
           if-no-files-found: error
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [windows, android]
+    needs: [windows, android, linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -145,6 +179,10 @@ jobs:
         with:
           name: android
           path: artifacts/release
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux
+          path: artifacts/release
       - name: Publish verified initial prerelease
         shell: bash
         env:
@@ -152,8 +190,8 @@ jobs:
         run: |
           version=$(node scripts/check-release.mjs)
           cd artifacts/release
-          sha256sum "Flownote-Remote-$version-android.apk" "Flownote-Remote-$version-windows-x64.exe" > SHA256SUMS.txt
+          sha256sum "Flownote-Remote-$version-android.apk" "Flownote-Remote-$version-windows-x64.exe" "Flownote-Remote-$version-linux-x64.tar.gz" > SHA256SUMS.txt
           sha256sum -c SHA256SUMS.txt
-          gh release create "$GITHUB_REF_NAME" "Flownote-Remote-$version-android.apk" "Flownote-Remote-$version-windows-x64.exe" SHA256SUMS.txt --verify-tag --draft --prerelease --title "Flownote Remote $version · EXE 배포 시험판" --notes-file "../../release-notes/v$version.md"
-          test "$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets | length')" = 3
+          gh release create "$GITHUB_REF_NAME" "Flownote-Remote-$version-android.apk" "Flownote-Remote-$version-windows-x64.exe" "Flownote-Remote-$version-linux-x64.tar.gz" SHA256SUMS.txt --verify-tag --draft --prerelease --title "Flownote Remote $version · Linux CLI / Windows EXE / Android" --notes-file "../../release-notes/v$version.md"
+          test "$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets | length')" = 4
           gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease --latest=false
