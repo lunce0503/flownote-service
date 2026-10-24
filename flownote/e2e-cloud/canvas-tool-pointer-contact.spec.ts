@@ -29,6 +29,13 @@ const viewport = (page: Page) => page.getByTestId('canvas-input-surface').evalua
 
 const pen = async (page: Page, cdp: CDPSession,
   type: 'mousePressed' | 'mouseMoved' | 'mouseReleased', point: Point) => {
+  if (type === 'mousePressed') {
+    // Tool selection used Playwright's mouse. Settle that distinct device on
+    // the surface before the FIRST pen event, so its queued leave cannot race
+    // a pen contact. No pen hover, capture stub or drawing state reset is used.
+    await page.mouse.move(point.x, point.y);
+    await paint(page);
+  }
   await cdp.send('Input.dispatchMouseEvent', {
     type, x: point.x, y: point.y, pointerType: 'pen', button: 'left',
     buttons: type === 'mouseReleased' ? 0 : 1,
@@ -52,7 +59,10 @@ const selectTool = async (page: Page, label: string) => {
 
 const expectMarker = async (page: Page, tool: string, label: string, point: Point) => {
   const marker = page.getByTestId('canvas-tool-pointer');
-  await expect(marker).toBeVisible();
+  await expect(marker).toBeVisible().catch(async error => {
+    console.log('Pointer event sequence:', await page.evaluate(() => (window as unknown as { __pointerProbe?: unknown[] }).__pointerProbe));
+    throw error;
+  });
   await expect(marker).toHaveAttribute('data-tool', tool);
   await expect(marker).toContainText(label);
   await expect(marker.locator('svg')).toBeVisible();
@@ -112,6 +122,19 @@ for (const width of [390, 820]) {
       await page.goto(`${web}/canvas/${canvasId}`);
       await expect(page.getByTestId('canvas-input-surface')).toHaveAttribute('data-ready', 'true');
       await expect(page.getByTestId('canvas-render-surface')).toHaveAttribute('data-visible-line-count', '1');
+      await page.evaluate(() => {
+        const events: unknown[] = [];
+        (window as unknown as { __pointerProbe: unknown[] }).__pointerProbe = events;
+        const surface = document.querySelector('[data-testid="canvas-input-surface"]')!;
+        for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointerleave', 'pointercancel', 'lostpointercapture']) {
+          surface.addEventListener(type, event => {
+            const e = event as PointerEvent;
+            events.push({ type, id: e.pointerId, kind: e.pointerType, x: e.clientX, y: e.clientY });
+            if (events.length > 100) events.shift();
+          });
+        }
+        window.addEventListener('blur', () => events.push({ type: 'window-blur' }));
+      });
       await selectTool(page, '펜');
       await expect(page.getByTestId('canvas-tool-pointer')).toBeHidden();
     });
