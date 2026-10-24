@@ -430,7 +430,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   return (
     <div
       data-canvas-touch-allow="true"
-      className={`pointer-events-none absolute inset-x-2 top-2 ${isFileMenuOpen ? 'z-[80]' : 'z-50'} flex flex-col items-center gap-2 text-stone-950 touch-pan-x touch-pan-y`}
+      className="pointer-events-none absolute inset-x-2 top-2 z-50 flex flex-col items-center gap-2 text-stone-950 touch-pan-x touch-pan-y"
     >
       <div className="pointer-events-auto relative flex w-full items-center gap-2 p-1 lg:hidden">
         <button

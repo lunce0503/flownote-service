@@ -821,7 +821,7 @@ const Canvas = () => {
                 />
 
                 {saveState.status !== "loading" && (
-                    <CanvasToolPointer key={selectedCanvasId} canvasRef={canvasRef} tool={tool} pencilOnlyMode={pencilOnlyMode} />
+                    <CanvasToolPointer key={`tool-pointer:${selectedCanvasId}`} canvasRef={canvasRef} tool={tool} pencilOnlyMode={pencilOnlyMode} />
                 )}
 
                 {editingTextBox && (

@@ -55,6 +55,12 @@ for (const width of [390, 820, 1024]) {
         const box = await surface.boundingBox();
         expect(box).not.toBeNull();
         const point = { x: box!.x + (rightEdge ? box!.width - 4 : 160), y: box!.y + 240 };
+        // Settle the real mouse left by the toolbar click before introducing a
+        // synthetic pen stream; a queued mouse leave must not race that sample.
+        await page.mouse.move(point.x, point.y);
+        await page.evaluate(() => new Promise<void>(resolve => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        }));
         await surface.dispatchEvent('pointermove', {
           pointerId: 51, pointerType: 'pen', clientX: point.x, clientY: point.y, buttons: 0,
         });

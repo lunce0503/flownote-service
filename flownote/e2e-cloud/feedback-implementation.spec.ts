@@ -95,9 +95,11 @@ test('canvas suggests tasks and schedules, preserves the planner, and uses round
   expect(diary.grid.cells['0']).toBe('existing');
   expect(diary.journal).toEqual([{ type: 'paragraph', content: '기존 일기' }]);
   await panel.getByRole('button', { name: '플래너 제안 닫기' }).click();
+  await expect(panel).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: '파일 동작', exact: true }).click();
   await page.getByRole('menuitem', { name: '플래너 제안' }).click();
+  await expect(panel).toHaveCount(1);
   await expect(panel).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
 });
