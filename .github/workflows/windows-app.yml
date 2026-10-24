@@ -16,6 +16,10 @@ on:
         description: 'Verify exact published binaries without rebuilding or writing cloud test data'
         type: boolean
         default: false
+      verify_shared_web:
+        description: 'Exercise the current staging web bundle in the published apps with synthetic staging data'
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -128,6 +132,9 @@ jobs:
           if (Test-Path (Join-Path $env:RUNNER_TEMP 'FlownotePortable/resources/installed-by-nsis')) { throw 'Portable package must not use NSIS update mode' }
       - name: Verify actual packaged Electron auto-download and cache
         run: node scripts/update-smoke.cjs "$env:RUNNER_TEMP/FlownoteInstalled/Flownote.exe" "$env:RUNNER_TEMP/FlownotePortable/Flownote.exe"
+      - name: Verify shared web release in existing published apps
+        if: inputs.verify_shared_web == true
+        run: node scripts/shared-web-smoke.mjs "$env:RUNNER_TEMP/FlownoteInstalled/Flownote.exe" "$env:RUNNER_TEMP/FlownotePortable/Flownote.exe"
   release:
     if: startsWith(github.ref, 'refs/tags/windows-v')
     needs: windows

@@ -37,6 +37,8 @@ Canvas는 자유 필기, 이미지, 텍스트 박스를 무한 좌표계에서 �
 | `features/canvas/model/canvasPdfImport.ts` | PDF 페이지를 편집 가능한 이미지 파일로 변환 |
 | `widgets/CanvasWidget/InfiniteCanvas/ui/CanvasPdfReader.tsx` | 현재 기기 전용 PDF 페이지 뷰어와 키보드/터치 격리 |
 | `widgets/CanvasWidget/InfiniteCanvas/model/canvasPanMomentum.ts` | viewport px/ms 기반 유한 시간 감속과 취소 |
+| `widgets/CanvasWidget/InfiniteCanvas/ui/CanvasToolPointer.tsx` | 실제 편집 입력과 분리한 장식 포인터·도구명 |
+| `widgets/CanvasWidget/InfiniteCanvas/model/canvasToolPointer.ts` | pen/touch 위치와 복수 접촉 숨김의 표시 상태 |
 | `shared/lib/librarySorting.ts` | Canvas와 Blog가 공유하는 최근/카테고리 정렬 |
 
 ## 포인터 입력과 렌더링

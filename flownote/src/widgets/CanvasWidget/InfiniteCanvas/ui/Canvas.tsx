@@ -41,6 +41,7 @@ import { useLassoActions } from "../model/useLassoActions";
 import { Toolbar } from "./Toolbar";
 import { CanvasPlannerSuggestions } from "./CanvasPlannerSuggestions";
 import { CanvasPdfReader } from "./CanvasPdfReader";
+import { CanvasToolPointer } from "./CanvasToolPointer";
 import "../index.css";
 
 const isEditableKeyboardTarget = (target: EventTarget | null) => {
@@ -818,6 +819,10 @@ const Canvas = () => {
                     onPointerLeave={handlePointerUp}
                     onContextMenu={handleContextMenu}
                 />
+
+                {saveState.status !== "loading" && (
+                    <CanvasToolPointer key={selectedCanvasId} canvasRef={canvasRef} tool={tool} pencilOnlyMode={pencilOnlyMode} />
+                )}
 
                 {editingTextBox && (
                     <textarea

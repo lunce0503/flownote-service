@@ -2,7 +2,7 @@ import axios from 'axios';
 import { API_BASE_URL, authHeaders } from '../api';
 import { withDeviceWorkspace } from './deviceStorage';
 import { deviceOwner } from './deviceMode';
-import { pendingDeviceDraftMessage, readDeviceDraftBackup } from './devicePendingDrafts';
+import { pendingCloudDraftMessage, pendingDeviceDraftMessage, readCloudDraftBackup, readDeviceDraftBackup } from './devicePendingDrafts';
 import { buildDeviceSyncPlan, prepareOfflineWorkspace } from './deviceSyncModel';
 import { DEVICE_SYNC_HEADER, runWithDeviceSyncNetwork } from './deviceSyncNetwork';
 import {
@@ -146,6 +146,10 @@ export async function prepareDeviceOffline(progress: Progress = () => {}) {
   const owner = deviceOwner();
   const cloud = await fetchCloudWorkspace(progress);
   await ensureStorageCapacity(cloud);
+  // A snapshot from the network may predate an editor's last pending save.
+  // Check existing cloud drafts immediately before committing the device copy.
+  const pending = pendingCloudDraftMessage(cloud, await readCloudDraftBackup());
+  if (pending) throw new Error(pending);
   progress('기기 저장소에 확정 중');
   await withDeviceWorkspace(true, state => {
     if (deviceOwner() !== owner) throw new Error('계정이 변경되어 스냅샷 저장을 중단했습니다.');

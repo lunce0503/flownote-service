@@ -516,11 +516,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </button>
           <span
             data-testid="canvas-current-tool"
-            className={`${iconButtonClass} ${selectedIconButtonClass} relative`}
+            className={`${iconButtonClass} ${selectedIconButtonClass} relative gap-2`}
             title={`현재 도구: ${activeTool.label}`}
             aria-label={`현재 도구: ${activeTool.label}`}
+            role="status"
+            aria-live="polite"
           >
             {activeTool.icon}
+            <span className="whitespace-nowrap text-xs font-bold">{activeTool.label}</span>
             {activeTool.tool === 'pen' && (
               <span className="absolute bottom-1.5 h-2 w-2 rounded-full ring-1 ring-white/80" style={{ backgroundColor: penColor }} aria-hidden="true" />
             )}

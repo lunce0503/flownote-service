@@ -18,7 +18,7 @@ import {
 import { useTheme, type ThemeMode } from "@/features/theme";
 import { isInstalledApp } from '@/shared/lib/androidApp';
 import { useAuth } from "@/features/auth";
-import { postFeedback, listMyFeedback, FEEDBACK_CATEGORIES, type FeedbackItem } from "@/entities/feedback";
+import { postFeedback, listMyFeedback, FEEDBACK_CATEGORIES, FeedbackStatus, type FeedbackItem } from "@/entities/feedback";
 import { readPreferences, applyPreferences, defaultPreferences, PREF_STORAGE_KEY, type UserPreferences } from "@/shared/lib/userPreferences";
 import DeviceSyncSettings from './DeviceSyncSettings';
 import { isDeviceOnly } from '@/shared/lib/deviceMode';
@@ -356,7 +356,7 @@ const SettingsPage = () => {
                             <span className="text-[11px] text-stone-500">
                               {new Date(item.created_at).toLocaleString("ko-KR")}
                             </span>
-                            <span className="ml-auto text-[11px] font-bold text-emerald-700">{item.status}</span>
+                            <FeedbackStatus status={item.status} createdAt={item.created_at} />
                           </div>
                           <p className="mt-1 whitespace-pre-wrap break-words text-sm text-stone-800">{item.message}</p>
                         </li>

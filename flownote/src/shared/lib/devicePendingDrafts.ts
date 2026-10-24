@@ -1,5 +1,5 @@
 import { deviceOwner } from './deviceMode.ts';
-import type { DeviceWorkspace } from './deviceWorkspace.ts';
+import type { DeviceWorkspace, WorkspaceSnapshot } from './deviceWorkspace.ts';
 
 type Stored = { key: IDBValidKey; value: unknown };
 export type DeviceDraftBackup = { notes: Stored[]; canvases: Stored[]; operations: Stored[] };
@@ -32,16 +32,42 @@ const readExisting = (name: string, stores: string[]): Promise<Record<string, St
   };
 });
 
-export async function readDeviceDraftBackup(): Promise<DeviceDraftBackup> {
+async function readDraftBackup(device: boolean): Promise<DeviceDraftBackup> {
   const owner = deviceOwner();
   if (!owner) throw new Error('기기 초안 계정을 확인해주세요.');
   const [notes, canvas] = await Promise.all([
-    readExisting(`flownote-note-drafts-device:${owner}`, ['drafts']),
-    readExisting(`flownote-canvas-device:${owner}`, ['drafts', 'operations']),
+    readExisting(device ? `flownote-note-drafts-device:${owner}` : 'flownote-note-drafts', ['drafts']),
+    readExisting(device ? `flownote-canvas-device:${owner}` : 'flownote-canvas', ['drafts', 'operations']),
   ]);
   if (deviceOwner() !== owner) throw new Error('계정이 변경되어 초안 읽기를 중단했습니다.');
   return { notes: notes.drafts ?? [], canvases: canvas.drafts ?? [], operations: canvas.operations ?? [] };
 }
+
+export const readDeviceDraftBackup = (): Promise<DeviceDraftBackup> => readDraftBackup(true);
+export const readCloudDraftBackup = (): Promise<DeviceDraftBackup> => readDraftBackup(false);
+
+/** OFF must not hide the cloud editor's pending input behind a new storage namespace. */
+export const pendingCloudDraftMessage = (cloud: WorkspaceSnapshot, backup: DeviceDraftBackup): string => {
+  const owner = deviceOwner();
+  for (const entry of backup.notes) {
+    const draft = entry.value as { userId?: string; note?: { id?: string; title?: string; content?: unknown } } | undefined;
+    if (!draft?.note?.id || draft.userId !== owner) continue;
+    const saved = cloud.notes.find(note => note.id === draft.note!.id);
+    if (!saved || saved.title !== draft.note.title || JSON.stringify(saved.content) !== JSON.stringify(draft.note.content)) {
+      return `“${draft.note.title || '노트'}”에 서버에 저장되지 않은 초안이 있어 동기화를 끄지 않았습니다. 해당 노트에서 초안을 복구·저장하거나 내보낸 뒤 다시 시도해주세요. 초안은 그대로 보존했습니다.`;
+    }
+  }
+  // The cloud Canvas cache is shared across accounts. Only snapshot IDs prove
+  // ownership; another account's draft must not leak or block this transition.
+  const canvasIds = new Set(cloud.canvases.map(canvas => canvas.id));
+  if (backup.canvases.some(entry => typeof entry.key === 'string' && canvasIds.has(entry.key)
+    && (entry.value as { hasPendingChanges?: boolean } | undefined)?.hasPendingChanges)) {
+    return '캔버스에 서버에 저장되지 않은 초안이 있어 동기화를 끄지 않았습니다. 해당 캔버스를 저장·복구한 뒤 다시 시도해주세요. 초안은 보존했습니다.';
+  }
+  const pending = backup.operations.some(entry => entry.key === 'retryQueue' && Array.isArray(entry.value)
+    && entry.value.some(item => item && typeof item === 'object' && canvasIds.has(item.canvasId)));
+  return pending ? '캔버스에 서버 저장 대기 변경이 있어 동기화를 끄지 않았습니다. 해당 캔버스에서 재시도·복구한 뒤 다시 시도해주세요. 대기 변경은 보존했습니다.' : '';
+};
 
 export const pendingDeviceDraftMessage = (workspace: DeviceWorkspace, backup: DeviceDraftBackup): string => {
   for (const entry of backup.notes) {
