@@ -9,6 +9,9 @@ import pty
 import signal
 import threading
 import time
+import fcntl
+import termios
+import array
 
 root = Path(__file__).resolve().parent.parent
 executable = os.environ.get('FLOWNOTE_REMOTE_CLI')
@@ -46,7 +49,14 @@ with tempfile.TemporaryDirectory(prefix='flownote-voice-') as workspace:
     process.wait(timeout=10)
     assert process.returncode != 0 and b'Delayed voice failure' in process.stderr.read()
     process.stdin.close()
-    stalled = subprocess.Popen(voice, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stalled = subprocess.Popen(voice, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               start_new_session=True, pipesize=4096)
+    ready = threading.Event()
+    def drain_status():
+        for line in stalled.stderr:
+            if b'Voice connected' in line:
+                ready.set()
+    threading.Thread(target=drain_status, daemon=True).start()
     def fill():
         try:
             stalled.stdin.write(bytes(200000))
@@ -54,12 +64,27 @@ with tempfile.TemporaryDirectory(prefix='flownote-voice-') as workspace:
         except (BrokenPipeError, ValueError):
             pass
     threading.Thread(target=fill, daemon=True).start()
-    # Do not consume audio stdout; termination must interrupt blocked playback.
-    time.sleep(1.5)
-    stalled.send_signal(signal.SIGTERM)
-    stalled.wait(timeout=6)
-    assert stalled.returncode == 0, stalled.stderr.read()
-    stalled.stdin.close()
+    try:
+        assert ready.wait(12), 'Stalled-output fixture never connected'
+        # Wait for a genuinely full pipe instead of assuming startup timing.
+        capacity = fcntl.fcntl(stalled.stdout.fileno(), fcntl.F_GETPIPE_SZ)
+        deadline = time.monotonic() + 8
+        while True:
+            waiting = array.array('i', [0])
+            fcntl.ioctl(stalled.stdout.fileno(), termios.FIONREAD, waiting, True)
+            if waiting[0] >= capacity - 2400:
+                break
+            assert time.monotonic() < deadline, 'Audio output never filled the pipe'
+            time.sleep(.05)
+        time.sleep(.2)
+        stalled.send_signal(signal.SIGTERM)
+        stalled.wait(timeout=6)
+        assert stalled.returncode == 0, 'Blocked playback did not stop cleanly'
+    finally:
+        if stalled.poll() is None:
+            os.killpg(stalled.pid, signal.SIGKILL)
+            stalled.wait()
+        stalled.stdin.close()
     master, slave = pty.openpty()
     try:
         result = subprocess.run(command + ['voice', '--native', '--remote-tools', '--workspace', workspace,

@@ -12,7 +12,7 @@
 ## 검증
 
 - .NET CLI Release 빌드: 경고/오류 0.
-- 오프라인 실제 프로세스 검사: ChatGPT 계정 확인, 미로그인/API 키 계정 거부, API 키 환경 상속/대체 차단, SDP 중계, PCM·전사 분리/중복 방지, 승인/관리 동작 거부, 원격 오류/종료·유휴 입력 중 실패 취소·잘못된 입력 거부 통과.
+- 오프라인 실제 프로세스 검사: ChatGPT 계정 확인, 미로그인/API 키 계정 거부, API 키 환경 상속/대체 차단, SDP 중계, PCM·전사 분리/중복 방지, 승인/관리 동작 거부, 원격 오류/종료·유휴 입력 중 실패 취소·잘못된 입력 거부 통과. 실제 연결 후 4KiB 출력 파이프를 채워 SIGTERM이 정리를 완료하는 강제 backpressure 검사도 source/self-contained에서 통과했다.
 - `node tests/webrtc-audio-checks.mjs`: Chromium 양단의 AudioWorklet → WebRTC/Opus → 24kHz mono PCM. 18개 청크 중 8개에 실제 신호 확인. API 키/계정 없이 로컬 미디어 경로를 검증하며 실제 계정 검증과 구분한다.
 - 실제 계정: `tests/live-account-voice-check.py --run`. 현재 Codex 0.164.0 ChatGPT 로그인으로 backend/SDP/미디어 연결, 짧은 요청에 대한 음성 응답과 assistant 전사를 확인했다. API 키 환경에 의도적으로 유효하지 않은 테스트 표식을 넣어도 키를 전달/사용하지 않고 성공했다. exit=0, PCM 수신 230,400 bytes, non-silent 14 chunks, peak RMS 0.07124, 전사=true, 오류 없음. 음성 원본과 계정 식별자/토큰을 파일로 저장하지 않았다.
 - Chromium 원격 stream은 활성 volume=0 audio element로 디코더를 가동해야 WebAudio PCM이 무음이 되지 않는다. 해당 실패/수정은 [버그 기록](../bugs/2026-10-24-remote-cli-voice-auth.md)에 남겼다.

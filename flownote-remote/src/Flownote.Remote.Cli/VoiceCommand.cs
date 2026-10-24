@@ -239,7 +239,14 @@ public static class VoiceCommand
                 if (stdio) stream = Console.OpenStandardOutput();
                 else { playback = StartAlsa("aplay", device, true); stream = playback.StandardInput.BaseStream; }
             }
-            await stream.WriteAsync(bytes, token).AsTask().WaitAsync(token);
+            if (stdio)
+            {
+                // Console stdout may block synchronously inside WriteAsync on Unix.
+                // Keep that write off the media reader so SIGTERM/remote errors can cancel it.
+                Stream destination = stream;
+                await Task.Run(() => destination.Write(bytes), CancellationToken.None).WaitAsync(token);
+            }
+            else await stream.WriteAsync(bytes, token).AsTask().WaitAsync(token);
             await stream.FlushAsync(token).WaitAsync(token);
         }
         public async ValueTask DisposeAsync()

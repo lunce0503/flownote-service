@@ -24,3 +24,7 @@
 ### Chromium 무음 수신
 
 연결과 RTP 패킷 수신은 성공했지만 WebAudio만 연결했을 때 디코더의 수신 sample duration/energy가 0이고 PCM이 무음이었다. 원격 stream을 volume=0인 활성 HTML audio element에도 연결해 Chromium 디코더를 가동하고 실제 재생은 PCM 소비자에게 맡겼다. 실제 양단 Chromium Opus 검사에서 18개 PCM 청크 중 8개가 유의한 신호로 확인됐다. 이 회귀를 `tests/webrtc-audio-checks.mjs`와 추출 배포 패키지 CI에 추가했다.
+
+### PCM 소비자 정지와 종료
+
+출력 파이프를 읽지 않을 때 Unix Console stdout의 쓰기가 WriteAsync 호출 안에서 동기적으로 막혀 종료가 지연될 수 있었다. 표준출력 쓰기를 별도 작업으로 격리하고 취소 가능한 대기를 사용했다. 테스트의 고정 시작 지연도 실제 연결 완료·4KiB 파이프 채움 확인으로 교체해 타이밍에 따른 거짓 성공을 막고 실패 시 전체 fixture 프로세스 그룹을 정리한다. 수정 후 source와 self-contained 실행 파일 모두 이 강제 backpressure/SIGTERM 검사를 통과했다. 빌드 캐시를 비운 동일 해시의 파일에서도 타이밍 차이가 있었으므로 캐시 문제로 기록하지 않는다.
