@@ -58,6 +58,11 @@ for (const width of [390, 820, 1024]) {
         await surface.dispatchEvent('pointermove', {
           pointerId: 51, pointerType: 'pen', clientX: point.x, clientY: point.y, buttons: 0,
         });
+        // Visibility can already be true from the prior hover. Wait for the
+        // queued position update before checking the unchanged coordinate contract.
+        await page.evaluate(() => new Promise<void>(resolve => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        }));
         await expect(marker).toBeVisible();
         const tip = await page.getByTestId('canvas-tool-pointer-tip').boundingBox();
         expect(tip).not.toBeNull();

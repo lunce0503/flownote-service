@@ -79,7 +79,8 @@ for (const executablePath of process.argv.slice(2)) {
     await marker.waitFor(); assert.equal(await marker.getAttribute('data-tool'), 'pen');
     assert.equal(await marker.evaluate(node => getComputedStyle(node).pointerEvents), 'none');
     await page.reload();
-    await page.getByTestId('canvas-input-surface').waitFor();
+    await page.waitForFunction(() => document.querySelector('[data-testid="canvas-input-surface"]')?.getAttribute('data-ready') === 'true');
+    await page.getByTestId('canvas-tool-pointer').waitFor({ state: 'attached' });
     assert.equal(await page.getByTestId('canvas-tool-pointer').count(), 1);
     console.log('PASS existing published Windows app: current staging entry SHA-256, reload/process restart, login/draft preservation and new tool-pointer presentation');
   } finally {

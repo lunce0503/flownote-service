@@ -49,13 +49,18 @@ for (const width of [1440, 390]) {
       await expect(label).toBeVisible();
 
       // Only browser time moves; the cloud session and data keep their real times.
-      await page.clock.pauseAt(new Date(Date.parse(created.created_at) + day - 1000));
+      // Pause near the current time, then move wall time without replaying a
+      // day's animation frames/timers. Keep the exact one-second boundary.
+      await page.clock.pauseAt(new Date(Date.parse(created.created_at) + 10000));
+      await page.clock.setSystemTime(new Date(Date.parse(created.created_at) + day - 1000));
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
       await expect(label).toBeVisible();
       await page.clock.runFor(2000);
       await expect(label).toHaveCount(0);
       await expect(row.getByText(message, { exact: true })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
 
+      await page.clock.resume();
       await page.reload();
       await row.scrollIntoViewIfNeeded();
       await expect(row.getByText(message, { exact: true })).toBeVisible();
