@@ -52,7 +52,18 @@ for (const executablePath of process.argv.slice(2)) {
     assert.equal(await page.evaluate(() => localStorage.getItem('flownote-shared-web-release-probe')), 'preserved');
     const response = page.waitForResponse(response => response.url() === entryUrl);
     await page.reload();
-    assert.equal(hash(await (await response).body()), expectedHash, 'Published binary cached an older web bundle');
+    assert([200, 304].includes((await response).status()), 'Entry module did not load or revalidate');
+    // Electron exposes cache revalidation as 304; that response has no body.
+    // Read the browser's cached bytes and also require the executing entry URL.
+    const loaded = await page.evaluate(async url => {
+      const script = document.querySelector('script[type="module"][src]');
+      if (!script || new URL(script.getAttribute('src'), location.href).href !== url) throw new Error('Unexpected executing entry');
+      const response = await fetch(url, { cache: 'force-cache' });
+      if (!response.ok) throw new Error('Cached entry unavailable');
+      const digest = await crypto.subtle.digest('SHA-256', await response.arrayBuffer());
+      return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+    }, entryUrl);
+    assert.equal(loaded, expectedHash, 'Published binary cached an older web bundle');
     await page.goto(`${web}/canvas/${canvas.id}`);
     const surface = page.getByTestId('canvas-input-surface');
     await surface.waitFor();
