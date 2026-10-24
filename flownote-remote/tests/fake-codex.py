@@ -20,8 +20,9 @@ if 'generate-json-schema' in sys.argv:
     root = pathlib.Path(sys.argv[sys.argv.index('--out') + 1])
     (root / 'v2').mkdir(parents=True)
     (root / 'ClientRequest.json').write_text(json.dumps({'methods': [
-        'thread/realtime/start', 'thread/realtime/appendAudio', 'thread/realtime/stop']}))
-    (root / 'v2/ThreadRealtimeStartParams.json').write_text(json.dumps({'properties': {'outputModality': {}}}))
+        'account/read', 'thread/realtime/start', 'thread/realtime/stop']}))
+    (root / 'v2/ThreadRealtimeStartParams.json').write_text(json.dumps({'properties': {'outputModality': {}, 'webrtc': {}}}))
+    (root / 'v2/ThreadRealtimeSdpNotification.json').write_text('{}')
     sys.exit(0)
 if 'login' in sys.argv:
     sys.exit(0)
@@ -42,17 +43,23 @@ for line in sys.stdin:
     if 'id' not in req:
         continue
     result = {}
-    if method in ('thread/start', 'thread/resume'):
+    assert 'OPENAI_API_KEY' not in os.environ and 'CODEX_API_KEY' not in os.environ, 'API key inherited by voice process'
+    if method == 'account/read':
+        result = {'account': None if mode == 'signed-out' else {'type': 'apiKey' if mode == 'api-key' else 'chatgpt'}}
+    elif method in ('thread/start', 'thread/resume'):
         assert req['params']['sandbox'] == 'read-only'
         assert req['params']['approvalPolicy'] == 'never'
         result = {'thread': {'id': thread}}
     elif method == 'thread/realtime/start':
         assert req['params']['outputModality'] == 'audio'
-        assert req['params']['transport']['type'] == 'websocket'
+        assert req['params']['transport'] == {'type': 'webrtc', 'sdp': 'fixture-webrtc-offer'}
         if mode == 'denied':
             send({'id': req['id'], 'error': {'code': -32000, 'message': 'Voice entitlement unavailable (fixture)'}})
             continue
         notify('thread/realtime/started', version='v3')
+        notify('thread/realtime/sdp', sdp='fixture-webrtc-answer')
+        notify('thread/realtime/item/completed', item={'type': 'transcriptSegment', 'role': 'assistant', 'text': '오디오 확인'})
+        notify('thread/realtime/transcript/done', role='assistant', text='오디오 확인')
         if mode == 'remote-error':
             notify('thread/realtime/error', message='Voice backend disconnected (fixture)')
         if mode == 'delayed-error':
@@ -64,12 +71,7 @@ for line in sys.stdin:
             sys.exit(9)
         send({'id': 'danger', 'method': 'item/commandExecution/requestApproval', 'params': {'threadId': thread}})
     elif method == 'thread/realtime/appendAudio':
-        audio = req['params']['audio']
-        assert audio['sampleRate'] == 24000 and audio['numChannels'] == 1
-        pcm = base64.b64decode(audio['data'], validate=True)
-        assert len(pcm) % 2 == 0 and audio['samplesPerChannel'] == len(pcm)//2
-        notify('thread/realtime/outputAudio/delta', audio=audio)
-        notify('thread/realtime/transcript/done', role='assistant', text='오디오 확인')
+        raise AssertionError('Account voice must use WebRTC media, not API-key WebSocket audio')
     elif method == 'thread/realtime/stop':
         notify('thread/realtime/closed', reason='requested')
     send({'id': req['id'], 'result': result})

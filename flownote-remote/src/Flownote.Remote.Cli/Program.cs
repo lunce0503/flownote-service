@@ -20,6 +20,7 @@ namespace Flownote.Remote.Cli
             flownote-remote voice [--workspace PATH] [--thread UUID] [--codex PATH]
                 [--input-device default] [--output-device default] [--voice NAME]
                 [--native | --pcm-stdio] [--remote-tools] [--data-dir PATH]
+                [--voice-root PATH] [--node PATH] [--message TEXT]
             flownote-remote doctor [--codex PATH]
             flownote-remote mcp [--data-dir PATH]  # restricted media tools over stdio
 
@@ -27,9 +28,9 @@ namespace Flownote.Remote.Cli
             owner's local Unix socket. invite prints a 2-minute one-time link.
             voice --native: open Codex's own terminal; enter /voice there. Uses
             Codex's account/voice availability and native audio devices.
-            voice: experimental app-server audio bridge; the tested Codex build
-            requires API-key authentication for this WebSocket transport.
-            Microphone/speaker use ALSA arecord/aplay.
+            voice: use the account signed in to Codex CLI through WebRTC.
+            No API key or API-key fallback. Install Node 24 + pinned Playwright
+            Chromium; microphone/speaker use ALSA arecord/aplay.
             --pcm-stdio: PCM16LE, 24 kHz, mono stdin/stdout (e.g. over SSH).
             All voice status/transcripts go to stderr. Ctrl+C or EOF stops capture.
             --remote-tools: allow voice to inspect connected clients and control

@@ -43,3 +43,7 @@
 ## Linux CLI (0.4.0+)
 
 `linux` 작업은 Core/Network/CLI·오프라인 음성 규약·실제 Chromium 모델 경로를 검사하고 `scripts/package-linux.sh`로 .NET 포함 tar.gz를 만든다. 압축을 새 디렉터리에 풀어 정확한 실행 파일을 다시 검사한다. 태그 릴리스는 Windows EXE·서명 APK·Linux x64 CLI tar.gz·SHA256SUMS.txt의 4개 파일로 공개한다. Codex 음성 fixture 통과를 실제 계정 음성 성공으로 대신하지 않는다. 현재 API 인증 제한과 설치 조건은 [CLI 문서](CLI.md)에 명시한다.
+
+### 계정 음성 (0.4.1+)
+
+Linux 작업은 `node tests/webrtc-audio-checks.mjs`로 실제 Chromium 양단의 AudioWorklet/WebRTC/Opus/PCM을 검사한다. 배포 아카이브에 `scripts/voice-worker.mjs`를 포함하고 추출본에서도 같은 검사를 실행한다. 계정 fixture는 API 키 전달/대체 거부·ChatGPT 계정 확인·SDP·PCM·전사·실패 정리를 검증한다. 실제 계정 음성 통화는 CI 비밀에 사용자 자격 증명을 추가하지 않고 별도 검증해 기록한다. 0.4.0 API 키 요구 안내는 WebSocket 경로에 한정됐으며 기본 WebRTC 음성에는 적용하지 않는다.

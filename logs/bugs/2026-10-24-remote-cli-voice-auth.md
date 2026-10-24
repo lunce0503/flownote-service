@@ -16,3 +16,11 @@
 ## 패키징
 
 - 첫 `package-linux.sh`는 저장소에 없는 루트 LICENSE 복사로 실패했다. 원본 앱에 임의 라이선스를 부여하지 않고 존재하는 third-party notices·.NET·MediaPipe·Playwright·Sound Manager 원문만 패키징하도록 정정했다.
+
+## 0.4.1 해결: 로그인 계정 WebRTC
+
+기존 오류를 계정 음성 전체의 API 키 요구로 해석한 부분을 정정한다. `account/read`에서 chatgpt 계정을 확인하고 `thread/realtime/start` transport를 webrtc+SDP로 바꾸면 Codex CLI 0.164.0의 같은 로그인으로 세션이 시작된다. 실제 WebRTC 연결/데이터 채널·무음이 아닌 음성 응답 수신에 성공했다. API 키 환경 변수를 자식에 전달하지 않으며 저장된 인증 파일/토큰을 직접 읽지 않는다. API 키 계정·미로그인·백엔드 거부는 캡처 전에 실패시키고 API 전송 경로로 대체하지 않는다.
+
+### Chromium 무음 수신
+
+연결과 RTP 패킷 수신은 성공했지만 WebAudio만 연결했을 때 디코더의 수신 sample duration/energy가 0이고 PCM이 무음이었다. 원격 stream을 volume=0인 활성 HTML audio element에도 연결해 Chromium 디코더를 가동하고 실제 재생은 PCM 소비자에게 맡겼다. 실제 양단 Chromium Opus 검사에서 18개 PCM 청크 중 8개가 유의한 신호로 확인됐다. 이 회귀를 `tests/webrtc-audio-checks.mjs`와 추출 배포 패키지 CI에 추가했다.

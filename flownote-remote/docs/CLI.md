@@ -4,11 +4,11 @@
 
 ## 설치와 서버
 
-공개 릴리스의 `Flownote-Remote-0.4.0-linux-x64.tar.gz`를 내려받아 체크섬을 확인하고 압축을 푼다. .NET 런타임은 포함한다. 기본 서버는 별도로 설치된 Node.js 24와 Playwright Chromium/시스템 라이브러리를 사용한다. 사용자 계정으로 실행한다.
+공개 릴리스의 `Flownote-Remote-0.4.1-linux-x64.tar.gz`를 내려받아 체크섬을 확인하고 압축을 푼다. .NET 런타임은 포함한다. 기본 서버는 별도로 설치된 Node.js 24와 Playwright Chromium/시스템 라이브러리를 사용한다. 사용자 계정으로 실행한다.
 
 ```bash
-tar -xzf Flownote-Remote-0.4.0-linux-x64.tar.gz
-cd Flownote-Remote-0.4.0-linux-x64
+tar -xzf Flownote-Remote-0.4.1-linux-x64.tar.gz
+cd Flownote-Remote-0.4.1-linux-x64
 # 포함된 Playwright 버전의 Chromium과 OS 의존성을 설치한다. OS 패키지 설치에는 관리자 권한이 필요하다.
 node node_modules/playwright/cli.js install --with-deps chromium
 ./flownote-remote server --listen 192.168.0.10
@@ -43,39 +43,37 @@ node node_modules/playwright/cli.js install --with-deps chromium
 
 `packaging/flownote-remote.service`는 사용자 systemd 템플릿이다. 설치 경로와 IP를 실제 값으로 편집하고 `~/.config/systemd/user/`에 복사한 뒤 `systemctl --user daemon-reload`, `systemctl --user enable --now flownote-remote`로 실행한다. 본 CLI는 사용자 서버를 자동 설치/활성화하지 않는다. 서버 실행과 초대 명령이 같은 데이터 경로를 사용해야 한다.
 
-## Codex 네이티브 음성
+## 로그인된 Codex 계정의 음성 세션 (0.4.1+)
 
-Codex CLI를 설치·로그인한 터미널에서:
+Codex CLI 0.164.0의 ChatGPT 로그인 상태를 그대로 사용한다. 이미 로그인했다면 다시 로그인할 필요가 없다. 로그인하지 않은 경우에만 공식 기기 코드 흐름을 사용한다.
 
 ```bash
-codex login --device-auth
+codex login --device-auth  # 미로그인일 때만
 ./flownote-remote doctor
-./flownote-remote voice --native --workspace /작업/폴더
-# 같은 계정의 서버를 음성으로 조회/미디어 제어할 때 MCP 도구를 명시적으로 연결
-./flownote-remote voice --native --remote-tools --workspace /작업/폴더
-# 열린 Codex 터미널에서 /voice, /voice mute, /voice stop 사용
+./flownote-remote voice --workspace /작업/폴더
+# 같은 사용자의 Flownote 서버 조회/미디어 제어도 연결할 때
+./flownote-remote voice --remote-tools --workspace /작업/폴더
 ```
 
-`--native`는 Codex 자체 TUI와 음성 장치를 사용하며 보이스 자동 시작이나 마이크 권한을 우회하지 않는다. 기본 read-only 작업 공간과 승인 불가 정책을 전달하고 기존 Codex 설정을 수정하지 않는다. `--remote-tools`는 이번 실행에만 `flownote-remote mcp` stdio 서버를 연결해 제한된 미디어 도구를 제공한다. 지원 버전/플랫폼·계정의 음성 사용 권한이 필요하다. `--thread <UUID>`로 기존 대화를 열 수 있다. SSH TTY는 마이크를 전달하지 않으므로 원격 컴퓨터에서 이 명령을 실행하면 그 컴퓨터의 장치만 사용한다.
+기본 `voice`는 `codex app-server --listen stdio://`를 자식 프로세스로 실행한다. `account/read`에서 ChatGPT 계정인지 확인하고 `thread/realtime/start`에 **WebRTC SDP**를 전달한다. 로그인·계정 토큰 갱신과 호출 인증은 Codex가 담당한다. Flownote는 auth.json/토큰을 읽거나 복사하지 않는다. API 키가 shell 환경에 있어도 음성 Codex 자식 프로세스에 전달하지 않으며 API 키 계정이면 실행 전에 명시적으로 거부한다. 미디어 worker에도 계정/API 인증 정보를 전달하지 않는다. 기존 로그인·사용자 설정을 자동 변경하지 않는다.
 
-## CLI 음성 브리지와 headless 서버
+오디오 미디어는 포함된 Playwright 코드와 별도 설치된 Chromium의 WebRTC/Opus로 전달한다. Web Audio AudioWorklet이 PCM16LE 24kHz mono와 연결하며 브라우저 자체 마이크를 자동 캡처하지 않는다. ALSA `arecord`/`aplay` 또는 명시적 stdin/stdout만 사용한다. Node.js 24와 포함된 Playwright 버전의 Chromium/OS 의존성 설치가 음성에도 필요하다. `arecord -L`, `aplay -L`로 장치 이름을 확인하고 `--input-device`, `--output-device`로 고른다. ALSA 명령은 `alsa-utils` 패키지다.
 
-`voice`의 기본 브리지는 `codex app-server --listen stdio://`를 자식 프로세스로 실행하고 실험적 `thread/realtime/*`를 사용한다. 설치된 Codex가 생성하는 JSON schema에서 메서드/형식을 확인하고 `initialize` → `thread/start` 또는 `thread/resume` → `thread/realtime/start`를 보낸다. 시작 완료 이벤트 후에만 캡처하며 닫힘/오류/Ctrl+C/EOF에 캡처와 자식 프로세스를 정리한다. 일반 로그와 전사는 stderr, `--pcm-stdio`의 stdout은 오디오 전용이다.
+Codex 세션 시작과 실제 WebRTC 연결이 **모두** 완료된 뒤 마이크를 연다. 인증 거부·ICE 실패·연결 종료·Ctrl+C·EOF에는 캡처와 미디어 프로세스를 정리한다. 실제 미디어 연결 전에는 연결 성공을 표시하지 않는다. 입력 버퍼는 최대 2초로 제한하고 파일/파이프 입력도 실시간 속도로 보낸다. 로컬 ALSA 재생은 말 끼어들기 이벤트 때 중단한다. 외부 PCM 플레이어의 버퍼는 그 소비자가 관리한다.
 
-**실제 Codex 0.164.0 / 현재 계정 검증:** 로그인과 schema/RPC는 성공했지만 WebSocket 음성 시작은 `realtime conversation requires API key auth`로 거부됐다. ChatGPT 로그인만으로 브리지가 동작한다고 보장하지 않는다. 지원되는 API-key 인증과 음성 모델 권한이 있는 Codex 환경에서 사용해야 한다. API 키를 Flownote 옵션·문서·초대·로그에 넣지 않는다. 기존 로그인을 자동 변경하지 않으며 Codex의 공식 인증 방식으로 별도 구성한다. 음성/전사는 사용자가 선택한 Codex 제공자에 전달되며 Flownote는 이를 파일로 녹음하지 않는다. Codex의 자체 대화 기록 정책은 별도로 적용된다.
-
-Linux 장치에서는 `alsa-utils`의 `arecord`/`aplay`를 사용한다. `arecord -L`, `aplay -L`로 장치 이름을 찾는다.
+0.4.0의 `realtime conversation requires API key auth` 오류는 **기존 WebSocket 음성 경로의 선택** 때문이었다. 로그인 계정 음성 전체가 API 키를 필요로 한다는 뜻이 아니다. 0.4.1에서 WebRTC로 수정했으며 현재 실제 로그인 계정으로 세션 연결과 무음이 아닌 음성 응답 수신을 검증했다. 음성 사용 가능 여부/한도는 해당 계정·워크스페이스 정책을 따른다. 오류가 나도 API 인증으로 자동 전환하지 않는다.
 
 ```bash
-./flownote-remote voice --workspace /작업/폴더 --input-device default --output-device default
-./flownote-remote voice --thread <Codex-대화-UUID>
-# 명시한 경우에만 기기 조회/볼륨/음소거 도구를 새 Codex 대화에 연결한다.
-./flownote-remote voice --remote-tools
+./flownote-remote voice --thread <기존-Codex-대화-UUID>
+# 시작할 때 짧은 문장을 전달하는 선택적 입력
+./flownote-remote voice --message '음성 연결을 확인해줘.'
 ```
 
-`--remote-tools`는 같은 사용자의 서버 소켓에서 `devices`, `volume-up`, `volume-down`, `mute`, `unmute`만 허용한다. 기기 등록/권한 변경/초대/임의 셸 명령은 이 도구에 포함하지 않는다. 기존 대화에 도구를 소급 추가하지 않는다. 지원되지 않는 Codex 승인/도구 요청은 거부하고 대기 상태로 남기지 않는다. 앱의 `conversationalAssistant` 역량은 아직 false다. CLI 보이스 연결을 앱 내 음성 비서 연결 완료로 표시하지 않는다.
+`--remote-tools`는 같은 사용자의 서버 소켓에서 `devices`, `volume-up`, `volume-down`, `mute`, `unmute`만 허용한다. 관리·초대·임의 명령은 이 도구에 없다. 직접 브리지에서 도구는 새 대화에 등록한다. 지원하지 않는 승인 요청을 거부하며 기본 Codex 작업 공간은 read-only다. Android/Windows 앱의 마이크 전송이나 `conversationalAssistant` 역량은 아직 추가하지 않는다. 음성/전사는 로그인한 계정의 Codex 서비스에 전달되며 Flownote는 이를 파일로 녹음하지 않는다. Codex 자체 대화 기록 정책은 별도로 적용된다.
 
-마이크 없는 Linux 서버에서 실행하려면 로컬 Linux 컴퓨터의 음성을 SSH 표준 입출력으로 전달한다. SSH 서버 키 검증은 정상 설정을 유지한다.
+## 마이크 없는 Linux 서버와 SSH
+
+로컬 Linux 컴퓨터의 음성을 SSH 표준 입출력으로 전달할 수 있다. 서버에는 ALSA가 없어도 되지만 Node/Chromium과 로그인된 Codex CLI는 필요하다. SSH 서버 키 검증을 정상 유지한다.
 
 ```bash
 arecord -q -t raw -f S16_LE -r 24000 -c 1 |
@@ -83,7 +81,18 @@ arecord -q -t raw -f S16_LE -r 24000 -c 1 |
   aplay -q -t raw -f S16_LE -r 24000 -c 1
 ```
 
-형식은 **PCM16 little-endian, 24kHz, mono**다. `--pcm-stdio`는 ALSA 설치를 요구하지 않는다. 자막/진단이 오디오에 섞이지 않게 `2>&1`을 붙이지 않는다. 지연·계정 제한·물리 마이크/스피커·에코 제거는 실제 장치에서 별도 확인한다. 스피커 소리가 재입력되지 않도록 헤드셋을 권장한다. 네이티브 TUI와 PCM 브리지 옵션을 섞으면 거부한다.
+형식은 PCM16 little-endian, 24kHz, mono다. 일반 로그·전사는 stderr, stdout은 오디오 전용이므로 `2>&1`을 붙이지 않는다. 헤드셋을 사용하면 재생음의 재입력을 줄일 수 있다. 물리 마이크/스피커·원거리 SSH 지연은 별도 장치 검증이 필요하다.
+
+소스 실행은 `dotnet build src/Flownote.Remote.Cli -c Release` 후 빌드된 실행 파일에 `voice --voice-root "$PWD"`를 전달한다. 빌드 로그가 PCM에 섞이지 않게 `dotnet run`으로 오디오 파이프를 열지 않는다. 패키지에는 worker가 포함되어 `--voice-root`를 생략한다. `--node PATH`는 별도 위치의 Node 실행 파일을 지정한다.
+
+## Codex 자체 터미널 음성
+
+```bash
+./flownote-remote voice --native --remote-tools --workspace /작업/폴더
+# Codex 터미널에서 /voice, /voice mute, /voice stop
+```
+
+`--native`는 같은 계정 확인 후 Codex 자체 TUI와 음성 장치를 사용한다. `--remote-tools`는 이번 실행에만 Flownote 미디어 MCP를 연결하고 사용자 설정 파일은 수정하지 않는다. 인터랙티브 터미널이 필요하다. SSH TTY는 마이크를 전달하지 않으므로 이 방식은 실행된 컴퓨터의 음성 장치를 사용한다. 위의 SSH PCM 브리지와 구분한다.
 
 ## 검증과 배포
 
@@ -91,9 +100,10 @@ arecord -q -t raw -f S16_LE -r 24000 -c 1 |
 dotnet build src/Flownote.Remote.Cli -c Release
 dotnet run --project tests/Flownote.Remote.Cli.Checks -c Release -- --vision
 python3 tests/cli-voice-checks.py
+node tests/webrtc-audio-checks.mjs
 bash scripts/package-linux.sh
 ```
 
-CLI 서버 검사는 실제 TLS/WSS 등록·소유자 소켓 권한·중복 실행·제스처·출력 시험 어댑터·재시작/자격 유지·해제·SIGTERM을 검증한다. 음성 fixture 검사는 PCM 바이트 보존, stderr 전사, 위험 요청 거부, 백엔드 거부/종료와 잘못된 PCM을 검증하며 **실제 계정 음성 통화 성공을 대체하지 않는다**. Linux CI에서 추출한 정확한 배포 실행 파일도 검사한다. Windows 배포는 계속 단일 EXE, Android는 기존 키의 서명 APK이며 Linux CLI tar.gz와 함께 체크섬에 포함한다. 이 CLI에는 Vercel/Railway 배포 target이 없다.
+CLI 서버 검사는 실제 TLS/WSS 등록·소유자 소켓 권한·중복 실행·제스처·출력 시험 어댑터·재시작/자격 유지·해제·SIGTERM을 검증한다. 음성 fixture 검사는 ChatGPT 계정 확인·API 키 전달/대체 차단·SDP 중계·PCM 파이프·stderr 전사·위험 요청 거부·오류/종료를 검증한다. Chromium 양단 검사에서는 실제 AudioWorklet/WebRTC/Opus/PCM 송수신을 확인한다. 실제 계정 세션/음성 응답은 별도로 수동 검증하며 CI fixture로 대체하지 않는다. Linux CI에서 추출한 정확한 배포 실행 파일도 검사한다. Windows 배포는 계속 단일 EXE, Android는 기존 키의 서명 APK이며 Linux CLI tar.gz와 함께 체크섬에 포함한다. 이 CLI에는 Vercel/Railway 배포 target이 없다.
 
 공식 규약: [OpenAI Codex App Server](https://learn.chatgpt.com/docs/app-server), [Codex CLI reference](https://learn.chatgpt.com/docs/cli/reference). 실험적 음성 필드는 로컬 `codex app-server generate-json-schema --experimental` 결과가 기준이다.

@@ -26,6 +26,7 @@ jobs:
       - run: dotnet build src/Flownote.Remote.Cli -c Release
       - run: dotnet run --project tests/Flownote.Remote.Cli.Checks -c Release -- --vision
       - run: python3 tests/cli-voice-checks.py
+      - run: node tests/webrtc-audio-checks.mjs
       - run: bash scripts/package-linux.sh
       - name: Check exact extracted Linux package
         shell: bash
@@ -36,6 +37,8 @@ jobs:
           export FLOWNOTE_REMOTE_CLI="$RUNNER_TEMP/flownote-linux/Flownote-Remote-$version-linux-x64/flownote-remote"
           dotnet run --project tests/Flownote.Remote.Cli.Checks -c Release -- --vision
           python3 tests/cli-voice-checks.py
+          export FLOWNOTE_REMOTE_VOICE_WORKER="$(dirname "$FLOWNOTE_REMOTE_CLI")/scripts/voice-worker.mjs"
+          node tests/webrtc-audio-checks.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: linux

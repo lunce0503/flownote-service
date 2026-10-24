@@ -1,5 +1,7 @@
 # Linux CLI와 Codex 음성 세션
 
+> 후속 정정: 이 기록의 API 키 제한은 0.4.0 WebSocket 경로에 대한 당시 결과다. 0.4.1에서는 로그인 계정 WebRTC와 실제 음성 응답 수신에 성공했다. 현재 사용법은 [CLI 문서](../../flownote-remote/docs/CLI.md)를 따른다.
+
 ## 범위
 
 - 요청: `flownote-remote` CLI 버전, Linux 서버 지원, Codex CLI 연결과 보이스 세션.

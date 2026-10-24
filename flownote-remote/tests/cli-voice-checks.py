@@ -6,21 +6,30 @@ import subprocess
 import sys
 import tempfile
 import pty
+import signal
+import threading
+import time
 
 root = Path(__file__).resolve().parent.parent
 executable = os.environ.get('FLOWNOTE_REMOTE_CLI')
 command = [executable] if executable else ['dotnet', str(root / 'src/Flownote.Remote.Cli/bin/Release/net10.0/flownote-remote.dll')]
 fixture = root / 'tests/fake-codex.py'
 fixture.chmod(0o755)
+media_fixture = root / 'tests/fake-voice-worker.py'
+media_fixture.chmod(0o755)
+voice_root = str(Path(executable).parent if executable else root)
 
 with tempfile.TemporaryDirectory(prefix='flownote-voice-') as workspace:
-    voice = command + ['voice', '--pcm-stdio', '--workspace', workspace, '--codex', str(fixture)]
+    voice = command + ['voice', '--pcm-stdio', '--workspace', workspace, '--codex', str(fixture),
+                       '--node', str(media_fixture), '--voice-root', voice_root]
     pcm = bytes(range(256)) * 80
-    result = subprocess.run(voice, input=pcm, capture_output=True, timeout=20)
+    result = subprocess.run(voice, input=pcm, capture_output=True, timeout=20,
+                            env={**os.environ, 'OPENAI_API_KEY': 'invalid-test-key-must-not-be-used', 'CODEX_API_KEY': 'invalid-test-key-must-not-be-used'})
     assert result.returncode == 0, result.stderr.decode(errors='replace')
     assert result.stdout == pcm, f'PCM stream changed: expected {len(pcm)}, received {len(result.stdout)}'
     assert '오디오 확인' in result.stderr.decode(), 'Transcript missing from stderr'
-    for mode in ('denied', 'remote-error', 'exit'):
+    assert result.stderr.decode().count('오디오 확인') == 1, 'Canonical/legacy transcripts duplicated'
+    for mode in ('denied', 'remote-error', 'exit', 'api-key', 'signed-out'):
         env = {**os.environ, 'FLOWNOTE_VOICE_FIXTURE': mode}
         result = subprocess.run(voice, input=bytes(2400), capture_output=True, timeout=15, env=env)
         assert result.returncode != 0, f'{mode} was reported as success'
@@ -37,6 +46,20 @@ with tempfile.TemporaryDirectory(prefix='flownote-voice-') as workspace:
     process.wait(timeout=10)
     assert process.returncode != 0 and b'Delayed voice failure' in process.stderr.read()
     process.stdin.close()
+    stalled = subprocess.Popen(voice, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    def fill():
+        try:
+            stalled.stdin.write(bytes(200000))
+            stalled.stdin.flush()
+        except (BrokenPipeError, ValueError):
+            pass
+    threading.Thread(target=fill, daemon=True).start()
+    # Do not consume audio stdout; termination must interrupt blocked playback.
+    time.sleep(1.5)
+    stalled.send_signal(signal.SIGTERM)
+    stalled.wait(timeout=6)
+    assert stalled.returncode == 0, stalled.stderr.read()
+    stalled.stdin.close()
     master, slave = pty.openpty()
     try:
         result = subprocess.run(command + ['voice', '--native', '--remote-tools', '--workspace', workspace,
@@ -56,5 +79,5 @@ with tempfile.TemporaryDirectory(prefix='flownote-voice-') as workspace:
     responses = [json.loads(line) for line in result.stdout.splitlines()]
     assert responses[1]['result']['tools'][0]['name'] == 'flownote_remote'
     assert responses[2]['result']['isError'] and 'Action denied' in responses[2]['result']['content'][0]['text']
-print('PASS: PCM input/output byte identity, stderr-only transcripts, unsafe request rejection, entitlement failure, remote failure/exit, odd PCM rejection and invalid CLI options')
+print('PASS: Codex account/WebRTC path, API-key inheritance/fallback blocked, PCM pipes, transcripts, approvals, entitlement/remote failure/exit and malformed input')
 print('PASS: remote error interrupts idle microphone pipe, native TTY adapter/MCP configuration and MCP admin-action rejection')

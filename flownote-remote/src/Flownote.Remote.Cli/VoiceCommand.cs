@@ -6,18 +6,27 @@ namespace Flownote.Remote.Cli;
 public static class VoiceCommand
 {
     public const int SampleRate = 24000;
+    private static async Task InitializeAccountAsync(CodexRpc rpc, CancellationToken token)
+    {
+        await rpc.RequestAsync("initialize", new { clientInfo = new { name = "flownote_remote_cli", version = "0.4.1" },
+            capabilities = new { experimentalApi = true } }, token);
+        await rpc.NotifyAsync("initialized", new { }, token);
+        var account = await rpc.RequestAsync("account/read", new { refreshToken = false }, token);
+        if (!account.TryGetProperty("account", out var identity) || identity.ValueKind != JsonValueKind.Object ||
+            !identity.TryGetProperty("type", out var type) || type.GetString() != "chatgpt")
+            throw new InvalidOperationException("A Codex ChatGPT account login is required. Run codex login --device-auth. API-key fallback is disabled.");
+    }
     public static async Task<int> DoctorAsync(Options options, CancellationToken token)
     {
         string codex = options.Value("codex", "codex"); options.Validate([]);
         await CodexRpc.CheckSchemaAsync(codex, token);
-        Console.WriteLine("PASS: Codex realtime app-server protocol (experimental)");
-        bool login = await CodexRpc.RunProbeAsync(codex, ["login", "status"], token) == 0;
-        Console.WriteLine(login ? "PASS: Codex login" : "MISSING: run codex login --device-auth on the server");
-        foreach (string tool in new[] { "arecord", "aplay" })
-            Console.WriteLine(FindExecutable(tool) is null ? "MISSING: " + tool + " (install alsa-utils, or use voice --pcm-stdio)" : "PASS: " + tool);
-        Console.WriteLine("Voice account entitlement and physical microphone/playback are checked when a session starts.");
-        Console.WriteLine("The tested Codex 0.164.0 WebSocket voice bridge requires API-key auth. For account-based native voice use: voice --native, then /voice.");
-        return login ? 0 : 1;
+        Console.WriteLine("PASS: Codex account WebRTC voice protocol (experimental)");
+        await using (var rpc = new CodexRpc(codex, Environment.CurrentDirectory)) await InitializeAccountAsync(rpc, token);
+        Console.WriteLine("PASS: signed-in Codex ChatGPT account; no API key used");
+        foreach (string tool in new[] { "node", "arecord", "aplay" })
+            Console.WriteLine(FindExecutable(tool) is null ? "MISSING: " + tool + " (see docs/CLI.md)" : "PASS: " + tool);
+        Console.WriteLine("WebRTC requires Node 24 and pinned Playwright Chromium. Account voice access and media connectivity are verified at session start.");
+        return 0;
     }
     private static string? FindExecutable(string name) => (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
         .Select(p => Path.Combine(p, name)).FirstOrDefault(File.Exists);
@@ -28,15 +37,18 @@ public static class VoiceCommand
         string thread = options.Value("thread", ""), codex = options.Value("codex", "codex"), voice = options.Value("voice", "");
         string input = options.Value("input-device", "default"), output = options.Value("output-device", "default");
         string directory = options.Value("data-dir", StateStore.DefaultDirectory);
+        string root = options.Value("voice-root", AppContext.BaseDirectory), node = options.Value("node", "node"), message = options.Value("message", "");
         bool stdio = options.Flag("pcm-stdio"), tools = options.Flag("remote-tools"), native = options.Flag("native"); options.Validate([]);
         if (!Directory.Exists(workspace)) throw new ArgumentException("--workspace does not exist.");
+        if (message.Length > 2000) throw new ArgumentException("--message must be at most 2000 characters.");
         if (thread.Length != 0 && !Guid.TryParse(thread, out _)) throw new ArgumentException("--thread must be an existing Codex thread UUID.");
         if (tools && thread.Length != 0 && !native) throw new ArgumentException("--remote-tools requires a new voice thread so its restricted tools can be registered.");
         if (native)
         {
-            if (stdio || voice.Length != 0 || input != "default" || output != "default")
+            if (stdio || voice.Length != 0 || input != "default" || output != "default" || message.Length != 0)
                 throw new ArgumentException("--native uses Codex's own audio/settings; bridge options cannot be combined with it.");
             if (Console.IsInputRedirected || Console.IsOutputRedirected) throw new InvalidOperationException("--native requires an interactive terminal. Over SSH, allocate a TTY with ssh -t.");
+            await using (var account = new CodexRpc(codex, workspace)) await InitializeAccountAsync(account, token);
             Console.Error.WriteLine("Opening Codex. Enter /voice to start, /voice mute to mute, /voice stop to finish. Native voice depends on Codex account/platform availability.");
             var nativeInfo = new ProcessStartInfo(codex) { WorkingDirectory = workspace, UseShellExecute = false };
             foreach (string arg in new[] { "--no-daemon", "--enable", "in_app_voice", "--sandbox", "read-only", "--ask-for-approval", "never", "--cd", workspace }) nativeInfo.ArgumentList.Add(arg);
@@ -49,6 +61,7 @@ public static class VoiceCommand
                     "-c", "mcp_servers.flownote_remote.args=" + JsonSerializer.Serialize(toolArgs) }) nativeInfo.ArgumentList.Add(arg);
             }
             if (thread.Length > 0) { nativeInfo.ArgumentList.Add("resume"); nativeInfo.ArgumentList.Add(thread); }
+            CodexRpc.UseAccountCredentials(nativeInfo);
             using var process = Process.Start(nativeInfo) ?? throw new InvalidOperationException("Cannot start Codex.");
             try { await process.WaitForExitAsync(token); if (process.ExitCode != 0) throw new InvalidOperationException("Codex terminal exited with code " + process.ExitCode); }
             finally { if (!process.HasExited) process.Kill(true); }
@@ -59,27 +72,29 @@ public static class VoiceCommand
         await CodexRpc.CheckSchemaAsync(codex, token);
         using var session = CancellationTokenSource.CreateLinkedTokenSource(token);
         await using var rpc = new CodexRpc(codex, workspace);
-        Process? capture = null;
-        bool started = false;
-        Task events = Task.CompletedTask;
-        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await using var audio = new AudioOutput(stdio, output);
+        WebRtcAudio? media = null; Process? capture = null;
+        bool started = false;
+        var backendReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var mediaReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task mediaEvents = Task.CompletedTask;
+        Task events = ConsumeRpcAsync(rpc, () => media, () => thread, session, backendReady);
         try
         {
-            // Start draining before initialize: notifications and responses share the same pipe.
-            events = ConsumeAsync(rpc, audio, () => thread, session, ready);
-            rpc.ServerRequest = async message =>
+            rpc.ServerRequest = async request =>
             {
-                var parameters = message.GetProperty("params");
-                if (message.GetProperty("method").GetString() != "item/tool/call" || !tools ||
-                    parameters.GetProperty("threadId").GetString() != thread || parameters.GetProperty("tool").GetString() != "flownote_remote")
+                var data = request.GetProperty("params");
+                if (request.GetProperty("method").GetString() != "item/tool/call" || !tools ||
+                    data.GetProperty("threadId").GetString() != thread || data.GetProperty("tool").GetString() != "flownote_remote")
                     throw new InvalidOperationException("Unsupported or unapproved server request.");
-                string result = await MediaTools.CallAsync(directory, parameters.GetProperty("arguments"), session.Token);
+                string result = await MediaTools.CallAsync(directory, data.GetProperty("arguments"), session.Token);
                 return new { contentItems = new[] { new { type = "inputText", text = result } }, success = !result.StartsWith("ERROR:", StringComparison.Ordinal) };
             };
-            await rpc.RequestAsync("initialize", new { clientInfo = new { name = "flownote_remote_cli", version = "0.4.0" },
-                capabilities = new { experimentalApi = true } }, session.Token);
-            await rpc.NotifyAsync("initialized", new { }, session.Token);
+            await InitializeAccountAsync(rpc, session.Token);
+            Console.Error.WriteLine("Using the account signed in to Codex CLI · WebRTC · no API key");
+            media = new WebRtcAudio(root, node);
+            mediaEvents = ConsumeMediaAsync(media, audio, session, mediaReady);
+            string offer = await media.Offer.Task.WaitAsync(TimeSpan.FromSeconds(45), session.Token);
             var parameters = new Dictionary<string, object> { ["cwd"] = workspace, ["sandbox"] = "read-only", ["approvalPolicy"] = "never" };
             if (thread.Length != 0) parameters["threadId"] = thread;
             else
@@ -91,68 +106,104 @@ public static class VoiceCommand
             var result = await rpc.RequestAsync(thread.Length == 0 ? "thread/start" : "thread/resume", parameters, session.Token);
             thread = result.GetProperty("thread").GetProperty("id").GetString() ?? throw new InvalidOperationException("Codex returned no thread.");
             Console.Error.WriteLine("Codex voice thread: " + thread);
-            var start = new Dictionary<string, object> { ["threadId"] = thread, ["outputModality"] = "audio", ["version"] = "v3", ["transport"] = new { type = "websocket" } };
+            var start = new Dictionary<string, object> { ["threadId"] = thread, ["outputModality"] = "audio", ["version"] = "v3",
+                ["transport"] = new { type = "webrtc", sdp = offer } };
             if (voice.Length > 0) start["voice"] = voice;
-            await rpc.RequestAsync("thread/realtime/start", start, session.Token);
-            started = true;
-            await ready.Task.WaitAsync(TimeSpan.FromSeconds(45), session.Token);
-            // Only open the microphone after the backend accepts voice startup.
+            await rpc.RequestAsync("thread/realtime/start", start, session.Token); started = true;
+            await Task.WhenAll(backendReady.Task, mediaReady.Task).WaitAsync(TimeSpan.FromSeconds(60), session.Token);
+            // Account acceptance AND actual WebRTC connectivity must precede microphone capture.
             Stream source;
             if (stdio) source = Console.OpenStandardInput();
             else { capture = StartAlsa("arecord", input, false); source = capture.StandardOutput.BaseStream; }
-            Console.Error.WriteLine("Voice connected · PCM16LE/24000Hz/mono · Ctrl+C or input EOF ends the session.");
-                var buffer = new byte[2400]; // 50 ms; one request at a time bounds buffered capture.
-                int tail = 0;
-                while (!session.IsCancellationRequested)
+            Console.Error.WriteLine("Voice connected · Codex account/WebRTC · PCM16LE/24000Hz/mono · Ctrl+C or input EOF ends the session.");
+            if (message.Length > 0) await rpc.RequestAsync("thread/realtime/appendText", new { threadId = thread, text = message }, session.Token);
+            var buffer = new byte[2400]; int tail = 0; long samples = 0; var clock = Stopwatch.StartNew();
+            while (!session.IsCancellationRequested)
+            {
+                int count = await source.ReadAsync(buffer.AsMemory(tail, buffer.Length - tail), session.Token).AsTask().WaitAsync(session.Token);
+                if (count == 0) { if (tail != 0) throw new IOException("Truncated PCM16 input sample."); break; }
+                count += tail; int even = count & ~1;
+                if (even > 0)
                 {
-                    int count = await source.ReadAsync(buffer.AsMemory(tail, buffer.Length - tail), session.Token).AsTask().WaitAsync(session.Token);
-                    if (count == 0) { if (tail != 0) throw new IOException("Truncated PCM16 input sample."); break; }
-                    count += tail;
-                    int even = count & ~1;
-                    if (even > 0) await rpc.RequestAsync("thread/realtime/appendAudio", new { threadId = thread,
-                        audio = new { data = Convert.ToBase64String(buffer, 0, even), sampleRate = SampleRate, numChannels = 1, samplesPerChannel = even / 2 } }, session.Token);
-                    tail = count - even; if (tail != 0) buffer[0] = buffer[even];
+                    await media.InputAsync(buffer, even, session.Token); samples += even / 2;
+                    TimeSpan pace = TimeSpan.FromSeconds(samples / (double)SampleRate) - clock.Elapsed;
+                    if (pace > TimeSpan.Zero) await Task.Delay(pace, session.Token);
                 }
-                if (capture is not null && capture.HasExited && capture.ExitCode != 0) throw new IOException("Microphone capture failed. Check arecord -L and --input-device.");
+                tail = count - even; if (tail != 0) buffer[0] = buffer[even];
+            }
+            if (capture is not null)
+            {
+                await capture.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(2));
+                if (capture.ExitCode != 0) throw new IOException("Microphone capture failed. Check arecord -L and --input-device.");
+            }
         }
-        catch (OperationCanceledException) when (!token.IsCancellationRequested) { await events; }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested) { await ObserveAsync(events, mediaEvents); }
         finally
         {
             if (capture is not null) { if (!capture.HasExited) capture.Kill(true); await capture.WaitForExitAsync(); capture.Dispose(); }
             if (started)
             {
                 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-                try
-                {
-                    await rpc.RequestAsync("thread/realtime/stop", new { threadId = thread }, timeout.Token);
-                    await events.WaitAsync(TimeSpan.FromSeconds(1), timeout.Token);
-                }
+                try { await rpc.RequestAsync("thread/realtime/stop", new { threadId = thread }, timeout.Token); }
                 catch (Exception e) when (e is IOException or InvalidOperationException or OperationCanceledException or TimeoutException) { }
             }
             session.Cancel();
-            try { await events; } catch (OperationCanceledException) { }
+            if (media is not null) await media.DisposeAsync();
+            await ObserveAsync(events, mediaEvents);
         }
     }
-    private static async Task ConsumeAsync(CodexRpc rpc, AudioOutput output, Func<string> thread, CancellationTokenSource session, TaskCompletionSource ready)
+    private static async Task ObserveAsync(params Task[] tasks)
+    { foreach (var task in tasks) try { await task; } catch (OperationCanceledException) { } }
+    private static async Task ConsumeRpcAsync(CodexRpc rpc, Func<WebRtcAudio?> media, Func<string> thread,
+        CancellationTokenSource session, TaskCompletionSource ready)
     {
+        string lastTranscript = "";
+        void Transcript(string? role, string? text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            string key = role + ":" + text;
+            if (key == lastTranscript) return;
+            lastTranscript = key;
+            Console.Error.WriteLine($"[{role}] {text}");
+        }
         try
         {
             await foreach (var message in rpc.Events.Reader.ReadAllAsync(session.Token))
             {
                 string method = message.GetProperty("method").GetString() ?? "";
-                if (!message.TryGetProperty("params", out var data)) continue;
-                if (!data.TryGetProperty("threadId", out var id) || id.GetString() != thread()) continue;
+                if (!message.TryGetProperty("params", out var data) || !data.TryGetProperty("threadId", out var id) || id.GetString() != thread()) continue;
                 switch (method)
                 {
                     case "thread/realtime/started": ready.TrySetResult(); break;
-                    case "thread/realtime/outputAudio/delta": await output.WriteAsync(data.GetProperty("audio"), session.Token); break;
+                    case "thread/realtime/sdp":
+                        string sdp = data.GetProperty("sdp").GetString() ?? "";
+                        if (sdp.Length is < 1 or > 65536) throw new InvalidOperationException("Invalid Codex WebRTC answer.");
+                        await (media() ?? throw new InvalidOperationException("No WebRTC media worker.")).AnswerAsync(sdp, session.Token); break;
                     case "thread/realtime/transcript/done":
-                        Console.Error.WriteLine($"[{data.GetProperty("role").GetString()}] {data.GetProperty("text").GetString()}"); break;
+                        Transcript(data.GetProperty("role").GetString(), data.GetProperty("text").GetString()); break;
+                    case "thread/realtime/item/completed":
+                        var item = data.GetProperty("item");
+                        if (item.GetProperty("type").GetString() == "transcriptSegment")
+                            Transcript(item.GetProperty("role").GetString(), item.GetProperty("text").GetString());
+                        break;
                     case "thread/realtime/error": throw new InvalidOperationException("Codex voice: " + data.GetProperty("message").GetString());
-                    case "thread/realtime/closed":
-                        Console.Error.WriteLine("Codex voice session closed."); return;
+                    case "thread/realtime/closed": Console.Error.WriteLine("Codex voice session closed."); return;
                 }
             }
+        }
+        finally { session.Cancel(); }
+    }
+    private static async Task ConsumeMediaAsync(WebRtcAudio media, AudioOutput output, CancellationTokenSource session, TaskCompletionSource ready)
+    {
+        try
+        {
+            await foreach (var data in media.Events.Reader.ReadAllAsync(session.Token))
+                switch (data.GetProperty("type").GetString())
+                {
+                    case "connected": ready.TrySetResult(); break;
+                    case "audio": await output.WriteAsync(data, session.Token); break;
+                    case "interrupt": await output.InterruptAsync(); break;
+                }
         }
         finally { session.Cancel(); }
     }
@@ -169,6 +220,12 @@ public static class VoiceCommand
     {
         private Process? playback;
         private Stream? stream;
+        public async Task InterruptAsync()
+        {
+            if (playback is null) return; // A remote PCM consumer owns its own playback buffer.
+            if (!playback.HasExited) playback.Kill(true);
+            await playback.WaitForExitAsync(); playback.Dispose(); playback = null; stream = null;
+        }
         public async Task WriteAsync(JsonElement audio, CancellationToken token)
         {
             if (audio.GetProperty("sampleRate").GetInt32() != SampleRate || audio.GetProperty("numChannels").GetInt32() != 1)
@@ -182,7 +239,8 @@ public static class VoiceCommand
                 if (stdio) stream = Console.OpenStandardOutput();
                 else { playback = StartAlsa("aplay", device, true); stream = playback.StandardInput.BaseStream; }
             }
-            await stream.WriteAsync(bytes, token); await stream.FlushAsync(token);
+            await stream.WriteAsync(bytes, token).AsTask().WaitAsync(token);
+            await stream.FlushAsync(token).WaitAsync(token);
         }
         public async ValueTask DisposeAsync()
         {

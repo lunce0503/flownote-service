@@ -9,7 +9,7 @@ dotnet publish src/Flownote.Remote.Cli -c Release -r linux-x64 --self-contained 
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
   -p:DebugType=None -p:DebugSymbols=false -o "$package"
 mkdir -p "$package/scripts" "$package/artifacts" "$package/node_modules" "$package/docs" "$package/packaging" "$package/config"
-cp scripts/vision-worker.mjs "$package/scripts/"
+cp scripts/vision-worker.mjs scripts/voice-worker.mjs "$package/scripts/"
 cp -R artifacts/vision "$package/artifacts/"
 # Only the pinned Playwright runtime packages; no browser cache or test fixtures.
 cp -R node_modules/playwright node_modules/playwright-core "$package/node_modules/"

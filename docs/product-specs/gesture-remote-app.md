@@ -33,4 +33,8 @@
 
 사용자 요구로 Linux x64 서버를 추가했다. 동일 사설/VPN HTTPS/WSS 인증·카메라/제스처·미디어 제어 규약을 재사용하며 서버 관리만 소유자 전용 Unix 소켓으로 제공한다. 서버 재시작 시 제스처는 OFF다. Linux 상태 디렉터리는 0700, 인증서/등록 해시/설정/소켓은 0600으로 보호하며 Windows/Android 저장 방식과 구분한다.
 
-CLI의 Codex 네이티브 TUI 실행과 실험적 실시간 PCM 음성 브리지는 별도 기능이다. 현재 Codex 0.164.0 계정 실측에서 WebSocket 음성 시작은 API-key 인증 필요로 거부됐다. 오프라인 PCM 검증과 실제 음성 통화 성공을 구분한다. 앱 마이크 전송·대화형 AI 역량은 아직 false다. 설치·systemd·SSH·정확한 인증 제한과 검증은 [CLI 소유 문서](../../flownote-remote/docs/CLI.md)를 따른다. Linux CLI tar.gz를 릴리스에 추가하며 Windows는 계속 단일 EXE, Android는 기존 키의 APK다. Vercel/Railway 실행 target은 없다.
+CLI의 Codex 네이티브 TUI 실행과 실험적 실시간 PCM 음성 브리지는 별도 기능이다. 0.4.0의 Codex 0.164.0 계정 실측에서 기존 WebSocket 음성 시작은 API-key 인증 필요로 거부됐다. 오프라인 PCM 검증과 실제 음성 통화 성공을 구분한다. 앱 마이크 전송·대화형 AI 역량은 아직 false다. 설치·systemd·SSH·정확한 인증 제한과 검증은 [CLI 소유 문서](../../flownote-remote/docs/CLI.md)를 따른다. Linux CLI tar.gz를 릴리스에 추가하며 Windows는 계속 단일 EXE, Android는 기존 키의 APK다. Vercel/Railway 실행 target은 없다.
+
+### 0.4.1 계정 음성 정정
+
+기본 CLI `voice`를 WebRTC로 변경해 Codex CLI의 기존 ChatGPT 로그인을 사용한다. API 키를 요구하거나 API 키 인증으로 대체하지 않는다. Codex가 계정 인증/토큰 갱신을 담당하고 미디어 worker에는 자격 증명을 전달하지 않는다. 실제 계정 세션 시작·WebRTC 연결·음성 응답 수신을 확인했다. 기존 API 키 오류는 0.4.0에서 선택한 WebSocket 경로의 제약이었으며 계정 음성 전체의 제약이 아니다. ALSA/SSH PCM, 계정 확인, 시작/종료·검증 기준은 [CLI 문서](../../flownote-remote/docs/CLI.md)를 따른다. 앱 마이크 전송과 물리 장치 검증 범위는 별도로 유지한다.

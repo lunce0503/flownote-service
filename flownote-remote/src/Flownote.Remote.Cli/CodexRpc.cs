@@ -23,9 +23,16 @@ public sealed class CodexRpc : IAsyncDisposable
         var info = new ProcessStartInfo(executable) { WorkingDirectory = workspace, UseShellExecute = false,
             RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (string word in new[] { "app-server", "--listen", "stdio://" }) info.ArgumentList.Add(word);
+        UseAccountCredentials(info);
         process = Process.Start(info) ?? throw new InvalidOperationException("Cannot start Codex CLI.");
         _ = Task.Run(async () => { try { while (await process.StandardError.ReadLineAsync() is not null) { } } catch (IOException) { } });
         reader = ReadAsync();
+    }
+    public static void UseAccountCredentials(ProcessStartInfo info)
+    {
+        // Prefer the account already managed by Codex; never silently use a shell API key.
+        info.Environment.Remove("OPENAI_API_KEY");
+        info.Environment.Remove("CODEX_API_KEY");
     }
     private async Task ReadAsync()
     {
@@ -113,11 +120,14 @@ public sealed class CodexRpc : IAsyncDisposable
             int code = await RunProbeAsync(executable, ["app-server", "generate-json-schema", "--experimental", "--out", directory], token);
             if (code != 0) throw new InvalidOperationException("Codex schema generation failed. Install a Codex CLI with thread/realtime support.");
             string methods = await File.ReadAllTextAsync(Path.Combine(directory, "ClientRequest.json"), token);
-            foreach (string method in new[] { "thread/realtime/start", "thread/realtime/appendAudio", "thread/realtime/stop" })
+            foreach (string method in new[] { "account/read", "thread/realtime/start", "thread/realtime/stop" })
                 if (!methods.Contains('"' + method + '"', StringComparison.Ordinal)) throw new InvalidOperationException("Installed Codex CLI does not support " + method);
             using var schema = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, "v2", "ThreadRealtimeStartParams.json"), token));
             if (!schema.RootElement.GetProperty("properties").TryGetProperty("outputModality", out _))
                 throw new InvalidOperationException("Codex realtime schema is incompatible. Update the CLI; tested with 0.164.0.");
+            string sdpSchema = Path.Combine(directory, "v2", "ThreadRealtimeSdpNotification.json");
+            if (!File.Exists(sdpSchema) || !schema.RootElement.ToString().Contains("webrtc", StringComparison.Ordinal))
+                throw new InvalidOperationException("Codex does not expose the account WebRTC voice protocol. Update Codex CLI.");
         }
         finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
     }

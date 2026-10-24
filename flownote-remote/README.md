@@ -7,7 +7,7 @@ Windows PC 또는 Linux CLI 서버가 제스처·명령·상태 알림을 관리
 
 ## Linux CLI와 Codex 음성
 
-Linux x64 서버 실행·기기/초대/제스처/소리 관리와 Codex 네이티브 음성 실행 및 실험적 PCM 브리지를 추가했다. 설치, 명령, systemd, SSH 음성 연결과 실제 계정 검증 제한은 [CLI 안내](docs/CLI.md)를 따른다. 현재 Codex 0.164.0의 WebSocket 브리지는 API-key 인증을 요구하며 Android/Windows 앱 마이크 연결은 아직 없다.
+Linux x64 서버 실행·기기/초대/제스처/소리 관리와 Codex 네이티브 음성 실행 및 실험적 PCM 브리지를 추가했다. 설치, 명령, systemd, SSH 음성 연결과 실제 계정 검증 제한은 [CLI 안내](docs/CLI.md)를 따른다. 0.4.1부터 로그인된 Codex ChatGPT 계정과 WebRTC를 사용한다. API 키를 요구하거나 API 키 인증으로 대체하지 않는다. 실제 계정 세션 연결과 음성 응답 수신을 확인했다. Android/Windows 앱 마이크 연결은 아직 없다.
 
 ## 현재 가능한 것
 
@@ -74,4 +74,4 @@ cd android
 3. 대화형 비서 제공자와 권한 있는 작업 도구를 연결한다. 위험 알림은 대화형 AI 응답과 독립적으로 즉시 처리한다.
 4. 공개 인터넷 연결이 필요하면 별도 인증·중계·지연/비용 설계를 먼저 수행한다. 현재는 신뢰하는 사설망/VPN만 지원한다.
 
-앱 바이너리는 독립 GitHub 저장소의 시험 릴리스로 배포한다. Windows는 항상 단일 EXE이며 .NET·인식 모델·라이선스를 포함한다. Android는 같은 키로 서명한 APK다. 연결 방법과 제한은 [릴리스 노트](release-notes/v0.4.0.md)를 따른다. Vercel/Railway 서비스는 이 PC 앱 서버와 별개이며 변경하지 않는다. 웹 다운로드 자산이나 cloud API를 바꾸는 작업은 본 서비스 저장소의 staging-first 배포를 따른다.
+앱 바이너리는 독립 GitHub 저장소의 시험 릴리스로 배포한다. Windows는 항상 단일 EXE이며 .NET·인식 모델·라이선스를 포함한다. Android는 같은 키로 서명한 APK다. 연결 방법과 제한은 [릴리스 노트](release-notes/v0.4.1.md)를 따른다. Vercel/Railway 서비스는 이 PC 앱 서버와 별개이며 변경하지 않는다. 웹 다운로드 자산이나 cloud API를 바꾸는 작업은 본 서비스 저장소의 staging-first 배포를 따른다.
