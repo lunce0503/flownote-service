@@ -21,6 +21,17 @@
 ## 릴리스와 배포
 
 - 버전 0.4.1 / Android versionCode 6. 기존 Windows 단일 EXE, 동일 키 Android APK, Linux x64 CLI tar.gz와 체크섬 정책을 유지한다. worker와 관련 라이선스를 Linux 아카이브에 포함한다.
-- 최종 소스·두 저장소 CI·추출 패키지·공개 파일 결과는 완료 후 아래에 기록한다.
+- 최종 독립 앱 소스: `cb3a4fb879172c97d147a3c27d517880e859a93c`. [main 수용 검사](https://github.com/lunce0503/flownote-remote-service/actions/runs/40081589138) Windows/Android/Linux 모두 성공.
+- 상위 서비스 소스: `4dc6ddb0df0e7db9349a11cd58b328c6dd15508a`. [Quality Gates](https://github.com/lunce0503/flownote-service/actions/runs/40081642196) 8개 및 [앱 검사](https://github.com/lunce0503/flownote-service/actions/runs/40081642208) 3개 성공.
+- [동일 소스 태그 v0.4.1 릴리스](https://github.com/lunce0503/flownote-remote-service/actions/runs/40082039888)의 Windows/Android/Linux 및 게시 작업 모두 성공했다.
 - Vercel/Railway 실행 target이나 변경 산출물이 없어 cloud 배포는 생략한다. 향후 웹/API 변경이 생기면 `node scripts/deploy-cloud.mjs release <target>`으로 staging-first 검증/배포한다. 네이티브 앱의 같은 소스 수용 검사 후 GitHub 태그 릴리스를 진행한다.
 - 현재 계약: [CLI 안내](../../flownote-remote/docs/CLI.md), [제품 명세](../../docs/product-specs/gesture-remote-app.md). 공식 근거는 [OpenAI App Server](https://learn.chatgpt.com/docs/app-server)와 설치 CLI의 실험적 JSON schema이며, 미디어 규약은 [WebRTC 안내](https://developers.openai.com/api/docs/guides/voice-webrtc)를 참고했다. 계정 자격 증명을 API 예제 코드로 대체하지 않는다.
+
+## 공개 파일과 실제 배포 CLI 최종 확인
+
+- [v0.4.1 공개 시험판](https://github.com/lunce0503/flownote-remote-service/releases/tag/v0.4.1): draft=false / prerelease=true. 기존 릴리스/태그/자산을 덮어쓰지 않았다.
+- 자산 4개: Windows 단일 EXE 252,827,467 bytes, Android APK 3,521,551 bytes, Linux x64 CLI tar.gz 66,803,554 bytes, SHA256SUMS.txt 309 bytes.
+- 공개 파일을 다시 다운로드해 체크섬 3개 모두 일치. APK 서명 검증 성공 및 기존 signer SHA-256 `ebf8133cbb95a8c916ea2e05ed4b798ecb3db22f5a6a6d37a328afcf139ab0ed` 유지. 실제 APK versionName 0.4.1 / versionCode 6 / minSdk 29 / targetSdk 35 확인.
+- Windows 파일 MZ/PE/x64 확인. Linux tar.gz의 WebRTC worker 포함과 인증 파일/개인키/등록/테스트 자산 제외 확인. APK도 기기 시험 인증/영상 자산을 제외했다.
+- **공개 Linux tar.gz에서 추출한 정확한 실행 파일**로 `tests/live-account-voice-check.py --run --executable <추출 CLI>` 실행 성공. 기존 로그인 계정으로 WebRTC 연결, PCM 응답 230,400 bytes, non-silent 12 chunks, peak RMS 0.08971, assistant 전사=true, exit=0, 오류 없음. 유효하지 않은 API 키 환경 표식은 자식에 전달되지 않았으며 계정으로 성공했다. 임시 작업 공간에서 요청했고 음성 원본/계정 토큰을 저장하지 않았다.
+- 최종 앱 추적 파일 123개가 작업 폴더와 두 게시 소스 저장소에서 일치함을 확인했다. 원래 작업 폴더의 기존 변경과 빈 인덱스를 보존했다. 마지막 보고서 갱신은 보고서 전용이므로 Docker/클라우드/앱 빌드를 반복하지 않는다.
