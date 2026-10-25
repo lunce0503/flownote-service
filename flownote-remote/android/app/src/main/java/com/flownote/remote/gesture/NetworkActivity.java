@@ -150,7 +150,7 @@ public final class NetworkActivity extends Activity {
                     link=new RemoteLink(this,connection,new RemoteLink.Listener(){
                         public void connected(){runOnUiThread(()->{if(current!=generation)return;try{ConnectionStore.save(NetworkActivity.this,connection);saved=connection;reconnect.setVisibility(View.VISIBLE);connectionStatus.setText("서버에 연결됐어요.");success.run();}catch(Exception e){log("연결했지만 자격 증명을 저장하지 못했어요.");success.run();}});}
                         public void state(JSONObject value){runOnUiThread(()->{if(current==generation)render(value);});}
-                        public void gesture(String gesture,double confidence){runOnUiThread(()->{if(current==generation)detection.setText(gesture.equals("Tracking")?"골격 추적 중 · 원본 영상은 이 기기에만 유지":gesture.equals("None")?"손과 상체를 카메라에 보여 주세요.":gesture);});}
+                        public void gesture(String gesture,double confidence){runOnUiThread(()->{if(current==generation)detection.setText(gesture.equals("Rejected")?"잘못된 골격 프레임 제외 · 연결 유지":gesture.equals("Tracking")?"골격 추적 중 · 원본 영상은 이 기기에만 유지":gesture.equals("None")?"손과 상체를 카메라에 보여 주세요.":gesture);});}
                         public boolean interfaces(){return true;}
                         public void control(JSONObject command,java.util.function.Consumer<JSONObject> done){runOnUiThread(()->applyControl(command,done));}
                         public void alert(JSONObject alert){runOnUiThread(()->{if(current==generation)voice.speak(alert,voiceEnabled.isChecked());});}

@@ -18,6 +18,7 @@ public sealed class VisionHost : IDisposable
     private TaskCompletionSource<GestureSample>? result;
     private string? requestId;
     private bool cameraAllowed;
+    private long lastSkeletonWarning = -10000;
     private TaskCompletionSource<SkeletonFrame>? skeleton;
     private TaskCompletionSource<CameraDevice[]>? devices;
     public sealed record CameraDevice(string Id, string Name);
@@ -77,7 +78,13 @@ public sealed class VisionHost : IDisposable
                     {
                         try { var frame = message.GetProperty("frame").Deserialize<SkeletonFrame>(Protocol.Json)!; frame.Validate(); SkeletonFrame?.Invoke(frame); }
                         catch (Exception error) when (error is ArgumentException or JsonException)
-                        { cameraAllowed = false; Activity?.Invoke("카메라 권한 또는 골격 입력 범위를 확인하세요. 카메라를 다시 켜 주세요."); }
+                        {
+                            if (Environment.TickCount64-lastSkeletonWarning >= 5000)
+                            {
+                                lastSkeletonWarning = Environment.TickCount64;
+                                Activity?.Invoke(SkeletonDiagnostics.Message(error is SkeletonFrameException invalid ? invalid.Code : "invalid_schema"));
+                            }
+                        }
                     }
                     break;
                 case "skeleton.result":

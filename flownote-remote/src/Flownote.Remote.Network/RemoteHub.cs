@@ -23,6 +23,7 @@ public sealed partial class RemoteHub : IAsyncDisposable
         public GestureGate Gate { get; } = new(750);
         public SkeletonGestureGate Motion { get; } = new();
         public long Sequence;
+        public long RejectedFrames, LastSkeletonLog = -10000;
         public bool InterfaceReady;
         public double Zoom = 1, PanX, PanY;
         public readonly Dictionary<Guid,long> PendingControls = [];

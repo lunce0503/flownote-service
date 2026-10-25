@@ -84,6 +84,7 @@ final class RemoteLink implements AutoCloseable {
     private WebSocket socket;
     private volatile boolean connected,intentional,enabled=true,speakAlerts=true;
     private volatile boolean skeletonSupported;
+    private long lastSkeletonWarning=-10000;
     private final java.util.LinkedHashMap<String,JSONObject> controls=new java.util.LinkedHashMap<>();
     private float volume;
     RemoteLink(Context context,JSONObject connection,Listener listener)throws Exception {
@@ -116,7 +117,19 @@ final class RemoteLink implements AutoCloseable {
                         case "welcome":connected=true;readState(message.getJSONObject("state"));listener.connected();
                             timer.scheduleWithFixedDelay(RemoteLink.this::heartbeat,0,3,TimeUnit.SECONDS);break;
                         case "state":readState(message.getJSONObject("state"));break;
-                        case "skeleton.result":String expectedFrame=pendingFrame.get();if(expectedFrame!=null&&expectedFrame.equals(message.getString("frameId"))&&pendingFrame.compareAndSet(expectedFrame,null))listener.gesture(message.optString("gesture","Tracking"),0);break;
+                        case "skeleton.result":
+                            String expectedFrame=pendingFrame.get();
+                            if(expectedFrame!=null&&expectedFrame.equals(message.getString("frameId"))&&pendingFrame.compareAndSet(expectedFrame,null)){
+                                boolean rejected=message.has("accepted")&&!message.optBoolean("accepted",true);
+                                if(rejected&&android.os.SystemClock.elapsedRealtime()-lastSkeletonWarning>=5000){
+                                    lastSkeletonWarning=android.os.SystemClock.elapsedRealtime();
+                                    String code=message.optString("errorCode");
+                                    if(!java.util.Arrays.asList("invalid_frame","invalid_hand","non_finite_landmark","landmark_out_of_range","invalid_visibility","frame_too_large","unexpected_fields","invalid_frame_id","missing_frame","invalid_schema","stale_sequence").contains(code))code="invalid_frame";
+                                    listener.error("골격 프레임 제외 ["+code+"] · 연결 유지");
+                                }
+                                listener.gesture(rejected?"Rejected":message.optString("gesture","Tracking"),0);
+                            }
+                            break;
                         case "interface.set":applyInterface(message.getJSONObject("command"));break;
                         case "alert":
                             JSONObject alert=message.getJSONObject("alert");if(alert.optString("message").length()>256||alert.optString("english").length()>256)throw new IllegalArgumentException();

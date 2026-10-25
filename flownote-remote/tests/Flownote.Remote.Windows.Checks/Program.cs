@@ -30,6 +30,21 @@ internal static class Program
         byte[] image = await File.ReadAllBytesAsync(imagePath); Protocol.ValidateJpeg(image);
         var skeleton=await vision.ExtractSkeletonAsync(image);
         Check(skeleton.Hands.Length==1&&skeleton.Hands[0].Points.Length==21,"Real WebView hand skeleton missing");
+        // Exercise the trusted WebView message path without needing physical runner hardware.
+        var allowed=typeof(VisionHost).GetField("cameraAllowed",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!;
+        allowed.SetValue(vision,true);int acceptedFrames=0,rejectedFrames=0;
+        vision.SkeletonFrame+=_=>acceptedFrames++;
+        vision.Activity+=message=>{if(message.Contains("landmark_out_of_range",StringComparison.Ordinal))rejectedFrames++;};
+        var invalid=TestSkeletons.Frame(TestSkeletons.Pose("crossed"));invalid.Pose[32]=new Joint(.5,2.33,0,.03);
+        async Task PostFrame(SkeletonFrame frame)=>await vision.View.CoreWebView2.ExecuteScriptAsync("window.chrome.webview.postMessage("+
+            System.Text.Json.JsonSerializer.Serialize(new{type="camera.skeleton",frame},Protocol.Json)+")");
+        await PostFrame(invalid);
+        for(int i=0;i<40&&rejectedFrames==0;i++)await Task.Delay(50);
+        Check(rejectedFrames==1&&acceptedFrames==0&&(bool)allowed.GetValue(vision)!,"Invalid WebView frame stopped capture or reached transport");
+        await PostFrame(skeleton);
+        for(int i=0;i<40&&acceptedFrames==0;i++)await Task.Delay(50);
+        Check(acceptedFrames==1,"WebView did not recover after dropping an invalid frame");allowed.SetValue(vision,false);
+        Console.WriteLine("PASS: WebView invalid frame dropped with safe reason; camera consent and subsequent valid frame preserved");
         var settings=RemoteSettings.Defaults();settings.GesturesEnabled=true;
         using var cert=Protocol.CreateCertificate(IPAddress.Loopback);
         await using var hub=new RemoteHub(settings);

@@ -60,6 +60,24 @@ public class NetworkDeviceTest {
         return new JSONObject().put("schemaVersion",1).put("sequence",sequence).put("width",480).put("height",480).put("facing","back")
             .put("detectionThreshold",.7).put("precisionMode","off").put("pose",pose).put("hands",new org.json.JSONArray());
     }
+    private void exerciseLivePreview(android.app.Activity activity)throws Exception {
+        var instrumentation=InstrumentationRegistry.getInstrumentation();
+        var toggleField=NetworkActivity.class.getDeclaredField("cameraToggle");toggleField.setAccessible(true);
+        var previewField=NetworkActivity.class.getDeclaredField("preview");previewField.setAccessible(true);
+        var linkField=NetworkActivity.class.getDeclaredField("link");linkField.setAccessible(true);
+        var toggle=(android.widget.CompoundButton)toggleField.get(activity);var preview=(android.widget.ImageView)previewField.get(activity);
+        instrumentation.runOnMainSync(()->toggle.setChecked(true));boolean[] ready={false};
+        try{
+            for(int i=0;i<120;i++){
+                instrumentation.runOnMainSync(()->ready[0]=toggle.isChecked()&&preview.getDrawable()!=null);
+                if(ready[0])break;SystemClock.sleep(100);
+            }
+            assertTrue("Production rear camera/model pipeline never rendered a preview",ready[0]);
+            SystemClock.sleep(1200);
+            assertTrue("Production skeleton stream disconnected immediately after preview",((RemoteLink)linkField.get(activity)).connected());
+        }finally{instrumentation.runOnMainSync(()->toggle.setChecked(false));}
+        assertTrue("Camera stop disconnected the live client",((RemoteLink)linkField.get(activity)).connected());
+    }
     @Test public void realTlsCameraGestureOutputAndAlert()throws Exception {
         var instrumentation=InstrumentationRegistry.getInstrumentation();Context context=instrumentation.getTargetContext();
         JSONObject config=new JSONObject(new String(asset("session.json"),StandardCharsets.UTF_8));
@@ -73,7 +91,8 @@ public class NetworkDeviceTest {
         var qr=Bitmap.createBitmap(qrPixels,480,480,Bitmap.Config.ARGB_8888);assertTrue("Actual Android QR bitmap reader failed",invitation.equals(QrReader.decode(qr)));qr.recycle();
         JSONObject connection=RemoteLink.pair(parsed.address,parsed.pin,parsed.code,"Android real I/O acceptance");
         try{RemoteLink.pair(address,pin,code,"Replay");fail("Pairing code replay accepted");}catch(java.io.IOException expected){}
-        CountDownLatch connected=new CountDownLatch(1),gesture=new CountDownLatch(1),alert=new CountDownLatch(1),lost=new CountDownLatch(1),frames=new CountDownLatch(3);
+        CountDownLatch connected=new CountDownLatch(1),gesture=new CountDownLatch(1),alert=new CountDownLatch(1),lost=new CountDownLatch(1),frames=new CountDownLatch(3),rejected=new CountDownLatch(1),recovered=new CountDownLatch(1);
+        var rejectionLog=new java.util.concurrent.atomic.AtomicReference<String>("");
         AtomicBoolean alive=new AtomicBoolean(),checkingFixture=new AtomicBoolean();
         AudioManager audio=(AudioManager)context.getSystemService(Context.AUDIO_SERVICE);int maximum=audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC),initial=Math.max(2,maximum/3);
         audio.adjustStreamVolume(AudioManager.STREAM_MUSIC,AudioManager.ADJUST_UNMUTE,0);audio.setStreamVolume(AudioManager.STREAM_MUSIC,initial,0);
@@ -81,10 +100,10 @@ public class NetworkDeviceTest {
         RemoteLink link=new RemoteLink(context,connection,new RemoteLink.Listener(){
             public void connected(){alive.set(true);connected.countDown();}
             public void state(JSONObject state){}
-            public void gesture(String name,double confidence){if(checkingFixture.get()&&name.equals("WristsCrossed"))gesture.countDown();}
+            public void gesture(String name,double confidence){if(name.equals("Rejected"))rejected.countDown();if(rejected.getCount()==0&&name.equals("Tracking"))recovered.countDown();if(checkingFixture.get()&&name.equals("WristsCrossed"))gesture.countDown();}
             public void alert(JSONObject notice){if(notice.optString("code").startsWith("battery.low"))alert.countDown();}
             public void disconnected(boolean intentional){alive.set(false);if(!intentional)lost.countDown();}
-            public void error(String message){}
+            public void error(String message){if(message.contains("landmark_out_of_range"))rejectionLog.set(message);}
         });
         CameraSource[] camera=new CameraSource[1];android.app.Activity activity=null;
         try{
@@ -109,6 +128,15 @@ public class NetworkDeviceTest {
                 var drawing=Bitmap.createBitmap(480,480,Bitmap.Config.ARGB_8888);overlay.draw(new android.graphics.Canvas(drawing));
                 int[] pixels=new int[480*480];drawing.getPixels(pixels,0,480,0,0,480,480);boolean drawn=false;for(int pixel:pixels)if(pixel!=0){drawn=true;break;}assertTrue("Skeleton overlay drew no bones",drawn);drawing.recycle();
                 link.skeleton(bones);SystemClock.sleep(500);
+                var invalid=crossedPose(2);invalid.put("hands",bones.getJSONArray("hands"));
+                invalid.getJSONArray("pose").getJSONObject(32).put("y",2.33).put("visibility",.03);
+                link.skeleton(invalid);
+                assertTrue("Bad skeleton frame was not acknowledged",rejected.await(5,TimeUnit.SECONDS));
+                assertTrue("Bad skeleton frame disconnected Android",alive.get()&&link.connected());
+                assertTrue("Missing safe rejection reason",rejectionLog.get().contains("landmark_out_of_range"));
+                assertFalse("Coordinate data leaked to diagnostics",rejectionLog.get().contains("2.33"));
+                bones.put("sequence",3);link.skeleton(bones);
+                assertTrue("Android frame acknowledgement did not recover",recovered.await(5,TimeUnit.SECONDS));
             }
             assertFalse("Legacy thumb fixture must not control audio",audio.isStreamMute(AudioManager.STREAM_MUSIC));
             link.stopCamera();SystemClock.sleep(200);
@@ -146,6 +174,8 @@ public class NetworkDeviceTest {
             click("Android real I/O acceptance 사용");SystemClock.sleep(600);
             assertTrue("Client did not resume",visible("Android real I/O acceptance 사용").isChecked());
             capture("clients");
+            for(int i=0;i<18;i++)scroll(false);
+            exerciseLivePreview(activity);
             for(int i=0;i<18;i++)scroll(false);
             capture("dashboard");
             click("연결 코드");click("확인하고 연결");assertNotNull("Pairing must require explicit server confirmation",visible("내 서버의 QR 또는 지문인지 확인해 주세요."));click("닫기");

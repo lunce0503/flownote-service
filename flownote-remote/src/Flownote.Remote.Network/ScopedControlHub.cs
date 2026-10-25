@@ -22,21 +22,44 @@ public sealed partial class RemoteHub
 
     private async Task SkeletonAsync(Peer peer, JsonElement message)
     {
-        if (System.Text.Encoding.UTF8.GetByteCount(message.GetRawText()) > 16384) throw new ArgumentException("골격 메시지는 최대 16KiB입니다.");
-        if (message.EnumerateObject().Any(p => p.Name is not ("type" or "frameId" or "frame"))) throw new ArgumentException("골격 메시지에 원본 영상을 포함할 수 없습니다.");
-        Guid id = message.GetProperty("frameId").GetGuid();
-        var frame = message.GetProperty("frame").Deserialize<SkeletonFrame>(Protocol.Json) ?? throw new ArgumentException(); frame.Validate();
+        Guid id = Guid.Empty;
+        SkeletonFrame frame;
         ScopedCommand? action = null;
-        lock (gate)
+        try
         {
-            if (frame.Sequence <= peer.Sequence) throw new ArgumentException("골격 순서가 역전됐습니다.");
-            peer.Sequence = frame.Sequence;
-            if (Enabled(peer) && Environment.TickCount64-peer.LastFrame >= 60)
-            { peer.LastFrame = Environment.TickCount64; peer.CameraActive = true; action = peer.Motion.Observe(settings, frame, peer.LastFrame); }
+            if (!message.TryGetProperty("frameId",out var frameId) || frameId.ValueKind != JsonValueKind.String || !frameId.TryGetGuid(out id) || id == Guid.Empty)
+                throw new SkeletonFrameException("invalid_frame_id");
+            if (System.Text.Encoding.UTF8.GetByteCount(message.GetRawText()) > 16384) throw new SkeletonFrameException("frame_too_large");
+            if (message.EnumerateObject().Any(p => p.Name is not ("type" or "frameId" or "frame"))) throw new SkeletonFrameException("unexpected_fields");
+            if (!message.TryGetProperty("frame",out var data)) throw new SkeletonFrameException("missing_frame");
+            frame = data.Deserialize<SkeletonFrame>(Protocol.Json) ?? throw new SkeletonFrameException("invalid_frame");
+            frame.Validate();
+            lock (gate)
+            {
+                if (frame.Sequence <= peer.Sequence) throw new SkeletonFrameException("stale_sequence");
+                peer.Sequence = frame.Sequence;
+                if (Enabled(peer) && Environment.TickCount64-peer.LastFrame >= 60)
+                { peer.LastFrame = Environment.TickCount64; peer.CameraActive = true; action = peer.Motion.Observe(settings, frame, peer.LastFrame); }
+            }
         }
-        await SendAsync(peer, new { type = "skeleton.result", frameId = id, gesture = action?.Gesture ?? (frame.Hands.Length > 0 || frame.Pose.Length > 0 ? "Tracking" : "None"), scope = action?.Scope, confidence = 0 });
+        catch (SkeletonFrameException error) { await RejectSkeletonAsync(peer,id,error.Code); return; }
+        catch (JsonException) { await RejectSkeletonAsync(peer,id,"invalid_schema"); return; }
+        await SendAsync(peer, new { type = "skeleton.result", frameId = id, accepted = true, errorCode = (string?)null,
+            gesture = action?.Gesture ?? (frame.Hands.Length > 0 || frame.Pose.Length > 0 ? "Tracking" : "None"), scope = action?.Scope, confidence = 0 });
         if (action is not null) await ApplyGestureAsync(action);
         Changed?.Invoke();
+    }
+    private async Task RejectSkeletonAsync(Peer peer, Guid id, string reason)
+    {
+        string code = SkeletonDiagnostics.Normalize(reason); bool log; long count;
+        lock (gate)
+        {
+            peer.Motion.Reset(); peer.Gate.Reset(); count = ++peer.RejectedFrames;
+            log = count == 1 || Environment.TickCount64-peer.LastSkeletonLog >= 5000;
+            if (log) peer.LastSkeletonLog = Environment.TickCount64;
+        }
+        if (log) Activity?.Invoke($"{peer.Grant.Name}: {SkeletonDiagnostics.Message(code)} · 누적 {count}개");
+        await SendAsync(peer,new { type = "skeleton.result", frameId = id, accepted = false, errorCode = code, gesture = "Rejected", scope = (string?)null, confidence = 0 });
     }
     private async Task ApplyGestureAsync(ScopedCommand command)
     {

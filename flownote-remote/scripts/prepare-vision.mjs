@@ -29,4 +29,5 @@ for(const file of ['hand_landmarker.task','pose_landmarker.task'])await cp(path.
 await cp(path.join(root,'assets/vision'),output,{recursive:true});
 await mkdir(path.join(root,'artifacts/tests'),{recursive:true});
 await download(lock.testImageUrl,path.join(root,'artifacts/tests/thumb_up.jpg'),'sha256',lock.testImageSha256);
+await download(lock.poseTestImageUrl,path.join(root,'artifacts/tests/pose.jpg'),'sha256',lock.poseTestImageSha256);
 console.log('PASS: pinned MediaPipe code, WASM, model and public test image prepared');

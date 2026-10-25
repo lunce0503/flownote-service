@@ -63,7 +63,7 @@ QR/연결 코드는 `flownote-remote://pair?v=1&address=<escaped HTTPS IPv4 root
 | 서버 → 클라이언트 | output.set | command.commandId, volume(절대값), muted, stepIfUnchanged(기본 true; 정밀 입력은 false) |
 | 클라이언트 → 서버 | output.result | commandId, result.applied, volume, muted, error(선택) |
 | 클라이언트 → 서버 | skeleton.frame | frameId(UUID), frame(schemaVersion/sequence/크기/방향/추출 기준/모드/자세/손 관절), 최대 16KiB |
-| 서버 → 클라이언트 | skeleton.result | 같은 frameId, gesture, scope, confidence=0(확률 미제공) |
+| 서버 → 클라이언트 | skeleton.result | 같은 frameId, accepted, errorCode(거부 사유), gesture, scope, confidence=0(확률 미제공) |
 | 클라이언트 → 서버 | task.select | taskId(실제로 등록된 실행 작업) |
 | 클라이언트 → 서버 | control | targetId, command(정확한 음량/확대/위치/초기화 허용 목록) |
 | 서버 → 클라이언트 | interface.set | commandId/scope/action/value/x/y/taskId |
@@ -87,3 +87,11 @@ heartbeat는 3초마다 보낸다. 서버는 12초간 메시지가 없으면 세
 - Android 기기 CI: 실제 Camera2 가상 장치 프레임, 고정 지문 TLS/WSS, 실제 Chromium/동일 MediaPipe 모델, Android AudioManager 음량 변화, 배터리 알림과 예상치 못한 연결 종료 검사. 테스트 인증 코드/이미지는 androidTest에만 생성하고 release APK에 포함하지 않는다.
 
 물리 카메라·스피커·Bluetooth·멀리 떨어진 VPN에서의 지연은 별도 실기기 수용 항목이다. WebView2 Runtime이 없는 Windows PC에는 [Microsoft 공식 Runtime](https://learn.microsoft.com/microsoft-edge/webview2/concepts/distribution)을 설치해야 한다. MediaPipe 동작/API는 [Hand Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker)와 [Pose Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker) 공식 안내를 따른다.
+
+## 잘못된 골격 프레임 복구 (0.5.2)
+
+서버는 skeleton.frame의 범위/손/스키마/크기/sequence 검증 실패 시 해당 프레임을 버리고 기존 type=skeleton.result로 accepted=false, errorCode, gesture=Rejected를 응답한다. 연결·heartbeat·수동 제어는 유지한다. 실패한 프레임의 sequence로 수신 순서를 갱신하지 않으며 제스처 유지 상태를 초기화한다. 정상 데이터는 accepted=true로 응답한다. 이전 서버의 accepted 누락은 클라이언트가 기존 성공 응답으로 해석한다. 유효 frameId가 없으면 Guid.Empty로 응답하며 정상 클라이언트의 대기 프레임을 잘못 해제하지 않는다.
+
+거부 사유는 landmark_out_of_range / non_finite_landmark / invalid_visibility / invalid_frame / invalid_hand / invalid_schema / frame_too_large / unexpected_fields / invalid_frame_id / missing_frame / stale_sequence다. 서버의 기존 Activity 로그(Windows 연결 기록, CLI stderr)와 클라이언트 연결 기록에 고정 코드만 남긴다. 기기별 경고는 5초 간격으로 제한하고 서버는 누적 개수를 표시한다. 원본 JSON·좌표·영상·인증값·예외 메시지는 기록하거나 되돌려 보내지 않는다.
+
+16KiB 골격 한도와 좌표/개수/유한값 검증을 유지한다. 원본 camera.frame, 잘못된 제어 명령, 파싱할 수 없는 전체 JSON, 전체 메시지 256KiB 초과 등 전송 규약 오류는 기존 차단 정책을 유지한다. Windows의 로컬 골격 검사도 해당 프레임만 버리고 카메라 권한/캡처를 유지한다.

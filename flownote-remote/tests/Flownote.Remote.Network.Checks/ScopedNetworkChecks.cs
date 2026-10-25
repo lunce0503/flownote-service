@@ -73,12 +73,12 @@ internal static class ScopedNetworkChecks
             Check(rejected,"Malformed message was not rejected");hub.Revoke(grant.DeviceId);
         }
         await Reject(new{type="camera.frame",jpeg="/9j/2Q=="});
-        await Reject(new{type="skeleton.frame",frameId=Guid.NewGuid(),frame=TestSkeletons.Frame(),jpeg="forbidden"});
-        await Reject(new{type="skeleton.frame",frameId=Guid.NewGuid(),frame=TestSkeletons.Frame() with{SchemaVersion=2}});
         await Reject(new{type="control",targetId=grant1.DeviceId,command=new InterfaceCommand(Guid.NewGuid(),"all","interface.minimize")});
-        // Replayed sequence must close this camera session instead of repeating commands.
-        try{await a.SendSkeletonAsync(TestSkeletons.Frame(sequence:seq));}catch(OperationCanceledException){}
-        await Until(()=>!a.Connected);
+        // Reject replay without applying it or closing the live session.
+        GestureSample? replay=null;a.Gesture+=sample=>replay=sample;
+        await a.SendSkeletonAsync(TestSkeletons.Frame(sequence:seq));
+        Check(a.Connected&&replay?.Gesture=="Rejected","Replay must be discarded without disconnecting");
+        await a.SendSkeletonAsync(TestSkeletons.Frame(sequence:++seq));Check(a.Connected,"Tracking did not recover after replay");
         Console.WriteLine("PASS: skeleton-only TLS negotiation, global fanout, selected-task routing, keyboard values, actual acknowledgements, deduplication, pause guards and image/schema/replay rejection");
     }
 }

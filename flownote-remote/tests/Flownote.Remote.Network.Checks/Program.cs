@@ -3,6 +3,8 @@ using Flownote.Remote.Core;
 using Flownote.Remote.Network;
 using System.Text.Json;
 
+if (args is ["--recovery-fixture", var modelFixture]) { await SkeletonRecoveryChecks.RunAsync(modelFixture); return; }
+
 using (var input = typeof(Program).Assembly.GetManifestResourceStream("pairing-links.json")!)
 using (var vectors = JsonDocument.Parse(input))
     foreach (var vector in vectors.RootElement.EnumerateArray())
@@ -77,3 +79,4 @@ Console.WriteLine("PASS: shared QR contract/expiry validation, legacy grant migr
 
 await ScopedNetworkChecks.RunAsync();
 await QuantizedVolumeChecks.RunAsync();
+await SkeletonRecoveryChecks.RunAsync();

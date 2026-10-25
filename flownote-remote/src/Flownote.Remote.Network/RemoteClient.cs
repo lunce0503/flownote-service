@@ -18,6 +18,7 @@ public sealed class RemoteClient : IAsyncDisposable
     private readonly HashSet<Guid> applied = [], noticed = [];
     private TaskCompletionSource<bool>? frameAck;
     private Guid pendingFrame;
+    private long lastSkeletonWarning = -10000;
     private readonly TaskCompletionSource<bool> welcome = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private Task receiver = Task.CompletedTask, heartbeat = Task.CompletedTask;
     private bool intentional;
@@ -113,7 +114,14 @@ public sealed class RemoteClient : IAsyncDisposable
                     case "state": ReadState(message); break;
                     case "skeleton.result":
                         if (message.GetProperty("frameId").GetGuid() != pendingFrame) break;
-                        Gesture?.Invoke(new(message.GetProperty("gesture").GetString(), message.GetProperty("confidence").GetDouble()));
+                        bool rejected = message.TryGetProperty("accepted",out var accepted) && accepted.ValueKind == JsonValueKind.False;
+                        if (rejected && Environment.TickCount64-lastSkeletonWarning >= 5000)
+                        {
+                            lastSkeletonWarning = Environment.TickCount64;
+                            string? code = message.TryGetProperty("errorCode",out var reason) && reason.ValueKind == JsonValueKind.String ? reason.GetString() : null;
+                            Activity?.Invoke(SkeletonDiagnostics.Message(code));
+                        }
+                        Gesture?.Invoke(new(rejected ? "Rejected" : message.GetProperty("gesture").GetString(), message.GetProperty("confidence").GetDouble()));
                         frameAck?.TrySetResult(true); break;
                     case "interface.set":
                         var instruction = message.GetProperty("command").Deserialize<InterfaceCommand>(Protocol.Json) ?? throw new ArgumentException();

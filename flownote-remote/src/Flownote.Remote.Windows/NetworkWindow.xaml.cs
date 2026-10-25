@@ -173,7 +173,7 @@ public partial class NetworkWindow : Window
         };
         attached.Alert += alert => Dispatcher.BeginInvoke(() => { if (!closing && ReferenceEquals(client, attached)) { voice.Enabled = speakEnabled; voice.Speak(alert); } });
         attached.StateChanged += value => Dispatcher.BeginInvoke(() => { if (ReferenceEquals(client, attached)) RefreshDevices(value); });
-        attached.Gesture += sample => Dispatcher.BeginInvoke(() => { if (ReferenceEquals(client, attached)) Detection.Text = sample.Gesture == "Tracking" ? "골격 추적 중 · 원본 영상은 이 기기에만 유지" : sample.Gesture is "None" or null ? "손과 상체를 카메라에 보여 주세요." : sample.Gesture; });
+        attached.Gesture += sample => Dispatcher.BeginInvoke(() => { if (ReferenceEquals(client, attached)) Detection.Text = sample.Gesture == "Rejected" ? "잘못된 골격 프레임 제외 · 연결 유지" : sample.Gesture == "Tracking" ? "골격 추적 중 · 원본 영상은 이 기기에만 유지" : sample.Gesture is "None" or null ? "손과 상체를 카메라에 보여 주세요." : sample.Gesture; });
         await attached.ConnectAsync(address, pin, grant);
     }
     private async Task DisconnectAsync()

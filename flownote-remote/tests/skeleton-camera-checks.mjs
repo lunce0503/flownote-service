@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import {readFile,writeFile} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {chromium} from 'playwright';
 
@@ -48,5 +49,19 @@ try {
  await page.evaluate(()=>window.remoteVision.startCamera({facing:'front',qrOnly:true}));
  await page.waitForFunction(()=>window.messages.some(m=>m.type==='camera.frame'));
  await page.evaluate(()=>window.remoteVision.stopCamera());
+ // Reproduce the real partial-body model output that disconnected 0.5.1.
+ const poseJpeg=(await readFile('artifacts/tests/pose.jpg')).toString('base64');
+ await page.evaluate(async jpeg=>{
+  const image=await createImageBitmap(new Blob([Uint8Array.from(atob(jpeg),c=>c.charCodeAt(0))],{type:'image/jpeg'}));
+  const canvas=document.createElement('canvas');canvas.width=480;canvas.height=640;
+  canvas.getContext('2d').drawImage(image,.4*image.width,.3*image.height,.2*image.width,.3*image.height,0,0,480,640);image.close();
+  await window.remoteVision.extract(canvas.toDataURL('image/jpeg',.8).split(',')[1],'partial-body');
+ },poseJpeg);
+ const partial=await page.evaluate(()=>window.messages.find(m=>m.id==='partial-body').frame);
+ assert.equal(partial.pose.length,33);
+ assert.ok(partial.pose.some(p=>p.y>2&&p.visibility<.1),'Pinned partial body must reproduce an out-of-range hidden joint');
+ const fixture='artifacts/tests/partial-body-skeleton.json';await writeFile(fixture,JSON.stringify(partial));
+ execFileSync('dotnet',['run','--project','tests/Flownote.Remote.Network.Checks','-c','Release','--','--recovery-fixture',fixture],{stdio:'inherit'});
+ console.log('PASS: real partial-body pose → rejected TLS frame → same session recovers normal gestures and output control');
  console.log('PASS: real local hand model/overlay, fake-camera capture, skeleton-only live bridge, explicit precision, stop tracks, rear exact/no fallback and local QR path');
 } finally {await browser.close();}
