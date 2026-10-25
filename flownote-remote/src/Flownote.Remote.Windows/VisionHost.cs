@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using Flownote.Remote.Network;
+using Flownote.Remote.Core;
 
 namespace Flownote.Remote.Windows;
 
@@ -17,7 +18,11 @@ public sealed class VisionHost : IDisposable
     private TaskCompletionSource<GestureSample>? result;
     private string? requestId;
     private bool cameraAllowed;
+    private TaskCompletionSource<SkeletonFrame>? skeleton;
+    private TaskCompletionSource<CameraDevice[]>? devices;
+    public sealed record CameraDevice(string Id, string Name);
     public event Action<byte[]>? CameraFrame;
+    public event Action<SkeletonFrame>? SkeletonFrame;
     public event Action<string>? Activity;
 
     public async Task InitializeAsync()
@@ -61,11 +66,19 @@ public sealed class VisionHost : IDisposable
                     break;
                 case "gesture.error":
                     result?.TrySetException(new InvalidOperationException("영상 분석 실패"));
+                    skeleton?.TrySetException(new InvalidOperationException("골격 추출 실패"));
                     modelReady?.TrySetException(new InvalidOperationException("인식 모델을 불러오지 못했습니다.")); break;
                 case "camera.error": cameraAllowed = false; Activity?.Invoke("카메라 권한 또는 입력 장치를 확인하세요."); break;
                 case "camera.frame":
                     if (cameraAllowed) CameraFrame?.Invoke(Convert.FromBase64String(message.GetProperty("jpeg").GetString()!));
                     break;
+                case "camera.skeleton":
+                    if (cameraAllowed) { var frame = message.GetProperty("frame").Deserialize<SkeletonFrame>(Protocol.Json)!; frame.Validate(); SkeletonFrame?.Invoke(frame); }
+                    break;
+                case "skeleton.result":
+                    if (message.GetProperty("id").GetString() == requestId) skeleton?.TrySetResult(message.GetProperty("frame").Deserialize<SkeletonFrame>(Protocol.Json)!);
+                    break;
+                case "camera.devices": devices?.TrySetResult(message.GetProperty("devices").Deserialize<CameraDevice[]>(Protocol.Json)!); break;
             }
         };
         View.Source = new Uri(Origin + "index.html");
@@ -89,10 +102,30 @@ public sealed class VisionHost : IDisposable
         }
         finally { result = null; requestId = null; inference.Release(); }
     }
-    public async Task StartCameraAsync()
+    public async Task<SkeletonFrame> ExtractSkeletonAsync(byte[] jpeg)
+    {
+        await inference.WaitAsync();
+        try
+        {
+            skeleton = new(TaskCreationOptions.RunContinuationsAsynchronously); requestId = Guid.NewGuid().ToString();
+            await (await View.Dispatcher.InvokeAsync(() => View.CoreWebView2.ExecuteScriptAsync(
+                "window.remoteVision.extract(" + JsonSerializer.Serialize(Convert.ToBase64String(jpeg)) + "," + JsonSerializer.Serialize(requestId) + ")")));
+            var frame = await skeleton.Task.WaitAsync(TimeSpan.FromSeconds(8)); frame.Validate(); return frame;
+        }
+        finally { skeleton = null; requestId = null; inference.Release(); }
+    }
+    public async Task<CameraDevice[]> CamerasAsync()
+    {
+        devices = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        await View.CoreWebView2.ExecuteScriptAsync("window.remoteVision.cameras().then(devices=>window.chrome.webview.postMessage({type:'camera.devices',devices}))");
+        return await devices.Task.WaitAsync(TimeSpan.FromSeconds(8));
+    }
+    public Task PrecisionAsync(string mode) => View.CoreWebView2.ExecuteScriptAsync("window.remoteVision.setPrecision(" + JsonSerializer.Serialize(mode) + ")");
+    public async Task StartCameraAsync(string facing = "front", string mode = "off", double threshold = .8, bool qrOnly = false, string? deviceId = null)
     {
         cameraAllowed = true;
-        await View.CoreWebView2.ExecuteScriptAsync("window.remoteVision.startCamera().catch(()=>{window.remoteVision.stopCamera();window.chrome.webview.postMessage({type:'camera.error'})})");
+        string options = JsonSerializer.Serialize(new { facing, precisionMode = mode, threshold, qrOnly, deviceId });
+        await View.CoreWebView2.ExecuteScriptAsync("window.remoteVision.startCamera(" + options + ").catch(()=>{window.remoteVision.stopCamera();window.chrome.webview.postMessage({type:'camera.error'})})");
     }
     public async Task StopCameraAsync()
     { cameraAllowed = false; if (View.CoreWebView2 is not null) await View.CoreWebView2.ExecuteScriptAsync("window.remoteVision.stopCamera()"); }

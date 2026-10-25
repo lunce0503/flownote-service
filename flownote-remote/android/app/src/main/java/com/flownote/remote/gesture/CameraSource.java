@@ -27,8 +27,9 @@ final class CameraSource implements AutoCloseable {
         if(context.checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED)throw new SecurityException("카메라 권한이 필요합니다.");
         CameraManager manager=(CameraManager)context.getSystemService(Context.CAMERA_SERVICE);
         String[] ids=manager.getCameraIdList();if(ids.length==0)throw new IllegalStateException("카메라 없음");
-        String selected=ids[0];
+        String selected=null;
         for(String id:ids){Integer facing=manager.getCameraCharacteristics(id).get(CameraCharacteristics.LENS_FACING);if(facing!=null&&facing==(rear?CameraCharacteristics.LENS_FACING_BACK:CameraCharacteristics.LENS_FACING_FRONT)){selected=id;break;}}
+        if(selected==null)throw new IllegalStateException(rear?"후면 카메라가 없습니다.":"전면 카메라가 없습니다.");
         var info=manager.getCameraCharacteristics(selected);Integer sensor=info.get(CameraCharacteristics.SENSOR_ORIENTATION);orientation=sensor==null?0:sensor;
         Integer facing=info.get(CameraCharacteristics.LENS_FACING);front=facing!=null&&facing==CameraCharacteristics.LENS_FACING_FRONT;
         var map=info.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);if(map==null)throw new IllegalStateException("카메라 형식 없음");
@@ -38,7 +39,7 @@ final class CameraSource implements AutoCloseable {
         reader=ImageReader.newInstance(size.getWidth(),size.getHeight(),ImageFormat.YUV_420_888,2);
         reader.setOnImageAvailableListener(source->{
             try(Image image=source.acquireLatestImage()){
-                if(image==null||!running||android.os.SystemClock.elapsedRealtime()-lastFrame<240)return;
+                if(image==null||!running||android.os.SystemClock.elapsedRealtime()-lastFrame<90)return;
                 lastFrame=android.os.SystemClock.elapsedRealtime();listener.frame(jpeg(image));
             }catch(Exception e){if(running)listener.error("카메라 프레임을 읽지 못했습니다.");}
         },handler);
@@ -71,7 +72,7 @@ final class CameraSource implements AutoCloseable {
         Bitmap original=BitmapFactory.decodeByteArray(raw.toByteArray(),0,raw.size());
         int rotation=((WindowManager)context.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay().getRotation();
         int degrees=rotation==Surface.ROTATION_90?90:rotation==Surface.ROTATION_180?180:rotation==Surface.ROTATION_270?270:0;
-        Matrix matrix=new Matrix();matrix.postRotate(front?(orientation+degrees)%360:(orientation-degrees+360)%360);if(front)matrix.postScale(-1,1);
+        Matrix matrix=new Matrix();matrix.postRotate(front?(orientation+degrees)%360:(orientation-degrees+360)%360);
         Bitmap rotated=Bitmap.createBitmap(original,0,0,width,height,matrix,true);ByteArrayOutputStream output=new ByteArrayOutputStream();rotated.compress(Bitmap.CompressFormat.JPEG,60,output);
         if(rotated!=original)rotated.recycle();original.recycle();return output.toByteArray();
     }

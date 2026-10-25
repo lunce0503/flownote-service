@@ -26,6 +26,7 @@ jobs:
       - run: dotnet build src/Flownote.Remote.Cli -c Release
       - run: dotnet run --project tests/Flownote.Remote.Cli.Checks -c Release -- --vision
       - run: python3 tests/cli-voice-checks.py
+      - run: node tests/skeleton-camera-checks.mjs
       - run: node tests/webrtc-audio-checks.mjs
       - run: bash scripts/package-linux.sh
       - name: Check exact extracted Linux package

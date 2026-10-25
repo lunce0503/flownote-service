@@ -93,6 +93,37 @@ with tempfile.TemporaryDirectory(prefix='flownote-voice-') as workspace:
     finally:
         os.close(slave)
         os.close(master)
+    # Real owner socket: only a connected voice session appears in the task registry.
+    import json
+    state = str(Path(workspace) / 'server')
+    server = subprocess.Popen(command + ['server', '--listen', '127.0.0.1', '--port', '0', '--data-dir', state],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    registered = None
+    try:
+        for attempt in range(100):
+            status = subprocess.run(command + ['tasks', '--data-dir', state], capture_output=True, timeout=3)
+            if status.returncode == 0:
+                break
+            time.sleep(.05)
+        assert status.returncode == 0, 'Task registry server did not start'
+        registered = subprocess.Popen(voice + ['--data-dir', state], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        for attempt in range(100):
+            status = subprocess.run(command + ['tasks', '--data-dir', state], capture_output=True, timeout=3)
+            tasks = json.loads(status.stdout)['tasks']
+            if tasks:
+                break
+            assert registered.poll() is None, 'Voice exited before registering its task'
+            time.sleep(.05)
+        assert len(tasks) == 1 and tasks[0]['id'] == '00000000-0000-0000-0000-000000000042', tasks
+        registered.stdin.close()
+        registered.wait(timeout=10)
+        assert registered.returncode == 0, registered.stderr.read()
+        status = subprocess.run(command + ['tasks', '--data-dir', state], capture_output=True, timeout=3)
+        assert json.loads(status.stdout)['tasks'] == [], 'Voice task survived session shutdown'
+    finally:
+        if registered is not None and registered.poll() is None:
+            registered.kill(); registered.wait()
+        server.terminate(); server.wait(timeout=10)
     requests = [
         {'jsonrpc': '2.0', 'id': 1, 'method': 'initialize', 'params': {'protocolVersion': '2024-11-05'}},
         {'jsonrpc': '2.0', 'id': 2, 'method': 'tools/list'},
@@ -106,3 +137,5 @@ with tempfile.TemporaryDirectory(prefix='flownote-voice-') as workspace:
     assert responses[2]['result']['isError'] and 'Action denied' in responses[2]['result']['content'][0]['text']
 print('PASS: Codex account/WebRTC path, API-key inheritance/fallback blocked, PCM pipes, transcripts, approvals, entitlement/remote failure/exit and malformed input')
 print('PASS: remote error interrupts idle microphone pipe, native TTY adapter/MCP configuration and MCP admin-action rejection')
+
+print('PASS: connected Codex voice registers/removes its actual thread through the private owner socket')

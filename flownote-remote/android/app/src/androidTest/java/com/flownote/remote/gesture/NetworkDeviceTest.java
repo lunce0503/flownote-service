@@ -51,6 +51,15 @@ public class NetworkDeviceTest {
             ByteArrayOutputStream output=new ByteArrayOutputStream();byte[] buffer=new byte[4096];int count;while((count=input.read(buffer))!=-1)output.write(buffer,0,count);return output.toByteArray();
         }
     }
+    private JSONObject crossedPose(int sequence)throws Exception {
+        var pose=new org.json.JSONArray();for(int i=0;i<33;i++){
+            double x=i==11?.4:i==12?.6:i==15?.55:i==16?.45:.5;
+            double y=i==11||i==12||i==13||i==14?.45:.5;
+            pose.put(new JSONObject().put("x",x).put("y",y).put("z",0).put("visibility",1));
+        }
+        return new JSONObject().put("schemaVersion",1).put("sequence",sequence).put("width",480).put("height",480).put("facing","back")
+            .put("detectionThreshold",.7).put("precisionMode","off").put("pose",pose).put("hands",new org.json.JSONArray());
+    }
     @Test public void realTlsCameraGestureOutputAndAlert()throws Exception {
         var instrumentation=InstrumentationRegistry.getInstrumentation();Context context=instrumentation.getTargetContext();
         JSONObject config=new JSONObject(new String(asset("session.json"),StandardCharsets.UTF_8));
@@ -72,7 +81,7 @@ public class NetworkDeviceTest {
         RemoteLink link=new RemoteLink(context,connection,new RemoteLink.Listener(){
             public void connected(){alive.set(true);connected.countDown();}
             public void state(JSONObject state){}
-            public void gesture(String name,double confidence){if(checkingFixture.get()&&name.equals("Thumb_Up")&&confidence>=0.7)gesture.countDown();}
+            public void gesture(String name,double confidence){if(checkingFixture.get()&&name.equals("WristsCrossed"))gesture.countDown();}
             public void alert(JSONObject notice){if(notice.optString("code").startsWith("battery.low"))alert.countDown();}
             public void disconnected(boolean intentional){alive.set(false);if(!intentional)lost.countDown();}
             public void error(String message){}
@@ -83,16 +92,29 @@ public class NetworkDeviceTest {
             assertTrue("Low battery notice missing",alert.await(8,TimeUnit.SECONDS));
             activity=instrumentation.startActivitySync(new Intent(context,NetworkActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             instrumentation.getUiAutomation().grantRuntimePermission(context.getPackageName(),Manifest.permission.CAMERA);
-            camera[0]=new CameraSource(context,new CameraSource.Listener(){public void frame(byte[] jpeg){link.frame(jpeg);frames.countDown();}public void error(String message){}});
+            camera[0]=new CameraSource(context,new CameraSource.Listener(){public void frame(byte[] jpeg){frames.countDown();}public void error(String message){}});
             instrumentation.runOnMainSync(()->{try{camera[0].start(false);}catch(Exception e){throw new IllegalStateException(e);}});
             assertTrue("Camera2 did not deliver live YUV/JPEG frames",frames.await(12,TimeUnit.SECONDS));
             instrumentation.runOnMainSync(()->camera[0].close());link.stopCamera();SystemClock.sleep(900);
             audio.setStreamVolume(AudioManager.STREAM_MUSIC,initial,0);SystemClock.sleep(3300);checkingFixture.set(true);
             byte[] thumb=asset("thumb_up.jpg");
-            for(int i=0;i<10;i++){link.frame(thumb);SystemClock.sleep(300);}
-            assertTrue("Real server MediaPipe gesture missing",gesture.await(5,TimeUnit.SECONDS));
-            for(int i=0;i<40&&audio.getStreamVolume(AudioManager.STREAM_MUSIC)<=initial;i++)SystemClock.sleep(100);
-            assertTrue("Server gesture did not change actual Android media volume",audio.getStreamVolume(AudioManager.STREAM_MUSIC)>initial);
+            try(var tracker=new SkeletonTracker(context,.7)){
+                var bitmap=android.graphics.BitmapFactory.decodeByteArray(thumb,0,thumb.length);
+                var bones=tracker.detect(bitmap,true,"off");bitmap.recycle();
+                assertEquals("Real on-device hand landmarks missing",21,bones.getJSONArray("hands").getJSONObject(0).getJSONArray("points").length());
+                assertEquals("back",bones.getString("facing"));assertFalse(bones.toString().contains("jpeg"));assertFalse(bones.toString().contains("base64"));
+                var overlay=new SkeletonOverlay(context);instrumentation.runOnMainSync(()->{overlay.layout(0,0,480,480);overlay.show(bones);});
+                var drawing=Bitmap.createBitmap(480,480,Bitmap.Config.ARGB_8888);overlay.draw(new android.graphics.Canvas(drawing));
+                int[] pixels=new int[480*480];drawing.getPixels(pixels,0,480,0,0,480,480);boolean drawn=false;for(int pixel:pixels)if(pixel!=0){drawn=true;break;}assertTrue("Skeleton overlay drew no bones",drawn);drawing.recycle();
+                link.skeleton(bones);SystemClock.sleep(500);
+            }
+            assertFalse("Legacy thumb fixture must not control audio",audio.isStreamMute(AudioManager.STREAM_MUSIC));
+            link.stopCamera();SystemClock.sleep(200);
+            // Synthetic temporal pose verifies routing separately from the real native model above.
+            for(int i=1;i<=8;i++){link.skeleton(crossedPose(i));SystemClock.sleep(200);}
+            assertTrue("Skeleton server gesture missing",gesture.await(5,TimeUnit.SECONDS));
+            for(int i=0;i<40&&!audio.isStreamMute(AudioManager.STREAM_MUSIC);i++)SystemClock.sleep(100);
+            assertTrue("Skeleton command did not mute actual Android output",audio.isStreamMute(AudioManager.STREAM_MUSIC));
             var socketField=RemoteLink.class.getDeclaredField("socket");socketField.setAccessible(true);((WebSocket)socketField.get(link)).cancel();
             assertTrue("Unexpected disconnection was not reported",lost.await(8,TimeUnit.SECONDS));assertFalse(alive.get());
             // Reuse the already authenticated grant through the real dashboard's encrypted saved-connection path.
@@ -101,17 +123,23 @@ public class NetworkDeviceTest {
             assertNotNull("Dashboard title missing",visible("Flownote Remote"));
             assertNull("Advanced server address must not be on the home screen",find(instrumentation.getUiAutomation().getRootInActiveWindow(),"서버 HTTPS 주소"));
             click("더 보기");assertNotNull("Overflow settings missing",visible("연결 정보와 기록"));instrumentation.getUiAutomation().performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK);
+            for(int i=0;i<10&&find(instrumentation.getUiAutomation().getRootInActiveWindow(),"전면 / 후면 카메라 선택")==null;i++)scroll(true);
+            click("전면 / 후면 카메라 선택");click("후면 카메라");
+            assertTrue("Rear camera preference not saved",context.getSharedPreferences("camera-source-v1",Context.MODE_PRIVATE).getBoolean("rear",false));
+            android.app.Activity previous=activity;instrumentation.runOnMainSync(previous::finish);
+            activity=instrumentation.startActivitySync(new Intent(context,NetworkActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            var rearField=NetworkActivity.class.getDeclaredField("rear");rearField.setAccessible(true);assertTrue("Rear selection did not restore",rearField.getBoolean(activity));
             click("저장된 서버에 다시 연결");
-            for(int i=0;i<5&&find(instrumentation.getUiAutomation().getRootInActiveWindow(),"Android real I/O acceptance 사용")==null;i++)scroll(true);
+            for(int i=0;i<18&&find(instrumentation.getUiAutomation().getRootInActiveWindow(),"Android real I/O acceptance 사용")==null;i++)scroll(true);
             assertNotNull("Client row and accessible toggle missing",visible("Android real I/O acceptance 사용"));
             click("Android real I/O acceptance 사용");assertNotNull("Client pause was not reflected in the real dashboard",visible("사용 일시 중지"));
             click("Android real I/O acceptance 사용");SystemClock.sleep(600);
             assertTrue("Client did not resume",visible("Android real I/O acceptance 사용").isChecked());
             capture("clients");
-            for(int i=0;i<7;i++)scroll(false);
+            for(int i=0;i<18;i++)scroll(false);
             capture("dashboard");
             click("연결 코드");click("확인하고 연결");assertNotNull("Pairing must require explicit server confirmation",visible("내 서버의 QR 또는 지문인지 확인해 주세요."));click("닫기");
-            System.out.println("PASS: actual QR pixels/parser, Android Camera2, pinned TLS/WSS, real MediaPipe, AudioManager, alerts, overflow dashboard at 320dp/font1.3, saved reconnect, accessible client pause/resume and required pairing confirmation");
+            System.out.println("PASS: actual QR pixels/parser, Android Camera2, native hand skeleton extraction/overlay, landmark-only TLS/WSS, synthetic pose command, AudioManager, alerts, overflow dashboard at 320dp/font1.3, saved reconnect, accessible client pause/resume and required pairing confirmation");
         }finally{
             if(camera[0]!=null)camera[0].close();link.close();
             if(activity!=null){android.app.Activity open=activity;instrumentation.runOnMainSync(open::finish);}

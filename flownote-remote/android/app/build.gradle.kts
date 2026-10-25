@@ -7,8 +7,8 @@ android {
         applicationId = "com.flownote.remote.gesture"
         minSdk = 29
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.4.1"
+        versionCode = 7
+        versionName = "0.5.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
@@ -35,11 +35,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     sourceSets.getByName("main").assets.srcDir("../../config")
+    sourceSets.getByName("main").assets.srcDir("../../artifacts/android-vision")
     sourceSets.getByName("test").resources.srcDir("../../tests/fixtures")
     testOptions { unitTests.isReturnDefaultValues = false }
 }
 
 dependencies {
+    implementation("com.google.mediapipe:tasks-vision:1.1.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.zxing:core:3.5.4")
     testImplementation("junit:junit:4.13.2")
@@ -47,3 +49,9 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
 }
+
+val prepareGestureModels by tasks.registering(Exec::class) {
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine("node", "scripts/prepare-vision.mjs")
+}
+tasks.named("preBuild").configure { dependsOn(prepareGestureModels) }

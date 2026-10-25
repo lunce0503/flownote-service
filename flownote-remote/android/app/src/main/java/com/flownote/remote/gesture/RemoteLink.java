@@ -28,6 +28,8 @@ final class RemoteLink implements AutoCloseable {
     interface Listener {
         void connected(); void state(JSONObject state); void gesture(String gesture,double confidence);
         void alert(JSONObject alert); void disconnected(boolean intentional); void error(String message);
+        default boolean interfaces(){return false;}
+        default void control(JSONObject command,java.util.function.Consumer<JSONObject> done){try{done.accept(new JSONObject().put("applied",false).put("error","interface_unavailable"));}catch(Exception ignored){}}
     }
     // Self-signed device certificates are pinned exactly, checked for validity, and OkHttp's hostname verifier stays enabled.
     @android.annotation.SuppressLint("CustomX509TrustManager")
@@ -81,6 +83,8 @@ final class RemoteLink implements AutoCloseable {
     private final LinkedHashSet<String> applied=new LinkedHashSet<>(),alerts=new LinkedHashSet<>();
     private WebSocket socket;
     private volatile boolean connected,intentional,enabled=true,speakAlerts=true;
+    private volatile boolean skeletonSupported;
+    private final java.util.LinkedHashMap<String,JSONObject> controls=new java.util.LinkedHashMap<>();
     private float volume;
     RemoteLink(Context context,JSONObject connection,Listener listener)throws Exception {
         this.context=context.getApplicationContext();this.connection=connection;this.listener=listener;
@@ -89,11 +93,13 @@ final class RemoteLink implements AutoCloseable {
     }
     boolean connected(){return connected;}
     boolean enabled(){return enabled;}
+    boolean skeletonSupported(){return skeletonSupported;}
     String deviceId(){return connection.optString("deviceId");}
     void setVoiceAlerts(boolean value){speakAlerts=value;}
     void setEnabled(boolean value)throws Exception {send(new JSONObject().put("type","device.enabled").put("enabled",value));}
     private void readState(JSONObject state)throws Exception {
         enabled=false;var devices=state.getJSONArray("devices");
+        skeletonSupported=state.optJSONObject("capabilities")!=null&&state.optJSONObject("capabilities").optBoolean("skeletonFrames");
         for(int i=0;i<devices.length();i++){var device=devices.getJSONObject(i);if(device.optString("id").equals(deviceId()))enabled=device.optBoolean("enabled",true);}
         listener.state(state);
     }
@@ -107,10 +113,11 @@ final class RemoteLink implements AutoCloseable {
                 try{
                     JSONObject message=new JSONObject(text);String type=message.getString("type");
                     switch(type){
-                        case "welcome":connected=true;listener.connected();readState(message.getJSONObject("state"));
+                        case "welcome":connected=true;readState(message.getJSONObject("state"));listener.connected();
                             timer.scheduleWithFixedDelay(RemoteLink.this::heartbeat,0,3,TimeUnit.SECONDS);break;
                         case "state":readState(message.getJSONObject("state"));break;
-                        case "frame.result":String expectedFrame=pendingFrame.get();if(expectedFrame!=null&&expectedFrame.equals(message.getString("frameId"))&&pendingFrame.compareAndSet(expectedFrame,null))listener.gesture(message.optString("gesture","None"),message.optDouble("confidence",0));break;
+                        case "skeleton.result":String expectedFrame=pendingFrame.get();if(expectedFrame!=null&&expectedFrame.equals(message.getString("frameId"))&&pendingFrame.compareAndSet(expectedFrame,null))listener.gesture(message.optString("gesture","Tracking"),0);break;
+                        case "interface.set":applyInterface(message.getJSONObject("command"));break;
                         case "alert":
                             JSONObject alert=message.getJSONObject("alert");if(alert.optString("message").length()>256||alert.optString("english").length()>256)throw new IllegalArgumentException();
                             if(alert.optString("code").equals("server.stopping"))intentional=true;
@@ -129,7 +136,7 @@ final class RemoteLink implements AutoCloseable {
     private void heartbeat(){try{
         int max=audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);boolean muted=audio.isStreamMute(AudioManager.STREAM_MUSIC);
         if(!muted&&max>0)volume=audio.getStreamVolume(AudioManager.STREAM_MUSIC)/(float)max;
-        JSONObject sample=new JSONObject().put("volume",volume).put("muted",muted).put("outputReady",max>0&&!audio.isVolumeFixed()).put("speakAlerts",speakAlerts).put("platform","Android");
+        JSONObject sample=new JSONObject().put("volume",volume).put("muted",muted).put("outputReady",max>0&&!audio.isVolumeFixed()).put("speakAlerts",speakAlerts).put("platform","Android").put("interfaceReady",listener.interfaces());
         Intent battery=context.registerReceiver(null,new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         if(battery!=null){int level=battery.getIntExtra(BatteryManager.EXTRA_LEVEL,-1),scale=battery.getIntExtra(BatteryManager.EXTRA_SCALE,-1);if(level>=0&&scale>0)sample.put("batteryPercent",level*100/scale);}
         send(new JSONObject().put("type","heartbeat").put("health",sample));
@@ -160,10 +167,25 @@ final class RemoteLink implements AutoCloseable {
         if(!java.util.Arrays.asList("volume_up","volume_down","mute","unmute").contains(action))throw new IllegalArgumentException();UUID.fromString(target);
         send(new JSONObject().put("type","command").put("commandId",UUID.randomUUID().toString()).put("targetId",target).put("action",action));
     }
-    void frame(byte[] jpeg){
-        String id=UUID.randomUUID().toString();if(!connected||!enabled||jpeg.length>131072||!pendingFrame.compareAndSet(null,id))return;
-        try{send(new JSONObject().put("type","camera.frame").put("frameId",id).put("jpeg",Base64.encodeToString(jpeg,Base64.NO_WRAP)));timer.schedule(()->pendingFrame.compareAndSet(id,null),6,TimeUnit.SECONDS);}
-        catch(Exception e){pendingFrame.compareAndSet(id,null);listener.error("영상 전송 실패");}
+    void frame(byte[] jpeg){throw new IllegalStateException("원본 영상은 전송하지 않습니다.");}
+    void skeleton(JSONObject frame){
+        String id=UUID.randomUUID().toString();if(!connected||!enabled||!skeletonSupported||frame.toString().length()>16384||!pendingFrame.compareAndSet(null,id))return;
+        try{send(new JSONObject().put("type","skeleton.frame").put("frameId",id).put("frame",frame));timer.schedule(()->pendingFrame.compareAndSet(id,null),6,TimeUnit.SECONDS);}
+        catch(Exception e){pendingFrame.compareAndSet(id,null);listener.error("골격 전송 실패");}
+    }
+    void selectTask(String id)throws Exception {UUID.fromString(id);send(new JSONObject().put("type","task.select").put("taskId",id));}
+    void control(String target,String action,double value,double x,double y)throws Exception {
+        UUID.fromString(target);send(new JSONObject().put("type","control").put("targetId",target).put("command",new JSONObject().put("commandId",UUID.randomUUID().toString()).put("scope","precision").put("action",action).put("value",value).put("x",x).put("y",y)));
+    }
+    private void applyInterface(JSONObject command)throws Exception {
+        String id=command.getString("commandId");UUID.fromString(id);
+        java.util.function.Consumer<JSONObject> done=result->{try{
+            if(result.optBoolean("applied")){synchronized(controls){if(controls.size()>=128)controls.clear();controls.put(id,result);}}
+            send(new JSONObject().put("type","control.result").put("commandId",id).put("result",result));
+        }catch(Exception e){listener.error("화면 제어 결과를 전송하지 못했습니다.");}};
+        if(!enabled||!listener.interfaces()){done.accept(new JSONObject().put("applied",false).put("error","interface_unavailable"));return;}
+        JSONObject previous;synchronized(controls){previous=controls.get(id);}if(previous!=null){done.accept(previous);return;}
+        listener.control(command,done);
     }
     void stopCamera(){try{send(new JSONObject().put("type","camera.stop"));}catch(Exception ignored){}}
     @Override public void close(){intentional=true;try{send(new JSONObject().put("type","bye"));}catch(Exception ignored){}connected=false;timer.shutdownNow();if(socket!=null)socket.close(1000,"bye");http.connectionPool().evictAll();http.dispatcher().executorService().shutdown();}

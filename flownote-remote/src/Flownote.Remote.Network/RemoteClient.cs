@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Net.WebSockets;
 using System.Text.Json;
+using Flownote.Remote.Core;
 
 namespace Flownote.Remote.Network;
 
@@ -11,6 +12,9 @@ public sealed class RemoteClient : IAsyncDisposable
     private readonly CancellationTokenSource stop = new();
     private readonly Func<OutputCommand, Task<OutputResult>> output;
     private readonly Func<HealthSample> health;
+    private readonly Func<InterfaceCommand,Task<InterfaceResult>>? control;
+    private readonly Dictionary<Guid,InterfaceResult> controls = [];
+    public HubState? State { get; private set; }
     private readonly HashSet<Guid> applied = [], noticed = [];
     private TaskCompletionSource<bool>? frameAck;
     private Guid pendingFrame;
@@ -25,8 +29,9 @@ public sealed class RemoteClient : IAsyncDisposable
     public event Action<string>? Activity;
     public event Action<GestureSample>? Gesture;
 
-    public RemoteClient(Func<OutputCommand, Task<OutputResult>> output, Func<HealthSample> health)
-    { this.output = output; this.health = health; }
+    public RemoteClient(Func<OutputCommand, Task<OutputResult>> output, Func<HealthSample> health,
+        Func<InterfaceCommand,Task<InterfaceResult>>? control = null)
+    { this.output = output; this.health = () => health() with { InterfaceReady = control is not null }; this.control = control; }
 
     public static async Task<PairResult> PairAsync(string address, string pin, string code, string name, CancellationToken cancellation = default)
     {
@@ -61,24 +66,32 @@ public sealed class RemoteClient : IAsyncDisposable
         if (action is not ("volume_up" or "volume_down" or "mute" or "unmute")) throw new ArgumentException("허용되지 않은 명령입니다.");
         return SendAsync(new { type = "command", commandId = commandId ?? Guid.NewGuid(), targetId = target, action });
     }
-    public async Task SendCameraAsync(byte[] jpeg)
+    public Task SendCameraAsync(byte[] jpeg) => throw new InvalidOperationException("원본 영상은 전송하지 않습니다. SendSkeletonAsync를 사용하세요.");
+    public async Task SendSkeletonAsync(SkeletonFrame frame)
     {
-        Protocol.ValidateJpeg(jpeg);
+        frame.Validate();
+        if (JsonSerializer.SerializeToUtf8Bytes(new { type = "skeleton.frame", frameId = Guid.NewGuid(), frame },Protocol.Json).Length > 16384)
+            throw new ArgumentException("골격 메시지는 최대 16KiB입니다.");
+        if (State?.Capabilities?.SkeletonFrames != true) throw new InvalidOperationException("서버가 골격 입력을 지원하지 않습니다. 서버를 업데이트하세요.");
         if (!Connected || !await frameGate.WaitAsync(0)) return;
         try
         {
             frameAck = new(TaskCreationOptions.RunContinuationsAsynchronously);
             pendingFrame = Guid.NewGuid();
-            await SendAsync(new { type = "camera.frame", frameId = pendingFrame, jpeg = Convert.ToBase64String(jpeg) });
+            await SendAsync(new { type = "skeleton.frame", frameId = pendingFrame, frame });
             await frameAck.Task.WaitAsync(TimeSpan.FromSeconds(6), stop.Token);
         }
         finally { frameAck = null; frameGate.Release(); }
     }
     public Task StopCameraAsync() => SendAsync(new { type = "camera.stop" });
     public Task SetEnabledAsync(bool enabled) => SendAsync(new { type = "device.enabled", enabled });
+    public Task SelectTaskAsync(Guid id) => SendAsync(new { type = "task.select", taskId = id });
+    public Task ControlAsync(Guid target, string action, double value = 0, double x = 0, double y = 0) =>
+        SendAsync(new { type = "control", targetId = target, command = new InterfaceCommand(Guid.NewGuid(),"precision",action,value,x,y) });
     private void ReadState(JsonElement message)
     {
         var state = message.GetProperty("state").Deserialize<HubState>(Protocol.Json) ?? throw new ArgumentException();
+        State = state;
         Enabled = state.Devices.FirstOrDefault(d => d.Id == DeviceId)?.Enabled == true;
         StateChanged?.Invoke(state);
     }
@@ -96,13 +109,28 @@ public sealed class RemoteClient : IAsyncDisposable
                 switch (message.GetProperty("type").GetString())
                 {
                     case "welcome":
-                        welcome.TrySetResult(true); Activity?.Invoke("서버 연결됨");
-                        ReadState(message); break;
+                        ReadState(message); welcome.TrySetResult(true); Activity?.Invoke("서버 연결됨"); break;
                     case "state": ReadState(message); break;
-                    case "frame.result":
+                    case "skeleton.result":
                         if (message.GetProperty("frameId").GetGuid() != pendingFrame) break;
                         Gesture?.Invoke(new(message.GetProperty("gesture").GetString(), message.GetProperty("confidence").GetDouble()));
                         frameAck?.TrySetResult(true); break;
+                    case "interface.set":
+                        var instruction = message.GetProperty("command").Deserialize<InterfaceCommand>(Protocol.Json) ?? throw new ArgumentException();
+                        instruction.Validate();
+                        InterfaceResult interfaceResult;
+                        try
+                        {
+                            if (!Enabled || control is null) interfaceResult = new(false, Error: "interface_unavailable");
+                            else if (controls.TryGetValue(instruction.CommandId, out var previous)) interfaceResult = previous;
+                            else
+                            {
+                                interfaceResult = await control(instruction);
+                                if (interfaceResult.Applied) { if (controls.Count >= 128) controls.Clear(); controls.Add(instruction.CommandId,interfaceResult); }
+                            }
+                        }
+                        catch (InvalidOperationException) { interfaceResult = new(false, Error: "interface_unavailable"); }
+                        await SendAsync(new { type = "control.result", commandId = instruction.CommandId, result = interfaceResult }); break;
                     case "output.set":
                         var command = message.GetProperty("command").Deserialize<OutputCommand>(Protocol.Json) ?? throw new ArgumentException();
                         if (!float.IsFinite(command.Volume) || command.Volume is < 0 or > 1) throw new ArgumentException();

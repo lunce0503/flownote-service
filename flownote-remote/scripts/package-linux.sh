@@ -13,7 +13,7 @@ cp scripts/vision-worker.mjs scripts/voice-worker.mjs "$package/scripts/"
 cp -R artifacts/vision "$package/artifacts/"
 # Only the pinned Playwright runtime packages; no browser cache or test fixtures.
 cp -R node_modules/playwright node_modules/playwright-core "$package/node_modules/"
-cp docs/CLI.md docs/NETWORK.md docs/UX.md docs/RELEASING.md "$package/docs/"
+cp docs/CLI.md docs/NETWORK.md docs/GESTURES.md docs/UX.md docs/RELEASING.md "$package/docs/"
 cp config/Apache-2.0.txt "$package/config/"
 cp packaging/flownote-remote.service packaging/dotnet-LICENSE.txt "$package/packaging/"
 cp README.md THIRD-PARTY-NOTICES.md "$package/"

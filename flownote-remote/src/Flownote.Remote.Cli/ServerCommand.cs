@@ -12,8 +12,8 @@ public static class ServerCommand
         string addressText = options.Value("listen", "127.0.0.1");
         string portText = options.Value("port", Protocol.Port.ToString());
         string directory = options.Value("data-dir", StateStore.DefaultDirectory);
-        bool noVision = options.Flag("no-vision");
-        string root = options.Value("vision-root", AppContext.BaseDirectory);
+        _ = options.Flag("no-vision");
+        _ = options.Value("vision-root", AppContext.BaseDirectory);
         options.Validate([]);
         if (!IPAddress.TryParse(addressText, out var address) || address.AddressFamily != AddressFamily.InterNetwork || !Protocol.IsPrivate(address))
             throw new ArgumentException("--listen must be a private/VPN IPv4 address; 0.0.0.0/public addresses are not accepted.");
@@ -29,12 +29,10 @@ public static class ServerCommand
         using var listener = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
         if (File.Exists(socketPath)) { StateStore.VerifyPrivate(socketPath); File.Delete(socketPath); }
         using var certificate = store.Certificate(address);
-        await using var vision = noVision ? null : await VisionWorker.StartAsync(root, token);
         var settings = store.Settings();
         // A daemon restart must not silently re-arm camera commands.
         settings.GesturesEnabled = false;
-        await using var hub = new RemoteHub(settings, frame => vision is null ? Task.FromResult(new GestureSample(null, 0)) : vision.InferAsync(frame),
-            store.Grants(), new(CameraFrames: !noVision, GestureRecognition: !noVision));
+        await using var hub = new RemoteHub(settings, knownDevices: store.Grants());
         hub.GrantsChanged += store.SaveGrants;
         hub.Activity += message => Console.Error.WriteLine(message);
         try
@@ -50,13 +48,15 @@ public static class ServerCommand
                 if (words.Length == 0 || words.Length > 2 || words.Any(w => w is null)) throw new ArgumentException("Invalid command.");
                 switch (words[0])
                 {
-                    case "status" or "devices" when words.Length == 1: return JsonSerializer.Serialize(hub.Snapshot(), Protocol.Json);
+                    case "status" or "devices" or "tasks" when words.Length == 1: return JsonSerializer.Serialize(hub.Snapshot(), Protocol.Json);
                     case "invite" when words.Length == 1:
                         hub.RenewPairing(); return hub.Invitation(Protocol.Pin(certificate)).Encode();
                     case "gestures" when words.Length == 2 && words[1] is "on" or "off":
-                        if (noVision && words[1] == "on") throw new InvalidOperationException("Restart with vision configured before enabling gestures.");
+
                         settings.GesturesEnabled = words[1] == "on"; hub.Configure(settings); store.SaveSettings(settings); return "OK: gestures " + words[1];
                 }
+                if (words.Length == 2 && words[0] == "task.upsert") { await hub.UpsertTaskAsync(JsonSerializer.Deserialize<RemoteTask>(words[1],Protocol.Json) ?? throw new ArgumentException()); return "OK"; }
+                if (words.Length == 2 && words[0] == "task.remove") { await hub.RemoveTaskAsync(Guid.Parse(words[1])); return "OK"; }
                 if (words.Length != 2 || !Guid.TryParse(words[1], out Guid id) || !hub.RegisteredDevices().Any(d => d.Id == id))
                     throw new ArgumentException("Specify a registered device UUID. Run devices.");
                 switch (words[0])

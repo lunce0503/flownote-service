@@ -6,8 +6,8 @@
  <ScrollViewer VerticalScrollBarVisibility="Auto">
   <StackPanel Margin="28" MaxWidth="800">
    <TextBlock Text="제스처 세부 설정" FontSize="28" FontWeight="SemiBold"/>
-   <TextBlock Text="저장한 인식 기준과 동작을 서버에 적용합니다. 아래 합성 테스트는 실제 기기를 조작하지 않습니다."/>
-   <TextBlock Text="카메라 방향 (인식 연결 시 사용)"/>
+   <TextBlock Text="신뢰도·유지·재실행 기준을 서버에 적용합니다. 범주별 명령은 대시보드 안내를 따릅니다."/>
+   <TextBlock Text="기본 카메라 방향 (대시보드에서 선택 가능)"/>
    <ComboBox x:Name="Facing" AutomationProperties.Name="카메라 방향"/>
    <CheckBox x:Name="Enabled" Content="제스처 사용 설정 저장 (서버에서 명령 허용을 별도 확인)" Margin="0,10"/>
    <TextBlock x:Name="ConfidenceLabel"/>
@@ -16,7 +16,7 @@
    <Slider x:Name="Hold" Minimum="100" Maximum="2000" TickFrequency="100" IsSnapToTickEnabled="True" AutomationProperties.Name="유지 시간"/>
    <TextBlock x:Name="CooldownLabel"/>
    <Slider x:Name="Cooldown" Minimum="300" Maximum="5000" TickFrequency="100" IsSnapToTickEnabled="True" AutomationProperties.Name="재실행 간격"/>
-   <TextBlock Text="제스처별 동작" FontWeight="SemiBold" Margin="0,20,0,4"/>
+   <TextBlock Text="이전 손 모양 진단용 매핑 · 실제 골격 명령에는 적용되지 않습니다." FontWeight="SemiBold" Margin="0,20,0,4"/>
    <StackPanel x:Name="BindingsPanel"/>
    <TextBlock x:Name="VolumeLabel"/>
    <Slider x:Name="Volume" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" AutomationProperties.Name="음량 설정"/>

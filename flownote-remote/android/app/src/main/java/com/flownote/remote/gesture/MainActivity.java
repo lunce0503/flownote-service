@@ -52,12 +52,12 @@ public final class MainActivity extends Activity {
         label("Flownote Remote").setTextSize(28);
         label("제스처 세부 설정 · 테스트용");
         label("이 기기의 합성 테스트 설정입니다. 실제 인식 기준과 동작은 서버 PC에서 설정합니다.");
-        facing = spinner("카메라 방향 (인식 연결 시 사용)", new String[]{"front", "back"});
+        facing = spinner("기본 카메라 방향 (대시보드에서 선택 가능)", new String[]{"front", "back"});
         enabled = new Switch(this); enabled.setText("제스처 사용 설정 (현재 테스트 입력만 사용)"); content.addView(enabled);
         confidence = slider("최소 인식 신뢰도 (%)", 50, 100, 1);
         hold = slider("동작 유지 시간 (ms)", 100, 2000, 100);
         cooldown = slider("재실행 간격 (ms)", 300, 5000, 100);
-        label("제스처별 동작").setTextSize(20);
+        label("이전 손 모양 진단 매핑 · 골격 명령에는 적용 안 됨").setTextSize(20);
         for (String gesture : RemoteSettings.GESTURES) bindings.put(gesture, spinner(gesture, RemoteSettings.ACTIONS));
         volume = slider("음량 설정 (%) · 실제 출력 준비 중", 0, 100, 1);
         preset = spinner("EQ 프리셋", RemoteSettings.PRESETS);

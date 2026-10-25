@@ -1,0 +1,79 @@
+[
+  {
+    "scope": "all",
+    "id": "ArmsWide",
+    "name": "전체 화면 최소화",
+    "motion": "양팔을 어깨 높이로 크게 펼쳐 유지",
+    "action": "interface.minimize"
+  },
+  {
+    "scope": "all",
+    "id": "ArmsRaised",
+    "name": "전체 화면 복원",
+    "motion": "두 손목을 어깨보다 높이 올려 유지",
+    "action": "interface.restore"
+  },
+  {
+    "scope": "all",
+    "id": "WristsCrossed",
+    "name": "전체 음소거",
+    "motion": "두 손목을 가슴 앞에서 교차해 유지",
+    "action": "audio.mute"
+  },
+  {
+    "scope": "management",
+    "id": "OpenThenFist",
+    "name": "작업 화면 선택",
+    "motion": "한 손을 펼쳐 준비한 뒤 주먹으로 전환",
+    "action": "task.focus"
+  },
+  {
+    "scope": "management",
+    "id": "SwipeRight",
+    "name": "다음 작업",
+    "motion": "펼친 한 손을 화면 오른쪽으로 이동",
+    "action": "task.next"
+  },
+  {
+    "scope": "management",
+    "id": "SwipeLeft",
+    "name": "이전 작업",
+    "motion": "펼친 한 손을 화면 왼쪽으로 이동",
+    "action": "task.previous"
+  },
+  {
+    "scope": "management",
+    "id": "VictoryHold",
+    "name": "작업 상세 보기",
+    "motion": "검지와 중지를 V자로 펼쳐 유지",
+    "action": "interface.details"
+  },
+  {
+    "scope": "precision",
+    "id": "PinchVolume",
+    "name": "음량 미세 조정",
+    "motion": "음량 모드에서 엄지·검지를 붙인 채 위아래 이동",
+    "action": "audio.delta"
+  },
+  {
+    "scope": "precision",
+    "id": "PinchZoom",
+    "name": "확대·축소",
+    "motion": "확대 모드에서 엄지·검지를 붙여 준비한 뒤 벌리거나 좁힘",
+    "action": "interface.zoom"
+  },
+  {
+    "scope": "precision",
+    "id": "TwoHandPinchZoom",
+    "name": "양손 확대·축소",
+    "motion": "확대 모드에서 양손을 각각 핀치하고 양손 간격 조정",
+    "action": "interface.zoom"
+  },
+  {
+    "scope": "precision",
+    "id": "PinchMove",
+    "name": "작업 화면 이동",
+    "motion": "위치 모드에서 엄지·검지를 붙인 채 이동",
+    "action": "interface.pan"
+  }
+]

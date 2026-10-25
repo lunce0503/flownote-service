@@ -28,6 +28,7 @@ jobs:
       - run: dotnet build src/Flownote.Remote.Cli -c Release
       - run: dotnet run --project tests/Flownote.Remote.Cli.Checks -c Release -- --vision
       - run: python3 tests/cli-voice-checks.py
+      - run: node tests/skeleton-camera-checks.mjs
       - run: node tests/webrtc-audio-checks.mjs
       - run: bash scripts/package-linux.sh
       - uses: actions/upload-artifact@v4
@@ -66,6 +67,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
       - uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'

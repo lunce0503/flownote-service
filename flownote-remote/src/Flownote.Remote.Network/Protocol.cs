@@ -11,16 +11,40 @@ public sealed record PairRequest(string Code, string Name);
 public sealed record PairResult(Guid DeviceId, string Token);
 public sealed record GestureSample(string? Gesture, double Confidence);
 public sealed record DeviceState(Guid Id, string Name, bool Connected, bool CameraActive, float Volume, bool Muted, int? BatteryPercent, long LastSeenMs,
-    bool Enabled = true, bool Allowed = true, bool OutputReady = true, bool SpeakAlerts = true, string Platform = "클라이언트");
-public sealed record HubCapabilities(bool CameraFrames = true, bool GestureRecognition = true, bool OutputVolume = true,
+    bool Enabled = true, bool Allowed = true, bool OutputReady = true, bool SpeakAlerts = true, string Platform = "클라이언트",
+    bool InterfaceReady = false, double Zoom = 1, double PanX = 0, double PanY = 0);
+public sealed record HubCapabilities(bool CameraFrames = false, bool GestureRecognition = true, bool OutputVolume = true,
     bool HealthVoiceAlerts = true, bool AudioTransport = false, bool AudioSeparation = false, bool ScreenLayout = false,
-    bool ProjectorOutput = false, bool ConversationalAssistant = false, bool ClientParticipation = false);
-public sealed record HubState(DeviceState[] Devices, Guid? GestureTarget, Guid? VoiceTarget, bool GesturesEnabled, HubCapabilities? Capabilities = null);
+    bool ProjectorOutput = false, bool ConversationalAssistant = false, bool ClientParticipation = false,
+    bool SkeletonFrames = false, bool ScopedGestures = false, bool InterfaceControl = false);
+public sealed record RemoteTask(Guid Id, string Name, string Kind = "codex.voice");
+public sealed record HubState(DeviceState[] Devices, Guid? GestureTarget, Guid? VoiceTarget, bool GesturesEnabled, HubCapabilities? Capabilities = null,
+    RemoteTask[]? Tasks = null, Guid? SelectedTask = null, double DetectionThreshold = .8);
+public sealed record InterfaceCommand(Guid CommandId, string Scope, string Action, double Value = 0, double X = 0, double Y = 0, Guid? TaskId = null)
+{
+    public void Validate()
+    {
+        if (CommandId == Guid.Empty || Scope is not ("all" or "management" or "precision") ||
+            !double.IsFinite(Value) || !double.IsFinite(X) || !double.IsFinite(Y)) throw new ArgumentException("Invalid interface command.");
+        bool valid = Action switch
+        {
+            "interface.minimize" or "interface.restore" or "interface.details" or "interface.reset" => true,
+            "task.focus" => TaskId.HasValue && TaskId != Guid.Empty,
+            "interface.zoom" => Value is >= .88 and <= 1.12,
+            "interface.zoom_set" => Value is >= .5 and <= 2,
+            "interface.pan" => X is >= -.08 and <= .08 && Y is >= -.08 and <= .08,
+            "interface.pan_set" => X is >= -1 and <= 1 && Y is >= -1 and <= 1,
+            _ => false
+        };
+        if (!valid) throw new ArgumentException("Unsupported interface command.");
+    }
+}
+public sealed record InterfaceResult(bool Applied, double Zoom = 1, double PanX = 0, double PanY = 0, string? Error = null);
 public sealed record OutputCommand(Guid CommandId, float Volume, bool Muted);
 public sealed record OutputResult(bool Applied, float Volume, bool Muted, string? Error = null);
 public sealed record AlertNotice(Guid Id, string Code, string Severity, string Message, string English, bool Speak);
 public sealed record HealthSample(float Volume, bool Muted, int? BatteryPercent = null, bool OutputReady = true, int? MemoryLoadPercent = null,
-    bool SpeakAlerts = true, string Platform = "클라이언트");
+    bool SpeakAlerts = true, string Platform = "클라이언트", bool InterfaceReady = false);
 
 public static class Protocol
 {

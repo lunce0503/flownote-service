@@ -34,12 +34,14 @@
     </StackPanel></Border>
     <Border Style="{StaticResource Card}"><StackPanel>
      <Grid><TextBlock Text="◉  카메라" FontSize="21" FontWeight="SemiBold"/><ToggleButton x:Name="CameraControl" Style="{StaticResource Switch}" HorizontalAlignment="Right" AutomationProperties.Name="카메라 전송" Checked="CameraToggle_Click" Unchecked="CameraToggle_Click"/></Grid>
-     <TextBlock x:Name="Detection" Text="카메라 꺼짐 · 사용 중일 때만 전송합니다." Foreground="#61736A" MinHeight="42"/>
+     <TextBlock x:Name="Detection" Text="카메라 꺼짐 · 골격만 전송합니다." Foreground="#61736A" MinHeight="42"/>
+     <Button x:Name="ChooseCameraSource" Content="전면 / 후면 / 장치 선택" Click="CameraSource_Click"/>
      <Button Content="QR로 빠르게 연결" Click="ScanQr_Click"/>
     </StackPanel></Border>
     <Border Style="{StaticResource Card}"><StackPanel>
      <Grid><TextBlock Text="✋  제스처" FontSize="21" FontWeight="SemiBold"/><ToggleButton x:Name="AllowGestures" Style="{StaticResource Switch}" HorizontalAlignment="Right" AutomationProperties.Name="제스처 명령 허용" Checked="Gestures_Click" Unchecked="Gestures_Click"/></Grid>
-     <TextBlock Text="엄지 ↑ ↓ 음량 · 주먹 음소거" Foreground="#61736A" MinHeight="42"/>
+     <TextBlock Text="전체 · 중간 관리 · 세밀 조정" Foreground="#61736A" MinHeight="42"/>
+     <Button Content="범주별 제스처 안내" Click="GestureGuide_Click"/>
      <TextBlock x:Name="GestureSummary" Text="서버에서 켤 수 있어요."/>
     </StackPanel></Border>
     <Border Style="{StaticResource Card}"><StackPanel>
@@ -58,6 +60,25 @@
      <Button Grid.Column="2" Content="⋯" FontSize="24" Padding="0" Margin="0" Tag="{Binding Id}" AutomationProperties.Name="{Binding MenuLabel}" Click="ClientMore_Click"/>
     </Grid></Border>
    </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+   <Border Style="{StaticResource Card}"><StackPanel>
+    <TextBlock Text="선택한 작업 인터페이스" FontSize="20" FontWeight="SemiBold"/>
+    <ComboBox x:Name="TaskChoice" DisplayMemberPath="Name" SelectedValuePath="Id" AutomationProperties.Name="실행 중인 작업 선택" SelectionChanged="TaskChoice_Changed" MinHeight="40"/>
+    <Grid x:Name="TaskViewport" Height="160" ClipToBounds="True" Margin="0,8">
+     <Border x:Name="ControlledPane" Background="#E4ECE6" CornerRadius="12" Padding="16" RenderTransformOrigin=".5,.5"><StackPanel>
+      <TextBlock x:Name="ActiveTaskName" Text="실행 중인 작업 없음" FontSize="22" FontWeight="SemiBold"/>
+      <TextBlock x:Name="ActiveTaskDetails" Text="서버에 연결된 Codex 작업을 선택하면 확인할 수 있어요." Visibility="Collapsed" TextWrapping="Wrap"/>
+     </StackPanel></Border>
+    </Grid>
+    <TextBlock Text="세밀 조정 · 정확한 값은 키보드로 입력" FontWeight="SemiBold"/>
+    <ComboBox x:Name="PrecisionChoice" SelectedIndex="0" SelectionChanged="Precision_Changed" AutomationProperties.Name="조정할 값" MinHeight="40"><ComboBoxItem Content="음량 (%)"/><ComboBoxItem Content="확대·축소 (%)"/><ComboBoxItem Content="위치 (가로·세로 %)"/></ComboBox>
+    <CheckBox x:Name="PinchEnabled" Content="핀치 조정 허용 · 기본 꺼짐 (Esc로 해제)" Checked="Precision_Changed" Unchecked="Precision_Changed" Margin="0,8"/>
+    <WrapPanel>
+     <StackPanel><TextBlock Text="음량 0–100 / 확대 50–200"/><TextBox x:Name="ExactValue" Text="50" Width="180" AutomationProperties.Name="정확한 조정 값"/></StackPanel>
+     <StackPanel Margin="10,0"><TextBlock Text="가로 -100–100"/><TextBox x:Name="ExactX" Text="0" Width="110" AutomationProperties.Name="가로 위치"/></StackPanel>
+     <StackPanel><TextBlock Text="세로 -100–100"/><TextBox x:Name="ExactY" Text="0" Width="110" AutomationProperties.Name="세로 위치"/></StackPanel>
+    </WrapPanel>
+    <WrapPanel><Button Content="키보드 값 적용" Click="ExactApply_Click"/><Button Content="화면 배치 초기화" Click="ResetView_Click"/></WrapPanel>
+   </StackPanel></Border>
    <Border Style="{StaticResource Card}" Margin="0,12,0,0"><StackPanel>
     <TextBlock Text="카메라 미리보기" FontWeight="SemiBold"/>
     <ContentControl x:Name="CameraHost" Height="220"/>

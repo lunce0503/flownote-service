@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Flownote.Remote.Network;
 
 namespace Flownote.Remote.Cli;
 
@@ -8,7 +9,7 @@ public static class VoiceCommand
     public const int SampleRate = 24000;
     private static async Task InitializeAccountAsync(CodexRpc rpc, CancellationToken token)
     {
-        await rpc.RequestAsync("initialize", new { clientInfo = new { name = "flownote_remote_cli", version = "0.4.1" },
+        await rpc.RequestAsync("initialize", new { clientInfo = new { name = "flownote_remote_cli", version = "0.5.0" },
             capabilities = new { experimentalApi = true } }, token);
         await rpc.NotifyAsync("initialized", new { }, token);
         var account = await rpc.RequestAsync("account/read", new { refreshToken = false }, token);
@@ -78,6 +79,7 @@ public static class VoiceCommand
         var backendReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var mediaReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         Task mediaEvents = Task.CompletedTask;
+        Task registration = Task.CompletedTask;
         Task events = ConsumeRpcAsync(rpc, () => media, () => thread, session, backendReady);
         try
         {
@@ -111,6 +113,7 @@ public static class VoiceCommand
             if (voice.Length > 0) start["voice"] = voice;
             await rpc.RequestAsync("thread/realtime/start", start, session.Token); started = true;
             await Task.WhenAll(backendReady.Task, mediaReady.Task).WaitAsync(TimeSpan.FromSeconds(60), session.Token);
+            registration = RegisterTaskAsync(directory, thread, session.Token);
             // Account acceptance AND actual WebRTC connectivity must precede microphone capture.
             Stream source;
             if (stdio) source = Console.OpenStandardInput();
@@ -148,9 +151,33 @@ public static class VoiceCommand
                 catch (Exception e) when (e is IOException or InvalidOperationException or OperationCanceledException or TimeoutException) { }
             }
             session.Cancel();
+            await registration;
+            if (started) await UpdateTaskAsync(directory, ["task.remove", thread], CancellationToken.None);
             if (media is not null) await media.DisposeAsync();
             await ObserveAsync(events, mediaEvents);
         }
+    }
+    private static async Task RegisterTaskAsync(string directory, string thread, CancellationToken token)
+    {
+        var task = new RemoteTask(Guid.Parse(thread), "Codex 음성");
+        try
+        {
+            do
+            {
+                await UpdateTaskAsync(directory, ["task.upsert", JsonSerializer.Serialize(task, Protocol.Json)], token);
+                await Task.Delay(TimeSpan.FromSeconds(20), token);
+            } while (!token.IsCancellationRequested);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+    }
+    private static async Task UpdateTaskAsync(string directory, string[] command, CancellationToken token)
+    {
+        // Optional owner socket: standalone voice works without a running local server.
+        if (!OperatingSystem.IsLinux() || !File.Exists(LocalControl.SocketPath(directory))) return;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token); timeout.CancelAfter(TimeSpan.FromSeconds(1));
+        try { await LocalControl.CallAsync(directory, command, timeout.Token); }
+        catch (Exception e) when (e is IOException or System.Net.Sockets.SocketException or UnauthorizedAccessException or
+            ArgumentException or InvalidOperationException or OperationCanceledException or TimeoutException) { }
     }
     private static async Task ObserveAsync(params Task[] tasks)
     { foreach (var task in tasks) try { await task; } catch (OperationCanceledException) { } }

@@ -4,17 +4,15 @@
 
 ## 설치와 서버
 
-공개 릴리스의 `Flownote-Remote-0.4.1-linux-x64.tar.gz`를 내려받아 체크섬을 확인하고 압축을 푼다. .NET 런타임은 포함한다. 기본 서버는 별도로 설치된 Node.js 24와 Playwright Chromium/시스템 라이브러리를 사용한다. 사용자 계정으로 실행한다.
+공개 릴리스의 `Flownote-Remote-0.5.0-linux-x64.tar.gz`를 내려받아 체크섬을 확인하고 압축을 푼다. .NET 런타임은 포함한다. 0.5.0 골격 서버는 Node/Chromium 없이 실행한다. 음성 세션에만 Node.js 24와 Playwright Chromium/시스템 라이브러리가 필요하다. 사용자 계정으로 실행한다.
 
 ```bash
-tar -xzf Flownote-Remote-0.4.1-linux-x64.tar.gz
-cd Flownote-Remote-0.4.1-linux-x64
-# 포함된 Playwright 버전의 Chromium과 OS 의존성을 설치한다. OS 패키지 설치에는 관리자 권한이 필요하다.
-node node_modules/playwright/cli.js install --with-deps chromium
+tar -xzf Flownote-Remote-0.5.0-linux-x64.tar.gz
+cd Flownote-Remote-0.5.0-linux-x64
 ./flownote-remote server --listen 192.168.0.10
 ```
 
-서버 PC에 설정된 실제 사설/VPN IPv4를 지정한다. 기본 포트는 17843, 주소를 생략하면 loopback만 사용한다. `0.0.0.0`, 공개 IP/도메인, HTTP는 거부한다. 방화벽·VPN·포트 전달은 자동 변경하지 않는다. 카메라 영상은 Chromium 내 로컬 MediaPipe로 처리하며 외부 AI에 전송하지 않는다. 모델·Node·Chromium 오류는 서버 시작을 실패시킨다. 제스처는 재시작할 때마다 OFF다.
+서버 PC에 설정된 실제 사설/VPN IPv4를 지정한다. 기본 포트는 17843, 주소를 생략하면 loopback만 사용한다. `0.0.0.0`, 공개 IP/도메인, HTTP는 거부한다. 방화벽·VPN·포트 전달은 자동 변경하지 않는다. 클라이언트가 카메라에서 골격을 추출하고 서버는 관절 데이터만 판정한다. 원본 영상을 받지 않는다. 제스처는 재시작할 때마다 OFF다.
 
 별도 터미널에서 같은 설치 폴더의 실행 파일로 관리한다.
 
@@ -33,7 +31,7 @@ node node_modules/playwright/cli.js install --with-deps chromium
 
 링크에는 주소·인증서 지문·단기 코드만 넣고 장기 토큰은 넣지 않는다. 신뢰하는 기기에만 전달한다. 서버 기본 로그에는 연결 코드를 출력하지 않는다. `invite`를 실행하면 기존 초대는 무효화된다. `QUEUED`는 전달 요청이며 적용 완료를 뜻하지 않는다. 실제 결과는 `devices`의 상태로 확인한다. Linux 서버 자체는 출력 클라이언트로 등록하지 않고 연결된 Android/Windows 기기의 출력 장치를 사용한다.
 
-모델 없이 미디어/기기 관리만 필요하면 `server --listen <IP> --no-vision`을 쓴다. 이 모드에는 Node/Chromium이 필요 없고 카메라/인식 역량을 false로 알리며 제스처 켜기를 거부한다. 소스에서 실행하려면 `npm ci --ignore-scripts`, `node scripts/prepare-vision.mjs`, Chromium 설치 후 `dotnet run --project src/Flownote.Remote.Cli -- server --listen <IP> --vision-root "$PWD"`로 실행한다. 소스 모드의 출력 뒤에 붙는 빌드 로그를 PCM 파이프에 섞지 않도록 음성은 빌드된 실행 파일로 실행한다.
+`--no-vision`과 `--vision-root`는 이전 스크립트 호환용으로만 받아들이며 0.5.0 서버의 골격 기능을 끄거나 서버 모델을 켜지 않는다. 소스에서는 `dotnet run --project src/Flownote.Remote.Cli -- server --listen <IP>`로 실행한다. 음성은 빌드 로그가 PCM에 섞이지 않도록 빌드된 실행 파일로 실행한다. 범주별 동작·후면 카메라·관절 데이터 계약은 [GESTURES.md](GESTURES.md)를 따른다. `tasks`로 실제 등록 작업을 조회한다.
 
 ## 상태·관리와 systemd
 
@@ -49,6 +47,8 @@ Codex CLI 0.164.0의 ChatGPT 로그인 상태를 그대로 사용한다. 이미 
 
 ```bash
 codex login --device-auth  # 미로그인일 때만
+# 음성용 Chromium 설치 (서버만 쓸 때는 불필요). OS 의존성 설치에는 관리자 권한 필요.
+node node_modules/playwright/cli.js install --with-deps chromium
 ./flownote-remote doctor
 ./flownote-remote voice --workspace /작업/폴더
 # 같은 사용자의 Flownote 서버 조회/미디어 제어도 연결할 때
@@ -70,6 +70,8 @@ Codex 세션 시작과 실제 WebRTC 연결이 **모두** 완료된 뒤 마이�
 ```
 
 `--remote-tools`는 같은 사용자의 서버 소켓에서 `devices`, `volume-up`, `volume-down`, `mute`, `unmute`만 허용한다. 관리·초대·임의 명령은 이 도구에 없다. 직접 브리지에서 도구는 새 대화에 등록한다. 지원하지 않는 승인 요청을 거부하며 기본 Codex 작업 공간은 read-only다. Android/Windows 앱의 마이크 전송이나 `conversationalAssistant` 역량은 아직 추가하지 않는다. 음성/전사는 로그인한 계정의 Codex 서비스에 전달되며 Flownote는 이를 파일로 녹음하지 않는다. Codex 자체 대화 기록 정책은 별도로 적용된다.
+
+0.5.0부터 실제 WebRTC 음성 연결이 완료된 세션은 같은 사용자·같은 `--data-dir`의 실행 중 서버 작업 목록에 자동 등록한다. 세션 종료 시 제거하고 비정상 종료는 갱신 만료로 정리한다. `--native` 내부 세션과 다른 PC의 Windows 서버는 자동 등록 대상이 아니다. 상세 범위는 [GESTURES.md](GESTURES.md)를 따른다.
 
 ## 마이크 없는 Linux 서버와 SSH
 

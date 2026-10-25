@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Flownote.Remote.Network;
 
-public sealed class RemoteHub : IAsyncDisposable
+public sealed partial class RemoteHub : IAsyncDisposable
 {
     private sealed class Peer(DeviceGrant grant, WebSocket socket)
     {
@@ -21,6 +21,11 @@ public sealed class RemoteHub : IAsyncDisposable
         public WebSocket Socket { get; } = socket;
         public SemaphoreSlim Writer { get; } = new(1);
         public GestureGate Gate { get; } = new(750);
+        public SkeletonGestureGate Motion { get; } = new();
+        public long Sequence;
+        public bool InterfaceReady;
+        public double Zoom = 1, PanX, PanY;
+        public readonly Dictionary<Guid,long> PendingControls = [];
         public long LastSeen = Environment.TickCount64, LastFrame;
         public float Volume = 0.7f;
         public bool Muted, CameraActive, Leaving, Participating = true, OutputReady = true, SpeakAlerts = true;
@@ -38,7 +43,6 @@ public sealed class RemoteHub : IAsyncDisposable
     private readonly Dictionary<Guid, Peer> peers = [];
     private readonly Dictionary<string, (long Window, int Count)> attempts = [];
     private readonly Dictionary<string, long> alerts = [];
-    private readonly Func<byte[], Task<GestureSample>> infer;
     private readonly HubCapabilities capabilities;
     private readonly CancellationTokenSource stop = new();
     private RemoteSettings settings;
@@ -52,11 +56,11 @@ public sealed class RemoteHub : IAsyncDisposable
     public string PairingCode { get { lock (gate) return pairCode; } }
     public string Address { get; private set; } = "";
 
-    public RemoteHub(RemoteSettings settings, Func<byte[], Task<GestureSample>> infer, IEnumerable<DeviceGrant>? knownDevices = null,
+    public RemoteHub(RemoteSettings settings, Func<byte[], Task<GestureSample>>? infer = null, IEnumerable<DeviceGrant>? knownDevices = null,
         HubCapabilities? capabilities = null)
     {
-        this.settings = RemoteSettings.Parse(settings.ToJson()); this.infer = infer;
-        this.capabilities = (capabilities ?? new()) with { ClientParticipation = true };
+        this.settings = RemoteSettings.Parse(settings.ToJson());
+        this.capabilities = (capabilities ?? new()) with { ClientParticipation = true, CameraFrames = false, SkeletonFrames = true, ScopedGestures = true, InterfaceControl = true, GestureRecognition = true };
         grants = (knownDevices ?? []).Take(8).ToDictionary(g => g.Id);
         RenewPairing();
     }
@@ -74,7 +78,7 @@ public sealed class RemoteHub : IAsyncDisposable
         {
             if (!grants.TryGetValue(id, out var grant)) return;
             grants[id] = grant with { Allowed = allowed };
-            if (peers.TryGetValue(id, out var peer)) { peer.Gate.Reset(); if (!allowed) peer.CameraActive = false; }
+            if (peers.TryGetValue(id, out var peer)) { peer.Gate.Reset(); peer.Motion.Reset(); if (!allowed) peer.CameraActive = false; }
             GrantsChanged?.Invoke(grants.Values.ToArray());
         }
         Changed?.Invoke(); await BroadcastStateAsync();
@@ -90,7 +94,7 @@ public sealed class RemoteHub : IAsyncDisposable
     public void Configure(RemoteSettings value)
     {
         var copy = RemoteSettings.Parse(value.ToJson());
-        lock (gate) { settings = copy; foreach (var p in peers.Values) p.Gate.Reset(); }
+        lock (gate) { settings = copy; foreach (var p in peers.Values) { p.Gate.Reset(); p.Motion.Reset(); } }
         Changed?.Invoke();
     }
     public void SelectTargets(Guid? commandTarget, Guid? speechTarget)
@@ -99,9 +103,9 @@ public sealed class RemoteHub : IAsyncDisposable
     {
         lock (gate) return new(grants.Values.Select(g => peers.TryGetValue(g.Id, out var p)
             ? new DeviceState(g.Id, g.Name, true, p.CameraActive && Enabled(p), p.Volume, p.Muted, p.Battery, p.LastSeen,
-                Enabled(p), g.Allowed, p.OutputReady, p.SpeakAlerts, p.Platform)
+                Enabled(p), g.Allowed, p.OutputReady, p.SpeakAlerts, p.Platform, p.InterfaceReady, p.Zoom, p.PanX, p.PanY)
             : new DeviceState(g.Id, g.Name, false, false, 0, false, null, 0, false, g.Allowed, false, false)).ToArray(),
-            gestureTarget, voiceTarget, settings.GesturesEnabled, capabilities);
+            gestureTarget, voiceTarget, settings.GesturesEnabled, capabilities, tasks.Values.ToArray(), selectedTask, settings.ConfidenceThreshold);
     }
     public PairResult RegisterLocal(string name, Guid? deviceId = null)
     {
@@ -227,7 +231,7 @@ public sealed class RemoteHub : IAsyncDisposable
         switch (type)
         {
             case "device.enabled":
-                lock (gate) { peer.Participating = message.GetProperty("enabled").GetBoolean(); peer.Gate.Reset(); if (!Enabled(peer)) peer.CameraActive = false; }
+                lock (gate) { peer.Participating = message.GetProperty("enabled").GetBoolean(); peer.Gate.Reset(); peer.Motion.Reset(); if (!Enabled(peer)) peer.CameraActive = false; }
                 await BroadcastStateAsync(); Changed?.Invoke(); break;
             case "heartbeat":
                 var health = message.GetProperty("health").Deserialize<HealthSample>(Protocol.Json) ?? throw new ArgumentException();
@@ -237,6 +241,7 @@ public sealed class RemoteHub : IAsyncDisposable
                 {
                     peer.Volume = health.Volume; peer.Muted = health.Muted; peer.Battery = health.BatteryPercent;
                     peer.OutputReady = health.OutputReady; peer.SpeakAlerts = health.SpeakAlerts;
+                    peer.InterfaceReady = health.InterfaceReady;
                     peer.Platform = health.Platform is "Windows" or "Android" ? health.Platform : "클라이언트";
                     int batteryLevel = health.BatteryPercent is <= 5 ? 2 : health.BatteryPercent is <= 15 ? 1 : 0;
                     int memoryLevel = health.MemoryLoadPercent is >= 97 ? 2 : health.MemoryLoadPercent is >= 90 ? 1 : 0;
@@ -270,29 +275,29 @@ public sealed class RemoteHub : IAsyncDisposable
                 }
                 if (!output.Applied) await AnnounceAsync("output.error:" + peer.Grant.Id, "warning", $"{peer.Grant.Name}의 소리 출력 장치를 확인하세요.", "Please check the client's audio output device.");
                 Activity?.Invoke(output.Applied ? $"{peer.Grant.Name} 소리 제어 적용됨" : $"{peer.Grant.Name} 소리 제어 실패"); Changed?.Invoke(); break;
-            case "camera.frame":
-                Guid frameId = message.GetProperty("frameId").GetGuid();
-                bool enabled; lock (gate) enabled = Enabled(peer);
-                if (!enabled) { await SendAsync(peer, new { type = "frame.result", frameId, gesture = "None", confidence = 0 }); return; }
-                if (Environment.TickCount64 - peer.LastFrame < 180) { await SendAsync(peer, new { type = "frame.result", frameId, gesture = "None", confidence = 0 }); return; }
-                peer.LastFrame = Environment.TickCount64; peer.CameraActive = true;
-                string encoded = message.GetProperty("jpeg").GetString() ?? "";
-                if (encoded.Length > 180000) throw new ArgumentException();
-                byte[] frame = Convert.FromBase64String(encoded); Protocol.ValidateJpeg(frame);
-                GestureSample sample;
-                try { sample = await infer(frame).WaitAsync(TimeSpan.FromSeconds(4), stop.Token); }
-                catch (Exception e) when (e is TimeoutException or InvalidOperationException)
+            case "camera.frame": throw new ArgumentException("원본 영상 전송은 지원하지 않습니다. 골격 지원 클라이언트로 업데이트하세요.");
+            case "skeleton.frame": await SkeletonAsync(peer, message); break;
+            case "control":
+                lock (gate) { if (!Enabled(peer)) return; }
+                var control = message.GetProperty("command").Deserialize<InterfaceCommand>(Protocol.Json) ?? throw new ArgumentException();
+                if (!ValidManual(control)) throw new ArgumentException("허용되지 않은 제어 명령입니다.");
+                Guid targetId = message.GetProperty("targetId").GetGuid();
+                await RouteControlAsync(targetId, control with { Scope = "precision" }); break;
+            case "task.select":
+                lock (gate) { if (!Enabled(peer)) return; }
+                await SelectTaskAsync(message.GetProperty("taskId").GetGuid()); break;
+            case "control.result":
+                var result = message.GetProperty("result").Deserialize<InterfaceResult>(Protocol.Json) ?? throw new ArgumentException();
+                if (!double.IsFinite(result.Zoom) || result.Zoom is < .5 or > 2 || !double.IsFinite(result.PanX) || !double.IsFinite(result.PanY) ||
+                    result.PanX is < -1 or > 1 || result.PanY is < -1 or > 1 || result.Error?.Length > 64) throw new ArgumentException();
+                lock (gate)
                 {
-                    await AnnounceAsync("vision.unavailable", "warning", "서버의 카메라 분석을 사용할 수 없습니다.", "Server gesture recognition is unavailable.");
-                    sample = new(null, 0);
+                    if (!peer.PendingControls.Remove(message.GetProperty("commandId").GetGuid())) return;
+                    if (result.Applied) { peer.Zoom = result.Zoom; peer.PanX = result.PanX; peer.PanY = result.PanY; }
                 }
-                string? action; Guid? target;
-                lock (gate) { action = Enabled(peer) ? peer.Gate.Observe(settings, sample.Gesture, sample.Confidence, Environment.TickCount64) : null; target = gestureTarget; }
-                await SendAsync(peer, new { type = "frame.result", frameId, gesture = sample.Gesture, confidence = sample.Confidence });
-                if (action is not null && target.HasValue && action != "assistant_open") await ExecuteAsync(target.Value, action, Guid.NewGuid());
-                if (action == "assistant_open") await AnnounceAsync("assistant.pending", "info", "자연어 비서는 아직 연결되지 않았습니다.", "The conversational assistant is not connected yet.");
-                Changed?.Invoke(); break;
-            case "camera.stop": lock (gate) { peer.CameraActive = false; peer.Gate.Reset(); } Changed?.Invoke(); break;
+                Activity?.Invoke(result.Applied ? $"{peer.Grant.Name} 화면 제어 적용됨" : $"{peer.Grant.Name} 화면 제어 실패");
+                await BroadcastStateAsync(); Changed?.Invoke(); break;
+            case "camera.stop": lock (gate) { peer.CameraActive = false; peer.Gate.Reset(); peer.Motion.Reset(); peer.Sequence = 0; } Changed?.Invoke(); break;
             case "bye": peer.Leaving = true; break;
             default: throw new ArgumentException("지원하지 않는 명령입니다.");
         }
@@ -344,8 +349,11 @@ public sealed class RemoteHub : IAsyncDisposable
         {
             while (await timer.WaitForNextTickAsync(stop.Token))
             {
+                Guid[] expired;
                 lock (gate) foreach (var peer in peers.Values)
                     if (Environment.TickCount64 - peer.LastSeen > 12000) peer.Socket.Abort();
+                lock (gate) expired = taskLeases.Where(t => Environment.TickCount64-t.Value > 65000).Select(t => t.Key).ToArray();
+                foreach (var id in expired) await RemoveTaskAsync(id);
             }
         }
         catch (OperationCanceledException) { }

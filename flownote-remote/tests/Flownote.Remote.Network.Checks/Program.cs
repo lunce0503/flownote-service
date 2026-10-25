@@ -74,3 +74,5 @@ foreach (string uri in new[] { "http://127.0.0.1:17843", "https://user:pass@127.
 { try { Protocol.ServerUri(uri); throw new Exception("Unsafe address accepted"); } catch (ArgumentException) { } }
 try { Protocol.ValidateJpeg(new byte[4]); throw new Exception("Invalid camera frame accepted"); } catch (ArgumentException) { }
 Console.WriteLine("PASS: shared QR contract/expiry validation, legacy grant migration, real TLS pairing, pin/replay rejection, heartbeat, output acknowledgement, deduplication, client pause, server permission enforcement and revocation");
+
+await ScopedNetworkChecks.RunAsync();

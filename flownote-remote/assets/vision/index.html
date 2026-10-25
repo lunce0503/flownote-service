@@ -1,5 +1,5 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; worker-src 'self' blob:">
-<style>body{margin:0;background:#202020;color:#fff;font:15px sans-serif}video,img{width:100%;max-height:250px;object-fit:contain}p{padding:8px;margin:0}canvas{display:none}[hidden]{display:none}</style></head>
-<body><video id="preview" autoplay muted playsinline hidden></video><img id="received" hidden alt="서버가 분석 중인 클라이언트 영상"><canvas id="capture"></canvas><p id="status">카메라 꺼짐 · 서버에서 제스처를 판정합니다.</p><script type="module" src="vision.mjs"></script></body></html>
+<style>body{margin:0;background:#202020;color:#fff;font:15px sans-serif}video,img{width:100%;max-height:250px;object-fit:contain}p{padding:8px;margin:0}#capture{display:none}#previewWrap{position:relative}#bones{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;object-fit:contain}[hidden]{display:none}</style></head>
+<body><div id="previewWrap"><video id="preview" autoplay muted playsinline hidden></video><canvas id="bones" hidden></canvas></div><img id="received" hidden alt="이 기기의 진단 영상"><canvas id="capture"></canvas><p id="status">카메라 꺼짐 · 이 기기에서 골격을 추출합니다.</p><script type="module" src="vision.mjs"></script></body></html>

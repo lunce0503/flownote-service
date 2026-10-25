@@ -10,8 +10,8 @@ namespace Flownote.Remote.Cli
             Flownote Remote CLI — Linux HTTPS/WSS server and Codex voice
 
             flownote-remote server --listen <private IPv4> [--port 17843]
-                [--data-dir PATH] [--vision-root PATH | --no-vision]
-            flownote-remote status|invite|devices [--data-dir PATH]
+                [--data-dir PATH]
+            flownote-remote status|invite|devices|tasks [--data-dir PATH]
             flownote-remote allow|pause|revoke <device UUID> [--data-dir PATH]
             flownote-remote target|voice-target <device UUID> [--data-dir PATH]
             flownote-remote gestures on|off [--data-dir PATH]
@@ -25,7 +25,8 @@ namespace Flownote.Remote.Cli
             flownote-remote mcp [--data-dir PATH]  # restricted media tools over stdio
 
             server: private/VPN IPv4 only; gestures start OFF. Manage through the
-            owner's local Unix socket. invite prints a 2-minute one-time link.
+            owner's local Unix socket. Clients extract skeletons; server needs no
+            Node/model/browser. invite prints a 2-minute one-time link.
             voice --native: open Codex's own terminal; enter /voice there. Uses
             Codex's account/voice availability and native audio devices.
             voice: use the account signed in to Codex CLI through WebRTC.

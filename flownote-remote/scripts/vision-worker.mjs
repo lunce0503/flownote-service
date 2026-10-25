@@ -21,9 +21,9 @@ console.log(JSON.stringify({ready:true}));
 const lines=readline.createInterface({input:process.stdin});let pending=Promise.resolve();
 lines.on('line',line=>{pending=pending.then(async()=>{
  const request=JSON.parse(line);
- const result=await page.evaluate(async({jpeg,id})=>await new Promise((resolve,reject)=>{
-  window.chrome.webview.postMessage=message=>{if(message.id!==id)return;if(message.type==='gesture.error')reject(Error('Inference failed'));else if(message.type==='gesture.result')resolve(message);};
-  window.remoteVision.infer(jpeg,id);
+ const result=await page.evaluate(async({jpeg,id,skeleton})=>await new Promise((resolve,reject)=>{
+  window.chrome.webview.postMessage=message=>{if(message.id!==id)return;if(message.type==='gesture.error')reject(Error('Inference failed'));else if(message.type==='gesture.result'||message.type==='skeleton.result')resolve(message);};
+  window.remoteVision[skeleton?'extract':'infer'](jpeg,id);
  }),request);
  console.log(JSON.stringify(result));
 }).catch(error=>{process.stderr.write('Vision inference failed\n');process.exitCode=1;lines.close();});});

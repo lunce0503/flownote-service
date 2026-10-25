@@ -28,34 +28,34 @@ internal static class Program
         Console.WriteLine("PASS: actual displayed QR pixels round-trip through the QR decoder");
         await vision.InitializeAsync(); await vision.LoadModelAsync();
         byte[] image = await File.ReadAllBytesAsync(imagePath); Protocol.ValidateJpeg(image);
-        var recognized = await vision.InferAsync(image);
-        Console.WriteLine($"Real MediaPipe classification: {recognized.Gesture} {recognized.Confidence:F3}");
-        Check(recognized.Gesture == "Thumb_Up" && recognized.Confidence >= 0.7, "Real gesture model did not recognize the public thumb-up fixture");
-        var settings = RemoteSettings.Defaults(); settings.GesturesEnabled = true;
-        using var cert = Protocol.CreateCertificate(IPAddress.Loopback);
-        await using var hub = new RemoteHub(settings, vision.InferAsync);
-        await hub.StartAsync(IPAddress.Loopback, 0, cert);
-        var grant = await RemoteClient.PairAsync(hub.Address, Protocol.Pin(cert), hub.PairingCode, "Camera acceptance client");
-        float volume = 0.4f; int commands = 0, spokenAlerts = 0;
-        await using var client = new RemoteClient(command => { volume = command.Volume; commands++; return Task.FromResult(new OutputResult(true, volume, command.Muted)); }, () => new(volume, false));
-        client.Alert += alert => { if (alert.Speak) Interlocked.Increment(ref spokenAlerts); };
-        await client.ConnectAsync(hub.Address, Protocol.Pin(cert), grant);
-        await Task.Delay(250);
-        if (recognized.Confidence < settings.ConfidenceThreshold)
-        {
-            for (int frame = 0; frame < 3; frame++) { await client.SendCameraAsync(image); await Task.Delay(200); }
-            Check(commands == 0, "Below-threshold model result caused an output command");
-        }
-        settings.ConfidenceThreshold = 0.7; hub.Configure(settings);
-        for (int frame = 0; frame < 5; frame++) { await client.SendCameraAsync(image); await Task.Delay(200); }
-        for (int i = 0; i < 30 && commands == 0; i++) await Task.Delay(100);
-        Check(commands == 1 && Math.Abs(volume - 0.45f) < 0.01, "Camera -> server model -> gesture gate -> authenticated client output acknowledgement failed");
+        var skeleton=await vision.ExtractSkeletonAsync(image);
+        Check(skeleton.Hands.Length==1&&skeleton.Hands[0].Points.Length==21,"Real WebView hand skeleton missing");
+        var settings=RemoteSettings.Defaults();settings.GesturesEnabled=true;
+        using var cert=Protocol.CreateCertificate(IPAddress.Loopback);
+        await using var hub=new RemoteHub(settings);
+        await hub.StartAsync(IPAddress.Loopback,0,cert);
+        var grant=await RemoteClient.PairAsync(hub.Address,Protocol.Pin(cert),hub.PairingCode,"Camera acceptance client");
+        float volume=.4f;int commands=0,spokenAlerts=0;bool muted=false;
+        var viewport=new InterfaceViewport();
+        await using var client=new RemoteClient(command=>{volume=command.Volume;muted=command.Muted;commands++;return Task.FromResult(new OutputResult(true,volume,muted));},()=>new(volume,muted),command=>{
+            viewport.Apply(command.Action,command.Value,command.X,command.Y);return Task.FromResult(new InterfaceResult(true,viewport.Zoom,viewport.X,viewport.Y));});
+        client.Alert+=alert=>{if(alert.Speak)Interlocked.Increment(ref spokenAlerts);};
+        await client.ConnectAsync(hub.Address,Protocol.Pin(cert),grant);await Task.Delay(250);
+        Check(client.State?.Capabilities is {SkeletonFrames:true,CameraFrames:false},"Skeleton-only capability missing");
+        await client.SendSkeletonAsync(skeleton);Check(commands==0,"Legacy thumb unexpectedly executed action");
+        await client.StopCameraAsync();
+        for(int i=1;i<=6;i++){await client.SendSkeletonAsync(TestSkeletons.Frame(TestSkeletons.Pose("crossed"),sequence:i));await Task.Delay(150);}
+        for(int i=0;i<30&&!muted;i++)await Task.Delay(100);
+        Check(commands==1&&muted,"Skeleton gate -> authenticated client output acknowledgement failed");
+        await client.ControlAsync(grant.DeviceId,"interface.zoom_set",1.5);
+        for(int i=0;i<30&&viewport.Zoom!=1.5;i++)await Task.Delay(100);
+        Check(viewport.Zoom==1.5,"Exact interface control failed");
         await hub.AnnounceAsync("test.server.warning", "critical", "서버 상태를 확인하세요.", "Please check the server status.");
         for (int i = 0; i < 30 && spokenAlerts == 0; i++) await Task.Delay(50);
         Check(spokenAlerts > 0, "Server critical notice did not reach the voice client");
         using var speech = new SpeechSynthesizer(); using var wave = new MemoryStream();
         speech.SetOutputToWaveStream(wave); speech.Speak("Please check the server status.");
         Check(wave.Length > 1000, "OS assistant voice did not synthesize a WAV");
-        Console.WriteLine("PASS: real camera-image model, TLS/WSS server command routing and output test adapter, held-gesture suppression, critical alert delivery and real OS speech synthesis");
+        Console.WriteLine("PASS: real local hand skeleton model, landmark-only TLS/WSS routing, synthetic held-gesture mute, exact interface command, critical alert and real OS speech synthesis");
     }
 }

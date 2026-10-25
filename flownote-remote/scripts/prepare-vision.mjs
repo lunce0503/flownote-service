@@ -21,6 +21,11 @@ await download(lock.packageUrl,archive,'sha512',lock.packageIntegrity,'base64');
 const entries=['vision_bundle.mjs',...['vision_wasm_internal','vision_wasm_nosimd_internal','vision_wasm_module_internal'].flatMap(n=>['wasm/'+n+'.js','wasm/'+n+'.wasm'])];
 execFileSync('tar',['-xzf',archive,'-C',output,'--strip-components=1',...entries.map(n=>'package/'+n)]);
 await download(lock.modelUrl,path.join(output,'gesture_recognizer.task'),'sha256',lock.modelSha256);
+for (const [key,file] of [['handLandmarker','hand_landmarker.task'],['poseLandmarker','pose_landmarker.task']])
+ await download(lock[key+'Url'],path.join(output,file),'sha256',lock[key+'Sha256']);
+const androidModels=path.join(root,'artifacts/android-vision');
+await mkdir(androidModels,{recursive:true});
+for(const file of ['hand_landmarker.task','pose_landmarker.task'])await cp(path.join(output,file),path.join(androidModels,file));
 await cp(path.join(root,'assets/vision'),output,{recursive:true});
 await mkdir(path.join(root,'artifacts/tests'),{recursive:true});
 await download(lock.testImageUrl,path.join(root,'artifacts/tests/thumb_up.jpg'),'sha256',lock.testImageSha256);

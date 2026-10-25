@@ -48,6 +48,7 @@ public partial class NetworkWindow : Window
         Width = Math.Min(Width, work.Width); Height = Math.Min(Height, work.Height); WindowStartupLocation = WindowStartupLocation.CenterScreen;
         SizeChanged += (_, _) => FeatureGrid.Columns = ActualWidth >= 740 ? 2 : 1;
         readSettings = settings ?? (() => File.Exists(settingsPath) ? RemoteSettings.Parse(File.ReadAllText(settingsPath)) : RemoteSettings.Defaults());
+        try { cameraPreference = PrivateStore.Load<CameraPreference>("camera") ?? new(readSettings().CameraFacing,null); } catch { cameraPreference = new("front",null); }
         CameraHost.Content = vision.View; ClientList.ItemsSource = rows; StartServer.IsEnabled = false;
         RecentNotice.Text = "카메라 입력을 준비하고 있어요…";
         addresses = NetworkInterface.GetAllNetworkInterfaces().Where(n => n.OperationalStatus == OperationalStatus.Up)
@@ -77,14 +78,17 @@ public partial class NetworkWindow : Window
                 finally { Interlocked.Exchange(ref scanBusy, 0); }
                 return;
             }
-            if (client is not { Connected: true, Enabled: true }) return;
-            try { await client.SendCameraAsync(frame); }
-            catch (Exception e) when (e is OperationCanceledException or TimeoutException or System.Net.WebSockets.WebSocketException or InvalidOperationException) { Log("영상 응답을 확인할 수 없습니다."); }
+        };
+        vision.SkeletonFrame += async frame =>
+        {
+            if (closing || closed || scanningQr || client is not { Connected: true, Enabled: true }) return;
+            try { await client.SendSkeletonAsync(frame); }
+            catch (Exception error) when (error is OperationCanceledException or TimeoutException or System.Net.WebSockets.WebSocketException or InvalidOperationException) { Log("골격 응답을 확인할 수 없습니다."); }
         };
         Loaded += async (_, _) =>
         {
-            try { await vision.InitializeAsync(); loaded = true; StartServer.IsEnabled = true; Log("카메라 입력 준비됨 · 사용할 기능을 켜 주세요."); }
-            catch (Exception) { Log("카메라 준비 실패: WebView2 Runtime 설치를 확인하세요."); }
+            try { StartServer.IsEnabled = true; await vision.InitializeAsync(); loaded = true; StartServer.IsEnabled = true; Log("카메라 입력 준비됨 · 사용할 기능을 켜 주세요."); }
+            catch (Exception) { StartServer.IsEnabled = true; Log("카메라 준비 실패: WebView2 Runtime 설치를 확인하세요. 서버와 수동 제어는 사용할 수 있습니다."); }
         };
         Closing += async (_, e) =>
         {
@@ -107,14 +111,14 @@ public partial class NetworkWindow : Window
     { var settings = readSettings(); settings.GesturesEnabled = AllowGestures.IsChecked == true; return settings; }
     private async void StartServer_Click(object sender, RoutedEventArgs e) => await Guard(async () =>
     {
-        if (!loaded || hub is not null) return;
+        if (hub is not null) return;
         if (bindAddress is null) { Log("연결된 사설망/VPN이 없습니다. 네트워크에 연결한 뒤 앱을 다시 열어 주세요."); return; }
         StartServer.IsEnabled = false; string stage = "인식 모델 준비";
         try
         {
-            await DisconnectAsync(); await vision.LoadModelAsync();
+            await DisconnectAsync();
             stage = "서버 인증서 저장"; certificate = PrivateStore.Certificate(bindAddress);
-            stage = "설정 복원"; hub = new RemoteHub(ServerSettings(), vision.InferAsync, PrivateStore.Load<DeviceGrant[]>("devices"));
+            stage = "설정 복원"; hub = new RemoteHub(ServerSettings(), knownDevices: PrivateStore.Load<DeviceGrant[]>("devices"));
             hub.Activity += Log; hub.Changed += () => Dispatcher.BeginInvoke(RefreshServer);
             hub.GrantsChanged += grants => PrivateStore.Save("devices", grants);
             stage = "서버 포트 열기"; await hub.StartAsync(IPAddress.Parse(bindAddress), Protocol.Port, certificate);
@@ -153,13 +157,14 @@ public partial class NetworkWindow : Window
         ConnectionStatus.Text = hub is not null ? $"이 PC가 서버입니다 · {count}대 연결됨" : $"서버에 연결됨 · {count}대 참여 중";
         AllowGestures.IsEnabled = hub is not null; AllowGestures.IsChecked = value.GesturesEnabled;
         GestureSummary.Text = value.GesturesEnabled ? "제스처 명령 사용 중" : "꺼짐 · 켜면 손 모양으로 제어합니다.";
+        RefreshScopedState(value);
         if (client is not null && value.Devices.Any(d => d.Id == client.DeviceId && !d.Enabled))
             _ = Guard(StopCameraAsync);
         } finally { refreshing = false; }
     }
     private async Task AttachAsync(string address, string pin, PairResult grant)
     {
-        var attached = new RemoteClient(NativeOutput.ApplyAsync, () => NativeOutput.Health() with { SpeakAlerts = speakEnabled, Platform = "Windows" });
+        var attached = new RemoteClient(NativeOutput.ApplyAsync, () => NativeOutput.Health() with { SpeakAlerts = speakEnabled, Platform = "Windows" }, ApplyInterfaceAsync);
         client = attached;
         attached.Activity += message =>
         {
@@ -168,7 +173,7 @@ public partial class NetworkWindow : Window
         };
         attached.Alert += alert => Dispatcher.BeginInvoke(() => { if (!closing && ReferenceEquals(client, attached)) { voice.Enabled = speakEnabled; voice.Speak(alert); } });
         attached.StateChanged += value => Dispatcher.BeginInvoke(() => { if (ReferenceEquals(client, attached)) RefreshDevices(value); });
-        attached.Gesture += sample => Dispatcher.BeginInvoke(() => { if (ReferenceEquals(client, attached)) Detection.Text = $"{sample.Gesture ?? "손 없음"} · 신뢰도 {sample.Confidence:P0}"; });
+        attached.Gesture += sample => Dispatcher.BeginInvoke(() => { if (ReferenceEquals(client, attached)) Detection.Text = sample.Gesture == "Tracking" ? "골격 추적 중 · 원본 영상은 이 기기에만 유지" : sample.Gesture ?? "추적 없음"; });
         await attached.ConnectAsync(address, pin, grant);
     }
     private async Task DisconnectAsync()
@@ -182,7 +187,7 @@ public partial class NetworkWindow : Window
     {
         if (hub is not null) await hub.AnnounceAsync("server.stopping", "info", "서버가 종료됩니다.", "The server is stopping.");
         await DisconnectAsync(); if (hub is not null) { await hub.DisposeAsync(); hub = null; }
-        certificate?.Dispose(); certificate = null; StartServer.IsEnabled = loaded; AllowGestures.IsEnabled = false;
+        certificate?.Dispose(); certificate = null; StartServer.IsEnabled = true; AllowGestures.IsEnabled = false;
         refreshing = true; AllowGestures.IsChecked = false; refreshing = false;
         rows.Clear(); state = null; target = null; EmptyClients.Visibility = Visibility.Visible;
         ConnectionStatus.Text = "서버가 꺼져 있어요."; ClientsTitle.Text = "클라이언트"; SoundSummary.Text = "클라이언트를 연결해 주세요.";
@@ -190,7 +195,7 @@ public partial class NetworkWindow : Window
     private async Task StopCameraAsync()
     {
         bool wasActive = scanningQr || CameraControl.IsChecked == true;
-        scanningQr = false; SetCameraToggle(false); await vision.StopCameraAsync();
+        scanningQr = false; PinchEnabled.IsChecked = false; SetCameraToggle(false); await vision.StopCameraAsync();
         if (wasActive && client?.Connected == true) await client.StopCameraAsync(); Detection.Text = "카메라 꺼짐";
     }
     private void SetCameraToggle(bool value) { bool previous = refreshing; refreshing = true; CameraControl.IsChecked = value; refreshing = previous; }
@@ -210,13 +215,15 @@ public partial class NetworkWindow : Window
         if (refreshing || !((ToggleButton)sender).IsLoaded) return;
         if (CameraControl.IsChecked != true) { await StopCameraAsync(); return; }
         if (!loaded || client is not { Connected: true, Enabled: true }) { SetCameraToggle(false); Log("사용 중인 클라이언트로 서버에 연결한 뒤 카메라를 켜 주세요."); return; }
-        scanningQr = false; await vision.StartCameraAsync(); Detection.Text = "카메라 전송 중 · 서버 판정 대기";
+        if (state?.Capabilities?.SkeletonFrames != true) { SetCameraToggle(false); Log("골격을 지원하는 서버로 업데이트해 주세요."); return; }
+        scanningQr = false; activeThreshold = state.DetectionThreshold;
+        await vision.StartCameraAsync(cameraPreference.Facing, PrecisionMode, activeThreshold, deviceId: cameraPreference.DeviceId); Detection.Text = "골격만 서버로 전송합니다.";
     });
     private async void ScanQr_Click(object sender, RoutedEventArgs e) => await Guard(async () =>
     {
         if (hub is not null) { ShowInvitation(); return; }
         if (!loaded) { Log("카메라 준비가 끝난 뒤 다시 시도해 주세요."); return; }
-        connectionDialog?.Close(); await StopCameraAsync(); scanningQr = true; await vision.StartCameraAsync();
+        connectionDialog?.Close(); await StopCameraAsync(); scanningQr = true; await vision.StartCameraAsync(cameraPreference.Facing, qrOnly: true, deviceId: cameraPreference.DeviceId);
         SetCameraToggle(true); Detection.Text = "서버 PC의 연결 QR을 카메라에 보여 주세요. 토글을 끄면 읽기를 중지합니다.";
     });
     private async void Command_Click(object sender, RoutedEventArgs e) => await SendCommand((string)((Button)sender).Tag);

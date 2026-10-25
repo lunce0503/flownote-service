@@ -55,3 +55,5 @@ Check(sound.Mixer.Settings.MasterVolume == 0.6f && sound.Mixer.Settings.BassDb =
 var samples = new float[960]; sound.Mixer.Render(samples);
 Check(samples.All(x => x == 0), "Empty mixer produced audio");
 Console.WriteLine("PASS: settings, gesture confidence/hold/release/cooldown/gaps and Sound Manager integration");
+
+SkeletonChecks.Run();

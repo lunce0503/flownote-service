@@ -3,5 +3,6 @@
   <ItemGroup>
     <ProjectReference Include="../../vendor/sound-manager/src/SoundManager.Core/SoundManager.Core.csproj" />
     <EmbeddedResource Include="../../config/default-settings.json" LogicalName="default-settings.json" />
+    <EmbeddedResource Include="../../config/scoped-gestures.json" LogicalName="scoped-gestures.json" />
   </ItemGroup>
 </Project>

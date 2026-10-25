@@ -22,8 +22,9 @@ and available in [packaging/dotnet-LICENSE.txt](packaging/dotnet-LICENSE.txt) in
 
 ## MediaPipe Tasks Vision
 
-The Windows EXE embeds @mediapipe/tasks-vision 1.1.1 and Google's gesture
-recognizer model. Exact download URLs, npm integrity and model SHA-256 are
+The Windows EXE embeds @mediapipe/tasks-vision 1.1.1 and Google's Hand
+Landmarker, Pose Landmarker Lite and legacy diagnostic Gesture Recognizer models.
+Android uses com.google.mediapipe:tasks-vision:1.1.1 and bundles the hand/pose models. Exact download URLs, npm integrity and model SHA-256 are
 recorded in [vision.lock.json](vision.lock.json). Licensed under Apache 2.0;
 the full text is [licenses/MediaPipe-LICENSE.txt](licenses/MediaPipe-LICENSE.txt)
 and is embedded in the EXE. The public thumb-up test image is downloaded only

@@ -43,7 +43,7 @@ public static class MediaTools
                 if (method == "initialize")
                 {
                     initialized = true;
-                    result = new { protocolVersion = "2024-11-05", serverInfo = new { name = "flownote-remote", version = "0.4.1" }, capabilities = new { tools = new { } } };
+                    result = new { protocolVersion = "2024-11-05", serverInfo = new { name = "flownote-remote", version = "0.5.0" }, capabilities = new { tools = new { } } };
                 }
                 else if (!initialized) throw new InvalidOperationException("Initialize first.");
                 else if (method == "ping") result = new { };

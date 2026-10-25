@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Flownote.Remote.Network;
+using Flownote.Remote.Core;
 
 namespace Flownote.Remote.Cli;
 
@@ -47,6 +48,23 @@ public sealed class VisionWorker : IAsyncDisposable
         }
         catch (Exception e) when (e is IOException or TimeoutException or JsonException or InvalidOperationException)
         { failed = true; if (!process.HasExited) process.Kill(true); throw new InvalidOperationException("Vision worker unavailable. Restart the server.", e); }
+        finally { gate.Release(); }
+    }
+    // Acceptance/local diagnostics only: production servers never receive images.
+    public async Task<SkeletonFrame> ExtractAsync(byte[] image)
+    {
+        await gate.WaitAsync();
+        try
+        {
+            string id = Guid.NewGuid().ToString();
+            await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { id, skeleton = true, jpeg = Convert.ToBase64String(image) }));
+            await process.StandardInput.FlushAsync();
+            string line = await process.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(15)) ?? throw new IOException("Local model exited.");
+            using var doc = JsonDocument.Parse(line);
+            if (doc.RootElement.GetProperty("id").GetString() != id) throw new IOException("Local model response mismatch.");
+            var frame = doc.RootElement.GetProperty("frame").Deserialize<SkeletonFrame>(Protocol.Json)!;
+            frame.Validate(); return frame;
+        }
         finally { gate.Release(); }
     }
     public async ValueTask DisposeAsync()

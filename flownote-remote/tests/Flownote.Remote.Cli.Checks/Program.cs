@@ -68,7 +68,7 @@ try
     Check((await Control("mute", grant.DeviceId.ToString())).StartsWith("ERROR:", StringComparison.Ordinal), "Paused output accepted");
     await Control("allow", grant.DeviceId.ToString()); await Until(() => client.Enabled);
     await Control("mute", grant.DeviceId.ToString()); await Until(() => muted);
-    Check((await Control("gestures", "on")).StartsWith("ERROR:", StringComparison.Ordinal), "Vision-disabled server enabled gestures");
+    Check(await Control("gestures", "on") == "OK: gestures on", "Skeleton server must work without Node vision");
     foreach (string file in new[] { "server.pfx", "grants.json", "owner.sock", "server.lock" }) StateStore.VerifyPrivate(Path.Combine(directory, file));
     using (var second = Launch()) { await second.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10)); Check(second.ExitCode != 0, "Duplicate server replaced owner socket"); }
     Check((await Control("devices")).Contains(grant.DeviceId.ToString(), StringComparison.Ordinal), "Original owner socket was replaced");
@@ -88,15 +88,29 @@ try
         server = Launch(true); await WaitReady();
         var live = PairingLink.Parse(await Control("invite"));
         var cameraGrant = await RemoteClient.PairAsync(live.Address, live.Pin, live.Code, "Real Linux vision");
-        int commands = 0; GestureSample? recognized = null;
-        await using var camera = new RemoteClient(c => { commands++; return Task.FromResult(new OutputResult(true, c.Volume, c.Muted)); }, () => new(0.4f, false));
+        int commands = 0; GestureSample? recognized = null; bool isMuted = false;
+        await using var camera = new RemoteClient(c => { commands++; isMuted=c.Muted; return Task.FromResult(new OutputResult(true, c.Volume, c.Muted)); }, () => new(0.4f, isMuted));
         camera.Gesture += result => recognized = result;
         await camera.ConnectAsync(live.Address, live.Pin, cameraGrant); await Control("gestures", "on");
-        byte[] jpeg = await File.ReadAllBytesAsync("artifacts/tests/thumb_up.jpg");
-        for (int i = 0; i < 5; i++) { await camera.SendCameraAsync(jpeg); await Task.Delay(200); }
-        await Until(() => commands == 1);
-        Check(recognized?.Gesture == "Thumb_Up" && recognized.Confidence >= 0.7, "Real Linux MediaPipe inference failed");
-        Console.WriteLine($"PASS: Linux Chromium/MediaPipe {recognized!.Gesture} {recognized.Confidence:F3} → TLS/WSS → gesture gate → output test adapter");
+        string modelRoot=prefix.Length==0 ? Path.GetDirectoryName(executable)! : root;
+        await using var localModel=await VisionWorker.StartAsync(modelRoot,CancellationToken.None);
+        var skeleton=await localModel.ExtractAsync(await File.ReadAllBytesAsync("artifacts/tests/thumb_up.jpg"));
+        Check(skeleton.Hands.Length==1 && skeleton.Hands[0].Points.Length==21,"Real client hand landmarks missing");
+        string wire=JsonSerializer.Serialize(skeleton,Protocol.Json);
+        Check(!wire.Contains("jpeg",StringComparison.OrdinalIgnoreCase) && !wire.Contains("base64",StringComparison.OrdinalIgnoreCase),"Image in wire contract");
+        await camera.SendSkeletonAsync(skeleton);
+        Check(recognized?.Gesture=="Tracking" && commands==0,"Legacy thumb must not execute scoped command");
+        await camera.StopCameraAsync();
+        for(int i=1;i<=6;i++) { await camera.SendSkeletonAsync(TestSkeletons.Frame(TestSkeletons.Pose("crossed"),sequence:i)); await Task.Delay(150); }
+        await Until(()=>isMuted);
+        Check(commands==1,"Held skeleton gesture repeated");
+        var task=new RemoteTask(Guid.NewGuid(),"Acceptance voice session");
+        Check(await Control("task.upsert",JsonSerializer.Serialize(task,Protocol.Json))=="OK","Owner task registration failed");
+        await Until(()=>camera.State?.Tasks?.Length==1);
+        Check((await Control("tasks")).Contains(task.Id.ToString(),StringComparison.Ordinal),"Actual task missing");
+        Check(await Control("task.remove",task.Id.ToString())=="OK","Owner task cleanup failed");
+        await Until(()=>camera.State?.Tasks?.Length==0);
+        Console.WriteLine("PASS: client Chromium/MediaPipe → 21 hand landmarks only → TLS/WSS skeleton server → mute acknowledgement, real owner task registration/removal");
         await StopServer();
     }
     Console.WriteLine("PASS: exact CLI server, owner socket permissions, TLS pairing, media acknowledgements, pause enforcement, duplicate process lock, stable certificate, reconnect, revocation and SIGTERM cleanup");
