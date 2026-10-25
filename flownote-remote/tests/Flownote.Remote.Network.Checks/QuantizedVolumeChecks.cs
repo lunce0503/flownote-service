@@ -1,0 +1,39 @@
+using System.Net;
+using Flownote.Remote.Core;
+using Flownote.Remote.Network;
+
+internal static class QuantizedVolumeChecks
+{
+    public static async Task RunAsync()
+    {
+        static void Check(bool ok,string message){if(!ok)throw new InvalidOperationException(message);}
+        static async Task Until(Func<bool> ok){for(int i=0;i<100;i++){if(ok())return;await Task.Delay(30);}throw new TimeoutException("Quantized output acknowledgement missing");}
+        var settings=RemoteSettings.Defaults();settings.GesturesEnabled=true;
+        using var cert=Protocol.CreateCertificate(IPAddress.Loopback);
+        await using var hub=new RemoteHub(settings);await hub.StartAsync(IPAddress.Loopback,0,cert);
+        var grant=await RemoteClient.PairAsync(hub.Address,Protocol.Pin(cert),hub.PairingCode,"15 step output");
+        int index=5,executions=0;OutputCommand? last=null;
+        await using var client=new RemoteClient(c=>{
+            int next=(int)Math.Round(c.Volume*15,MidpointRounding.AwayFromZero);
+            if(c.StepIfUnchanged&&next==index&&Math.Abs(c.Volume-index/15f)>.0001)next=Math.Clamp(next+(c.Volume>index/15f?1:-1),0,15);
+            index=next;last=c;executions++;return Task.FromResult(new OutputResult(true,index/15f,c.Muted));
+        },()=>new(index/15f,false));
+        await client.ConnectAsync(hub.Address,Protocol.Pin(cert),grant);
+        await Until(()=>Math.Abs(hub.Snapshot().Devices[0].Volume-5/15f)<.001);
+        for(int i=1;i<=3;i++)
+        {await client.ControlAsync(grant.DeviceId,"audio.set",.33);int expected=i;await Until(()=>executions==expected);Check(index==5&&last?.StepIfUnchanged==false,"Repeating an exact volume drifted on discrete hardware");}
+        long seq=0;
+        for(int i=0;i<5;i++){await client.SendSkeletonAsync(TestSkeletons.Frame(hands:[TestSkeletons.Hand("pinch")],mode:"volume",sequence:++seq));await Task.Delay(100);}
+        for(int i=1;i<=4;i++){await client.SendSkeletonAsync(TestSkeletons.Frame(hands:[TestSkeletons.Hand("pinch",y:-.02*i)],mode:"volume",sequence:++seq));await Task.Delay(160);}
+        await Until(()=>executions==7);
+        Check(index==6&&Math.Abs(last!.Volume-.37f)<.002,"Sub-step pinch input must accumulate instead of stalling or forcing full steps");
+        // A physical output change supersedes the fractional gesture accumulator.
+        await client.SendSkeletonAsync(TestSkeletons.Frame(mode:"volume",sequence:++seq));
+        index=8;await Until(()=>Math.Abs(hub.Snapshot().Devices[0].Volume-8/15f)<.001);
+        await client.SendSkeletonAsync(TestSkeletons.Frame(hands:[TestSkeletons.Hand("pinch")],mode:"volume",sequence:++seq));await Task.Delay(300);
+        await client.SendSkeletonAsync(TestSkeletons.Frame(hands:[TestSkeletons.Hand("pinch")],mode:"volume",sequence:++seq));await Task.Delay(150);
+        await client.SendSkeletonAsync(TestSkeletons.Frame(hands:[TestSkeletons.Hand("pinch",y:-.02)],mode:"volume",sequence:++seq));
+        await Until(()=>executions==8);Check(Math.Abs(last!.Volume-(8/15f+.01f))<.002,"External output change did not reset fine input");
+        Console.WriteLine("PASS: exact volume repeat stability, fractional pinch accumulation and hardware-change resync on a real TLS session with a 15-step output adapter");
+    }
+}

@@ -151,7 +151,7 @@ final class RemoteLink implements AutoCloseable {
             if(!applied.contains(id)){
                 int max=audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);if(max<=0)throw new IllegalStateException();int index=(int)Math.round(requested*max);
                 int previous=(int)Math.round(volume*max);
-                if(index==previous&&Math.abs(requested-volume)>0.0001)index=Math.max(0,Math.min(max,index+(requested>volume?1:-1)));
+                if(command.optBoolean("stepIfUnchanged",true)&&index==previous&&Math.abs(requested-volume)>0.0001)index=Math.max(0,Math.min(max,index+(requested>volume?1:-1)));
                 audio.adjustStreamVolume(AudioManager.STREAM_MUSIC,AudioManager.ADJUST_UNMUTE,0);
                 audio.setStreamVolume(AudioManager.STREAM_MUSIC,index,0);
                 volume=audio.getStreamVolume(AudioManager.STREAM_MUSIC)/(float)max;

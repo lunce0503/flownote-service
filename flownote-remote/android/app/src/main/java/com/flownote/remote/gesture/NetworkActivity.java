@@ -98,7 +98,7 @@ public final class NetworkActivity extends Activity {
             case 1:chooseCamera();break;
             case 2:startActivity(new Intent(this,MainActivity.class).putExtra("settings",true));break;
             case 3:if(link!=null&&link.connected()){disconnect();log("서버 연결을 해제했습니다.");}else showConnection(null);break;
-            case 4:new AlertDialog.Builder(this).setTitle("지원 기능과 라이선스").setMessage("카메라 전송·서버 제스처 판정·음량 제어·OS 음성 알림을 사용합니다.\n\n음원 분리/합성·화면·프로젝터·대화형 AI는 아직 연결 전입니다.\n\nQR 판독: ZXing 3.5.4 · Apache 2.0\n네트워크: OkHttp 4.12.0 · Apache 2.0\n\n"+apacheLicense()).setPositiveButton("닫기",null).show();break;
+            case 4:new AlertDialog.Builder(this).setTitle("지원 기능과 라이선스").setMessage("카메라 전송·서버 제스처 판정·음량 제어·OS 음성 알림을 사용합니다.\n\n음원 분리/합성·화면·프로젝터·대화형 AI는 아직 연결 전입니다.\n\n골격: MediaPipe Tasks Vision 1.1.1 및 Hand/Pose 모델 · Apache 2.0\nQR 판독: ZXing 3.5.4 · Apache 2.0\n네트워크: OkHttp 4.12.0 · Apache 2.0\n\n"+apacheLicense()).setPositiveButton("닫기",null).show();break;
             default:return false;
         }return true;});popup.show();
     }

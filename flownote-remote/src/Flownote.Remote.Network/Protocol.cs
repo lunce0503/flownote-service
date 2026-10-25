@@ -40,7 +40,7 @@ public sealed record InterfaceCommand(Guid CommandId, string Scope, string Actio
     }
 }
 public sealed record InterfaceResult(bool Applied, double Zoom = 1, double PanX = 0, double PanY = 0, string? Error = null);
-public sealed record OutputCommand(Guid CommandId, float Volume, bool Muted);
+public sealed record OutputCommand(Guid CommandId, float Volume, bool Muted, bool StepIfUnchanged = true);
 public sealed record OutputResult(bool Applied, float Volume, bool Muted, string? Error = null);
 public sealed record AlertNotice(Guid Id, string Code, string Severity, string Message, string English, bool Speak);
 public sealed record HealthSample(float Volume, bool Muted, int? BatteryPercent = null, bool OutputReady = true, int? MemoryLoadPercent = null,

@@ -104,9 +104,10 @@ public sealed partial class RemoteHub
         {
             if (!peers.TryGetValue(target,out peer) || !Enabled(peer) || !peer.OutputReady || peer.PendingOutputs.Count >= 128) return;
             if (!peer.PendingOutputs.Add(commandId)) return;
-            volume = (float)Math.Clamp(absolute ? value : (peer.DesiredVolume ?? peer.Volume)+value,0,1); muted = peer.Muted;
+            peer.FineVolume = Math.Clamp(absolute ? value : (peer.FineVolume ?? peer.DesiredVolume ?? peer.Volume)+value,0,1);
+            volume = (float)peer.FineVolume.Value; muted = peer.Muted;
             peer.DesiredVolume = volume; peer.DesiredMuted = muted;
         }
-        await SendAsync(peer,new { type = "output.set", command = new OutputCommand(commandId,volume,muted) });
+        await SendAsync(peer,new { type = "output.set", command = new OutputCommand(commandId,volume,muted,StepIfUnchanged:false) });
     }
 }

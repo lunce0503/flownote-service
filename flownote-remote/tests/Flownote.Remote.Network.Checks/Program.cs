@@ -76,3 +76,4 @@ try { Protocol.ValidateJpeg(new byte[4]); throw new Exception("Invalid camera fr
 Console.WriteLine("PASS: shared QR contract/expiry validation, legacy grant migration, real TLS pairing, pin/replay rejection, heartbeat, output acknowledgement, deduplication, client pause, server permission enforcement and revocation");
 
 await ScopedNetworkChecks.RunAsync();
+await QuantizedVolumeChecks.RunAsync();

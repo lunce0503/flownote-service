@@ -93,7 +93,7 @@ public class NetworkDeviceTest {
             activity=instrumentation.startActivitySync(new Intent(context,NetworkActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             instrumentation.getUiAutomation().grantRuntimePermission(context.getPackageName(),Manifest.permission.CAMERA);
             camera[0]=new CameraSource(context,new CameraSource.Listener(){public void frame(byte[] jpeg){frames.countDown();}public void error(String message){}});
-            instrumentation.runOnMainSync(()->{try{camera[0].start(false);}catch(Exception e){throw new IllegalStateException(e);}});
+            instrumentation.runOnMainSync(()->{try{camera[0].start(true);}catch(Exception e){throw new IllegalStateException(e);}});
             assertTrue("Camera2 did not deliver live YUV/JPEG frames",frames.await(12,TimeUnit.SECONDS));
             instrumentation.runOnMainSync(()->camera[0].close());link.stopCamera();SystemClock.sleep(900);
             audio.setStreamVolume(AudioManager.STREAM_MUSIC,initial,0);SystemClock.sleep(3300);checkingFixture.set(true);
@@ -117,6 +117,14 @@ public class NetworkDeviceTest {
             assertTrue("Skeleton server gesture missing",gesture.await(5,TimeUnit.SECONDS));
             for(int i=0;i<40&&!audio.isStreamMute(AudioManager.STREAM_MUSIC);i++)SystemClock.sleep(100);
             assertTrue("Skeleton command did not mute actual Android output",audio.isStreamMute(AudioManager.STREAM_MUSIC));
+            link.command(connection.getString("deviceId"),"unmute");
+            for(int i=0;i<40&&audio.isStreamMute(AudioManager.STREAM_MUSIC);i++)SystemClock.sleep(100);
+            assertFalse("Output did not unmute",audio.isStreamMute(AudioManager.STREAM_MUSIC));
+            int exact=(int)Math.round(.33*maximum);
+            link.control(connection.getString("deviceId"),"audio.set",.33,0,0);
+            for(int i=0;i<40&&audio.getStreamVolume(AudioManager.STREAM_MUSIC)!=exact;i++)SystemClock.sleep(100);
+            assertEquals("Absolute input did not choose the nearest OS volume step",exact,audio.getStreamVolume(AudioManager.STREAM_MUSIC));
+            for(int i=0;i<3;i++){link.control(connection.getString("deviceId"),"audio.set",.33,0,0);SystemClock.sleep(350);assertEquals("Repeating exact volume drifted",exact,audio.getStreamVolume(AudioManager.STREAM_MUSIC));}
             var socketField=RemoteLink.class.getDeclaredField("socket");socketField.setAccessible(true);((WebSocket)socketField.get(link)).cancel();
             assertTrue("Unexpected disconnection was not reported",lost.await(8,TimeUnit.SECONDS));assertFalse(alive.get());
             // Reuse the already authenticated grant through the real dashboard's encrypted saved-connection path.

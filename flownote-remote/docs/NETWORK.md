@@ -60,7 +60,7 @@ QR/연결 코드는 `flownote-remote://pair?v=1&address=<escaped HTTPS IPv4 root
 | 클라이언트 → 서버 | heartbeat | health.volume(0–1), muted, batteryPercent(선택 0–100), outputReady, memoryLoadPercent(선택 0–100), speakAlerts, platform(Windows/Android) |
 | 클라이언트 → 서버 | device.enabled | enabled(boolean), 발신 기기 자신의 일시 중지/재개만 변경 |
 | 클라이언트 → 서버 | command | commandId(UUID), targetId(UUID), action(volume_up / volume_down / mute / unmute) |
-| 서버 → 클라이언트 | output.set | command.commandId, volume(절대값), muted |
+| 서버 → 클라이언트 | output.set | command.commandId, volume(절대값), muted, stepIfUnchanged(기본 true; 정밀 입력은 false) |
 | 클라이언트 → 서버 | output.result | commandId, result.applied, volume, muted, error(선택) |
 | 클라이언트 → 서버 | skeleton.frame | frameId(UUID), frame(schemaVersion/sequence/크기/방향/추출 기준/모드/자세/손 관절), 최대 16KiB |
 | 서버 → 클라이언트 | skeleton.result | 같은 frameId, gesture, scope, confidence=0(확률 미제공) |

@@ -32,6 +32,7 @@ public sealed partial class RemoteHub : IAsyncDisposable
         public string Platform = "클라이언트";
         public int BatteryWarning, MemoryWarning;
         public float? DesiredVolume;
+        public double? FineVolume;
         public bool DesiredMuted;
         public readonly HashSet<Guid> PendingOutputs = [];
         public int? Battery;
@@ -78,7 +79,7 @@ public sealed partial class RemoteHub : IAsyncDisposable
         {
             if (!grants.TryGetValue(id, out var grant)) return;
             grants[id] = grant with { Allowed = allowed };
-            if (peers.TryGetValue(id, out var peer)) { peer.Gate.Reset(); peer.Motion.Reset(); if (!allowed) peer.CameraActive = false; }
+            if (peers.TryGetValue(id, out var peer)) { peer.Gate.Reset(); peer.Motion.Reset(); peer.FineVolume = null; if (!allowed) peer.CameraActive = false; }
             GrantsChanged?.Invoke(grants.Values.ToArray());
         }
         Changed?.Invoke(); await BroadcastStateAsync();
@@ -94,7 +95,7 @@ public sealed partial class RemoteHub : IAsyncDisposable
     public void Configure(RemoteSettings value)
     {
         var copy = RemoteSettings.Parse(value.ToJson());
-        lock (gate) { settings = copy; foreach (var p in peers.Values) { p.Gate.Reset(); p.Motion.Reset(); } }
+        lock (gate) { settings = copy; foreach (var p in peers.Values) { p.Gate.Reset(); p.Motion.Reset(); p.FineVolume = null; } }
         Changed?.Invoke();
     }
     public void SelectTargets(Guid? commandTarget, Guid? speechTarget)
@@ -231,7 +232,7 @@ public sealed partial class RemoteHub : IAsyncDisposable
         switch (type)
         {
             case "device.enabled":
-                lock (gate) { peer.Participating = message.GetProperty("enabled").GetBoolean(); peer.Gate.Reset(); peer.Motion.Reset(); if (!Enabled(peer)) peer.CameraActive = false; }
+                lock (gate) { peer.Participating = message.GetProperty("enabled").GetBoolean(); peer.Gate.Reset(); peer.Motion.Reset(); peer.FineVolume = null; if (!Enabled(peer)) peer.CameraActive = false; }
                 await BroadcastStateAsync(); Changed?.Invoke(); break;
             case "heartbeat":
                 var health = message.GetProperty("health").Deserialize<HealthSample>(Protocol.Json) ?? throw new ArgumentException();
@@ -239,6 +240,7 @@ public sealed partial class RemoteHub : IAsyncDisposable
                 bool warn, memory;
                 lock (gate)
                 {
+                    if (Math.Abs(peer.Volume-health.Volume) > .0001 && peer.PendingOutputs.Count == 0) peer.FineVolume = null;
                     peer.Volume = health.Volume; peer.Muted = health.Muted; peer.Battery = health.BatteryPercent;
                     peer.OutputReady = health.OutputReady; peer.SpeakAlerts = health.SpeakAlerts;
                     peer.InterfaceReady = health.InterfaceReady;
@@ -271,6 +273,7 @@ public sealed partial class RemoteHub : IAsyncDisposable
                 {
                     if (!peer.PendingOutputs.Remove(message.GetProperty("commandId").GetGuid())) return;
                     if (output.Applied) { peer.Volume = output.Volume; peer.Muted = output.Muted; }
+                    else peer.FineVolume = null;
                     if (peer.PendingOutputs.Count == 0) peer.DesiredVolume = null;
                 }
                 if (!output.Applied) await AnnounceAsync("output.error:" + peer.Grant.Id, "warning", $"{peer.Grant.Name}의 소리 출력 장치를 확인하세요.", "Please check the client's audio output device.");
@@ -297,7 +300,7 @@ public sealed partial class RemoteHub : IAsyncDisposable
                 }
                 Activity?.Invoke(result.Applied ? $"{peer.Grant.Name} 화면 제어 적용됨" : $"{peer.Grant.Name} 화면 제어 실패");
                 await BroadcastStateAsync(); Changed?.Invoke(); break;
-            case "camera.stop": lock (gate) { peer.CameraActive = false; peer.Gate.Reset(); peer.Motion.Reset(); peer.Sequence = 0; } Changed?.Invoke(); break;
+            case "camera.stop": lock (gate) { peer.CameraActive = false; peer.Gate.Reset(); peer.Motion.Reset(); peer.Sequence = 0; foreach (var p in peers.Values) p.FineVolume = null; } Changed?.Invoke(); break;
             case "bye": peer.Leaving = true; break;
             default: throw new ArgumentException("지원하지 않는 명령입니다.");
         }
@@ -311,6 +314,7 @@ public sealed partial class RemoteHub : IAsyncDisposable
             if (!peers.TryGetValue(target, out peer)) return;
             if (!Enabled(peer)) return;
             if (peer.PendingOutputs.Count >= 128) throw new InvalidOperationException("출력 응답을 기다리고 있습니다.");
+            peer.FineVolume = null;
             volume = peer.DesiredVolume ?? peer.Volume; muted = peer.DesiredVolume.HasValue ? peer.DesiredMuted : peer.Muted;
             switch (action)
             {
