@@ -5,3 +5,5 @@
 - 수정: OutputCommand의 선택적 stepIfUnchanged를 정밀 입력에서 false로 보낸다. 서버는 제한된 핀치 변화량을 별도로 누적하고 실제 OS 상태는 그대로 응답/표시한다. 외부 음량 변경·수동 버튼·카메라 중지·설정/참여 변경 시 누적을 초기화한다.
 - 검증: 실제 TLS 세션의 15단계 출력 어댑터로 반복 33% 입력·작은 핀치 누적·외부 변경 동기화를 검사한다. Android 계측에서 실제 AudioManager에 같은 수치를 반복 적용해 값이 유지되는지 검사한다.
 - 배포: v0.5.0은 공개 릴리스 전에 태그 workflow를 취소했다. 태그를 이동/삭제하지 않고 0.5.1/versionCode 8로 보완한다.
+
+검증 완료: staging 40148957200 및 v0.5.1 tag 40149604538의 Windows/Linux TLS 15단계 회귀와 Android 실제 AudioManager 반복 적용 모두 통과했다. 공개 APK 서명과 versionCode 8, 세 공개 앱의 체크섬을 재확인했다.
