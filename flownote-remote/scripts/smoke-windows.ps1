@@ -79,10 +79,14 @@ try {
     $source=Find-ProcessControl $app.Process.Id 'CameraSourceDialog'
     $choice=Find-Control $source 'CameraSourceChoice'
     $choice.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
-    $rear=$choice.FindFirst([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'후면 카메라 (환경 방향)'))
+    $rearCondition=[System.Windows.Automation.AndCondition]::new(
+        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'후면 카메라 (환경 방향)'),
+        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::ListItem))
+    $rear=$choice.FindFirst([System.Windows.Automation.TreeScope]::Descendants,$rearCondition)
     if (!$rear) { throw 'Rear camera choice missing' }
     $rear.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
     Invoke-Control (Find-Control $source 'ApplyCameraSource')
+    Start-Sleep -Milliseconds 350
     $settings=Open-Settings $app
     $enabled=(Find-Control $settings 'Enabled').GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
     if ($enabled.Current.ToggleState -ne [System.Windows.Automation.ToggleState]::Off) { throw 'Gestures must default OFF' }
@@ -153,6 +157,9 @@ try {
     Scroll-Dashboard $app.Root 100
     Save-Screenshot $app.Root 'clients-windows-narrow'
     Write-Output 'PASS: exact EXE dashboard, overflow settings/licenses, restart restore, offline model/TLS server, accessible client pause/resume and invitation panel'
+} catch {
+    Write-Output $_.ScriptStackTrace
+    throw
 } finally {
     if ($app -and !$app.Process.HasExited) {
         $app.Process.CloseMainWindow() | Out-Null

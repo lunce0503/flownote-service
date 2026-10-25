@@ -100,7 +100,9 @@ public class NetworkDeviceTest {
             byte[] thumb=asset("thumb_up.jpg");
             try(var tracker=new SkeletonTracker(context,.7)){
                 var bitmap=android.graphics.BitmapFactory.decodeByteArray(thumb,0,thumb.length);
-                var bones=tracker.detect(bitmap,true,"off");bitmap.recycle();
+                var bones=tracker.detect(bitmap,true,"off");
+                assertFalse("Native inference recycled the live preview bitmap",bitmap.isRecycled());
+                bitmap.recycle();
                 assertEquals("Real on-device hand landmarks missing",21,bones.getJSONArray("hands").getJSONObject(0).getJSONArray("points").length());
                 assertEquals("back",bones.getString("facing"));assertFalse(bones.toString().contains("jpeg"));assertFalse(bones.toString().contains("base64"));
                 var overlay=new SkeletonOverlay(context);instrumentation.runOnMainSync(()->{overlay.layout(0,0,480,480);overlay.show(bones);});

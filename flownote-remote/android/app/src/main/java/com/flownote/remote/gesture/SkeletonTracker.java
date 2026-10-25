@@ -38,7 +38,8 @@ final class SkeletonTracker implements AutoCloseable {
         return points;
     }
     JSONObject detect(Bitmap bitmap,boolean rear,String mode)throws Exception {
-        var image=new BitmapImageBuilder(bitmap).build();
+        // MPImage.close() recycles its bitmap. Preserve the caller's live preview frame.
+        var image=new BitmapImageBuilder(bitmap.copy(Bitmap.Config.ARGB_8888,false)).build();
         try {
             var h=hands.detect(image);var p=pose.detect(image);var resultHands=new JSONArray();var sides=new HashSet<String>();
             for(int i=0;i<h.landmarks().size();i++) {
