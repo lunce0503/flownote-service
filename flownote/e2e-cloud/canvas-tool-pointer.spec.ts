@@ -72,6 +72,11 @@ for (const width of [390, 820, 1024]) {
         await expect(marker).toBeVisible();
         const tip = await page.getByTestId('canvas-tool-pointer-tip').boundingBox();
         expect(tip).not.toBeNull();
+        expect(tip!.width).toBe(4);
+        expect(tip!.height).toBe(4);
+        expect(await page.getByTestId('canvas-tool-pointer-tip').evaluate(tip =>
+          parseFloat(getComputedStyle(tip).borderTopLeftRadius))).toBeGreaterThanOrEqual(2);
+        await expect(page.getByTestId('canvas-tool-pointer-tip')).toHaveCSS('box-shadow', 'none');
         expect(tip!.x + tip!.width / 2).toBeCloseTo(point.x, 0);
         expect(tip!.y + tip!.height / 2).toBeCloseTo(point.y, 0);
       };
@@ -90,20 +95,22 @@ for (const width of [390, 820, 1024]) {
         }
         await hover();
         await expect(marker).toHaveAttribute('data-tool', tool);
-        await expect(marker).toContainText(label);
+        await expect(marker).toHaveText('');
+        await expect(marker.locator('svg')).toHaveCount(0);
+        await expect(marker.locator('span')).toHaveCount(1);
         await expect(marker).toHaveCSS('pointer-events', 'none');
         await expect(marker).toHaveAttribute('aria-hidden', 'true');
       }
       // Tool switches from the existing Pencil double-tap event update a stationary marker.
       await page.evaluate(() => window.dispatchEvent(new CustomEvent('flownote:apple-pencil-double-tap')));
       await expect(marker).toHaveAttribute('data-tool', 'eraser');
-      await expect(marker).toContainText('지우개');
+      await expect(marker).toHaveText('');
       await page.evaluate(() => window.dispatchEvent(new CustomEvent('flownote:apple-pencil-double-tap')));
       await expect(marker).toHaveAttribute('data-tool', 'pen');
       await hover(true);
-      const labelBox = await marker.locator('span').last().boundingBox();
-      expect(labelBox).not.toBeNull();
-      expect(labelBox!.x + labelBox!.width).toBeLessThanOrEqual(width);
+      const tipBox = await page.getByTestId('canvas-tool-pointer-tip').boundingBox();
+      expect(tipBox).not.toBeNull();
+      expect(tipBox!.x + tipBox!.width).toBeLessThanOrEqual(width);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
       for (const type of ['pointerleave', 'pointercancel', 'lostpointercapture']) {
         await hover();

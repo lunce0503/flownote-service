@@ -57,19 +57,22 @@ const selectTool = async (page: Page, label: string) => {
   await page.keyboard.press('Escape');
 };
 
-const expectMarker = async (page: Page, tool: string, label: string, point: Point) => {
+const expectMarker = async (page: Page, tool: string, point: Point) => {
   const marker = page.getByTestId('canvas-tool-pointer');
   await expect(marker).toBeVisible().catch(async error => {
     console.log('Pointer event sequence:', await page.evaluate(() => (window as unknown as { __pointerProbe?: unknown[] }).__pointerProbe));
     throw error;
   });
   await expect(marker).toHaveAttribute('data-tool', tool);
-  await expect(marker).toContainText(label);
-  await expect(marker.locator('svg')).toBeVisible();
+  await expect(marker).toHaveText('');
+  await expect(marker.locator('svg')).toHaveCount(0);
+  await expect(marker.locator('span')).toHaveCount(1);
   await expect(marker).toHaveAttribute('aria-hidden', 'true');
   await expect(marker).toHaveCSS('pointer-events', 'none');
   const tip = await page.getByTestId('canvas-tool-pointer-tip').boundingBox();
   expect(tip).not.toBeNull();
+  expect(tip!.width).toBe(4);
+  expect(tip!.height).toBe(4);
   expect(tip!.x + tip!.width / 2).toBeCloseTo(point.x, 0);
   expect(tip!.y + tip!.height / 2).toBeCloseTo(point.y, 0);
   // The visual overlay must leave the actual input surface hit-testable.
@@ -155,10 +158,10 @@ for (const width of [390, 820]) {
       const before = await viewport(page);
       // No preceding hover event: contact alone must make the marker visible.
       await pen(page, cdp, 'mousePressed', start);
-      await expectMarker(page, 'pen', '펜', start);
+      await expectMarker(page, 'pen', start);
       await pen(page, cdp, 'mouseMoved', { x: start.x + 40, y: start.y + 20 });
       await pen(page, cdp, 'mouseMoved', end);
-      await expectMarker(page, 'pen', '펜', end);
+      await expectMarker(page, 'pen', end);
       await pen(page, cdp, 'mouseReleased', end);
       await expect(page.getByTestId('canvas-tool-pointer')).toBeHidden();
       expect(await viewport(page)).toEqual(before);
@@ -196,12 +199,12 @@ for (const width of [390, 820]) {
         await expect(page.getByTestId('canvas-current-tool')).toHaveAttribute('aria-label', `현재 도구: ${label}`);
         const before = await viewport(page);
         await touch(page, cdp, 'touchStart', [start]);
-        await expectMarker(page, 'pan', '화면 이동', start);
+        await expectMarker(page, 'pan', start);
         for (const step of [1, 2]) {
           const point = { ...start, x: start.x + (axis === 'x' ? 40 : 5) * step,
             y: start.y + (axis === 'y' ? 40 : 5) * step };
           await touch(page, cdp, 'touchMove', [point]);
-          await expectMarker(page, 'pan', '화면 이동', point);
+          await expectMarker(page, 'pan', point);
         }
         const moved = await viewport(page);
         expect(moved[axis]).toBeGreaterThan(before[axis] + 20);
@@ -231,7 +234,7 @@ for (const width of [390, 820]) {
       // replacing DOM events, stubbing capture, or resetting component state.
       await selectTool(page, '올가미');
       await pen(page, cdp, 'mousePressed', first);
-      await expectMarker(page, 'lasso', '올가미', first);
+      await expectMarker(page, 'lasso', first);
       await touch(page, cdp, 'touchStart', [second]);
       await expect(marker).toBeHidden();
       await touch(page, cdp, 'touchMove', [{ ...second, x: second.x + 20 }]);
@@ -245,7 +248,7 @@ for (const width of [390, 820]) {
 
       // Once every contact ends, a new single contact must be visible again.
       await touch(page, cdp, 'touchStart', [first]);
-      await expectMarker(page, 'pan', '화면 이동', first);
+      await expectMarker(page, 'pan', first);
       const beforePinch = await viewport(page);
       await touch(page, cdp, 'touchStart', [first, second]);
       await expect(marker).toBeHidden();
@@ -257,7 +260,7 @@ for (const width of [390, 820]) {
       await expect(marker).toBeHidden();
       expect(await viewport(page)).toEqual(pinched);
       await touch(page, cdp, 'touchStart', [first]);
-      await expectMarker(page, 'pan', '화면 이동', first);
+      await expectMarker(page, 'pan', first);
       await touch(page, cdp, 'touchEnd', []);
       await expect(marker).toBeHidden();
       const response = await request.get(`${api}/api/canvas/load?canvasId=${canvasId}`, { headers: headers() });

@@ -37,7 +37,7 @@ Canvas는 자유 필기, 이미지, 텍스트 박스를 무한 좌표계에서 �
 | `features/canvas/model/canvasPdfImport.ts` | PDF 페이지를 편집 가능한 이미지 파일로 변환 |
 | `widgets/CanvasWidget/InfiniteCanvas/ui/CanvasPdfReader.tsx` | 현재 기기 전용 PDF 페이지 뷰어와 키보드/터치 격리 |
 | `widgets/CanvasWidget/InfiniteCanvas/model/canvasPanMomentum.ts` | viewport px/ms 기반 유한 시간 감속과 취소 |
-| `widgets/CanvasWidget/InfiniteCanvas/ui/CanvasToolPointer.tsx` | 실제 편집 입력과 분리한 장식 포인터·도구명 |
+| `widgets/CanvasWidget/InfiniteCanvas/ui/CanvasToolPointer.tsx` | 실제 편집 입력과 분리한 4px 원형 위치 표시 |
 | `widgets/CanvasWidget/InfiniteCanvas/model/canvasToolPointer.ts` | pen/touch 위치와 복수 접촉 숨김의 표시 상태 |
 | `shared/lib/librarySorting.ts` | Canvas와 Blog가 공유하는 최근/카테고리 정렬 |
 
@@ -45,6 +45,7 @@ Canvas는 자유 필기, 이미지, 텍스트 박스를 무한 좌표계에서 �
 
 - 최초 원격 로드가 끝날 때까지 입력 canvas는 `data-ready=false`이고 포인터 입력을 받지 않는다. 빈 원격 snapshot이 사용자의 첫 획을 덮어쓰면 안 된다.
 - 입력 좌표는 `useCanvasState`와 `useCanvasPointerInput`에서 offset/scale을 반영해 월드 좌표로 변환한다.
+- Pencil 호버·pen/touch 접촉 위치는 확대율과 무관한 지름 4 CSS px 원 하나만 표시한다. 커서를 따라다니는 도구명·아이콘·바깥 링·그림자는 표시하지 않으며 현재 도구는 기존 도구막대에서 확인한다. 장식 원은 입력을 가로채거나 저장 요소를 바꾸지 않고 복수 접촉·종료·취소 시 기존 정책대로 숨긴다.
 - 줌 범위는 `canvasConstants.ts`의 10%~500%를 휠·터치 핀치·저장 뷰포트 복원에서 공유한다. 10%는 전체 배치 탐색용이며 세밀한 필기는 확대 후 수행한다.
 - 빠른 `pointerdown`-`pointerup` 사이의 그리기 여부는 동기 ref가 소유한다. React state 반영 전에 종료된 짧은 획도 보존해야 한다.
 - 펜슬 전용 그리기 상태의 한 손가락 터치는 이동 시작 방향을 판별한 뒤 X축 또는 Y축으로 잠긴다. 두 번째 손가락이 닿으면 기존의 자유 이동·핀치 확대 제스처로 전환한다.

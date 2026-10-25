@@ -1,16 +1,6 @@
 import { useEffect, useState, type RefObject } from 'react';
-import { Eraser, Hand, Lasso, Move, PenLine, Type } from 'lucide-react';
 import type { ToolType } from '@/entities/canvas';
 import { createCanvasToolPointer, getCanvasPointerTool, type ToolPointerPosition } from '../model/canvasToolPointer';
-
-const tools = {
-    pen: { label: '펜', Icon: PenLine },
-    eraser: { label: '지우개', Icon: Eraser },
-    lasso: { label: '올가미', Icon: Lasso },
-    handle: { label: '이동', Icon: Hand },
-    text: { label: '텍스트', Icon: Type },
-    pan: { label: '화면 이동', Icon: Move },
-};
 
 export const CanvasToolPointer = ({ canvasRef, tool, pencilOnlyMode }: {
     canvasRef: RefObject<HTMLCanvasElement | null>;
@@ -55,7 +45,6 @@ export const CanvasToolPointer = ({ canvasRef, tool, pencilOnlyMode }: {
     }, [canvasRef]);
 
     const pointerTool = getCanvasPointerTool(tool, position?.pointerType ?? '', pencilOnlyMode);
-    const { label, Icon } = tools[pointerTool];
     return (
         <div
             data-testid="canvas-tool-pointer"
@@ -66,19 +55,9 @@ export const CanvasToolPointer = ({ canvasRef, tool, pencilOnlyMode }: {
         >
             <span
                 data-testid="canvas-tool-pointer-tip"
-                className={`absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 border-2 border-stone-950 bg-white/70 ring-2 ring-white ${pointerTool === 'eraser' ? 'rounded-sm' : 'rounded-full'} ${pointerTool === 'lasso' ? 'border-dashed' : ''}`}
+                className="absolute h-[4px] w-[4px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-stone-900/70 bg-white/60"
                 style={{ left: position?.x ?? 0, top: position?.y ?? 0 }}
             />
-            <span
-                className="absolute inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-stone-950 px-2 py-1 text-xs font-bold text-white shadow-md ring-1 ring-white"
-                style={{
-                    // Keep the label above the finger and inside even narrow viewports.
-                    left: `clamp(4px, ${(position?.x ?? 0) + 14}px, calc(100% - 100px))`,
-                    top: (position?.y ?? 0) < 48 ? (position?.y ?? 0) + 18 : (position?.y ?? 0) - 40,
-                }}
-            >
-                <Icon size={16} />{label}
-            </span>
         </div>
     );
 };
