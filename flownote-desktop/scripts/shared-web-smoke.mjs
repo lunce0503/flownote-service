@@ -78,6 +78,10 @@ for (const executablePath of process.argv.slice(2)) {
     const marker = page.getByTestId('canvas-tool-pointer');
     await marker.waitFor(); assert.equal(await marker.getAttribute('data-tool'), 'pen');
     assert.equal(await marker.evaluate(node => getComputedStyle(node).pointerEvents), 'none');
+    assert.equal(await marker.textContent(), '');
+    assert.equal(await marker.locator('svg').count(), 0);
+    const tip = await page.getByTestId('canvas-tool-pointer-tip').boundingBox();
+    assert(tip); assert.equal(tip.width, 4); assert.equal(tip.height, 4);
     await page.reload();
     await page.waitForFunction(() => document.querySelector('[data-testid="canvas-input-surface"]')?.getAttribute('data-ready') === 'true');
     await page.getByTestId('canvas-tool-pointer').waitFor({ state: 'attached' });
