@@ -16,6 +16,11 @@ public partial class NetworkWindow
     private readonly InterfaceViewport viewport = new();
     private double activeThreshold = .8;
     private string taskSignature = "";
+    private void ClearScopedState()
+    {
+        taskSignature = ""; TaskChoice.ItemsSource = null; ActiveTaskName.Text = "연결되지 않음";
+        ActiveTaskDetails.Text = ""; ActiveTaskDetails.Visibility = Visibility.Collapsed;
+    }
     private string PrecisionMode => PinchEnabled?.IsChecked == true && PrecisionChoice is not null
         ? new[] { "volume", "zoom", "move" }[Math.Clamp(PrecisionChoice.SelectedIndex,0,2)] : "off";
     private async void Precision_Changed(object sender, RoutedEventArgs e)

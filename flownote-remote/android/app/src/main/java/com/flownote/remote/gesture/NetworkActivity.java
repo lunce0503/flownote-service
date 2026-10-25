@@ -150,7 +150,7 @@ public final class NetworkActivity extends Activity {
                     link=new RemoteLink(this,connection,new RemoteLink.Listener(){
                         public void connected(){runOnUiThread(()->{if(current!=generation)return;try{ConnectionStore.save(NetworkActivity.this,connection);saved=connection;reconnect.setVisibility(View.VISIBLE);connectionStatus.setText("서버에 연결됐어요.");success.run();}catch(Exception e){log("연결했지만 자격 증명을 저장하지 못했어요.");success.run();}});}
                         public void state(JSONObject value){runOnUiThread(()->{if(current==generation)render(value);});}
-                        public void gesture(String gesture,double confidence){runOnUiThread(()->{if(current==generation)detection.setText(gesture.equals("Tracking")?"골격 추적 중 · 원본 영상은 이 기기에만 유지":gesture);});}
+                        public void gesture(String gesture,double confidence){runOnUiThread(()->{if(current==generation)detection.setText(gesture.equals("Tracking")?"골격 추적 중 · 원본 영상은 이 기기에만 유지":gesture.equals("None")?"손과 상체를 카메라에 보여 주세요.":gesture);});}
                         public boolean interfaces(){return true;}
                         public void control(JSONObject command,java.util.function.Consumer<JSONObject> done){runOnUiThread(()->applyControl(command,done));}
                         public void alert(JSONObject alert){runOnUiThread(()->{if(current==generation)voice.speak(alert,voiceEnabled.isChecked());});}
@@ -270,7 +270,7 @@ public final class NetworkActivity extends Activity {
         }catch(Exception e){try{done.accept(new JSONObject().put("applied",false).put("error","unsupported_interface_command"));}catch(Exception ignored){}}
     }
     @Override public boolean onKeyUp(int code,android.view.KeyEvent event){if(code==android.view.KeyEvent.KEYCODE_ESCAPE){precisionEnabled.setChecked(false);return true;}return super.onKeyUp(code,event);}
-    private void markOffline(){for(var view:clientRows.values()){view.updating=true;view.enabled.setChecked(false);view.enabled.setEnabled(false);view.updating=false;view.summary.setText("오프라인");}clientTitle.setText("클라이언트 · 연결 안 됨");soundSummary.setText("클라이언트를 연결해 주세요.");}
+    private void markOffline(){runningTasks=new JSONArray();taskSignature="";if(taskChoice!=null)taskChoice.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"연결되지 않음"}));if(taskName!=null)taskName.setText("연결되지 않음");if(taskDetails!=null)taskDetails.setVisibility(View.GONE);for(var view:clientRows.values()){view.updating=true;view.enabled.setChecked(false);view.enabled.setEnabled(false);view.updating=false;view.summary.setText("오프라인");}clientTitle.setText("클라이언트 · 연결 안 됨");soundSummary.setText("클라이언트를 연결해 주세요.");}
     private void command(String action){try{if(link==null||!link.connected()||!link.enabled()||target==null){log("사용 중인 기기로 연결한 뒤 제어 대상을 선택해 주세요.");return;}link.command(target,action);}catch(Exception e){log("명령을 보내지 못했어요.");}}
     private void startCamera(){
         if(link==null||!link.connected()||!link.enabled()||!link.skeletonSupported()){setCameraToggle(false);log("골격을 지원하는 서버에 연결한 뒤 카메라를 켜 주세요.");return;}

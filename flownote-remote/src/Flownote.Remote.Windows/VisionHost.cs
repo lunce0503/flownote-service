@@ -73,7 +73,12 @@ public sealed class VisionHost : IDisposable
                     if (cameraAllowed) CameraFrame?.Invoke(Convert.FromBase64String(message.GetProperty("jpeg").GetString()!));
                     break;
                 case "camera.skeleton":
-                    if (cameraAllowed) { var frame = message.GetProperty("frame").Deserialize<SkeletonFrame>(Protocol.Json)!; frame.Validate(); SkeletonFrame?.Invoke(frame); }
+                    if (cameraAllowed)
+                    {
+                        try { var frame = message.GetProperty("frame").Deserialize<SkeletonFrame>(Protocol.Json)!; frame.Validate(); SkeletonFrame?.Invoke(frame); }
+                        catch (Exception error) when (error is ArgumentException or JsonException)
+                        { cameraAllowed = false; Activity?.Invoke("카메라 권한 또는 골격 입력 범위를 확인하세요. 카메라를 다시 켜 주세요."); }
+                    }
                     break;
                 case "skeleton.result":
                     if (message.GetProperty("id").GetString() == requestId) skeleton?.TrySetResult(message.GetProperty("frame").Deserialize<SkeletonFrame>(Protocol.Json)!);

@@ -83,7 +83,7 @@ public partial class NetworkWindow : Window
         {
             if (closing || closed || scanningQr || client is not { Connected: true, Enabled: true }) return;
             try { await client.SendSkeletonAsync(frame); }
-            catch (Exception error) when (error is OperationCanceledException or TimeoutException or System.Net.WebSockets.WebSocketException or InvalidOperationException) { Log("골격 응답을 확인할 수 없습니다."); }
+            catch (Exception error) when (error is OperationCanceledException or TimeoutException or System.Net.WebSockets.WebSocketException or InvalidOperationException or ArgumentException) { Log("골격 응답을 확인할 수 없습니다."); }
         };
         Loaded += async (_, _) =>
         {
@@ -169,11 +169,11 @@ public partial class NetworkWindow : Window
         attached.Activity += message =>
         {
             Log(message);
-            if (!attached.Connected) Dispatcher.BeginInvoke(async () => { if (!closed && !closing && ReferenceEquals(client, attached)) { await Guard(StopCameraAsync); ConnectionStatus.Text = "연결이 끊겼습니다. 서버에 다시 연결해 주세요."; } });
+            if (!attached.Connected) Dispatcher.BeginInvoke(async () => { if (!closed && !closing && ReferenceEquals(client, attached)) { await Guard(StopCameraAsync); ClearScopedState(); ConnectionStatus.Text = "연결이 끊겼습니다. 서버에 다시 연결해 주세요."; } });
         };
         attached.Alert += alert => Dispatcher.BeginInvoke(() => { if (!closing && ReferenceEquals(client, attached)) { voice.Enabled = speakEnabled; voice.Speak(alert); } });
         attached.StateChanged += value => Dispatcher.BeginInvoke(() => { if (ReferenceEquals(client, attached)) RefreshDevices(value); });
-        attached.Gesture += sample => Dispatcher.BeginInvoke(() => { if (ReferenceEquals(client, attached)) Detection.Text = sample.Gesture == "Tracking" ? "골격 추적 중 · 원본 영상은 이 기기에만 유지" : sample.Gesture ?? "추적 없음"; });
+        attached.Gesture += sample => Dispatcher.BeginInvoke(() => { if (ReferenceEquals(client, attached)) Detection.Text = sample.Gesture == "Tracking" ? "골격 추적 중 · 원본 영상은 이 기기에만 유지" : sample.Gesture is "None" or null ? "손과 상체를 카메라에 보여 주세요." : sample.Gesture; });
         await attached.ConnectAsync(address, pin, grant);
     }
     private async Task DisconnectAsync()
@@ -181,6 +181,7 @@ public partial class NetworkWindow : Window
         await StopCameraAsync();
         if (client is not null) { var previous = client; client = null; await previous.DisposeAsync(); }
         rows.Clear(); state = null; target = null; EmptyClients.Visibility = Visibility.Visible;
+        ClearScopedState();
         ClientsTitle.Text = "클라이언트"; SoundSummary.Text = "클라이언트를 연결해 주세요."; ConnectionStatus.Text = "연결 안 됨";
     }
     private async Task StopAllAsync()

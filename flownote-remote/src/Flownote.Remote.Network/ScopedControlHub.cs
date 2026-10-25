@@ -34,7 +34,7 @@ public sealed partial class RemoteHub
             if (Enabled(peer) && Environment.TickCount64-peer.LastFrame >= 60)
             { peer.LastFrame = Environment.TickCount64; peer.CameraActive = true; action = peer.Motion.Observe(settings, frame, peer.LastFrame); }
         }
-        await SendAsync(peer, new { type = "skeleton.result", frameId = id, gesture = action?.Gesture ?? "Tracking", scope = action?.Scope, confidence = 0 });
+        await SendAsync(peer, new { type = "skeleton.result", frameId = id, gesture = action?.Gesture ?? (frame.Hands.Length > 0 || frame.Pose.Length > 0 ? "Tracking" : "None"), scope = action?.Scope, confidence = 0 });
         if (action is not null) await ApplyGestureAsync(action);
         Changed?.Invoke();
     }

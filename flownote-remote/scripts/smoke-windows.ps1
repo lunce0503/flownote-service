@@ -78,13 +78,12 @@ try {
     Invoke-Control (Find-Control $app.Root 'ChooseCameraSource')
     $source=Find-ProcessControl $app.Process.Id 'CameraSourceDialog'
     $choice=Find-Control $source 'CameraSourceChoice'
-    $choice.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
-    $rearCondition=[System.Windows.Automation.AndCondition]::new(
-        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'후면 카메라 (환경 방향)'),
-        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::ListItem))
-    $rear=$choice.FindFirst([System.Windows.Automation.TreeScope]::Descendants,$rearCondition)
-    if (!$rear) { throw 'Rear camera choice missing' }
-    $rear.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+    # WPF exposes the display text separately from selectable item peers.
+    # Exercise the keyboard path (front=Home, rear=Down) instead of invoking a TextBlock pattern.
+    $choice.SetFocus()
+    $keyboard=New-Object -ComObject WScript.Shell
+    $keyboard.SendKeys('{HOME}{DOWN}{ENTER}')
+    Start-Sleep -Milliseconds 350
     Invoke-Control (Find-Control $source 'ApplyCameraSource')
     Start-Sleep -Milliseconds 350
     $settings=Open-Settings $app
@@ -110,8 +109,9 @@ try {
     Invoke-Control (Find-Control $app.Root 'ChooseCameraSource')
     $source=Find-ProcessControl $app.Process.Id 'CameraSourceDialog'
     $choice=Find-Control $source 'CameraSourceChoice'
-    $selection=$choice.GetCurrentPattern([System.Windows.Automation.SelectionPattern]::Pattern).Current.GetSelection()
-    if ($selection.Length -ne 1 -or $selection[0].Current.Name -ne '후면 카메라 (환경 방향)') { throw 'Camera source did not restore after restart' }
+    $selected=$choice.FindFirst([System.Windows.Automation.TreeScope]::Descendants,
+        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'후면 카메라 (환경 방향)'))
+    if (!$selected -or $selected.Current.IsOffscreen) { throw 'Camera source did not restore after restart' }
     Close-Window $source
     $ready=$false
     for ($attempt=0; $attempt -lt 120; $attempt++) {
