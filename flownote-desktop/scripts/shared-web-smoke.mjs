@@ -73,6 +73,11 @@ for (const executablePath of process.argv.slice(2)) {
     await page.getByRole('button', { name: '펜', exact: true }).click();
     await page.keyboard.press('Escape');
     const box = await surface.boundingBox(); assert(box);
+    // Settle the real toolbar mouse before introducing a separate pen stream.
+    await page.mouse.move(box.x + 180, box.y + 240);
+    await page.evaluate(() => new Promise(resolve => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    }));
     // Presentation event only. This does not certify Windows pen hardware.
     await surface.dispatchEvent('pointermove', { pointerId: 90, pointerType: 'pen', clientX: box.x + 180, clientY: box.y + 240, buttons: 0 });
     const marker = page.getByTestId('canvas-tool-pointer');
