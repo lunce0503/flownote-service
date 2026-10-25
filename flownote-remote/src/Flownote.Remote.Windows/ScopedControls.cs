@@ -81,16 +81,24 @@ public partial class NetworkWindow
     {
         var options = new List<CameraOption> { new("전면 카메라","front",null),new("후면 카메라 (환경 방향)","back",null) };
         if (loaded) options.AddRange((await vision.CamerasAsync()).Where(d => d.Id.Length > 0).Select(d => new CameraOption(d.Name,"external",d.Id)));
-        var panel = new StackPanel { Margin = new Thickness(20) }; var choice = new ComboBox { ItemsSource = options, DisplayMemberPath = "Name", MinHeight = 40 };
+        var panel = new StackPanel { Margin = new Thickness(20) }; var choice = new ComboBox { MinHeight = 40 };
         System.Windows.Automation.AutomationProperties.SetAutomationId(choice,"CameraSourceChoice");
-        choice.SelectedItem = options.FirstOrDefault(o => o.Facing == cameraPreference.Facing && o.Id == cameraPreference.DeviceId) ?? options[0]; panel.Children.Add(choice);
+        for (int i = 0; i < options.Count; i++)
+        {
+            var item = new ComboBoxItem { Content = options[i].Name, Tag = options[i] };
+            System.Windows.Automation.AutomationProperties.SetAutomationId(item,"CameraSource-"+i); choice.Items.Add(item);
+        }
+        void DescribeChoice() => System.Windows.Automation.AutomationProperties.SetName(choice,"카메라 방향 · "+((choice.SelectedItem as ComboBoxItem)?.Content ?? "선택 안 됨"));
+        choice.SelectionChanged += (_, _) => DescribeChoice();
+        choice.SelectedIndex = Math.Max(0,options.FindIndex(o => o.Facing == cameraPreference.Facing && o.Id == cameraPreference.DeviceId));
+        DescribeChoice(); panel.Children.Add(choice);
         panel.Children.Add(new TextBlock { Text = "후면/선택 장치가 없으면 다른 장치로 자동 대체하지 않습니다.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,12,0,12) });
         var apply = new Button { Content = "카메라 선택" }; panel.Children.Add(apply); var dialog = new Window { Owner = this, Title = "카메라 선택", Width = Math.Min(440,SystemParameters.WorkArea.Width), SizeToContent = SizeToContent.Height, Content = panel, WindowStartupLocation = WindowStartupLocation.CenterOwner };
         System.Windows.Automation.AutomationProperties.SetAutomationId(dialog,"CameraSourceDialog");
         System.Windows.Automation.AutomationProperties.SetAutomationId(apply,"ApplyCameraSource");
         apply.Click += async (_, _) => await Guard(async () =>
         {
-            if (choice.SelectedItem is not CameraOption chosen) return;
+            if (choice.SelectedItem is not ComboBoxItem { Tag: CameraOption chosen }) return;
             bool active = CameraControl.IsChecked == true; await StopCameraAsync(); cameraPreference = new(chosen.Facing,chosen.Id); PrivateStore.Save("camera",cameraPreference); dialog.Close();
             if (active && client is { Connected: true, Enabled: true }) { SetCameraToggle(true); activeThreshold = state?.DetectionThreshold ?? .8; await vision.StartCameraAsync(chosen.Facing,PrecisionMode,activeThreshold,deviceId:chosen.Id); }
         });
