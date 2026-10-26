@@ -1,6 +1,6 @@
 # 책 읽기 조작·두 쪽 보기·한국어 다의어 사전
 
-상태: 진행 중. 기준 운영 소스 f90a1b9 / dpl_EqEmiv3Qt3rayKM27gqezAybGL8s. 이전 작업의 107개 gate는 이번 변경의 완료 증거로 사용하지 않는다.
+상태: 2026-10-27 완료. 이번 소스 e3a02f1의 전체 staging116/116·핵심9/9 및 기존 Windows/Android 설치본 검증 후 같은 지문으로 canvas/web production을 배포했다. [최종 릴리스 기록](../../../logs/report/2026-10-27-0327-reader-korean-app-release.md)에 ID·지문·화면 실측과 실물 기기 한계를 남겼다. 이전107개 gate와 구분한다.
 
 ## 완료 기준
 
@@ -31,3 +31,7 @@ navigation 경계/휠 burst/스와이프·다중입력/펼침 페이지 순수 �
 - 모델85/85·프런트 verify·Go 전체 검사 통과. 실제 공식 번역 제공자에 2개 뜻을 요청해 각각 한국어를 반환하는 Go live audit도 통과했다.
 - 기존 클라우드 키는 유효하지 않아 프로젝트에 이미 보관된 유효한 자격 증명을 사용했다. staging canvas 전용 번역 비밀값과 모델을 설정·read-back했고 deploy는 아직 실행하지 않았다. AI 서비스/비밀값은 변경하지 않았다. production은 staging 통과 후 같은 보호 절차로 전용 설정을 주입한다.
 - 새 브라우저 시나리오9개를 포함해116개/25파일 등록 확인. 실제 staging 전체 실행과 production 및 앱 반영은 미완료다.
+
+- 앱 관리 실화면 검토에서44px/툴바-선택버튼/첫줄가림/앱하단중복여백을 보완했다(e3a02f1). 핵심9/9 및 Android 실제WebView·Windows 공개설치형/포터블 새읽기 흐름,390px 스캔PDF 안내·직접한국어조회가 통과했다. 전체116개 및 production은 진행 중이며 [실행 보고서](../../../logs/report/2026-10-27-0327-reader-korean-app-release.md)에 결과를 갱신한다.
+
+- 최종 staging116/116 통과(13.8분, retries=0), 검증 지문 `83a1221f98d99b039f4a20b98d5b1e204ec5e32c8169a1011322a91096f7260c`. production 전용 번역 설정 주입/read-back 후 matching receipt로 운영 canvas `34252ac2-7d9b-43a6-b00b-a40f4acb3c92` SUCCESS, web `dpl_BmWBxsWc4ffYw3DwuM4V3m8EfS55` READY. 배포 완료 2026-10-27 08:44:07 Asia/Seoul. 양 alias/health/서명feed/다운로드/인증/readback 전체 통과. 물리 iPad/Pencil은 미연결이며 새 네이티브 바이너리는 생성하지 않았다.

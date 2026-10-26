@@ -1,6 +1,6 @@
 # 책 읽기·한국어 사전 배포 후보 인계
 
-상태: 코드 및 정적/단위 검증 완료, staging/production·앱 반영 미완료. 이전 f90a1b9 운영 배포는 이번 개선의 완료 증거가 아니다.
+상태 정정: 앱 관리 세션이 실제 UX 보완·이번 staging116/116·기존 Windows/Android 앱 검증 후 동일 소스로 production canvas/web 배포와 readback을 완료했다. 아래 내용은 최초 인계 시점 기록이며 최종 ID·지문·한계는 [완료 기록](2026-10-27-0327-reader-korean-app-release.md)을 따른다. 이전 f90a1b9 운영 배포와 구분한다.
 
 사용자의 요구는 휠·Space/Shift+Space·손가락으로 넘기기, 숨김 UI 정리, 두 쪽 보기 설정, 한국어 번역과 여러 뜻 동시 표시다. [실행 계획](../../docs/exec-plan/active/2026-10-27-library-reader-korean.md)과 [기능 계약](../../docs/product-specs/textbook-library.md)을 따른다.
 
