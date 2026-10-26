@@ -96,7 +96,7 @@ test('phone reading contains zoom and column scrolling inside the PDF area', asy
   await setReaderRegion(page,'left');
   await expect(page.getByTestId('library-pdf-page')).toHaveAttribute('data-page', '1');
   await page.getByRole('button', { name: '확대', exact: true }).click();
-  await expect(page.getByRole('button', { name: '폭 맞춤', exact:true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '폭 맞춤', exact:true })).toHaveText('125%');
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await expect.poll(() => page.getByLabel('PDF 페이지 확대 영역').evaluate(node => node.scrollWidth > node.clientWidth)).toBe(true);
   await setReaderRegion(page,'right');
