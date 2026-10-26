@@ -169,7 +169,7 @@ html[data-installed-app=true] .book-reader { height: calc(100dvh - 76px); }
 .reader-settings select { width: 100%; }
 .reader-settings p { color: var(--workspace-muted); line-height: 1.8; font-size: 13px; }
 .reader-immersive .reader-selection-action { bottom: 65px; }
-.reader-immersive.reader-controls-open .reader-selection-action { bottom: 122px; }
+.reader-immersive.reader-controls-open .reader-selection-action { bottom: calc(58px + var(--reader-toolbar-height, 56px) + 12px); }
 @media (max-width: 600px) {
  .reader-floating-header { top: 8px; left: 8px; gap: 4px; padding: 3px; }
  .reader-floating-header button span { display: none; }

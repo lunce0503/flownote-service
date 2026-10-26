@@ -20,6 +20,7 @@ export default function BookReader({ book, owner, back, savePage, bookmark, chan
   const [controls, setControls] = useState(true), [menu, setMenu] = useState(false), [details, setDetails] = useState(false), [settings, setSettings] = useState(false);
   const [dictionary, setDictionary] = useState<{ term: string; page: number } | null>(null), [selection, setSelection] = useState<{ term: string; page: number } | null>(null);
   const menuTrigger = useRef<HTMLButtonElement>(null), menuPanel = useRef<HTMLDivElement>(null), scroll = useRef<HTMLDivElement>(null), reader = useRef<HTMLElement>(null);
+  const toolbar = useRef<HTMLElement>(null);
   const [wheelPager] = useState(createWheelPager);
   const lastTouch = useRef(-Infinity);
   const touch = useRef<{ x: number; y: number; at: number; max: number } | null>(null), contacts = useRef(new Set<number>());
@@ -51,6 +52,14 @@ export default function BookReader({ book, owner, back, savePage, bookmark, chan
     const observer = new ResizeObserver(entries => setWidth(Math.max(1, Math.floor(entries[0].contentRect.width - 24))));
     observer.observe(scroll.current); return () => observer.disconnect();
   }, []);
+  useEffect(() => {
+    const host = reader.current, tools = toolbar.current;
+    if (!host || !tools) return;
+    const measure = () => host.style.setProperty('--reader-toolbar-height', `${tools.getBoundingClientRect().height}px`);
+    const observer = new ResizeObserver(measure);
+    measure(); observer.observe(tools);
+    return () => observer.disconnect();
+  }, [controls]);
   useEffect(() => { scroll.current?.scrollTo({ left: 0, top: 0 }); window.getSelection()?.removeAllRanges(); }, [renderKey]);
   useEffect(() => {
     if (!ready) return;
@@ -166,7 +175,7 @@ export default function BookReader({ book, owner, back, savePage, bookmark, chan
     </div>
     {(error || saveError || renderError.key === renderKey) && <p role="alert" className="reader-error">{error || saveError || renderError.message}</p>}
     {!ready && !error && <div className="reader-loading" role="status">페이지를 준비하고 있습니다…</div>}
-    {controls && <footer data-reader-controls="true" className="reader-floating-toolbar">
+    {controls && <footer ref={toolbar} data-reader-controls="true" className="reader-floating-toolbar">
       <button aria-label="이전 페이지" disabled={!ready || pages[0] <= 1} aria-disabled={!ready || pages[0] <= 1} onClick={() => turn(-1)} title="Shift+Space"><ChevronLeft size={20} /></button>
       <form onSubmit={event => { event.preventDefault(); setPage(bookPage(Number(new FormData(event.currentTarget).get('page')), book.pages)); }}>
         <input aria-label="이동할 페이지" name="page" type="number" min={1} max={book.pages} defaultValue={page} key={page} required /><span>/ {book.pages}</span><button>이동</button>

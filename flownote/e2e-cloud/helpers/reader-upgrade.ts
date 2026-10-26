@@ -62,11 +62,15 @@ export function registerReaderUpgrade(engine:'chromium'|'webkit',width:number){
   });
   test('the second PDF page selects real text and displays multiple Korean meanings saved on page two',async({page,request})=>{
    test.setTimeout(150000);const actor=await createCloudActor(request);await openReader(page,actor);await showReaderTools(page);await page.getByRole('button',{name:'두 쪽 보기',exact:true}).click();await expect.poll(()=>pageNumbers(page)).toEqual(['1','2']);
-   await page.getByRole('button',{name:'읽기 도구 숨기기',exact:true}).click();
+   await showReaderTools(page);
    const text=page.locator('[data-testid="library-pdf-text"][data-page="2"]');await expect(text).toContainText('derivative');
    const b=await text.evaluate(layer=>{const node=Array.from(layer.querySelectorAll('span')).find(n=>n.textContent?.includes('derivative'))?.firstChild;if(!node)throw Error('PDF glyphs missing');const i=node.textContent!.indexOf('derivative'),r=document.createRange();r.setStart(node,i);r.setEnd(node,i+10);const box=r.getBoundingClientRect();return{x:box.x,y:box.y,w:box.width,h:box.height};});
    await page.mouse.move(b.x+.3,b.y+b.h/2);await page.mouse.down();await page.mouse.move(b.x+b.w-.3,b.y+b.h/2,{steps:12});await page.mouse.up();
    await expect.poll(()=>page.evaluate(()=>getSelection()?.toString().trim())).toBe('derivative');
+   await expect(page.locator('.reader-floating-toolbar')).toBeVisible();
+   const action=page.getByRole('button',{name:/derivative.*사전 검색/});await expect(action).toBeVisible();
+   const actionBox=await action.boundingBox(),toolbarBox=await page.locator('.reader-floating-toolbar').boundingBox();expect(actionBox).not.toBeNull();expect(toolbarBox).not.toBeNull();expect(actionBox!.y+actionBox!.height).toBeLessThanOrEqual(toolbarBox!.y-8);
+   await page.screenshot({path:test.info().outputPath('reader-selection-controls.png'),fullPage:true});
    await page.getByRole('button',{name:/derivative.*사전 검색/}).click();const dictionary=page.getByRole('dialog',{name:'사전과 단어장'});const result=dictionary.getByRole('region',{name:'사전 검색 결과'});
    await expect(result.locator('.dictionary-senses li').first()).toBeVisible({timeout:40000});expect(await result.locator('.dictionary-senses li').count()).toBeGreaterThan(1);
    expect(await result.locator('p[lang=ko]').evaluateAll(nodes=>nodes.every(node=>/[가-힣]/.test(node.textContent||'')))).toBe(true);
