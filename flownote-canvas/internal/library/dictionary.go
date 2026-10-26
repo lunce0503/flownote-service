@@ -38,12 +38,19 @@ func validTerm(term string) bool {
 	return true
 }
 
+type DictionarySense struct {
+	PartOfSpeech string `json:"partOfSpeech"`
+	Definition   string `json:"definition"`
+	Translation  string `json:"translation"`
+}
 type DictionaryResult struct {
-	Term       string `json:"term"`
-	Definition string `json:"definition"`
-	SourceURL  string `json:"sourceUrl"`
-	License    string `json:"license"`
-	Found      bool   `json:"found"`
+	Term       string            `json:"term"`
+	Definition string            `json:"definition"`
+	SourceURL  string            `json:"sourceUrl"`
+	License    string            `json:"license"`
+	Found      bool              `json:"found"`
+	Language   string            `json:"language"`
+	Senses     []DictionarySense `json:"senses"`
 }
 type dictionaryEntry struct {
 	PartOfSpeech string `json:"partOfSpeech"`
@@ -53,46 +60,76 @@ type dictionaryEntry struct {
 }
 
 func parseDefinitions(data []byte, term string) (DictionaryResult, error) {
-	result := DictionaryResult{Term: term, SourceURL: sourceURL(term), License: "Wiktionary · CC BY-SA"}
+	result := DictionaryResult{Term: term, SourceURL: sourceURL(term), License: "Wiktionary · CC BY-SA", Senses: []DictionarySense{}}
 	var entries map[string][]dictionaryEntry
 	if err := json.Unmarshal(data, &entries); err != nil {
 		return result, httpjson.Errorf(502, "사전 응답을 해석하지 못했습니다.")
 	}
-	keys := []string{"ko", "en"}
+	keys := []string{"en", "ko"}
+	for _, r := range term {
+		if r >= 0xAC00 && r <= 0xD7A3 {
+			keys = []string{"ko", "en"}
+			break
+		}
+	}
 	other := []string{}
 	for key := range entries {
-		if key != "ko" && key != "en" {
+		if key != "en" && key != "ko" {
 			other = append(other, key)
 		}
 	}
 	sort.Strings(other)
 	keys = append(keys, other...)
-	definitions := []string{}
 	for _, key := range keys {
+		groups := [][]DictionarySense{}
+		seen := map[string]bool{}
 		for _, entry := range entries[key] {
+			group := []DictionarySense{}
 			for _, d := range entry.Definitions {
 				value := plainDefinition(d.Definition)
-				if value == "" {
+				if value == "" || seen[value] {
 					continue
 				}
+				seen[value] = true
 				runes := []rune(value)
 				if len(runes) > 700 {
 					value = string(runes[:700]) + "…"
 				}
-				definitions = append(definitions, value)
-				if len(definitions) >= 6 {
-					break
+				part := []rune(strings.ToLower(strings.TrimSpace(entry.PartOfSpeech)))
+				if len(part) > 80 {
+					part = part[:80]
+				}
+				group = append(group, DictionarySense{PartOfSpeech: string(part), Definition: value})
+			}
+			if len(group) > 0 {
+				groups = append(groups, group)
+			}
+		}
+		// Include different parts of speech before filling the remaining senses.
+		for index := 0; len(result.Senses) < 8; index++ {
+			added := false
+			for _, group := range groups {
+				if index < len(group) {
+					result.Senses = append(result.Senses, group[index])
+					added = true
+					if len(result.Senses) == 8 {
+						break
+					}
 				}
 			}
-			if len(definitions) >= 6 {
+			if !added {
 				break
 			}
 		}
-		if len(definitions) > 0 {
+		if len(result.Senses) > 0 {
 			break
 		}
 	}
-	result.Found = len(definitions) > 0
+	definitions := []string{}
+	for _, sense := range result.Senses {
+		definitions = append(definitions, sense.Definition)
+	}
+	result.Found = len(result.Senses) > 0
 	result.Definition = strings.Join(definitions, "\n\n")
 	return result, nil
 }
@@ -192,10 +229,29 @@ func (h *Handler) lookup(w http.ResponseWriter, r *http.Request) {
 		respond(w, nil, httpjson.Errorf(400, "페이지가 올바르지 않습니다."))
 		return
 	}
+	if !h.translator.Allow(auth.UserID(r.Context())) {
+		w.Header().Set("Retry-After", "60")
+		respond(w, nil, httpjson.Errorf(429, "사전 검색이 잠시 많습니다. 1분 뒤 다시 검색해 주세요."))
+		return
+	}
 	definition, err := lookupDictionary(r.Context(), req.Term)
 	if err != nil {
 		respond(w, nil, err)
 		return
+	}
+	if definition.Found {
+		translated, translationErr := h.translator.Translate(r.Context(), req.Term, definition.Senses)
+		if translationErr != nil {
+			respond(w, nil, translationErr)
+			return
+		}
+		definitions := []string{}
+		for index := range definition.Senses {
+			definition.Senses[index].Translation = translated[index]
+			definitions = append(definitions, strconv.Itoa(index+1)+". "+translated[index])
+		}
+		definition.Language = "ko"
+		definition.Definition = strings.Join(definitions, "\n\n")
 	}
 	term, err := h.repo.saveTerm(r.Context(), auth.UserID(r.Context()), Term{ID: req.ID, BookID: b.ID, Page: req.Page, Term: req.Term, Definition: definition.Definition}, false)
 	respond(w, map[string]any{"result": definition, "saved": term}, err)

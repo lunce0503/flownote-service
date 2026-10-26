@@ -22,6 +22,8 @@
 
 ## 진행 중인 작업
 
+- [책 읽기 조작·두 쪽 보기·한국어 사전](exec-plan/active/2026-10-27-library-reader-korean.md): 휠/Space/스와이프·읽기 도구·원본 두 쪽·한국어 복수 뜻을 구현하고 staging-first 및 앱 반영을 검증한다.
+
 - [작업 공간·책장·캔버스 UX 갱신](exec-plan/active/2026-10-26-workspace-library-ux.md): 책장 클라우드/사전, 노트·캔버스 통합 목록, 실시간 Markdown, 모바일 커서·저장 상태·전체 화면 버튼 정리.
 
 - [Flownote 핵심 MVP 안정화](exec-plan/active/2026-10-18-mvp-stabilization.md): 기능별 해결 계획을 `design-docs/blog/`, `design-docs/planner/`, `design-docs/agent/`에 두고 백그라운드 구현·검증·릴리스를 추적한다.

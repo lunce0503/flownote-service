@@ -1,3 +1,4 @@
+import { showReaderTools } from './helpers/reader';
 import { expect, test, devices, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 import { randomUUID, createHash } from 'node:crypto';
 import { textbookPdf } from '../../flownote-desktop/scripts/library-fixture.mjs';
@@ -66,6 +67,8 @@ test('private library API enforces ownership, chunk hashes, metadata revisions, 
     const lookup = await request.post(`${api}/api/library/books/${book.id}/lookup`, { headers: headers(actor), data: { id: randomUUID(), page: 1, term: 'derivative' } });
     expect(lookup.ok()).toBeTruthy(); const found = await lookup.json();
     expect(found.result.found).toBe(true); expect(found.result.definition.length).toBeGreaterThan(0);
+    expect(found.result.language).toBe('ko'); expect(found.result.senses.length).toBeGreaterThan(1);
+    expect(found.result.senses.every((sense: {translation:string}) => /[가-힣]/.test(sense.translation))).toBe(true);
     expect(found.saved.bookId).toBe(book.id); expect(found.saved.page).toBe(1);
     const manual = await request.post(`${api}/api/library/books/${book.id}/terms`, { headers: headers(actor), data: { id: found.saved.id, page: 1, term: 'derivative', definition: 'Synthetic preserved study note' } });
     expect(manual.ok()).toBeTruthy();
@@ -99,12 +102,6 @@ async function device(browser: Browser, actor: { token: string; user: { id: stri
   await context.addCookies([{ name: '__Host-flownote_session', value: actor.token, url: web, secure: true, httpOnly: true, sameSite: 'Strict' }]);
   await context.addInitScript(user => localStorage.setItem('flownote_auth_user', JSON.stringify(user)), actor.user);
   return context;
-}
-async function showTools(page: Page) {
-  if (!await page.getByLabel('페이지 보기').isVisible()) {
-    await page.getByRole('button', { name: '읽기 메뉴', exact: true }).click();
-    await page.getByRole('menuitem', { name: '읽기 도구 표시' }).click();
-  }
 }
 test.describe('iPad WebKit cloud reader', () => {
   test('OFF library edits stay on device, then metadata and vocabulary reconcile and appear on another device', async ({ browser, request }) => {
@@ -183,7 +180,7 @@ test.describe('iPad WebKit cloud reader', () => {
       await a.getByRole('button', { name: '책 읽기', exact: true }).click();
       await expect(a.getByTestId('library-pdf-page')).toHaveAttribute('data-page', '1');
       const text = a.getByTestId('library-pdf-text'); await expect(text).toContainText('Synthetic native textbook');
-      await expect(a.getByLabel('페이지 보기')).toBeHidden();
+      await expect(a.getByRole('button', { name: '다음 페이지', exact:true })).toBeHidden();
       // Native browser mouse drag across actual PDF glyphs; no selection event or range is installed.
       const bounds = await text.evaluate(layer => {
         const node = Array.from(layer.querySelectorAll('span')).find(span => span.textContent?.includes('textbook'))?.firstChild;
@@ -216,7 +213,7 @@ test.describe('iPad WebKit cloud reader', () => {
       await b.getByRole('menuitem', { name: '사전·단어장' }).click();
       await expect(b.getByRole('region', { name: '저장한 단어장' })).toContainText('textbook');
       await b.getByRole('button', { name: '대화상자 닫기' }).click();
-      await showTools(b);
+      await showReaderTools(b);
       await b.getByRole('button', { name: '표지로', exact: true }).click();
       await b.getByRole('button', { name: '대화상자 닫기' }).click();
       await remove(request, actor, book.id);

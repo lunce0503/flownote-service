@@ -2,6 +2,8 @@
 
 ## 진행 중
 
+- [책 읽기 조작·두 쪽 보기·한국어 사전](2026-10-27-library-reader-korean.md): 읽기 입력/배치와 한국어 다의어 조회·보존·배포 검증.
+
 - [작업 공간·책장·캔버스 UX 갱신](2026-10-26-workspace-library-ux.md): 여섯 사용자 요구사항 전체 구현·교차 기기/100MiB/실시간 Markdown 검증 및 앱 관리 인계.
 
 - [Flownote 핵심 MVP 안정화](2026-10-18-mvp-stabilization.md): 노트 입력 복구·플래너 동시 저장·노트 조회·AI 가용성, 백그라운드 구현과 후속 staging-first 검증.

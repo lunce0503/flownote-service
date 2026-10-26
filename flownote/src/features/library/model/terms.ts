@@ -2,7 +2,8 @@ import { isDeviceOnly } from '@/shared/lib/deviceMode';
 import { libraryError, libraryRequest, syncLibrary } from './cloud';
 import { acknowledgeTerm, activeLibraryLookups, listLocalTerms, mergeTermSnapshot, mutateLocalTerm, ownerCheck, putLocalTerm, type LibraryTerm } from './storage';
 
-export type DictionaryResult = { term: string; definition: string; sourceUrl: string; found: boolean; license: string };
+export type DictionarySense = { partOfSpeech: string; definition: string; translation: string };
+export type DictionaryResult = { term: string; definition: string; sourceUrl: string; found: boolean; license: string; language?: string; senses?: DictionarySense[] };
 const termKey = (bookId: string, page: number, term: string) => JSON.stringify([bookId, page, term]);
 const source = (term: string) => `https://en.wiktionary.org/wiki/${encodeURIComponent(term)}`;
 export async function listTerms(owner: string, bookId: string, strict = false): Promise<LibraryTerm[]> {

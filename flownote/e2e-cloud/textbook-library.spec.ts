@@ -1,3 +1,4 @@
+import { showReaderTools, openReaderSettings, setReaderRegion } from './helpers/reader';
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
@@ -56,16 +57,21 @@ test('stores a textbook, opens its cover first, resumes pages and bookmarks, and
   await cover.getByRole('button', { name: '책 읽기', exact: true }).click();
   const canvas = page.getByTestId('library-pdf-page');
   await expect(canvas).toHaveAttribute('data-page', '1');
+  await showReaderTools(page);
   await page.getByRole('button', { name: '다음 페이지', exact: true }).click();
   await expect(canvas).toHaveAttribute('data-page', '2');
+  await showReaderTools(page);
   await page.getByRole('button', { name: '현재 페이지 책갈피' }).click();
+  await openReaderSettings(page);
   await expect(page.getByRole('navigation', { name: '페이지 책갈피 목록' }).getByRole('button', { name: '2쪽' })).toBeVisible();
-  await expect(page.getByRole('status')).toContainText('읽던 위치 저장됨');
+  await page.getByRole('button', { name: '읽기 계속', exact: true }).click();
+  await expect(page.getByRole('status', {name:'현재 읽기 위치'})).toContainText('저장됨');
   await page.reload();
   await page.getByRole('button', { name: `${title} 표지 보기` }).click();
   await page.getByRole('button', { name: '2쪽부터 이어 읽기' }).click();
   await expect(canvas).toHaveAttribute('data-page', '2');
-  await page.getByRole('button', { name: '표지로' }).click();
+  await showReaderTools(page);
+  await page.getByRole('button', { name: '표지로', exact:true }).click();
   await page.getByRole('dialog').getByLabel('분야 / 칸막이').fill('응용수학');
   await page.getByRole('button', { name: '제목·분야 저장' }).click();
   await expect(page.getByRole('dialog').getByText('응용수학', { exact: true })).toBeVisible();
@@ -87,13 +93,13 @@ test('phone reading contains zoom and column scrolling inside the PDF area', asy
   await page.goto(`${web}/library`); await add(page);
   await page.getByRole('button', { name: '책 읽기', exact: true }).click();
   await expect(page.getByTestId('library-pdf-page')).toHaveAttribute('data-page', '1');
-  await page.getByLabel('페이지 보기').selectOption('left');
+  await setReaderRegion(page,'left');
   await expect(page.getByTestId('library-pdf-page')).toHaveAttribute('data-page', '1');
   await page.getByRole('button', { name: '확대', exact: true }).click();
-  await expect(page.getByRole('button', { name: '폭 맞춤 125%' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '폭 맞춤', exact:true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await expect.poll(() => page.getByLabel('PDF 페이지 확대 영역').evaluate(node => node.scrollWidth > node.clientWidth)).toBe(true);
-  await page.getByLabel('페이지 보기').selectOption('right');
+  await setReaderRegion(page,'right');
   await page.getByLabel('이동할 페이지').fill('3'); await page.getByRole('button', { name: '이동', exact: true }).click();
   await expect(page.getByTestId('library-pdf-page')).toHaveAttribute('data-page', '3');
   await expect(page.getByRole('button', { name: '다음 페이지', exact: true })).toHaveAttribute('aria-disabled', 'true');

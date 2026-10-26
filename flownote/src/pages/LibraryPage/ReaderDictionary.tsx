@@ -6,6 +6,7 @@ import LibraryDialog from './LibraryDialog';
 export default function ReaderDictionary({ owner, book, page, initialTerm, close }: {
   owner: string; book: Book; page: number; initialTerm: string; close: () => void;
 }) {
+  const parts: Record<string, string> = { noun: '명사', verb: '동사', adjective: '형용사', adverb: '부사', pronoun: '대명사', preposition: '전치사', conjunction: '접속사', interjection: '감탄사', 'proper noun': '고유명사', abbreviation: '약어', symbol: '기호', prefix: '접두사', suffix: '접미사', phrase: '구절' };
   const [query, setQuery] = useState(initialTerm);
   const [result, setResult] = useState<DictionaryResult | null>(null);
   const [terms, setTerms] = useState<LibraryTerm[]>([]);
@@ -43,10 +44,26 @@ export default function ReaderDictionary({ owner, book, page, initialTerm, close
       <label>선택한 단어<input aria-label="사전에서 검색할 단어" value={query} maxLength={120} onChange={event => setQuery(event.target.value)} /></label>
       <button className="library-primary" disabled={busy || !query.trim()}><Search size={16} />{busy ? '검색·저장 중…' : '사전 검색'}</button>
     </form>
-    <p className="library-muted">선택한 단어만 Wiktionary에 조회합니다. PDF 원본은 사전으로 전송하지 않습니다.</p>
+    <p className="library-muted">선택한 단어와 공개 사전의 뜻을 조회·번역 서비스에 전송해 한국어로 보여줍니다.</p>
     {error && <p role="alert">{error}</p>}
     {result && <section className="reader-dictionary-result" aria-label="사전 검색 결과">
-      <h3>{result.term}</h3><p>{result.found ? result.definition : '사전에 일치하는 뜻이 없습니다. 단어는 저장했으며, 단어장에서 뜻이나 메모를 직접 적을 수 있습니다.'}</p>
+      <h3>{result.term}</h3>
+      {result.found ? result.language === 'ko' && result.senses?.length ? <>
+        <p className="dictionary-translation-label">한국어 자동 번역 · {result.senses.length}개의 뜻</p>
+        <ol className="dictionary-senses">{result.senses.map((sense, index) => <li key={`${sense.partOfSpeech}:${index}`}>
+          <span className="dictionary-part">{parts[sense.partOfSpeech.toLowerCase()] || sense.partOfSpeech || '뜻'}</span>
+          <p lang="ko">{sense.translation}</p>
+          <details><summary>원문 뜻 보기</summary><p lang="en">{sense.definition}</p></details>
+        </li>)}</ol>
+        {terms.some(term => term.page === page && term.term === result.term && term.definition !== result.definition) && <button disabled={busy} onClick={() => {
+          const saved = terms.find(term => term.page === page && term.term === result.term);
+          if (!saved || !window.confirm('저장해 둔 뜻·메모를 이번 한국어 검색 결과로 바꿀까요?')) return;
+          setBusy(true); setError('');
+          void saveTermDefinition(owner, saved, result.definition).catch(failure => { if (alive.current) setError(String(failure)); })
+            .finally(() => { if (alive.current) { setBusy(false); void refresh().catch(() => {}); } });
+        }}>한국어 검색 결과를 단어장에 반영</button>}
+      </> : <p role="alert">한국어 뜻이 포함되지 않은 이전 검색 결과입니다. 잠시 뒤 다시 검색해 주세요.</p>
+        : <p>사전에 일치하는 뜻이 없습니다. 단어는 저장했으며, 단어장에서 뜻이나 메모를 직접 적을 수 있습니다.</p>}
       <a href={`https://en.wiktionary.org/wiki/${encodeURIComponent(result.term)}`} target="_blank" rel="noopener noreferrer">Wiktionary · CC BY-SA <ExternalLink size={14} /></a>
     </section>}
     <section aria-label="저장한 단어장" className="reader-word-list"><h3><BookOpen size={18} />저장한 단어 <span>{terms.length}</span></h3>

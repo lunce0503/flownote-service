@@ -15,12 +15,14 @@ type Config struct {
 	DatabaseURL string
 
 	// S3 호환 오브젝트 스토리지(Spring의 FLOWNOTE_STORAGE_* 와 동일 변수).
-	StorageEndpoint      string
-	StorageBucket        string
-	StorageRegion        string
-	StorageAccessKey     string
-	StorageSecretKey     string
-	StoragePublicBaseURL string
+	StorageEndpoint            string
+	StorageBucket              string
+	StorageRegion              string
+	StorageAccessKey           string
+	StorageSecretKey           string
+	StoragePublicBaseURL       string
+	DictionaryTranslationKey   string
+	DictionaryTranslationModel string
 
 	// CORS 허용 오리진(쉼표 구분). 게이트웨이 뒤에 있으면 보통 비워둔다.
 	CORSOrigins []string
@@ -32,15 +34,17 @@ type Config struct {
 // Load는 환경 변수에서 설정을 읽는다. Postgres 연결 문자열이 없으면 오류를 반환한다.
 func Load() (Config, error) {
 	cfg := Config{
-		Port:                 firstNonEmpty(os.Getenv("PORT"), "8090"),
-		DatabaseURL:          strings.TrimSpace(os.Getenv("DATABASE_URL")),
-		StorageEndpoint:      strings.TrimSpace(os.Getenv("FLOWNOTE_STORAGE_ENDPOINT")),
-		StorageBucket:        strings.TrimSpace(os.Getenv("FLOWNOTE_STORAGE_BUCKET")),
-		StorageRegion:        firstNonEmpty(os.Getenv("FLOWNOTE_STORAGE_REGION"), "us-east-1"),
-		StorageAccessKey:     strings.TrimSpace(os.Getenv("FLOWNOTE_STORAGE_ACCESS_KEY_ID")),
-		StorageSecretKey:     strings.TrimSpace(os.Getenv("FLOWNOTE_STORAGE_SECRET_ACCESS_KEY")),
-		StoragePublicBaseURL: strings.TrimSpace(os.Getenv("FLOWNOTE_STORAGE_PUBLIC_BASE_URL")),
-		UploadDir:            firstNonEmpty(os.Getenv("FLOWNOTE_UPLOAD_DIR"), "./uploads"),
+		DictionaryTranslationKey:   strings.TrimSpace(os.Getenv("FLOWNOTE_DICTIONARY_TRANSLATION_KEY")),
+		DictionaryTranslationModel: firstNonEmpty(os.Getenv("FLOWNOTE_DICTIONARY_TRANSLATION_MODEL"), "gemini-3.1-flash-lite"),
+		Port:                       firstNonEmpty(os.Getenv("PORT"), "8090"),
+		DatabaseURL:                strings.TrimSpace(os.Getenv("DATABASE_URL")),
+		StorageEndpoint:            strings.TrimSpace(os.Getenv("FLOWNOTE_STORAGE_ENDPOINT")),
+		StorageBucket:              strings.TrimSpace(os.Getenv("FLOWNOTE_STORAGE_BUCKET")),
+		StorageRegion:              firstNonEmpty(os.Getenv("FLOWNOTE_STORAGE_REGION"), "us-east-1"),
+		StorageAccessKey:           strings.TrimSpace(os.Getenv("FLOWNOTE_STORAGE_ACCESS_KEY_ID")),
+		StorageSecretKey:           strings.TrimSpace(os.Getenv("FLOWNOTE_STORAGE_SECRET_ACCESS_KEY")),
+		StoragePublicBaseURL:       strings.TrimSpace(os.Getenv("FLOWNOTE_STORAGE_PUBLIC_BASE_URL")),
+		UploadDir:                  firstNonEmpty(os.Getenv("FLOWNOTE_UPLOAD_DIR"), "./uploads"),
 	}
 
 	if cfg.DatabaseURL == "" {

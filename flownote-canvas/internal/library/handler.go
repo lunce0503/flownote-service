@@ -14,11 +14,14 @@ import (
 )
 
 type Handler struct {
-	repo *Repo
-	auth *auth.Authenticator
+	repo       *Repo
+	auth       *auth.Authenticator
+	translator *DictionaryTranslator
 }
 
-func NewHandler(repo *Repo, a *auth.Authenticator) *Handler { return &Handler{repo, a} }
+func NewHandler(repo *Repo, a *auth.Authenticator, translator *DictionaryTranslator) *Handler {
+	return &Handler{repo, a, translator}
+}
 func (h *Handler) Register(mux *http.ServeMux) {
 	protect := func(fn http.HandlerFunc) http.Handler {
 		return h.auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
