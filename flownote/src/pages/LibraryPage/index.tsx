@@ -114,7 +114,7 @@ function Bookshelf({ owner }: { owner: string }) {
   const filtered = books.filter(book => (!subject || book.subject === subject) && (!onlyFavorites || book.favorite)
     && `${book.title} ${book.subject}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const shelfSubjects = [...new Set(filtered.map(book => book.subject))];
-  if (reading && selected) return <div className="workspace-surface textbook-library"><BookReader key={selectedId} book={selected} owner={owner} back={() => setReading(false)} savePage={savePage}
+  if (reading && selected) return <div className="workspace-surface textbook-library textbook-library-reading"><BookReader key={selectedId} book={selected} owner={owner} back={() => setReading(false)} savePage={savePage}
     change={update => change(selected.id, update)} bookmark={page => { void change(selected.id, { type: 'bookmark', page }).catch(failure => setError(String(failure))); }} />{error && <p role="alert">{error}</p>}</div>;
 
   return <main className="workspace-surface textbook-library">

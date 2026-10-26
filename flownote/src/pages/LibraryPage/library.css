@@ -86,6 +86,9 @@
 .book-page-marks button[aria-current=page], .library-reader-heading button[aria-pressed=true] { background: var(--workspace-selected); }
 html[data-installed-app=true] .textbook-library { padding-bottom: 76px; }
 html[data-installed-app=true] .book-reader { height: calc(100dvh - 76px); }
+.textbook-library.textbook-library-reading { min-height: 0; }
+html[data-installed-app=true] .textbook-library.textbook-library-reading { padding-bottom: 0; }
+html[data-installed-app=true] .textbook-library-reading .book-reader { height: calc(100dvh - var(--workspace-shell-offset, 76px)); }
 @media (max-width: 800px) {
   .library-shell { grid-template-columns: minmax(0, 1fr); }
   .library-sidebar { padding: 16px 20px; border-right: 0; border-bottom: 1px solid var(--workspace-border); }
