@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { EditorView } from '@tiptap/pm/view';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -10,6 +10,7 @@ import Image from '@tiptap/extension-image';
 import { Bold, Code, Heading2, Italic, List, Sigma } from 'lucide-react';
 import { safeMarkdownUrl } from '@/entities/blog';
 import 'katex/dist/katex.min.css';
+import { createLiveMarkdownParser } from './liveMarkdownParser';
 
 const editedViews = new WeakSet<EditorView>();
 
@@ -25,13 +26,14 @@ export default function LiveMarkdownEditor({ value, disabled, onChange }: {
   value: string; disabled: boolean; onChange: (markdown: string) => void;
 }) {
   const lastChange = useRef(value);
+  const [parser] = useState(createLiveMarkdownParser);
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [StarterKit.configure({
       link: { openOnClick: false, isAllowedUri: url => !!safeMarkdownUrl(url),
         HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' } },
       underline: false,
-    }), Markdown, Mathematics.configure({ katexOptions: { trust: false, throwOnError: false, strict: 'ignore' },
+    }), Markdown.configure({ marked: parser }), Mathematics.configure({ katexOptions: { trust: false, throwOnError: false, strict: 'ignore' },
       inlineOptions: { onClick(node, pos) { const latex = window.prompt('LaTeX 수식 수정', String(node.attrs.latex)); if (latex !== null && editor) { editedViews.add(editor.view); editor.chain().focus().updateInlineMath({ latex, pos }).run(); } } },
       blockOptions: { onClick(node, pos) { const latex = window.prompt('LaTeX 수식 수정', String(node.attrs.latex)); if (latex !== null && editor) { editedViews.add(editor.view); editor.chain().focus().updateBlockMath({ latex, pos }).run(); } } },
     }),

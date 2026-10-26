@@ -378,7 +378,10 @@ function WorkspaceList({ owner }: { owner: string }) {
             if (getAuthUser()?.id !== owner) return;
             if (selectedNoteFolder) await addNoteToFolder(selectedNoteFolder.id, saved.id);
             navigate(`/blog/${saved.id}`);
-        } catch { setError('노트 생성 또는 폴더 배치에 실패했습니다. 목록을 새로고침해 확인해 주세요.'); await loadLibrary(); }
+        } catch {
+            await loadLibrary();
+            setError('파일 작업에 실패했습니다. 노트를 만들지 못했으며 기존 목록은 유지했습니다.');
+        }
         finally { setIsCreating(false); }
     };
     const beginRename = (document: WorkspaceFile) => {

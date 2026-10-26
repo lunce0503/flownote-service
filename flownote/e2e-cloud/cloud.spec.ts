@@ -175,7 +175,7 @@ test('new canvases appear immediately while the cloud request is pending', async
 
   try {
     await page.goto('/canvas');
-    await expect(page.getByRole('heading', { name: '캔버스', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '작업 공간', exact: true })).toBeVisible();
     const createResponse = page.waitForResponse(response => (
       response.request().method() === 'POST' && response.url().endsWith('/api/canvas/documents')
     ));
@@ -230,6 +230,13 @@ test('copied elements can be pasted after moving to another canvas', async ({ pa
     const box = await surface.boundingBox();
     expect(box).not.toBeNull();
 
+    // Keep this copy contract independent from drawing performed by another test.
+    await page.getByRole('button', { name: '펜', exact: true }).filter({ visible: true }).click();
+    await page.mouse.move(box!.x + 400, box!.y + 250);
+    await page.mouse.down();
+    await page.mouse.move(box!.x + 520, box!.y + 320, { steps: 12 });
+    await page.mouse.up();
+    await expect(page.getByTestId('canvas-render-surface')).not.toHaveAttribute('data-visible-line-count', '0');
     await page.getByRole('button', { name: '올가미', exact: true }).filter({ visible: true }).click();
     const points = [
       [box!.x + 340, box!.y + 190],

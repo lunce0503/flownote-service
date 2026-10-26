@@ -41,6 +41,7 @@
     "katex": "^0.16.27",
     "konva": "^10.3.0",
     "lucide-react": "^1.7.0",
+    "marked": "17.0.6",
     "pdfjs-dist": "3.4.120",
     "rbush": "^4.0.1",
     "react": "19.2.4",

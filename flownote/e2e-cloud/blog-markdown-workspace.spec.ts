@@ -309,11 +309,14 @@ test('failed target detail exposes a draft export and leaves other notes usable'
   const target = `**/web-api/api/notes/${ids[1]}`;
   await page.route(target, route => route.fulfill({ status: 502, contentType: 'application/json', body: '{"error":"synthetic body unavailable"}' }));
   await page.getByRole('treeitem', { name: 'Synthetic note 2.md', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/blog/${ids[2]}$`));
   await expect((await markdownSource(page))).toBeVisible();
   await page.getByRole('treeitem', { name: 'Synthetic note 1.md', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/blog/${ids[1]}$`));
   await expect(page.getByRole('button', { name: '기기 초안 .md 내보내기', exact: true })).toBeVisible();
   await expect(page.getByLabel('Markdown 본문')).toHaveCount(0);
   await expect(page.getByLabel('노트 편집')).toHaveCount(0);
   await page.getByRole('treeitem', { name: 'Synthetic note 2.md', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/blog/${ids[2]}$`));
   await expect((await markdownSource(page))).toBeVisible();
 });
