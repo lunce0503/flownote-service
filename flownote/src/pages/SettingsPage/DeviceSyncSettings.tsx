@@ -65,7 +65,7 @@ export default function DeviceSyncSettings() {
           await downloadBlob(`flownote-device-${new Date().toISOString().slice(0, 10)}.json`, blob);
         }).catch(cause => setError(cause instanceof Error ? cause.message : '백업을 읽지 못했습니다.')).finally(() => setBusy(false));
       }}>기기 자료 JSON 백업 내보내기</button>
-      <p className="mt-1 text-xs text-stone-500">전체 백업은 8MB 이하입니다. 백업에는 개인 작성 내용과 기준본·충돌 복구본이 포함됩니다.</p>
+      <p className="mt-1 text-xs text-stone-500">전체 백업은 8MB 이하입니다. 백업에는 개인 작성 내용과 기준본·충돌 복구본이 포함됩니다. 책장 PDF 원본은 포함되지 않으므로 책장에서 별도로 내보내세요.</p>
     </>}
     {busy && <p role="status" className="mt-2 text-sm">{progress || '처리 중…'}</p>}
     {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}

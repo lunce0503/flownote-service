@@ -125,7 +125,7 @@ func (r *Repo) StartUpload(ctx context.Context, user string, book Book) (Upload,
 		}
 	} else if errors.Is(err, pgx.ErrNoRows) {
 		var count int
-		if err = tx.QueryRow(ctx, `SELECT count(*) FROM library_uploads WHERE user_id=$1 AND expires_at>now()`, user).Scan(&count); err != nil {
+		if err = tx.QueryRow(ctx, `SELECT count(*) FROM library_uploads u WHERE u.user_id=$1 AND u.expires_at>now() AND NOT EXISTS(SELECT 1 FROM library_books b WHERE b.upload_id=u.id AND b.user_id=u.user_id)`, user).Scan(&count); err != nil {
 			return Upload{}, err
 		}
 		if count >= 4 {

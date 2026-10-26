@@ -40,3 +40,5 @@
 - 프런트 모델 80/80, API 31/31, Spring Gradle test, Go 전체 패키지 검사가 통과했다. 최종 수정 후 프런트/Go 재검증을 이어간다.
 - 새 E2E는 사전·소유권·100MiB 원본 비교·새 기기의 읽기/단어장·실제 브라우저 드래그·실시간 Markdown·IME·공통 목록·회색 상태 아이콘 및 32px 지우개를 추가한다. 기존 원문 보존 검사는 명시적 원문 모드로 유지한다. 테스트 등록만으로 기능 통과로 표시하지 않는다.
 - Railway 인증을 현재 환경에서 확인했다. release library의 실제 staging/production 및 앱 관리 인계는 다음 실행 단계다.
+
+- 부모 최종 리뷰에서 완료 업로드 receipt가 진행 중 4개 제한을 소비하는 오류를 발견했다. library repo count에서 완료된 소유자 일치 receipt를 제외하고 library-upload-cap.spec.ts를 추가했다. 앱 관리 실행 중 의존성 설치 단계에서 양쪽 소스에 같은 좁은 수정을 반영했으며 신규 backend/전체 gate 검증 대상이다. 상세 원인은 [버그 기록](../../../logs/bugs/2026-10-26-library-completed-upload-cap.md)에 남겼다. 이전 책장 웹 결과 보고서의 끊어진 상대 링크도 해당 historical 보고서를 추가해 복원했다.

@@ -107,6 +107,70 @@ async function showTools(page: Page) {
   }
 }
 test.describe('iPad WebKit cloud reader', () => {
+  test('OFF library edits stay on device, then metadata and vocabulary reconcile and appear on another device', async ({ browser, request }) => {
+    test.setTimeout(240000);
+    const actor = await account(request), original = textbookPdf(4096), book = metadata(original.length, 'Offline transition book');
+    const saved = await upload(request, actor, original, book);
+    const seeded = await request.post(`${api}/api/library/books/${book.id}/terms`, { headers: headers(actor), data: {
+      id: randomUUID(), page: 1, term: 'integral', definition: 'Cloud baseline definition',
+    } });
+    expect(seeded.ok()).toBeTruthy();
+    const first = await device(browser, actor), second = await device(browser, actor);
+    try {
+      const a = await first.newPage(), b = await second.newPage();
+      await a.goto(`${web}/library`);
+      await expect(a.getByRole('button', { name: `${book.title} 표지 보기` })).toBeVisible();
+      await a.goto(`${web}/settings`);
+      a.once('dialog', dialog => dialog.accept());
+      await a.getByRole('switch', { name: '앱 동기화', exact: true }).click();
+      await expect(a.getByRole('switch', { name: '앱 동기화', exact: true })).toHaveAttribute('aria-checked', 'false');
+
+      const outgoing: string[] = [];
+      a.on('request', request => { if (request.url().includes('/api/library/')) outgoing.push(`${request.method()} ${request.url()}`); });
+      await a.goto(`${web}/library`);
+      await a.getByRole('button', { name: `${book.title} 표지 보기` }).click();
+      await a.getByRole('button', { name: '책 읽기', exact: true }).click();
+      await a.getByRole('button', { name: '읽기 메뉴', exact: true }).click();
+      await a.getByRole('menuitem', { name: '책 제목·분야 수정' }).click();
+      const details = a.getByRole('dialog', { name: '책 세부 정보 수정' });
+      await details.getByLabel('책 제목').fill('Offline reconciled book');
+      await details.getByLabel('분야 / 칸막이').fill('오프라인수학');
+      await details.getByRole('button', { name: '제목·분야 저장' }).click();
+      await a.getByRole('button', { name: '읽기 메뉴', exact: true }).click();
+      await a.getByRole('menuitem', { name: '사전·단어장' }).click();
+      const dictionary = a.getByRole('dialog', { name: '사전과 단어장' });
+      await expect(dictionary.getByRole('region', { name: '저장한 단어장' })).toContainText('integral');
+      await dictionary.getByRole('button', { name: '뜻·메모 편집' }).click();
+      await dictionary.getByLabel('integral 뜻과 메모').fill('Offline expanded definition');
+      await dictionary.getByRole('button', { name: '뜻·메모 저장' }).click();
+      await expect(dictionary.getByRole('region', { name: '저장한 단어장' })).toContainText('Offline expanded definition');
+      expect(outgoing).toEqual([]);
+      const unchanged = await (await request.get(`${api}/api/library/books/${book.id}`, { headers: headers(actor) })).json();
+      expect(unchanged.title).toBe(saved.title);
+      const unchangedTerms = await (await request.get(`${api}/api/library/books/${book.id}/terms`, { headers: headers(actor) })).json();
+      expect(unchangedTerms.terms[0].definition).toBe('Cloud baseline definition');
+
+      await a.goto(`${web}/settings`);
+      a.once('dialog', dialog => dialog.accept());
+      await a.getByRole('switch', { name: '앱 동기화', exact: true }).click();
+      await expect(a.getByRole('switch', { name: '앱 동기화', exact: true })).toHaveAttribute('aria-checked', 'true');
+      await expect.poll(async () => (await (await request.get(`${api}/api/library/books/${book.id}`, { headers: headers(actor) })).json()).title).toBe('Offline reconciled book');
+      await expect.poll(async () => {
+        const value = await (await request.get(`${api}/api/library/books/${book.id}/terms`, { headers: headers(actor) })).json();
+        return value.terms.find((term: { term: string }) => term.term === 'integral')?.definition;
+      }).toBe('Offline expanded definition');
+
+      await b.goto(`${web}/library`);
+      await expect(b.getByRole('button', { name: 'Offline reconciled book 표지 보기' })).toBeVisible();
+      await b.getByRole('button', { name: 'Offline reconciled book 표지 보기' }).click();
+      await expect(b.getByRole('dialog', { name: '책 펼쳐 보기' })).toContainText('오프라인수학');
+      await b.getByRole('button', { name: '책 읽기', exact: true }).click();
+      await b.getByRole('button', { name: '읽기 메뉴', exact: true }).click();
+      await b.getByRole('menuitem', { name: '사전·단어장' }).click();
+      await expect(b.getByRole('region', { name: '저장한 단어장' })).toContainText('Offline expanded definition');
+    } finally { await first.close(); await second.close(); await remove(request, actor, book.id); }
+  });
+
   test('a fresh device opens the same book, selects PDF text, stores a dictionary entry, edits details and receives deletion', async ({ browser, request }) => {
     test.setTimeout(180000);
     const actor = await account(request), original = textbookPdf(4096), book = metadata(original.length, 'Cross-device study book');

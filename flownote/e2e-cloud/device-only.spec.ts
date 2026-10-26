@@ -76,6 +76,7 @@ test('cloud material is available offline and device edits reconcile on re-enabl
     await page.reload(); await expect(page.getByText('기기 할 일', { exact: true }).first()).toBeVisible();
     await page.goto('/agent'); await expect(page.getByRole('heading', { name: '서버 연결이 필요한 기능입니다' })).toBeVisible();
     await page.goto('/settings'); await page.getByRole('button', { name: '기기 자료 JSON 백업 내보내기' }).click();
+    await expect(page.getByText('책장 PDF 원본은 포함되지 않으므로 책장에서 별도로 내보내세요.')).toBeVisible();
     await expect.poll(() => page.evaluate(() => (window as Window & { deviceExports: string[] }).deviceExports.length)).toBe(1);
     const exported = await page.evaluate(() => JSON.parse((window as Window & { deviceExports: string[] }).deviceExports[0]));
     const backup = JSON.parse(Buffer.from(exported.base64, 'base64').toString('utf8'));
