@@ -40,11 +40,13 @@ export function registerReaderUpgrade(engine:'chromium'|'webkit',width:number){
   test('wheel, Space and spread layout preserve pages, odd end, progress, selection and remembered settings',async({page,request})=>{
    const actor=await createCloudActor(request);await openReader(page,actor);const viewport=page.getByTestId('library-reader-viewport');
    await showReaderTools(page);
-   const controls=await page.locator('.reader-floating-header button,.reader-floating-toolbar button,.reader-progress-dock button').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};}));
+   const controls=await page.locator('.reader-floating-header button:visible,.reader-floating-toolbar button:visible,.reader-progress-dock button:visible').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};}));
    for(const box of controls){expect(box.width).toBeGreaterThanOrEqual(44);expect(box.height).toBeGreaterThanOrEqual(44);expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width+1);}
    for(let i=0;i<controls.length;i++)for(let j=i+1;j<controls.length;j++){const a=controls[i],b=controls[j];expect(Math.min(a.x+a.width,b.x+b.width)-Math.max(a.x,b.x)>1&&Math.min(a.y+a.height,b.y+b.height)-Math.max(a.y,b.y)>1).toBe(false);}
    await page.screenshot({path:test.info().outputPath('reader-single-controls.png'),fullPage:true});
-   await viewport.evaluate(node=>{node.scrollTop=node.scrollHeight;});await viewport.hover();await page.mouse.wheel(0,110);
+   await viewport.evaluate(node=>{node.scrollTop=node.scrollHeight;});await viewport.hover();
+   // Playwright does not provide native wheel input in mobile WebKit.
+   if(engine==='webkit')await viewport.dispatchEvent('wheel',{deltaY:110});else await page.mouse.wheel(0,110);
    await expect(page.getByTestId('library-pdf-page')).toHaveAttribute('data-page','2');
    await viewport.focus();await page.keyboard.press('Space');await expect(page.getByTestId('library-pdf-page')).toHaveAttribute('data-page','3');
    await page.keyboard.press('Shift+Space');await expect(page.getByTestId('library-pdf-page')).toHaveAttribute('data-page','2');

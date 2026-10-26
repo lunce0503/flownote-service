@@ -141,9 +141,9 @@ html[data-installed-app=true] .book-reader { height: calc(100dvh - 76px); }
 .book-page-scroll { min-height: 80px; }
 /* Stable page viewport; floating controls do not resize or jump the PDF. */
 .reader-immersive { isolation: isolate; overflow: hidden; }
-.reader-immersive .book-page-scroll { padding: 24px 12px 100px; min-height: 0; touch-action: pan-y pinch-zoom; }
+.reader-immersive .book-page-scroll { padding: 84px 12px 100px; min-height: 0; touch-action: pan-y pinch-zoom; }
 .reader-floating-header { position: absolute; z-index: 7; top: 12px; left: 12px; right: 66px; display: flex; align-items: center; gap: 10px; padding: 6px; border: 1px solid var(--workspace-border); border-radius: 12px; background: var(--workspace-paper); box-shadow: 0 3px 16px #0000000d; }
-.reader-floating-header h1 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; font-size: 14px; font-weight: 600; }
+.reader-immersive .reader-floating-header h1 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; font-size: 14px; font-weight: 600; }
 .reader-floating-header button, .reader-floating-toolbar button, .reader-progress-dock button { min-width: 44px; min-height: 44px; padding: 7px; border: 0; background: transparent; flex-shrink: 0; }
 .reader-layout-switch { display: flex; gap: 2px; border-left: 1px solid var(--workspace-border); padding-left: 5px; }
 .reader-layout-switch button[aria-pressed=true] { background: var(--workspace-selected); }
@@ -177,6 +177,7 @@ html[data-installed-app=true] .book-reader { height: calc(100dvh - 76px); }
  .reader-floating-toolbar button { min-width: 44px; padding: 5px; }
  .reader-floating-toolbar input { width: 48px; }
  .reader-floating-toolbar form { gap: 3px; }
+ .reader-floating-toolbar > button[aria-label="읽기 설정"] { display: none; }
  .reader-toolbar-divider { margin: 0; }
  .reader-progress-dock { max-width: calc(100% - 20px); }
 }

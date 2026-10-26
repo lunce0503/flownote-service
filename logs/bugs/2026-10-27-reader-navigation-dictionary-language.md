@@ -7,3 +7,5 @@
 수정: 독립 페이지 렌더와 읽기 navigation/spread 모델, 안정된 viewport의 겹침형 제어, 페이지별 선택/사전 기록, 품사별 복수 뜻 추출과 공식 Gemini 한국어 번역/검증·캐시를 추가한다. 기존 수동 메모는 명시적 갱신 전까지 보존한다.
 
 검증: 순수 모델·Go 번역/provider schema·프런트 build와 실제 staging 휠/키/손가락/텍스트 드래그/두 쪽·한국어 복수 뜻·저장 및 전체 회귀 검증으로 마무리한다. 최초 단위 검사는 미구현 모델/타입으로 실패한 뒤 구현을 추가해 통과했다. 자세한 단계와 실제 배포 상태는 [실행 계획](../../docs/exec-plan/active/2026-10-27-library-reader-korean.md)을 따른다.
+
+앱 관리 실제 화면 검토: 390px/820px에서 겹침형 상단 도구가 PDF 첫 줄을 가려 실제 드래그가 실패했다. 안정된 상단 여백을 확보하고, 44px 터치 영역을 유지하면서 작은 화면의 중복 설정은 More 메뉴로 모았다. 선택 검색 버튼은 ResizeObserver로 측정한 툴바 높이 위에 12px 간격을 둔다. 도구를 표시한 실제 드래그 후 두 사각형의 비겹침과 44px/overflow를 기존 핵심 시나리오에 추가했다. Playwright mobile WebKit은 mouse.wheel API를 지원하지 않아 해당 엔진은 DOM wheel smoke로 구분하며 Chromium 실제 wheel/터치와 모든 기능 assertion은 유지한다.
