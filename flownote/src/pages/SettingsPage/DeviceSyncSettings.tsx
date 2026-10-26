@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { isDeviceOnly, setDeviceOnly } from '@/shared/lib/deviceMode';
+import { isDeviceOnly, setDeviceOnly, deviceOwner } from '@/shared/lib/deviceMode';
 import { readDeviceBackup, withDeviceWorkspace } from '@/shared/lib/deviceStorage';
 import { downloadBlob } from '@/shared/lib/downloadBlob';
 import { prepareDeviceOffline, reconcileDeviceToCloud } from '@/shared/lib/deviceCloudSync';
@@ -17,15 +17,20 @@ export default function DeviceSyncSettings() {
   const change = async () => {
     const message = local
       ? '동기화를 켤까요? 서버의 최신 변경과 이 기기의 오프라인 변경을 안전하게 조정해 업로드합니다. 충돌한 다른 버전은 복구본으로 보존합니다.'
-      : '동기화를 끌까요? 먼저 서버의 노트·캔버스·이미지·플래너를 이 기기에 저장합니다. 준비가 끝난 뒤부터 서버 저장과 실시간 수신을 중지합니다.';
+      : '동기화를 끌까요? 먼저 서버의 노트·캔버스·이미지·책장 PDF·플래너를 이 기기에 저장합니다. 준비가 끝난 뒤부터 서버 저장과 실시간 수신을 중지합니다.';
     if (!window.confirm(message)) return;
     setBusy(true); setError(''); setProgress('준비 중');
     try {
       if (local) {
         const result = await reconcileDeviceToCloud(setProgress);
+        setProgress('책장과 단어장을 클라우드에 동기화하고 있습니다');
+        const { reconcileLibraryToCloud } = await import('@/features/library');
+        await reconcileLibraryToCloud(deviceOwner());
         setDeviceOnly(false);
         if (result.conflicts > 0) setProgress(`${result.conflicts}개 충돌을 조정하고 다른 버전을 복구본에 보존했습니다.`);
       } else {
+        const { cacheLibraryForOffline } = await import('@/features/library');
+        await cacheLibraryForOffline(deviceOwner(), setProgress);
         await prepareDeviceOffline(setProgress);
         setDeviceOnly(true);
       }
@@ -40,7 +45,7 @@ export default function DeviceSyncSettings() {
     <h2 id="device-sync-title" className="text-lg font-black text-stone-950">앱 동기화</h2>
     <div className="mt-3 flex items-start justify-between gap-4">
       <div className="min-w-0"><p className="font-bold">{local ? '꺼짐 · 기기 전용' : '켜짐 · 서버 작업 공간'}</p>
-        <p className="mt-1 text-sm text-stone-600">끄면 노트·캔버스·할 일·시간표·일기를 이 기기에만 저장하며, 서버 저장과 다른 기기의 변경 수신을 모두 중지합니다.</p>
+        <p className="mt-1 text-sm text-stone-600">끄면 노트·캔버스·책장·단어장·할 일·시간표·일기를 이 기기에만 저장하며, 서버 저장과 다른 기기의 변경 수신을 모두 중지합니다.</p>
       </div>
       <button type="button" role="switch" aria-label="앱 동기화" aria-checked={!local} disabled={busy} onClick={() => void change()}
         className={`flex h-8 w-14 shrink-0 items-center rounded-full p-1 disabled:opacity-50 ${local ? 'justify-start bg-stone-300' : 'justify-end bg-stone-950'}`}>

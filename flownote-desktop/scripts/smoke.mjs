@@ -67,7 +67,7 @@ try {
   await page.getByRole('heading', { name: '작업을 선택하세요' }).waitFor();
   await page.getByRole('button', { name: '전체 기능', exact: true }).click();
   const menu = page.getByRole('dialog', { name: '전체 기능' });
-  for (const href of ['/library', '/blog', '/canvas', '/planner', '/social', '/agent', '/settings']) assert.equal(await menu.locator(`a[href="${href}"]`).count(), 1);
+  for (const href of ['/library', '/canvas', '/planner', '/social', '/agent', '/settings']) assert.equal(await menu.locator(`a[href="${href}"]`).count(), 1);
   await page.keyboard.press('Escape');
   await menu.waitFor({ state: 'hidden' });
   assert.equal(await page.evaluate(() => localStorage.getItem('flownote_auth_token')), null);

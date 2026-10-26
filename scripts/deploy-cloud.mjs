@@ -15,11 +15,11 @@ const target = process.argv[3] ?? 'all';
 const services = { main: ['flownote-main', 'flownote-server'], canvas: ['flownote-canvas', 'flownote-canvas'],
   serve: ['flownote-sub', 'flownote-serve'], ai: ['flownote-ai', 'flownote-ai'], api: ['flownote-api', 'flownote-API'],
   mobile: [null, 'flownote-mobile'], expo: [null, 'flownote-mobile'], web: [null, 'flownote'] };
-if (!['release', 'staging', 'production'].includes(mode) || (target !== 'all' && target !== 'feedback' && target !== 'feedback-auto' && target !== 'blog' && !services[target])) {
-  throw new Error('Usage: node scripts/deploy-cloud.mjs [release|staging|production] [all|feedback|blog|web|api|main|canvas|serve|ai|mobile|expo]');
+if (!['release', 'staging', 'production'].includes(mode) || (target !== 'all' && target !== 'feedback' && target !== 'feedback-auto' && target !== 'blog' && target !== 'library' && !services[target])) {
+  throw new Error('Usage: node scripts/deploy-cloud.mjs [release|staging|production] [all|feedback|blog|library|web|api|main|canvas|serve|ai|mobile|expo]');
 }
 const targets = target === 'feedback-auto' ? (process.env.FLOWNOTE_RELEASE_TARGETS ?? '').split(',')
-  : target === 'all' ? allDeploymentTargets : target === 'feedback' ? ['main', 'web'] : target === 'blog' ? ['canvas', 'web'] : [target];
+  : target === 'library' ? ['main', 'canvas', 'api', 'web'] : target === 'all' ? allDeploymentTargets : target === 'feedback' ? ['main', 'web'] : target === 'blog' ? ['canvas', 'web'] : [target];
 if (target === 'feedback-auto' && (targets.length === 0 || targets.some(name => !allDeploymentTargets.includes(name)) || !targets.includes('web') || new Set(targets).size !== targets.length)) {
   throw new Error('Automatic feedback release requires explicit unique active targets including web.');
 }

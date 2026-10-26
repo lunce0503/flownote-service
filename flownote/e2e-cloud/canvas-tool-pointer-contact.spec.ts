@@ -4,7 +4,8 @@ import { randomUUID } from 'node:crypto';
 // Native browser contact input, including pointer capture and the existing React
 // gesture handlers. WebKit hover coverage remains in canvas-tool-pointer.spec.ts;
 // CDP emulation does not certify physical iOS/Pencil hardware behavior.
-test.use({ browserName: 'chromium', hasTouch: true, isMobile: true, deviceScaleFactor: 1 });
+test.use({ browserName: 'chromium', hasTouch: true, isMobile: true, deviceScaleFactor: 1,
+  userAgent: 'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/132.0 Mobile Safari/537.36 FlownoteAndroid/1.3.0' });
 const api = 'https://flownote-api-staging.up.railway.app';
 const web = 'https://flownote-react-staging.vercel.app';
 
@@ -59,6 +60,12 @@ const selectTool = async (page: Page, label: string) => {
 
 const expectMarker = async (page: Page, tool: string, point: Point) => {
   const marker = page.getByTestId('canvas-tool-pointer');
+  if (tool === 'pen') {
+    await expect(marker).toBeHidden();
+    await expect(page.getByTestId('canvas-input-surface')).toHaveCSS('cursor', 'none');
+    expect(await page.evaluate(point => document.elementFromPoint(point.x, point.y)?.getAttribute('data-testid'), point)).toBe('canvas-input-surface');
+    return;
+  }
   await expect(marker).toBeVisible().catch(async error => {
     console.log('Pointer event sequence:', await page.evaluate(() => (window as unknown as { __pointerProbe?: unknown[] }).__pointerProbe));
     throw error;
@@ -71,8 +78,8 @@ const expectMarker = async (page: Page, tool: string, point: Point) => {
   await expect(marker).toHaveCSS('pointer-events', 'none');
   const tip = await page.getByTestId('canvas-tool-pointer-tip').boundingBox();
   expect(tip).not.toBeNull();
-  expect(tip!.width).toBe(4);
-  expect(tip!.height).toBe(4);
+  expect(tip!.width).toBe(tool === 'eraser' ? 32 : 4);
+  expect(tip!.height).toBe(tool === 'eraser' ? 32 : 4);
   expect(tip!.x + tip!.width / 2).toBeCloseTo(point.x, 0);
   expect(tip!.y + tip!.height / 2).toBeCloseTo(point.y, 0);
   // The visual overlay must leave the actual input surface hit-testable.
@@ -220,6 +227,23 @@ for (const width of [390, 820]) {
       expect(saved.lines).toEqual(original.lines);
       expect(saved.textBoxes ?? saved.text_boxes).toEqual(original.textBoxes ?? original.text_boxes);
       await expect(page.getByTestId('canvas-render-surface')).toHaveAttribute('data-visible-line-count', '1');
+    });
+
+    test('eraser contact shows a 32px ring and still removes the new stroke while preserving existing content', async ({ page, request }) => {
+      const cdp = await page.context().newCDPSession(page);
+      const surface = page.getByTestId('canvas-input-surface'); const box = await surface.boundingBox(); expect(box).not.toBeNull();
+      const start = { x: box!.x + 140, y: box!.y + 420 }, end = { x: box!.x + 220, y: box!.y + 460 };
+      await pen(page, cdp, 'mousePressed', start); await pen(page, cdp, 'mouseMoved', { x: start.x + 40, y: start.y + 20 }); await pen(page, cdp, 'mouseMoved', end); await pen(page, cdp, 'mouseReleased', end);
+      const load = async (): Promise<SavedCanvas> => (await request.get(`${api}/api/canvas/load?canvasId=${canvasId}`, { headers: headers() })).json();
+      await expect.poll(async () => (await load()).lines.length).toBe(2);
+      await selectTool(page, '지우개');
+      await pen(page, cdp, 'mousePressed', end); await expectMarker(page, 'eraser', end);
+      await expect(surface).toHaveCSS('cursor', 'none');
+      await expect(page.getByTestId('canvas-tool-pointer-tip')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await pen(page, cdp, 'mouseMoved', { x: end.x - 5, y: end.y - 3 }); await pen(page, cdp, 'mouseReleased', end);
+      await expect.poll(async () => (await load()).lines.length).toBe(1);
+      const saved = await load(); expect(saved.lines).toEqual(original.lines);
+      expect(saved.textBoxes ?? saved.text_boxes).toEqual(original.textBoxes ?? original.text_boxes);
     });
 
     test('multiple contacts suppress markers through partial release and preserve pinch navigation', async ({ page, request }) => {

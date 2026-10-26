@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
-import { BookOpen, Bot, CheckSquare, Palette, PenLine, Search } from "lucide-react";
+import { BookOpen, Bot, CheckSquare, PenLine, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const destinations = [
     { label: "전공서 책장", description: "분야별로 꽂아 두는 나의 PDF 서재", keywords: "책 PDF 전공서 수학 과학 도서관", href: "/library", icon: BookOpen },
     {
-        label: "노트 관리",
-        description: "노트 작성과 폴더 정리",
-        keywords: "노트 문서 블로그 글",
-        href: "/blog",
+        label: "작업 공간",
+        description: "노트와 캔버스를 한 목록에서 관리",
+        keywords: "노트 문서 블로그 글 캔버스 필기 드로잉",
+        href: "/canvas",
         icon: PenLine,
     },
     {
@@ -25,13 +25,7 @@ const destinations = [
         href: "/agent",
         icon: Bot,
     },
-    {
-        label: "캔버스 열기",
-        description: "아이디어를 자유롭게 배치",
-        keywords: "캔버스 필기 드로잉",
-        href: "/canvas",
-        icon: Palette,
-    },
+
 ];
 
 const Home = () => {

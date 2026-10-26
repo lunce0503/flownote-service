@@ -9,16 +9,16 @@ const event = (type, pointerType = 'pen', pointerId = 1, clientX = 70, clientY =
 
 test('Pencil hover and contact show viewport coordinates without zoom or document changes', () => {
     const pointer = createCanvasToolPointer();
-    assert.deepEqual(pointer.update(event('pointermove'), bounds), { x: 60, y: 80, pointerType: 'pen' });
-    assert.deepEqual(pointer.update(event('pointerdown'), bounds), { x: 60, y: 80, pointerType: 'pen' });
+    assert.deepEqual(pointer.update(event('pointermove'), bounds), { x: 60, y: 80, pointerType: 'pen', contact: false });
+    assert.deepEqual(pointer.update(event('pointerdown'), bounds), { x: 60, y: 80, pointerType: 'pen', contact: true });
     assert.equal(pointer.update(event('pointerup'), bounds), null);
-    assert.deepEqual(pointer.update(event('pointermove'), bounds), { x: 60, y: 80, pointerType: 'pen' });
+    assert.deepEqual(pointer.update(event('pointermove'), bounds), { x: 60, y: 80, pointerType: 'pen', contact: false });
 });
 
 test('finger marker only appears during contact and mouse keeps its native cursor', () => {
     const pointer = createCanvasToolPointer();
     assert.equal(pointer.update(event('pointermove', 'touch'), bounds), null);
-    assert.deepEqual(pointer.update(event('pointerdown', 'touch'), bounds), { x: 60, y: 80, pointerType: 'touch' });
+    assert.deepEqual(pointer.update(event('pointerdown', 'touch'), bounds), { x: 60, y: 80, pointerType: 'touch', contact: true });
     assert.equal(pointer.update(event('pointerup', 'touch'), bounds), null);
     assert.equal(pointer.update(event('pointermove', 'mouse'), bounds), null);
 });

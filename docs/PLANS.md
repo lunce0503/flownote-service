@@ -22,6 +22,8 @@
 
 ## 진행 중인 작업
 
+- [작업 공간·책장·캔버스 UX 갱신](exec-plan/active/2026-10-26-workspace-library-ux.md): 책장 클라우드/사전, 노트·캔버스 통합 목록, 실시간 Markdown, 모바일 커서·저장 상태·전체 화면 버튼 정리.
+
 - [Flownote 핵심 MVP 안정화](exec-plan/active/2026-10-18-mvp-stabilization.md): 기능별 해결 계획을 `design-docs/blog/`, `design-docs/planner/`, `design-docs/agent/`에 두고 백그라운드 구현·검증·릴리스를 추적한다.
 
 - [IDLE 계획의 Flownote 편입](exec-plan/active/2026-10-14-idle-integration.md): 개발 작업 공간·에이전트 실행·데스크톱 편집기·모바일 제어 계획. 문서 편입 완료, 실행 계약과 조회가 다음 구현 단계다.

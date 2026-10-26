@@ -12,6 +12,7 @@ import (
 	"github.com/flownote/flownote-canvas/internal/auth"
 	"github.com/flownote/flownote-canvas/internal/canvas"
 	"github.com/flownote/flownote-canvas/internal/config"
+	"github.com/flownote/flownote-canvas/internal/library"
 	"github.com/flownote/flownote-canvas/internal/notes"
 	"github.com/flownote/flownote-canvas/internal/storage"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -65,6 +66,19 @@ func main() {
 	// 노트 도메인(노트·폴더·에디터 업로드) — flownote-server(Spring)에서 이관.
 	notesHandler := notes.NewHandler(notes.NewRepo(pool, store), authenticator, cfg.UploadDir)
 	notesHandler.Register(mux)
+
+	libraryRepo := library.NewRepo(pool, store)
+	library.NewHandler(libraryRepo, authenticator).Register(mux)
+	go func() {
+		for {
+			cleanupCtx, cleanupCancel := context.WithTimeout(ctx, 5*time.Minute)
+			if err := libraryRepo.Cleanup(cleanupCtx); err != nil {
+				log.Printf("library cleanup failed: %v", err)
+			}
+			cleanupCancel()
+			time.Sleep(time.Hour)
+		}
+	}()
 
 	// Spring의 진단 이벤트 보존 잡(매일, 30일 초과 삭제)을 이관했다.
 	go func() {

@@ -42,7 +42,7 @@ scripts/verify-services.sh all
 node scripts/deploy-cloud.mjs release all
 ```
 
-대상은 `all|feedback|blog|main|canvas|serve|ai|api|mobile|expo|web`이다. `feedback`은 프로필·캔버스 피드백 반영에 필요한 main과 web을 함께 스테이징 검증한 뒤 같은 소스로 배포한다. `blog`는 Notes API를 소유하는 canvas와 web을 한 소스로 스테이징 배포·전체 E2E한 뒤 같은 소스로 운영에 승격한다. 게시글 전용 변경은 `node scripts/deploy-cloud.mjs release blog`를 사용하며 관련 없는 인증·일정 서비스를 재배포하지 않는다. `all`은 production에서 가동 중인 main, canvas, serve, api, web만 배포한다. production에서 중지된 AI, 모바일 정적 웹, Expo Go는 staging에서도 기본적으로 중지하며 필요할 때만 명시적인 단일 대상을 배포한다. 기존 `scripts/deploy-production.sh <target>`도 같은 staging-first release를 실행한다.
+대상은 `all|feedback|blog|library|main|canvas|serve|ai|api|mobile|expo|web`이다. `library`는 책장 클라우드와 작업 공간 변경을 위해 main(Flyway)·canvas(책장)·api(라우팅)·web을 이 순서로 검증·배포하며 관련 없는 serve/ai/모바일 정적 서비스를 재배포하지 않는다. `feedback`은 프로필·캔버스 피드백 반영에 필요한 main과 web을 함께 스테이징 검증한 뒤 같은 소스로 배포한다. `blog`는 Notes API를 소유하는 canvas와 web을 한 소스로 스테이징 배포·전체 E2E한 뒤 같은 소스로 운영에 승격한다. 게시글 전용 변경은 `node scripts/deploy-cloud.mjs release blog`를 사용하며 관련 없는 인증·일정 서비스를 재배포하지 않는다. `all`은 production에서 가동 중인 main, canvas, serve, api, web만 배포한다. production에서 중지된 AI, 모바일 정적 웹, Expo Go는 staging에서도 기본적으로 중지하며 필요할 때만 명시적인 단일 대상을 배포한다. 기존 `scripts/deploy-production.sh <target>`도 같은 staging-first release를 실행한다.
 
 피드백 신뢰 컨트롤러는 `feedback-auto` 대상과 고정 정책이 계산한 `FLOWNOTE_RELEASE_TARGETS`를 사용한다. `FLOWNOTE_RELEASE_SOURCE_ROOT`의 격리 snapshot을 배포하되 cloud profile·설정·배포 스크립트는 관리 저장소의 신뢰된 파일을 사용한다. `FLOWNOTE_RELEASE_GUARD_ROOT/FINGERPRINT`는 staging 검증 중 원래 개발 소스가 바뀌었을 때 production을 차단한다. 모델 자체에는 이 배포 환경이나 credential을 전달하지 않는다. 일반 수동 release의 기본 root와 순서는 바뀌지 않는다.
 

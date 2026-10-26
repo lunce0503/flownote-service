@@ -1,9 +1,13 @@
+import type { BookDirty, EditableBook } from './syncModel';
+
 export const MAX_BOOK_BYTES = 100 * 1024 * 1024;
 export const defaultSubjects = ['수학', '물리학', '화학', '생명과학', '컴퓨터과학'];
 export type Book = {
   id: string; title: string; subject: string; pages: number; page: number;
   bookmarks: number[]; favorite: boolean; cover: string; filename: string;
   bytes: number; createdAt: string;
+  cloudRevision?: number; cloudBase?: EditableBook; dirty?: BookDirty; localVersion?: number;
+  deleted?: boolean; uploadId?: string; syncError?: string;
 };
 export type ReadingRegion = 'page' | 'trim' | 'left' | 'right';
 export const bookPage = (page: number, pages: number) => Math.min(pages, Math.max(1, Math.trunc(page) || 1));

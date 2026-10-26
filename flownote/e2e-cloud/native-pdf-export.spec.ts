@@ -13,7 +13,7 @@ test('iOS web PDF sender and native receiver preserve a 100MiB book with backpre
   const response = await request.post(`${api}/api/users/login`, { data: { email, password } });
   expect(response.ok()).toBeTruthy(); const account = await response.json();
   await page.context().addCookies([{ name: '__Host-flownote_session', value: account.token, url: web, secure: true, httpOnly: true, sameSite: 'Strict' }]);
-  await page.addInitScript(user => localStorage.setItem('flownote_auth_user', JSON.stringify(user)), account.user);
+  await page.addInitScript(user => { localStorage.setItem('flownote_auth_user', JSON.stringify(user)); localStorage.setItem(`flownote.device-mode:${user.id}`, 'device'); }, account.user);
   const original = textbookPdf(100 * 1024 * 1024), hash = createHash('sha256');
   const inputPath = test.info().outputPath('ios-100mib.pdf'); await writeFile(inputPath, original);
   let bytes = 0, closed = false, shared = false, removed = false, chunks = 0;

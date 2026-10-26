@@ -1,3 +1,4 @@
+import { markdownSource } from './helpers/markdown';
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
@@ -61,11 +62,11 @@ test('OFF refuses an unsaved cloud draft, then keeps server-authored content and
     const outgoing: string[] = [];
     page.on('request', request => { if (/\/web-api\/|\.railway\.app/.test(request.url())) outgoing.push(request.method()); });
     await page.goto(`/blog/${id}`);
-    await expect(page.getByLabel('Markdown 본문')).toHaveValue('Unacknowledged input');
-    await page.getByLabel('Markdown 본문').fill('Offline edit of the server-authored note');
+    await expect((await markdownSource(page))).toHaveValue('Unacknowledged input');
+    await (await markdownSource(page)).fill('Offline edit of the server-authored note');
     await expect(page.getByTestId('note-save-status')).toHaveText('기기에 저장됨 · 동기화 꺼짐');
     await page.reload();
-    await expect(page.getByLabel('Markdown 본문')).toHaveValue('Offline edit of the server-authored note');
+    await expect((await markdownSource(page))).toHaveValue('Offline edit of the server-authored note');
     expect(outgoing).toEqual([]);
     const after = await (await request.get(`${api}/api/notes/${id}`, { headers })).json();
     expect(after.content.markdown).toBe('Unacknowledged input', 'OFF edits must never secretly upload');

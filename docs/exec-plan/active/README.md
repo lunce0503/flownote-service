@@ -2,6 +2,8 @@
 
 ## 진행 중
 
+- [작업 공간·책장·캔버스 UX 갱신](2026-10-26-workspace-library-ux.md): 여섯 사용자 요구사항 전체 구현·교차 기기/100MiB/실시간 Markdown 검증 및 앱 관리 인계.
+
 - [Flownote 핵심 MVP 안정화](2026-10-18-mvp-stabilization.md): 노트 입력 복구·플래너 동시 저장·노트 조회·AI 가용성, 백그라운드 구현과 후속 staging-first 검증.
 
 - [IDLE 계획의 Flownote 편입](2026-10-14-idle-integration.md): 계획 편입 완료. 실행 계약·조회부터 구현한다.

@@ -13,7 +13,7 @@ Flownote는 Vite 웹과 Expo 모바일이 FastAPI 게이트웨이를 통해 Spri
 | `flownote-canvas/` | 캔버스, 노트, 폴더, 업로드 | Go, pgx, Redis, S3 |
 | `flownote-serve/` (`flownote-sub` 서비스) | 일기, 일정, 작업, 주식, 소셜, 채팅, 피드백 | Go, pgx, Redis, S3 |
 | `flownote-ai/` | 에이전트, 시장 데이터 | FastAPI, uv, Google GenAI |
-| `flownote-remote/` | PC 서버와 Android/Windows 카메라·미디어 입출력 클라이언트 | .NET 10 WPF, HTTPS/WSS, MediaPipe, Camera2 |
+| `flownote-remote/` | Windows/Linux 서버와 Android/Windows 카메라·미디어 입출력 클라이언트 | .NET 10 WPF/CLI, HTTPS/WSS, MediaPipe, Camera2, Codex stdio |
 | `scripts/deploy-cloud.mjs` | staging-first 클라우드 배포 | Railway, Vercel, Playwright |
 
 ## 서비스 경계
@@ -42,7 +42,7 @@ Flownote는 Vite 웹과 Expo 모바일이 FastAPI 게이트웨이를 통해 Spri
 ## 실행과 배포
 
 - 웹/API의 LAN/loopback 앱 통신과 Compose는 폐기됐다. staging 배포와 검증을 먼저 진행한다.
-- `flownote-remote`는 2026-10-23 사용자 요구에 따른 예외로 PC 서버와 사설/VPN TLS 직접 연결을 사용한다. 클라우드 서비스의 로컬 fallback을 추가하지 않는다. 이 네이티브 앱은 GitHub의 APK/단일 EXE 릴리스로 배포한다. [제품 사양](product-specs/gesture-remote-app.md)을 따른다.
+- `flownote-remote`는 2026-10-23 사용자 요구에 따른 예외로 PC 서버와 사설/VPN TLS 직접 연결을 사용한다. 클라우드 서비스의 로컬 fallback을 추가하지 않는다. 2026-10-24부터 Linux CLI 서버와 별도 Codex 음성 CLI도 제공한다. 이 네이티브 앱은 GitHub의 APK/단일 EXE/Linux CLI tar.gz 릴리스로 배포한다. [제품 사양](product-specs/gesture-remote-app.md)을 따른다.
 - 웹 production: Vercel `flownote-react`
 - 백엔드와 모바일 웹 테스트: Railway production의 `flownote-api`, `flownote-main`, `flownote-canvas`, `flownote-sub`, `flownote-ai`, `flownote-mobile-production`
 - 표준 검증: `scripts/verify-services.sh`
@@ -72,3 +72,8 @@ Flownote는 Vite 웹과 Expo 모바일이 FastAPI 게이트웨이를 통해 Spri
 - DB 마이그레이션은 순서를 유지하고 기존 데이터와 호환되게 작성한다.
 - 서비스 URL, 포트, 환경 변수 변경은 `scripts/cloud-environments.json`, `.env.example`, `docs/DEPLOYMENT.md`와 실제 클라우드 설정을 함께 확인한다.
 - 외부 클라이언트 계약은 직접 서비스 URL이 아니라 게이트웨이 경로를 기준으로 한다.
+
+
+## 계정별 책장과 공통 파일 목록 (2026-10-26 구현)
+
+클라우드 책장·사전 기록은 기존 Go canvas 서비스의 library 도메인이 소유하고 새 Flyway V22와 동일 환경의 S3를 사용한다. 원본은 1MiB 청크로 보관하며 공개 URL 대신 인증된 스트리밍 조회만 제공한다. 게이트웨이의 library 요청 크기 제한과 서버의 실제 세션 소유권을 적용한다. 웹의 화면 계정과 서버 계정 불일치도 쓰기 전에 거부한다. 노트/캔버스 공통 목록은 기존 summary/folder API를 조합하며 두 도메인의 데이터 ID·폴더 소유권을 합치지 않는다. [제품 계약](product-specs/textbook-library.md)과 [실행 상태](exec-plan/active/2026-10-26-workspace-library-ux.md)가 상세 기준을 소유한다.

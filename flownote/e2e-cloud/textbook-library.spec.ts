@@ -20,7 +20,7 @@ const pdf = () => {
   data += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map(value => `${String(value).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${offset}\n%%EOF\n`;
   return { name: 'synthetic-textbook.pdf', mimeType: 'application/pdf', buffer: Buffer.from(data) };
 };
-test.beforeAll(async ({ request }) => {
+test.beforeEach(async ({ request }) => {
   const email = `library-${randomUUID()}@example.com`, password = randomUUID();
   expect((await request.post(`${api}/api/users`, { data: { email, password, username: `lib-${randomUUID().slice(0, 8)}`, nickname: 'Synthetic library' } })).ok()).toBeTruthy();
   const login = await request.post(`${api}/api/users/login`, { data: { email, password } });
@@ -77,7 +77,7 @@ test('stores a textbook, opens its cover first, resumes pages and bookmarks, and
   const downloaded = page.waitForEvent('download');
   await page.getByRole('button', { name: '원본 PDF 내보내기' }).click();
   expect((await downloaded).suggestedFilename()).toBe('synthetic-textbook.pdf');
-  expect(uploads).toEqual([]);
+  await expect.poll(() => uploads.some(path => path.endsWith('/api/library/uploads'))).toBe(true);
   page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: '책장에서 삭제', exact: true }).click();
   await expect(spine).toHaveCount(0);

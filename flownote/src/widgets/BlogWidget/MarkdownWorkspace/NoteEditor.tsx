@@ -10,6 +10,7 @@ import { createNoteSaveQueue, waitForNoteSave } from '@/features/blog';
 import { downloadNote } from './downloadNote';
 
 const Preview = lazy(() => import('./MarkdownPreview'));
+const LiveEditor = lazy(() => import('./LiveMarkdownEditor'));
 
 type RegisterRename = (rename: ((title: string) => void) | null) => void;
 export default function NoteEditor({ owner, id, onSaved, registerRename }: { owner: string; id: string; onSaved: (saved: BlockDataProps) => void; registerRename: RegisterRename }) {
@@ -58,7 +59,7 @@ function Editor({ owner, initial, draft, draftError, onSaved, reload, registerRe
   const noteRef = useRef(initial);
   const [recovery, setRecovery] = useState(state !== 'matched' ? draft : null);
   const [status, setStatus] = useState(draftError ? '기기 초안 저장소를 사용할 수 없습니다 — 내보내기 필요' : state === 'matched' ? isDeviceOnly() ? '기기에 저장됨 · 동기화 꺼짐' : '서버에 저장됨' : '복구 확인 필요');
-  const [mode, setMode] = useState<'edit' | 'preview' | 'split'>('edit');
+  const [mode, setMode] = useState<'edit' | 'source' | 'preview' | 'split'>('edit');
   const [original, setOriginal] = useState(false);
   const [remoteChanged, setRemoteChanged] = useState(false);
   const [queue] = useState(() => createNoteSaveQueue(owner, initial, async snapshot => {
@@ -126,7 +127,7 @@ function Editor({ owner, initial, draft, draftError, onSaved, reload, registerRe
         <button onClick={() => {
           if (!queue.hasPending || window.confirm('미저장 입력이 있습니다. 저장 실패가 있다면 먼저 .md로 내보내세요. 서버본과 기기 초안을 다시 확인할까요?')) reload();
         }}>서버본·초안 확인</button>
-        {(['edit', 'preview', 'split'] as const).map((value, i) => <button key={value} aria-pressed={mode === value} onClick={() => setMode(value)}>{['편집', '미리보기', '나란히'][i]}</button>)}
+        {(['edit', 'source', 'preview', 'split'] as const).map((value, i) => <button key={value} aria-pressed={mode === value} onClick={() => setMode(value)}>{['편집', '원문', '미리보기', '나란히'][i]}</button>)}
         <button onClick={() => downloadNote(`${note.title.replace(/\.md$/i, '') || 'note'}.md`, markdown.markdown)}>.md 내보내기</button>
         <button disabled={!!recovery || needsReview} onClick={() => queue.retry()}>저장 다시 시도</button>
       </>}
@@ -146,10 +147,12 @@ function Editor({ owner, initial, draft, draftError, onSaved, reload, registerRe
       {mode === 'preview' && <Suspense fallback={<p>미리보기 준비 중…</p>}><Preview source={converted.content.markdown} /></Suspense>}
     </div>}
     {markdown && <div className={`note-editors note-editors-${mode}`}>
-      {mode !== 'preview' && <textarea aria-label="Markdown 본문" spellCheck={false} value={markdown.markdown}
+      {mode === 'edit' && <Suspense fallback={<p role="status">편집기 준비 중…</p>}><LiveEditor value={markdown.markdown} disabled={!!recovery || needsReview}
+        onChange={value => change({ ...noteRef.current, content: { ...markdown, markdown: value } })} /></Suspense>}
+      {(mode === 'source' || mode === 'split') && <textarea aria-label="Markdown 본문" spellCheck={false} value={markdown.markdown}
         disabled={!!recovery || needsReview} onChange={e => change({ ...noteRef.current, content: { ...markdown, markdown: e.target.value } })}
         onCompositionEnd={e => change({ ...noteRef.current, content: { ...markdown, markdown: e.currentTarget.value } })} />}
-      {mode !== 'edit' && <Suspense fallback={<p role="status">미리보기 준비 중…</p>}><Preview source={markdown.markdown} /></Suspense>}
+      {(mode === 'preview' || mode === 'split') && <Suspense fallback={<p role="status">미리보기 준비 중…</p>}><Preview source={markdown.markdown} /></Suspense>}
     </div>}
   </div>;
 }

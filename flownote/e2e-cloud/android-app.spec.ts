@@ -1,3 +1,4 @@
+import { markdownSource } from './helpers/markdown';
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
@@ -31,7 +32,7 @@ test('Android login persists, original header is absent, all feature routes rema
   await expect(page).toHaveURL(/\/$/);
   await nav.getByRole('button', { name: '전체 기능', exact: true }).click();
   const menu = page.getByRole('dialog', { name: '전체 기능' });
-  for (const href of ['/blog', '/canvas', '/planner', '/social', '/agent', '/settings', '/stocks', '/banpick', '/screw-puzzle', '/magic', '/admin/canvas', '/admin/feedback']) {
+  for (const href of ['/canvas', '/library', '/planner', '/social', '/agent', '/settings', '/stocks', '/banpick', '/screw-puzzle', '/magic', '/admin/canvas', '/admin/feedback']) {
     await expect(menu.locator(`a[href="${href}"]`)).toBeVisible();
   }
   await menu.getByRole('link', { name: '설정', exact: true }).click();
@@ -75,9 +76,9 @@ test('Android tablet layout preserves touch targets and canvas full working area
     await expect(page.getByTestId('canvas-input-surface')).toHaveAttribute('data-ready', 'true');
     await expect(page.locator('header')).toHaveCount(0);
     await expect(nav).toHaveCount(0);
-    await expect(page.getByRole('link', { name: '캔버스 목록으로 돌아가기' })).toBeVisible();
+    await expect(page.getByRole('link', { name: '작업 공간으로 돌아가기' })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
-    await page.getByRole('link', { name: '캔버스 목록으로 돌아가기' }).click();
+    await page.getByRole('link', { name: '작업 공간으로 돌아가기' }).click();
     await expect(nav).toBeVisible();
   } finally {
     expect((await request.delete(`${api}/api/canvas/documents/${id}`, { headers })).ok()).toBeTruthy();
@@ -115,7 +116,7 @@ test('Android preserves the structured original and saves Markdown through the s
     expect(untouched.revision).toBe(1);
     page.once('dialog', dialog => dialog.accept());
     await page.getByRole('button', { name: '원본 보관 후 Markdown으로 전환' }).click();
-    const editor = page.getByLabel('Markdown 본문');
+    const editor = (await markdownSource(page));
     await expect(editor).toBeVisible();
     await expect(editor).toHaveValue('**서식 노트 원본**');
     await page.getByLabel('노트 제목').fill('Android edited note');
@@ -131,7 +132,7 @@ test('Android preserves the structured original and saves Markdown through the s
     }, { timeout: 30000 }).toBeTruthy();
     await page.reload();
     await expect(page.getByLabel('노트 제목')).toHaveValue('Android edited note');
-    await expect(editor).toHaveValue('**서식 노트 원본** 앱에서 편집');
+    await expect((await markdownSource(page))).toHaveValue('**서식 노트 원본** 앱에서 편집');
     await page.getByRole('button', { name: '미리보기', exact: true }).click();
     await expect(page.locator('strong').filter({ hasText: '서식 노트 원본' })).toBeVisible();
   } finally {

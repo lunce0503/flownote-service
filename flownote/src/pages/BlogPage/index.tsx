@@ -1,2 +1,2 @@
-import MarkdownWorkspace from '@/widgets/BlogWidget/MarkdownWorkspace/MarkdownWorkspace';
-export default MarkdownWorkspace;
+import { CanvasList } from '@/widgets/CanvasWidget';
+export default CanvasList;

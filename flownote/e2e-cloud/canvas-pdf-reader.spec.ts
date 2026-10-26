@@ -87,7 +87,7 @@ test('turns PDF pages beside an editable canvas, preserves notes, and releases t
   await page.getByRole('button', { name: 'PDF 책 읽기', exact: true }).click();
   const reader = page.getByRole('complementary', { name: 'PDF 책 읽기' });
   const installed = await page.evaluate(() => document.documentElement.dataset.installedApp === 'true');
-  const library = page.getByRole('link', { name: '캔버스 목록으로 돌아가기' });
+  const library = page.getByRole('link', { name: '작업 공간으로 돌아가기' });
   if (installed) await expect(library).toBeHidden();
   const fileInput = reader.getByLabel('읽을 PDF 선택');
   await expect(fileInput).toBeFocused();

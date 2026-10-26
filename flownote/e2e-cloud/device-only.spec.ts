@@ -1,3 +1,4 @@
+import { markdownSource } from './helpers/markdown';
 import { test, expect, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
@@ -41,18 +42,18 @@ test('cloud material is available offline and device edits reconcile on re-enabl
     const outgoing: string[] = [];
     page.on('request', request => { if (/\/web-api\/|\.railway\.app/.test(request.url())) outgoing.push(`${request.method()} ${request.url()}`); });
     await page.reload(); await expect(page.getByText('꺼짐 · 기기 전용', { exact: true })).toBeVisible();
-    await page.goto('/blog'); await expect(page.getByRole('treeitem', { name: 'Cloud original.md', exact: true })).toBeVisible();
-    await page.getByRole('treeitem', { name: 'Cloud original.md', exact: true }).click();
-    await page.getByLabel('Markdown 본문').fill('first offline revision of cloud note');
+    await page.goto('/blog'); await expect(page.getByRole('button', { name: 'Cloud original', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Cloud original', exact: true }).click();
+    await (await markdownSource(page)).fill('first offline revision of cloud note');
     await expect(page.getByTestId('note-save-status')).toHaveText('기기에 저장됨 · 동기화 꺼짐');
-    await page.getByLabel('Markdown 본문').fill('second offline revision of cloud note');
+    await (await markdownSource(page)).fill('second offline revision of cloud note');
     await expect(page.getByTestId('note-save-status')).toHaveText('기기에 저장됨 · 동기화 꺼짐');
     page.once('dialog', dialog => dialog.accept('Device note'));
     await page.getByRole('button', { name: '새 노트', exact: true }).first().click();
     await expect(page).toHaveURL(/\/blog\/device-/);
-    await page.getByLabel('Markdown 본문').fill('# 기기만의 원고\n\nDo not upload');
+    await (await markdownSource(page)).fill('# 기기만의 원고\n\nDo not upload');
     await expect(page.getByTestId('note-save-status')).toHaveText('기기에 저장됨 · 동기화 꺼짐');
-    await page.reload(); await expect(page.getByLabel('Markdown 본문')).toHaveValue('# 기기만의 원고\n\nDo not upload');
+    await page.reload(); await expect((await markdownSource(page))).toHaveValue('# 기기만의 원고\n\nDo not upload');
     await page.goto('/canvas'); await page.getByRole('button', { name: '새 캔버스', exact: true }).click();
     await expect(page).toHaveURL(/\/canvas\/device-/);
     const surface = page.getByTestId('canvas-input-surface'); await expect(surface).toHaveAttribute('data-ready', 'true');
@@ -123,8 +124,8 @@ test('cloud material is available offline and device edits reconcile on re-enabl
     expect(interrupted).toBeTruthy();
     await page.unroute('**/web-api/api/notes');
     await toggle(page, true);
-    await page.goto('/blog'); await expect(page.getByRole('treeitem', { name: 'Cloud original.md', exact: true })).toBeVisible();
-    await expect(page.getByRole('treeitem', { name: 'Device note.md', exact: true })).toBeVisible();
+    await page.goto('/blog'); await expect(page.getByRole('button', { name: 'Cloud original', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Device note', exact: true })).toBeVisible();
     const afterCloud = await (await request.get(`${api}/api/notes`, { headers })).json();
     expect(afterCloud).toHaveLength(2);
     expect(afterCloud.find((item: { id: string }) => item.id === cloudId)?.content.markdown).toBe('second offline revision of cloud note');
@@ -135,8 +136,8 @@ test('cloud material is available offline and device edits reconcile on re-enabl
     expect(cloudElements.lines).toHaveLength(1); expect(cloudElements.images).toHaveLength(1);
     expect((await (await request.get(`${api}/api/tasks`, { headers })).json())).toHaveLength(1);
     await page.goto('/settings'); await toggle(page, false);
-    await page.goto('/blog'); await page.getByRole('treeitem', { name: 'Device note.md', exact: true }).click();
-    await expect(page.getByLabel('Markdown 본문')).toHaveValue('# 기기만의 원고\n\nDo not upload');
+    await page.goto('/blog'); await page.getByRole('button', { name: 'Device note', exact: true }).click();
+    await expect((await markdownSource(page))).toHaveValue('# 기기만의 원고\n\nDo not upload');
     expect(await page.locator('body').evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   } finally {
     const notes = await (await request.get(`${api}/api/notes`, { headers })).json();
@@ -163,7 +164,7 @@ test('same-field conflict keeps the more substantial offline edit and preserves 
   const localMarkdown = '# offline detailed edit\n\n' + Array.from({ length: 24 }, (_, index) => `meaningful-${index}`).join(' ');
   try {
     await page.goto('/settings'); await toggle(page, false);
-    await page.goto(`/blog/${id}`); await page.getByLabel('Markdown 본문').fill(localMarkdown);
+    await page.goto(`/blog/${id}`); await (await markdownSource(page)).fill(localMarkdown);
     await expect(page.getByTestId('note-save-status')).toHaveText('기기에 저장됨 · 동기화 꺼짐');
     expect((await request.post(`${api}/api/notes`, { headers, data: {
       id, title: 'Conflict note', content: { format: 'markdown', version: 1, markdown: 'remote short edit' }, revision: 2, client_id: randomUUID(),
@@ -198,14 +199,14 @@ test('device mode is isolated by account and unavailable storage cannot silently
   await page.goto('/blog'); page.once('dialog', dialog => dialog.accept('Only account A'));
   await page.getByRole('button', { name: '새 노트', exact: true }).first().click(); await expect(page.getByLabel('노트 제목')).toHaveValue('Only account A');
   await page.evaluate(({ user }) => { localStorage.setItem('flownote_auth_user', JSON.stringify({ ...user, id: `${user.id}-other` })); localStorage.setItem(`flownote.device-mode:${user.id}-other`, 'device'); }, { user });
-  await page.goto('/blog'); await expect(page.getByRole('treeitem', { name: 'Only account A.md', exact: true })).toHaveCount(0);
+  await page.goto('/blog'); await expect(page.getByRole('button', { name: 'Only account A', exact: true })).toHaveCount(0);
   await page.evaluate(({ user }) => localStorage.setItem('flownote_auth_user', JSON.stringify(user)), { user });
-  await page.goto('/blog'); await expect(page.getByRole('treeitem', { name: 'Only account A.md', exact: true })).toBeVisible();
+  await page.goto('/blog'); await expect(page.getByRole('button', { name: 'Only account A', exact: true })).toBeVisible();
   await page.evaluate(() => { IDBObjectStore.prototype.put = function () { throw new DOMException('Synthetic quota', 'QuotaExceededError'); }; });
   page.once('dialog', dialog => dialog.accept('Must not be called saved'));
   await page.getByRole('button', { name: '새 노트', exact: true }).first().click();
   await expect(page.locator('div[role="alert"]')).toContainText('파일 작업에 실패');
-  await page.reload(); await expect(page.getByRole('treeitem', { name: 'Must not be called saved.md', exact: true })).toHaveCount(0);
+  await page.reload(); await expect(page.getByRole('button', { name: 'Must not be called saved', exact: true })).toHaveCount(0);
   expect((await (await request.get(`${api}/api/notes`, { headers: { Authorization: `Bearer ${token}` } })).json())).toEqual([]);
 });
 
@@ -226,9 +227,9 @@ test('phone and desktop app markers restore an independent device workspace with
       await expect(page.locator('header')).toHaveCount(0);
       await page.goto(`${web}/blog`); page.once('dialog', dialog => dialog.accept('Device restore'));
       await page.getByRole('button', { name: '새 노트', exact: true }).first().click();
-      await page.getByLabel('Markdown 본문').fill('Stored only on this device');
+      await (await markdownSource(page)).fill('Stored only on this device');
       await expect(page.getByTestId('note-save-status')).toHaveText('기기에 저장됨 · 동기화 꺼짐');
-      await page.reload(); await expect(page.getByLabel('Markdown 본문')).toHaveValue('Stored only on this device');
+      await page.reload(); await expect((await markdownSource(page))).toHaveValue('Stored only on this device');
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
       expect(outgoing).toEqual([]);
     } finally { await context.close(); }

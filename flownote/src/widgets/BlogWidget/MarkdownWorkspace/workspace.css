@@ -7,3 +7,15 @@
 .note-document-heading{align-items:flex-start}.note-document-heading input{flex-basis:70%}.note-document-heading [role=status]{flex-basis:auto}.note-workspace input,.note-workspace select{color:inherit}.note-markdown input[type=checkbox]{margin-right:6px}
 
 .note-topbar{background:var(--workspace-sidebar)}.note-markdown a{text-underline-offset:3px}.note-explorer-heading{font-weight:600}.note-workspace-empty>button{background:var(--workspace-strong);color:var(--workspace-on-strong);padding:8px 16px}.note-tree-label[aria-selected=true]{font-weight:600}.note-document-heading input::placeholder{color:var(--workspace-muted)}
+.note-live-editor { min-width: 0; }
+.note-live-formatting { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--workspace-border); }
+.note-live-formatting button { min-width: 40px; min-height: 40px; padding: 8px; }
+.note-live-formatting button[aria-pressed=true] { background: var(--workspace-selected); }
+.note-live-formatting span { font-size: 11px; color: var(--workspace-muted); margin-left: 8px; }
+.note-live-content { min-height: 55dvh; outline: none; padding: 16px 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.note-live-content:focus-visible { outline: 1px solid var(--workspace-border); outline-offset: 4px; }
+.note-live-content ul[data-type=taskList] { list-style: none; padding-left: 0; }
+.note-live-content li[data-type=taskItem] { display: flex; gap: 9px; }
+.note-live-content li[data-type=taskItem] > div { min-width: 0; }
+.note-live-content .tableWrapper { max-width: 100%; overflow: auto; }
+.note-live-content .tiptap-mathematics-render { cursor: text; }

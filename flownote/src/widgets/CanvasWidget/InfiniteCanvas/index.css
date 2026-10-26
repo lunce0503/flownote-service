@@ -70,3 +70,6 @@
         border-left: 1px solid #e7e5e4;
     }
 }
+.canvas-touch-root canvas[data-hide-tool-cursor="true"] {
+  cursor: none !important;
+}

@@ -72,7 +72,8 @@ export const capabilityManifest: Capability[] = [
   {
     id: 'blog',
     label: '노트',
-    nav: true,
+    protected: true,
+    nav: false,
     enabled: true,
     routes: [
       {
@@ -86,7 +87,7 @@ export const capabilityManifest: Capability[] = [
   },
   {
     id: 'canvas',
-    label: '캔버스',
+    label: '작업 공간',
     nav: true,
     enabled: true,
     protected: true,

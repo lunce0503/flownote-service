@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
-import { Bot, CalendarDays, Grid2X2, House, NotebookPen, Palette, X } from 'lucide-react';
+import { Bot, CalendarDays, Grid2X2, House, Library, X } from 'lucide-react';
 import { useAuth } from '@/features/auth';
 import { useFullscreen } from '@/shared/lib/useFullscreen';
 import { capabilityManifest } from './capabilityManifest';
@@ -8,8 +8,8 @@ import './android-app.css';
 
 const primary = [
   { path: '/', label: '홈', icon: House },
-  { path: '/blog', label: '노트', icon: NotebookPen },
-  { path: '/canvas', label: '캔버스', icon: Palette },
+  { path: '/canvas', label: '작업 공간', icon: Grid2X2 },
+  { path: '/library', label: '책장', icon: Library },
   { path: '/planner', label: '플래너', icon: CalendarDays },
 ];
 
@@ -53,10 +53,10 @@ export default function AndroidNavigation() {
   if (authPage || isFullscreen) return null;
 
   return <>
-    {editor ? <Link to="/canvas" className="android-editor-library" aria-label="캔버스 목록으로 돌아가기"><Grid2X2 size={18} /></Link> : (
+    {editor ? <Link to="/canvas" className="android-editor-library" aria-label="작업 공간으로 돌아가기"><Grid2X2 size={18} /></Link> : (
       <nav className="android-navigation" aria-label="앱 기능">
         {primary.map(({ path, label, icon: Icon }) => <Link key={path} to={path}
-          aria-current={(path === '/' ? pathname === '/' : pathname.startsWith(path)) ? 'page' : undefined}>
+          aria-current={(path === '/' ? pathname === '/' : (pathname.startsWith(path) || (path === '/canvas' && pathname.startsWith('/blog')))) ? 'page' : undefined}>
           <Icon size={21} aria-hidden="true" /><span>{label}</span>
         </Link>)}
         <button ref={menuButtonRef} type="button" aria-label="전체 기능" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}>
@@ -71,7 +71,7 @@ export default function AndroidNavigation() {
           <button autoFocus data-android-menu-close type="button" aria-label="전체 기능 닫기" onClick={() => setMenuOpen(false)}><X size={22} /></button>
         </div>
         <div className="android-menu-grid">
-          {capabilityManifest.filter(item => item.enabled && item.id !== 'auth' && item.id !== 'home').map(item => {
+          {capabilityManifest.filter(item => item.enabled && item.id !== 'auth' && item.id !== 'home' && item.id !== 'blog').map(item => {
             const path = item.routes.find(route => route.path && !route.path.includes(':'))?.path;
             return path ? <Link key={item.id} to={path} onClick={() => setMenuOpen(false)}>
               {item.id === 'agent' ? <Bot size={20} /> : <Grid2X2 size={20} />}

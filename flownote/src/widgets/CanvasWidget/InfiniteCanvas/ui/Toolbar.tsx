@@ -1,9 +1,8 @@
 import React from 'react';
 import { BookOpen, CalendarDays } from 'lucide-react';
 import type { ToolType } from '@/entities/canvas';
-import type { CanvasLoadTrigger, CanvasSaveState, CanvasSaveStatus } from '@/features/canvas';
-import { BringToFront, Check, CheckCircle2, ChevronDown, ClipboardPaste, Cloud, CloudUpload, Copy, Crosshair, Download, Eraser, Hand, ImagePlus, Lasso, LayoutGrid, Loader2, Maximize, Minimize, MoreVertical, Palette, PenLine, Pencil, RefreshCw, RotateCcw, SendToBack, Settings, Trash2, TriangleAlert, Type, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
-import { useFullscreen } from '@/shared/lib/useFullscreen';
+import type { CanvasLoadTrigger, CanvasSaveState } from '@/features/canvas';
+import { BringToFront, Check, ChevronDown, ClipboardPaste, Copy, Crosshair, Download, Eraser, Hand, ImagePlus, Lasso, LayoutGrid, Loader2, MoreVertical, Palette, PenLine, Pencil, RefreshCw, RotateCcw, SendToBack, Settings, Trash2, TriangleAlert, Type, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
 
 interface ToolbarProps {
   canvasTitle: string;
@@ -58,16 +57,6 @@ const floatingPillClass = 'pointer-events-auto flex min-h-12 shrink-0 items-cent
 const iconButtonClass = 'inline-flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full p-3 text-stone-950 transition hover:bg-stone-100 active:scale-95';
 const selectedIconButtonClass = 'bg-stone-950 text-white hover:bg-stone-800';
 const libraryButtonClass = `${iconButtonClass} bg-white/95 shadow-lg ring-1 ring-stone-200/80 backdrop-blur`;
-
-const saveStatusClassByStatus: Record<CanvasSaveStatus, string> = {
-  idle: 'bg-stone-100 text-stone-600',
-  loading: 'bg-blue-100 text-blue-800',
-  pending: 'bg-amber-100 text-amber-800',
-  saving: 'bg-blue-100 text-blue-800',
-  saved: 'bg-emerald-100 text-emerald-800',
-  failed: 'bg-red-100 text-red-700',
-  retrying: 'bg-blue-100 text-blue-800',
-};
 
 const TOUCH_TAP_MAX_MOVEMENT = 10;
 const TOUCH_CLICK_SUPPRESSION_MS = 700;
@@ -294,7 +283,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   zoomPercent,
   viewportCenter,
 }) => {
-  const { isFullscreen, toggleFullscreen } = useFullscreen();
   const [isFileMenuOpen, setIsFileMenuOpen] = React.useState(false);
   const [isMobileToolMenuOpen, setIsMobileToolMenuOpen] = React.useState(false);
   const [isPenPaletteOpen, setIsPenPaletteOpen] = React.useState(false);
@@ -317,9 +305,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const saveStatusIcon = (() => {
     if (isSaveBusy) return <Loader2 size={TOOLBAR_ICON_SIZE} className="animate-spin" aria-hidden="true" />;
     if (saveState.status === 'failed') return <TriangleAlert size={TOOLBAR_ICON_SIZE} aria-hidden="true" />;
-    if (saveState.status === 'saved') return <CheckCircle2 size={TOOLBAR_ICON_SIZE} aria-hidden="true" />;
-    if (saveState.status === 'pending') return <CloudUpload size={TOOLBAR_ICON_SIZE} aria-hidden="true" />;
-    return <Cloud size={TOOLBAR_ICON_SIZE} aria-hidden="true" />;
+    if (saveState.status === 'saved') return <Check size={TOOLBAR_ICON_SIZE} aria-hidden="true" />;
+    return <Loader2 size={TOOLBAR_ICON_SIZE} className={saveState.status === 'pending' ? 'animate-spin' : undefined} aria-hidden="true" />;
   })();
   const saveStatusLabel = saveState.pendingRetries > 0
     ? `${saveState.message} ${saveState.pendingRetries}`
@@ -438,14 +425,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           {...touchActivation(onNavigateToCanvasList)}
           data-testid="canvas-library-button"
           className={libraryButtonClass}
-          aria-label="캔버스 목록으로"
+          aria-label="작업 공간으로"
         >
           <LayoutGrid size={TOOLBAR_ICON_SIZE} />
         </button>
         <CanvasTitleEditor canvasTitle={canvasTitle} onRenameCanvas={onRenameCanvas} className="flex min-h-12 min-w-0 flex-1 items-center rounded-full bg-white/95 px-4 text-sm font-black shadow-lg ring-1 ring-stone-200/80 backdrop-blur" />
         <div
           data-testid="canvas-save-status"
-          className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-lg ${saveStatusClassByStatus[saveState.status]}`}
+          data-save-state={saveState.status}
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center bg-transparent text-stone-500"
           title={saveStatusLabel}
           role="status"
           aria-label={saveStatusLabel}
@@ -491,10 +479,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <X size={18} /> 불러오기 취소
               </button>
             )}
-            <button type="button" role="menuitem" className={mobileMenuItemClass} {...touchActivation(() => { setIsFileMenuOpen(false); void toggleFullscreen(); })}>
-              {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
-              {isFullscreen ? '전체 화면 종료' : '전체 화면'}
-            </button>
             <button type="button" role="menuitem" className={mobileMenuItemClass} {...touchActivation(() => { setIsFileMenuOpen(false); onToggleCanvasSettingsVisible(); })}>
               <Settings size={18} /> 캔버스 설정
             </button>
@@ -591,7 +575,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             data-testid="canvas-library-button"
             className={libraryButtonClass}
             title="캔버스 목록으로"
-            aria-label="캔버스 목록으로"
+            aria-label="작업 공간으로"
           >
             <LayoutGrid size={TOOLBAR_ICON_SIZE} />
           </button>
@@ -648,7 +632,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <div className={floatingPillClass} aria-label="파일과 설정">
             <div
               data-testid="canvas-save-status"
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${saveStatusClassByStatus[saveState.status]}`}
+          data-save-state={saveState.status}
+              className="inline-flex h-10 w-10 items-center justify-center bg-transparent text-stone-500"
               title={saveStatusLabel}
               role="status"
               aria-label={saveStatusLabel}
@@ -707,16 +692,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <X size={TOOLBAR_ICON_SIZE} />
               </button>
             )}
-            <button
-              type="button"
-              {...touchActivation(() => { void toggleFullscreen(); })}
-              className={`${iconButtonClass} ${isFullscreen ? selectedIconButtonClass : ''}`}
-              title={isFullscreen ? '전체 화면 종료 (Esc)' : '전체 화면 (브라우저 툴바·헤더 숨김)'}
-              aria-label={isFullscreen ? '전체 화면 종료' : '전체 화면'}
-              aria-pressed={isFullscreen}
-            >
-              {isFullscreen ? <Minimize size={TOOLBAR_ICON_SIZE} /> : <Maximize size={TOOLBAR_ICON_SIZE} />}
-            </button>
             <button
               type="button"
               {...touchActivation(onToggleCanvasSettingsVisible)}

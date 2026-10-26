@@ -42,7 +42,7 @@ _AI_PREFIXES = ("aiclient", "market")
 # flownote-sub(소스: flownote-serve/, 부가기능 백엔드)가 소유하는 접두어 — Spring에서 이관.
 _SERVE_PREFIXES = ("schedule-items", "tasks", "stocks", "social", "chat", "diary", "feedback")
 # flownote-canvas(Go)가 소유하는 접두어: 캔버스 + 이관된 노트 도메인(노트·폴더·업로드) + 관리자 진단.
-_CANVAS_PREFIXES = ("canvas", "notes", "note-folders", "upload", "admin")
+_CANVAS_PREFIXES = ("canvas", "notes", "note-folders", "upload", "admin", "library")
 
 # 요청에서 상류로 전달하지 않는 hop-by-hop 헤더.
 _REQUEST_STRIP = {
@@ -133,7 +133,17 @@ async def _proxy(request: Request, target_base: str, target_name: str, full_path
     headers = _forward_headers(request, request_id)
     if path == "/api/users/login" and request.headers.get("x-flownote-web") == "1":
         headers["accept-encoding"] = "identity"
-    body = await request.body()
+    if path.startswith("/api/library/"):
+        # Library PDF uploads are <=1MiB chunks, before either proxy buffers them.
+        limit = 1024 * 1024 if "/chunks/" in path else 512 * 1024
+        content = bytearray()
+        async for chunk in request.stream():
+            if len(content) + len(chunk) > limit:
+                raise HTTPException(status_code=413, detail="책장 요청 크기 제한을 초과했습니다.")
+            content.extend(chunk)
+        body = bytes(content)
+    else:
+        body = await request.body()
     started = time.monotonic()
 
     client = httpx.AsyncClient(timeout=_TIMEOUT)

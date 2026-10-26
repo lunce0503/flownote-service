@@ -51,7 +51,7 @@ for (const width of [390, 820, 1024]) {
       await expect(marker).toBeHidden();
 
       // Browser PointerEvents exercise presentation only; physical Pencil hover is a device check.
-      const hover = async (rightEdge = false) => {
+      const hover = async (rightEdge = false, diameter = 4) => {
         const box = await surface.boundingBox();
         expect(box).not.toBeNull();
         const point = { x: box!.x + (rightEdge ? box!.width - 4 : 160), y: box!.y + 240 };
@@ -72,8 +72,8 @@ for (const width of [390, 820, 1024]) {
         await expect(marker).toBeVisible();
         const tip = await page.getByTestId('canvas-tool-pointer-tip').boundingBox();
         expect(tip).not.toBeNull();
-        expect(tip!.width).toBe(4);
-        expect(tip!.height).toBe(4);
+        expect(tip!.width).toBe(diameter);
+        expect(tip!.height).toBe(diameter);
         expect(await page.getByTestId('canvas-tool-pointer-tip').evaluate(tip =>
           parseFloat(getComputedStyle(tip).borderTopLeftRadius))).toBeGreaterThanOrEqual(2);
         await expect(page.getByTestId('canvas-tool-pointer-tip')).toHaveCSS('box-shadow', 'none');
@@ -93,7 +93,7 @@ for (const width of [390, 820, 1024]) {
           await expect(page.getByTestId('canvas-current-tool')).toContainText(label);
           await expect(page.getByTestId('canvas-current-tool')).toHaveAttribute('aria-label', `현재 도구: ${label}`);
         }
-        await hover();
+        await hover(false, tool === 'eraser' ? 32 : 4);
         await expect(marker).toHaveAttribute('data-tool', tool);
         await expect(marker).toHaveText('');
         await expect(marker.locator('svg')).toHaveCount(0);

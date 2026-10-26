@@ -1,3 +1,4 @@
+import { markdownSource } from './helpers/markdown';
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
@@ -58,13 +59,13 @@ test('metadata shell does not fetch bodies/renderers; selection, preview safety 
   const requested: string[] = [];
   page.on('request', r => requested.push(r.url()));
   await page.goto('/blog');
-  await expect(page.getByTestId('markdown-workspace')).toBeVisible();
-  await expect(page.getByRole('treeitem', { name: 'Synthetic note 0.md', exact: true })).toBeVisible();
+  await expect(page.getByTestId('canvas-explorer')).toHaveAttribute('data-unified', 'true');
+  await expect(page.getByRole('button', { name: 'Synthetic note 0', exact: true })).toBeVisible();
   expect(requested.filter(url => /\/api\/notes\/[0-9a-f-]+(?:\?|$)/.test(url))).toEqual([]);
   expect(requested.filter(url => /editor-blocknote|editor-integration|MarkdownPreview/.test(url))).toEqual([]);
   expect(requested.filter(url => /\/api\/notes(?:\?|$)/.test(url)).every(url => url.includes('view=summary'))).toBeTruthy();
-  await page.getByRole('treeitem', { name: 'Synthetic note 0.md', exact: true }).click();
-  await expect(page.getByLabel('Markdown 본문')).toHaveValue(markdown);
+  await page.getByRole('button', { name: 'Synthetic note 0', exact: true }).click();
+  await expect((await markdownSource(page))).toHaveValue(markdown);
   expect(requested.filter(url => /\/api\/notes\/[0-9a-f-]+(?:\?|$)/.test(url)).every(url => url.includes(ids[0]))).toBeTruthy();
   await page.getByRole('button', { name: '미리보기', exact: true }).click();
   await expect(page.getByTestId('markdown-preview').getByRole('heading', { name: '한글' })).toBeVisible();
@@ -96,20 +97,20 @@ test('a reused client revision only acknowledges the same document', async ({ re
 
 test('fast route changes, failed saves and reload keep the latest draft', async ({ page }) => {
   await page.goto(`/blog/${ids[0]}`);
-  await expect(page.getByLabel('Markdown 본문')).toHaveValue(markdown);
+  await expect((await markdownSource(page))).toHaveValue(markdown);
   await page.route('**/web-api/api/notes', route => route.request().method() === 'POST' ? route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"synthetic failure"}' }) : route.continue());
   const text = markdown + '\n빠른 이동 마지막 입력';
-  await page.getByLabel('Markdown 본문').fill(text);
+  await (await markdownSource(page)).fill(text);
   await page.getByRole('treeitem', { name: 'Synthetic note 1.md', exact: true }).click();
   await page.getByRole('treeitem', { name: 'Synthetic note 0.md', exact: true }).click();
   await expect(page.getByRole('button', { name: '초안 복구', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '초안 복구', exact: true }).click();
-  await expect(page.getByLabel('Markdown 본문')).toHaveValue(text);
+  await expect((await markdownSource(page))).toHaveValue(text);
   await expect(page.getByTestId('note-save-status')).toContainText('저장 실패');
   page.once('dialog', dialog => dialog.accept());
   await page.reload();
   await page.getByRole('button', { name: '초안 복구', exact: true }).click();
-  await expect(page.getByLabel('Markdown 본문')).toHaveValue(text);
+  await expect((await markdownSource(page))).toHaveValue(text);
   await page.unroute('**/web-api/api/notes');
   await page.getByRole('button', { name: '저장 다시 시도', exact: true }).click();
   await expect(page.getByTestId('note-save-status')).toHaveText('서버에 저장됨');
@@ -118,7 +119,7 @@ test('fast route changes, failed saves and reload keep the latest draft', async 
 test('a real concurrent API write exposes conflict recovery without a sync event', async ({ page, request }) => {
   const initial = await (await request.get(`${api}/api/notes/${ids[0]}`, { headers: headers() })).json();
   await page.goto(`/blog/${ids[0]}`);
-  await expect(page.getByLabel('Markdown 본문')).toHaveValue(initial.content.markdown);
+  await expect((await markdownSource(page))).toHaveValue(initial.content.markdown);
   const localText = initial.content.markdown + '\n확인 후 복구할 로컬 입력';
   const remoteText = initial.content.markdown + '\n다른 클라이언트의 변경';
   await page.route('**/web-api/api/notes', async route => {
@@ -129,16 +130,16 @@ test('a real concurrent API write exposes conflict recovery without a sync event
     expect(remote.ok()).toBeTruthy();
     await route.continue();
   }, { times: 1 });
-  await page.getByLabel('Markdown 본문').fill(localText);
+  await (await markdownSource(page)).fill(localText);
   await expect(page.getByTestId('note-save-status')).toContainText('충돌');
-  await expect(page.getByLabel('Markdown 본문')).toBeDisabled();
+  await expect((await markdownSource(page))).toBeDisabled();
   expect((await (await request.get(`${api}/api/notes/${ids[0]}`, { headers: headers() })).json()).content.markdown).toBe(remoteText);
   page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: '서버본 확인', exact: true }).click();
   await expect(page.getByRole('button', { name: '초안 복구', exact: true })).toBeVisible();
   page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: '초안 복구', exact: true }).click();
-  await expect(page.getByLabel('Markdown 본문')).toHaveValue(localText);
+  await expect((await markdownSource(page))).toHaveValue(localText);
   await expect(page.getByTestId('note-save-status')).toHaveText('서버에 저장됨');
   expect((await (await request.get(`${api}/api/notes/${ids[0]}`, { headers: headers() })).json()).content.markdown).toBe(localText);
 });
@@ -164,15 +165,15 @@ test('the explorer renders its first metadata page while a later page is delayed
   try {
     await page.goto('/blog');
     await expect.poll(() => firstTitle).not.toBe('');
-    await expect(page.getByRole('treeitem', { name: `${firstTitle}.md`, exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: firstTitle, exact: true })).toBeVisible();
   } finally { release(); }
-  await expect(page.getByRole('treeitem', { name: 'Synthetic note 1.md', exact: true })).toBeVisible();
-  await expect(page.getByRole('treeitem', { name: /^Synthetic note \d\.md$/ })).toHaveCount(5);
+  await expect(page.getByRole('button', { name: 'Synthetic note 1', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Synthetic note \d$/ })).toHaveCount(5);
 });
 
 for (const width of [390, 820, 1440]) test(`workspace navigation and overflow at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 }); await page.goto(`/blog/${ids[0]}`);
-  await expect(page.getByLabel('Markdown 본문')).toBeVisible();
+  await expect((await markdownSource(page))).toBeVisible();
   if (width === 390) {
     const toggle = page.getByRole('button', { name: '탐색기 토글' }); await toggle.click();
     await expect(page.getByRole('dialog', { name: '노트 탐색기' })).toBeVisible();
@@ -200,11 +201,11 @@ test('sidebar creates, renames, moves and deletes files without arbitrary nestin
   const initialIds = new Set(ids);
   page.once('dialog', dialog => dialog.accept('UI synthetic note'));
   await page.getByRole('button', { name: '새 노트', exact: true }).first().click();
-  await expect(page.getByLabel('Markdown 본문')).toBeVisible();
+  await expect((await markdownSource(page))).toBeVisible();
   const id = page.url().split('/').at(-1)!;
   expect(initialIds.has(id)).toBeFalsy(); ids.push(id);
   await page.getByLabel('노트 제목').fill('UI renamed note');
-  await page.getByLabel('Markdown 본문').fill('# Sidebar saved body');
+  await (await markdownSource(page)).fill('# Sidebar saved body');
   await expect(page.getByTestId('note-save-status')).toHaveText('서버에 저장됨');
   const before = await (await request.get(`${api}/api/notes/${id}`, { headers: headers() })).json();
   const dialogs = ['UI folder', 'UI category'];
@@ -302,16 +303,17 @@ test('explicit legacy conversion keeps drawing, image, math, table and unknown o
 test('failed target detail exposes a draft export and leaves other notes usable', async ({ page }) => {
   await page.route('**/web-api/api/notes', route => route.request().method() === 'POST' ? route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"synthetic save failure"}' }) : route.continue());
   await page.goto(`/blog/${ids[1]}`);
-  await expect(page.getByLabel('Markdown 본문')).toBeVisible();
-  await page.getByLabel('Markdown 본문').fill('draft before target body failure');
+  await expect((await markdownSource(page))).toBeVisible();
+  await (await markdownSource(page)).fill('draft before target body failure');
   await expect(page.getByTestId('note-save-status')).toContainText('기기에 보관됨');
   const target = `**/web-api/api/notes/${ids[1]}`;
   await page.route(target, route => route.fulfill({ status: 502, contentType: 'application/json', body: '{"error":"synthetic body unavailable"}' }));
   await page.getByRole('treeitem', { name: 'Synthetic note 2.md', exact: true }).click();
-  await expect(page.getByLabel('Markdown 본문')).toBeVisible();
+  await expect((await markdownSource(page))).toBeVisible();
   await page.getByRole('treeitem', { name: 'Synthetic note 1.md', exact: true }).click();
   await expect(page.getByRole('button', { name: '기기 초안 .md 내보내기', exact: true })).toBeVisible();
   await expect(page.getByLabel('Markdown 본문')).toHaveCount(0);
+  await expect(page.getByLabel('노트 편집')).toHaveCount(0);
   await page.getByRole('treeitem', { name: 'Synthetic note 2.md', exact: true }).click();
-  await expect(page.getByLabel('Markdown 본문')).toBeVisible();
+  await expect((await markdownSource(page))).toBeVisible();
 });

@@ -1,3 +1,4 @@
+import { markdownSource } from './helpers/markdown';
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
@@ -21,7 +22,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1024, height: 1366
     expect(await page.locator('body').evaluate(e => getComputedStyle(e).backgroundColor)).toBe('rgb(247, 243, 232)');
     await page.getByRole('button', { name: '전체 기능', exact: true }).click();
     const menu = page.getByRole('dialog', { name: '전체 기능' });
-    for (const href of ['/blog', '/canvas', '/planner', '/social', '/agent', '/settings', '/stocks', '/banpick', '/screw-puzzle', '/magic', '/admin/canvas', '/admin/feedback']) {
+    for (const href of ['/canvas', '/library', '/planner', '/social', '/agent', '/settings', '/stocks', '/banpick', '/screw-puzzle', '/magic', '/admin/canvas', '/admin/feedback']) {
       await expect(menu.locator(`a[href="${href}"]`)).toBeVisible();
     }
     await menu.getByRole('link', { name: '설정', exact: true }).click();
@@ -47,8 +48,8 @@ test('iOS shared notes save through the cloud and export exact Markdown and cale
   expect((await request.post(`${api}/api/notes`, { headers, data: { id, title: 'iPad export',
     content: { format: 'markdown', version: 1, markdown }, created_at: new Date().toISOString(), revision: 1, client_id: randomUUID() } })).ok()).toBeTruthy();
   try {
-    await page.goto(`/blog/${id}`); await expect(page.getByLabel('Markdown 본문')).toHaveValue(markdown);
-    const updated = markdown + '\n저장 동기화'; await page.getByLabel('Markdown 본문').fill(updated);
+    await page.goto(`/blog/${id}`); await expect((await markdownSource(page))).toHaveValue(markdown);
+    const updated = markdown + '\n저장 동기화'; await (await markdownSource(page)).fill(updated);
     await expect.poll(async () => (await (await request.get(`${api}/api/notes/${id}`, { headers })).json()).content.markdown).toBe(updated);
     await page.getByRole('button', { name: '.md 내보내기', exact: true }).click();
     await expect.poll(() => page.evaluate(() => (window as unknown as { nativeExports: unknown[] }).nativeExports.length)).toBe(1);
@@ -92,6 +93,6 @@ test('iPad canvas keeps the full editor and persists pointer strokes across relo
     await page.mouse.move(box!.x + 300, box!.y + 300, { steps: 12 }); await page.mouse.up();
     await expect.poll(async () => (await (await request.get(`${api}/api/canvas/load?canvasId=${id}`, { headers })).json()).lines.length).toBe(1);
     await page.reload(); await expect(page.getByTestId('canvas-render-surface')).toHaveAttribute('data-visible-line-count', '1');
-    await expect(page.getByRole('link', { name: '캔버스 목록으로 돌아가기' })).toBeVisible();
+    await expect(page.getByRole('link', { name: '작업 공간으로 돌아가기' })).toBeVisible();
   } finally { expect((await request.delete(`${api}/api/canvas/documents/${id}`, { headers })).ok()).toBeTruthy(); }
 });

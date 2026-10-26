@@ -1,6 +1,7 @@
 import { useEffect, useState, type RefObject } from 'react';
 import type { ToolType } from '@/entities/canvas';
 import { createCanvasToolPointer, getCanvasPointerTool, type ToolPointerPosition } from '../model/canvasToolPointer';
+import { canvasPointerAppearance, isMobileCanvasInput } from '../model/canvasPointerAppearance';
 
 export const CanvasToolPointer = ({ canvasRef, tool, pencilOnlyMode }: {
     canvasRef: RefObject<HTMLCanvasElement | null>;
@@ -12,7 +13,7 @@ export const CanvasToolPointer = ({ canvasRef, tool, pencilOnlyMode }: {
     useEffect(() => {
         const surface = canvasRef.current;
         if (!surface) return;
-        const pointer = createCanvasToolPointer();
+        const pointer = createCanvasToolPointer(true);
         let frame: number | null = null;
         let pending: ToolPointerPosition | null = null;
         const update = (event: PointerEvent) => {
@@ -45,18 +46,27 @@ export const CanvasToolPointer = ({ canvasRef, tool, pencilOnlyMode }: {
     }, [canvasRef]);
 
     const pointerTool = getCanvasPointerTool(tool, position?.pointerType ?? '', pencilOnlyMode);
+    const mobile = isMobileCanvasInput(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
+    const appearance = canvasPointerAppearance(pointerTool, position, mobile);
+    useEffect(() => {
+        const surface = canvasRef.current;
+        if (!surface) return;
+        surface.dataset.hideToolCursor = String(tool === 'eraser' || (mobile && pointerTool === 'pen' && position?.contact));
+        return () => { delete surface.dataset.hideToolCursor; };
+    }, [canvasRef, tool, mobile, pointerTool, position?.contact]);
     return (
         <div
             data-testid="canvas-tool-pointer"
             data-tool={pointerTool}
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 z-30"
-            style={{ display: position ? 'block' : 'none' }}
+            style={{ display: appearance.visible ? 'block' : 'none' }}
         >
             <span
                 data-testid="canvas-tool-pointer-tip"
-                className="absolute h-[4px] w-[4px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-stone-900/70 bg-white/60"
-                style={{ left: position?.x ?? 0, top: position?.y ?? 0 }}
+                className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-stone-900/70"
+                style={{ left: position?.x ?? 0, top: position?.y ?? 0, width: appearance.diameter, height: appearance.diameter,
+                    background: pointerTool === 'eraser' ? 'transparent' : 'rgb(255 255 255 / 60%)' }}
             />
         </div>
     );
