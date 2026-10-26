@@ -39,6 +39,11 @@ export function registerReaderUpgrade(engine:'chromium'|'webkit',width:number){
   test.use({viewport:{width,height:1000},hasTouch:true,...(engine==='chromium'&&width<600?{isMobile:true,userAgent:'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/132.0 Mobile Safari/537.36 FlownoteAndroid/1.3.0'}:{})});
   test('wheel, Space and spread layout preserve pages, odd end, progress, selection and remembered settings',async({page,request})=>{
    const actor=await createCloudActor(request);await openReader(page,actor);const viewport=page.getByTestId('library-reader-viewport');
+   await showReaderTools(page);
+   const controls=await page.locator('.reader-floating-header button,.reader-floating-toolbar button,.reader-progress-dock button').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};}));
+   for(const box of controls){expect(box.width).toBeGreaterThanOrEqual(44);expect(box.height).toBeGreaterThanOrEqual(44);expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width+1);}
+   for(let i=0;i<controls.length;i++)for(let j=i+1;j<controls.length;j++){const a=controls[i],b=controls[j];expect(Math.min(a.x+a.width,b.x+b.width)-Math.max(a.x,b.x)>1&&Math.min(a.y+a.height,b.y+b.height)-Math.max(a.y,b.y)>1).toBe(false);}
+   await page.screenshot({path:test.info().outputPath('reader-single-controls.png'),fullPage:true});
    await viewport.evaluate(node=>{node.scrollTop=node.scrollHeight;});await viewport.hover();await page.mouse.wheel(0,110);
    await expect(page.getByTestId('library-pdf-page')).toHaveAttribute('data-page','2');
    await viewport.focus();await page.keyboard.press('Space');await expect(page.getByTestId('library-pdf-page')).toHaveAttribute('data-page','3');
@@ -52,6 +57,7 @@ export function registerReaderUpgrade(engine:'chromium'|'webkit',width:number){
    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
    await page.reload();await page.getByRole('button',{name:'Synthetic reader upgrade 표지 보기'}).click();await page.getByRole('button',{name:'4쪽부터 이어 읽기'}).click();
    await expect.poll(()=>pageNumbers(page)).toEqual(['3','4']);
+   await showReaderTools(page);
    await page.screenshot({path:test.info().outputPath('reader-spread.png'),fullPage:true});
   });
   test('the second PDF page selects real text and displays multiple Korean meanings saved on page two',async({page,request})=>{
