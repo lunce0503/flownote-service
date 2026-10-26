@@ -1,6 +1,6 @@
 # 작업 공간·캔버스·책장 UX 및 클라우드 연결
 
-상태: 진행 중. 아래 여섯 요구사항 전체가 구현·검증·배포될 때 완료한다. 이전 턴은 4px Pencil 호버 개선을 실제 운영에 배포했으므로 progress이며, 이번 요구사항의 완료 증거로 대체하지 않는다.
+상태: 2026-10-26 완료. 여섯 요구사항 구현·staging 107/107·같은 소스 main/canvas/api/web production 배포 및 기존 앱 반영 검증을 완료했다. [최종 앱 릴리스 기록](../../../logs/report/2026-10-26-2049-workspace-library-app-release.md)에 ID·지문·앱 채널과 실기기 한계를 남겼다.
 
 ## 완료 기준
 
@@ -34,7 +34,7 @@
 
 ## 진행 기록
 
-- 현재 코드 확인: 책장은 계정별 IndexedDB 저장만 사용한다. PDF는 canvas만 렌더링하며 선택 가능한 텍스트층이 없다. 노트는 기본 raw textarea와 수동 preview/split을 사용한다. 두 목록·진입점이 분리돼 있다.
+- 작업 시작 시 코드: 책장은 계정별 IndexedDB 저장만 사용했다. PDF는 canvas만 렌더링하며 선택 가능한 텍스트층이 없었다. 노트는 기본 raw textarea와 수동 preview/split을 사용했고 두 목록·진입점이 분리돼 있었다.
 
 - 캔버스 표시/커서/전체 화면 제거, library API와 Flyway V22, 기기 저장 v2 및 클라우드 동기화, 텍스트층·사전/단어장, 공통 파일 목록과 기본 실시간 Markdown 편집을 구현했다. 아직 실제 클라우드 통과·운영 반영 증거는 없다.
 - 프런트 모델 80/80, API 31/31, Spring Gradle test, Go 전체 패키지 검사가 통과했다. 최종 수정 후 프런트/Go 재검증을 이어간다.
@@ -42,3 +42,6 @@
 - Railway 인증을 현재 환경에서 확인했다. release library의 실제 staging/production 및 앱 관리 인계는 다음 실행 단계다.
 
 - 부모 최종 리뷰에서 완료 업로드 receipt가 진행 중 4개 제한을 소비하는 오류를 발견했다. library repo count에서 완료된 소유자 일치 receipt를 제외하고 library-upload-cap.spec.ts를 추가했다. 앱 관리 실행 중 의존성 설치 단계에서 양쪽 소스에 같은 좁은 수정을 반영했으며 신규 backend/전체 gate 검증 대상이다. 상세 원인은 [버그 기록](../../../logs/bugs/2026-10-26-library-completed-upload-cap.md)에 남겼다. 이전 책장 웹 결과 보고서의 끊어진 상대 링크도 해당 historical 보고서를 추가해 복원했다.
+
+- 최종 소스 `0c8f5ac`: 완료 업로드 quota, OFF/ON 교차기기 E2E, PDF 백업 안내, 체크리스트 뒤 Markdown 재로드와 저장 실패 알림을 보완했다. 모델 81/81, 웹 verify, lazy bundle, Go/API/Spring 검사 및 전체 staging 107/107 통과. V22는 staging/production Flyway 이력에서 success=true를 직접 조회했다.
+- 2026-10-26 21:20 Asia/Seoul 운영 main/canvas/api/web 배포·smoke 완료. receipt 지문 `e865ae8000d28005c7f8bcdd3908310f901bb5ebcb06950dcaaaf8b7f609e6a6`. Windows 공개 설치형/포터블과 Android 기존 설치본의 새 staging entry 해시·재시작 보존 확인, iOS 1.3.0(8) TestFlight VALID/IN_BETA_TESTING 재확인. 물리 iPad/Pencil 동작은 미연결로 남는다.

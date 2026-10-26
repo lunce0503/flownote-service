@@ -1,6 +1,6 @@
 # 전공서 책장
 
-2026-10-26 구현 갱신. 클라우드·선택 사전 기능의 배포와 교차 기기 검증은 [현재 실행 계획](../exec-plan/active/2026-10-26-workspace-library-ux.md) 및 새 릴리스 보고서에서 확인한다. 현재 구현을 운영 반영 완료로 간주하지 않는다. 이전 기기 전용 웹/앱 1.3 릴리스는 [웹](../../logs/report/2026-10-24-0033-textbook-library-web.md)·[앱](../../logs/report/2026-10-24-0745-textbook-library-app-release.md) 기록을 따른다.
+2026-10-26 클라우드·선택 사전 기능 운영 반영 완료. 전체 staging 107/107, 두 기기·100MiB 원본·OFF/ON 검증과 기존 앱 반영 결과는 [최종 릴리스 기록](../../logs/report/2026-10-26-2049-workspace-library-app-release.md)을 따른다. 이전 기기 전용 웹/앱 1.3 릴리스는 [웹](../../logs/report/2026-10-24-0033-textbook-library-web.md)·[앱](../../logs/report/2026-10-24-0745-textbook-library-app-release.md) 기록을 따른다.
 
 ## 책장과 읽기
 

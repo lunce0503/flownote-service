@@ -1,6 +1,6 @@
 # 노트 Markdown 작업 공간
 
-기존 기준: 2026-10-19 구현·staging 47개 E2E·운영 배포 완료. 2026-10-26 통합 목록·실시간 편집 갱신은 구현·검증 중이며 [현재 실행 계획](../exec-plan/active/2026-10-26-workspace-library-ux.md)의 신규 배포 증거로 확인한다.
+기존 기준: 2026-10-19 구현·staging 47개 E2E·운영 배포 완료. 2026-10-26 통합 목록·실시간 편집 갱신도 staging 107/107 및 운영 배포를 완료했다. [최종 릴리스 기록](../../logs/report/2026-10-26-2049-workspace-library-app-release.md)에서 증거를 확인한다.
 
 ## 목표와 사용자 흐름
 
@@ -44,8 +44,10 @@
 색상·탐색·명칭은 [공통 작업 공간 디자인](../design-docs/canvas/workspace-explorer-design.md)을 따른다. 흰 문서·베이지 탐색/선택·검정 글자와 동작이 기준이며 다크 모드는 따뜻한 무채색이다.
 
 
-## 실시간 편집 갱신 (2026-10-26, 구현·검증 중)
+## 실시간 편집 갱신 (2026-10-26, 운영 반영 완료)
 
 기존 Tiptap 3.20 기반에 같은 버전의 Markdown·수식·표·체크리스트 편집 기능을 연결한다. 기본 화면은 입력 즉시 제목·강조·목록·수식 등을 렌더링하는 편집기다. Markdown 원문이 저장 기준이며 `content.format/version/legacy_original` 계약과 기기 초안·저장 큐·충돌 복구를 유지한다. 열기·포커스·초기 파싱만으로 원문을 자동 저장하지 않는다. 실제 입력·서식 조작부터 저장하고 복구/원문 모드의 외부 변경을 중복 저장하지 않는다.
 
 실시간 편집기는 문서를 선택할 때 지연 로드한다. HTML을 실행하지 않고 링크·이미지 URL은 기존 safeMarkdownUrl 기준으로 제한하며 KaTeX trust는 false다. 한글 조합, Markdown 바로 입력, 원문과의 전환, 재로드 후 서식/내용, 정확한 원문 내보내기를 검증한다. 관련 실행·운영 반영은 [현재 계획](../exec-plan/active/2026-10-26-workspace-library-ux.md)을 따른다.
+
+편집기별 Markdown 파서를 분리하며 체크리스트 뒤의 제목·강조·한글도 저장과 재로드에 보존한다. Tiptap 3.20의 빈 inline token 오류 보완은 [버그 기록](../../logs/bugs/2026-10-26-live-markdown-task-roundtrip.md)을 따른다.
