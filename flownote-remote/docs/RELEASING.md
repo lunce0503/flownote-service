@@ -51,3 +51,7 @@ Linux 작업은 `node tests/webrtc-audio-checks.mjs`로 실제 Chromium 양단�
 ### 골격 제스처 (0.5.0+)
 
 Core는 합성 관절로 전체/중간 관리/세밀 조정 11개 동작을 검증한다. 실제 모델 검사는 클라이언트의 손 21점 추출과 뼈대 표시를 확인하고 명령 전달은 합성 자세로 분리해 검사한다. Linux의 `node tests/skeleton-camera-checks.mjs`는 실제 손 모델·골격 표시·가상 카메라의 영상 없는 골격 bridge·후면 exact 및 자동 대체 금지·장치 종료·로컬 QR 경로를 검사한다. Android는 네이티브 Tasks Vision 모델을 APK에 포함하므로 Gradle preBuild에 Node 24의 모델 무결성 준비가 필요하다. 서버 운영에는 Node/모델이 필요 없으며 음성에는 기존 Chromium이 필요하다. 소유자 소켓의 실제 음성 작업 등록/제거도 검증한다.
+
+## 플랫폼별 개발 검증
+
+Android UI만 바꿨을 때 `gh workflow run release.yml --repo lunce0503/flownote-remote-service --ref main -f platform=android`로 동일 장치 검사를 실행할 수 있다. `platform`은 all(기본값)/android/windows/linux다. 태그 push와 PR은 항상 전체 플랫폼을 검증한다. 공개 릴리스는 기존처럼 세 플랫폼 성공을 모두 요구하며 부분 검증을 공개 릴리스 통과로 표시하지 않는다.

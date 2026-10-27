@@ -37,6 +37,12 @@ public class NetworkDeviceTest {
         var automation=InstrumentationRegistry.getInstrumentation().getUiAutomation();
         for(int i=0;i<35;i++){var value=find(automation.getRootInActiveWindow(),text);if(value!=null)return value;SystemClock.sleep(150);}return null;
     }
+    private AccessibilityNodeInfo reveal(String text){
+        var automation=InstrumentationRegistry.getInstrumentation().getUiAutomation();
+        var value=find(automation.getRootInActiveWindow(),text);if(value!=null)return value;
+        for(boolean forward:new boolean[]{false,true})for(int i=0;i<18;i++){scroll(forward);value=find(automation.getRootInActiveWindow(),text);if(value!=null)return value;}
+        return visible(text);
+    }
     private void click(String text){var value=visible(text);assertNotNull("Missing accessible control: "+text,value);assertTrue("Control was not clickable: "+text,value.performAction(AccessibilityNodeInfo.ACTION_CLICK));SystemClock.sleep(200);}
     private void scroll(boolean forward){var value=scrollable(InstrumentationRegistry.getInstrumentation().getUiAutomation().getRootInActiveWindow());if(value!=null)value.performAction(forward?AccessibilityNodeInfo.ACTION_SCROLL_FORWARD:AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);SystemClock.sleep(200);}
     private void capture(String name)throws Exception {
@@ -70,12 +76,12 @@ public class NetworkDeviceTest {
         java.util.function.BiConsumer<Integer,float[]> send=(action,xy)->instrumentation.runOnMainSync(()->{var event=android.view.MotionEvent.obtain(start,SystemClock.uptimeMillis(),action,xy[0],xy[1],0);pad.onTouchEvent(event);event.recycle();});
         send.accept(android.view.MotionEvent.ACTION_DOWN,new float[]{70,70});send.accept(android.view.MotionEvent.ACTION_UP,new float[]{70,70});SystemClock.sleep(150);
         send.accept(android.view.MotionEvent.ACTION_DOWN,new float[]{70,70});send.accept(android.view.MotionEvent.ACTION_MOVE,new float[]{110,90});SystemClock.sleep(100);send.accept(android.view.MotionEvent.ACTION_UP,new float[]{110,90});
-        for(int i=0;i<8&&find(instrumentation.getUiAutomation().getRootInActiveWindow(),"누른 채 드래그")==null;i++)scroll(true);
+        assertNotNull("Drag switch could not be revealed",reveal("누른 채 드래그"));
         click("누른 채 드래그");send.accept(android.view.MotionEvent.ACTION_DOWN,new float[]{70,70});SystemClock.sleep(500);send.accept(android.view.MotionEvent.ACTION_MOVE,new float[]{110,100});SystemClock.sleep(80);send.accept(android.view.MotionEvent.ACTION_UP,new float[]{110,100});SystemClock.sleep(200);
-        for(int i=0;i<14&&find(instrumentation.getUiAutomation().getRootInActiveWindow(),"＋ 커스텀 버튼 추가")==null;i++)scroll(true);
+        assertNotNull("Add button could not be revealed",reveal("＋ 커스텀 버튼 추가"));
         click("＋ 커스텀 버튼 추가");var name=visible("커스텀 버튼 이름");assertNotNull(name);var args=new android.os.Bundle();args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,"내 클릭");assertTrue(name.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,args));click("저장");
         assertTrue("Custom button did not persist",activity.getSharedPreferences("touch-remote-v1",Context.MODE_PRIVATE).getString("buttons","").contains("내 클릭"));
-        for(int i=0;i<8&&find(instrumentation.getUiAutomation().getRootInActiveWindow(),"내 클릭 · 클릭")==null;i++)scroll(true);
+        assertNotNull("Saved button could not be revealed",reveal("내 클릭 · 클릭"));
         click("내 클릭 · 클릭");capture("touch-buttons");
         for(int i=0;i<12;i++)scroll(false);capture("touch-remote");click("닫기");
         instrumentation.runOnMainSync(()->{var fresh=new TouchRemoteDialog(activity,m->{});fresh.show();try{var saved=TouchRemoteDialog.class.getDeclaredField("entries");saved.setAccessible(true);assertTrue("Custom button was not restored in a new window",saved.get(fresh).toString().contains("내 클릭"));}catch(ReflectiveOperationException e){throw new AssertionError(e);}fresh.dismiss();});
@@ -171,8 +177,8 @@ public class NetworkDeviceTest {
             var stateField=NetworkActivity.class.getDeclaredField("state");stateField.setAccessible(true);final android.app.Activity currentActivity=activity;boolean[] paused={false};
             for(int i=0;i<50&&!paused[0];i++){instrumentation.runOnMainSync(()->{try{var current=(JSONObject)stateField.get(currentActivity);if(current!=null){var list=current.getJSONArray("devices");for(int j=0;j<list.length();j++){var device=list.getJSONObject(j);if(device.optString("id").equals(connection.optString("deviceId")))paused[0]=!device.optBoolean("enabled");}}}catch(Exception error){throw new AssertionError(error);}});if(!paused[0])SystemClock.sleep(100);}
             assertTrue("Server state did not pause the source",paused[0]);
-            for(int i=0;i<4&&find(instrumentation.getUiAutomation().getRootInActiveWindow(),"사용 일시 중지")==null;i++)scroll(true);
-            capture("clients-paused");assertNotNull("Client pause summary was not visible after scrolling",visible("사용 일시 중지"));
+            var pausedSummary=reveal("사용 일시 중지");
+            capture("clients-paused");assertNotNull("Client pause summary was not visible after scrolling",pausedSummary);
             click("Android real I/O acceptance 사용");SystemClock.sleep(600);
             assertTrue("Client did not resume",visible("Android real I/O acceptance 사용").isChecked());
             capture("clients");

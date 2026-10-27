@@ -4,10 +4,17 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to validate (tags always validate all platforms)'
+        type: choice
+        default: all
+        options: [all, android, windows, linux]
 permissions:
   contents: read
 jobs:
   linux:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'linux'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -46,6 +53,7 @@ jobs:
           path: artifacts/Flownote-Remote-*-linux-x64.tar.gz
           if-no-files-found: error
   windows:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'windows'
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -81,6 +89,7 @@ jobs:
           path: artifacts/ux/*.png
           if-no-files-found: error
   android:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'android'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
