@@ -75,6 +75,8 @@ public class NetworkDeviceTest {
         for(int i=0;i<14&&find(instrumentation.getUiAutomation().getRootInActiveWindow(),"＋ 커스텀 버튼 추가")==null;i++)scroll(true);
         click("＋ 커스텀 버튼 추가");var name=visible("커스텀 버튼 이름");assertNotNull(name);var args=new android.os.Bundle();args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,"내 클릭");assertTrue(name.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,args));click("저장");
         assertTrue("Custom button did not persist",activity.getSharedPreferences("touch-remote-v1",Context.MODE_PRIVATE).getString("buttons","").contains("내 클릭"));
+        for(int i=0;i<8&&find(instrumentation.getUiAutomation().getRootInActiveWindow(),"내 클릭 · 클릭")==null;i++)scroll(true);
+        click("내 클릭 · 클릭");capture("touch-buttons");
         for(int i=0;i<12;i++)scroll(false);capture("touch-remote");click("닫기");
         instrumentation.runOnMainSync(()->{var fresh=new TouchRemoteDialog(activity,m->{});fresh.show();try{var saved=TouchRemoteDialog.class.getDeclaredField("entries");saved.setAccessible(true);assertTrue("Custom button was not restored in a new window",saved.get(fresh).toString().contains("내 클릭"));}catch(ReflectiveOperationException e){throw new AssertionError(e);}fresh.dismiss();});
     }

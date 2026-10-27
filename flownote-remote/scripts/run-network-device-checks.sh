@@ -24,7 +24,7 @@ device_status=0
 ./gradlew connectedDebugAndroidTest || device_status=$?
 mkdir -p ../artifacts/ux
 # Only known dashboard/control captures; pairing/QR screens are never captured.
-for image in dashboard clients clients-paused touch-remote; do
+for image in dashboard clients clients-paused touch-remote touch-buttons; do
   adb pull "/data/local/tmp/flownote-remote-$image.png" "../artifacts/ux/$image-android.png" || true
 done
 if [[ "$device_status" != 0 ]]; then exit "$device_status"; fi
@@ -35,9 +35,11 @@ actions=json.loads(Path('../artifacts/tests/touch-events.json').read_text())
 for expected in ['pointer.click','pointer.move','pointer.down','pointer.hold','pointer.up']:
     assert expected in actions, f'Android production touch window did not reach TLS output: {expected}'
 assert actions.index('pointer.down') < actions.index('pointer.up')
+assert actions.count('pointer.click') >= 2, 'Pad tap and saved custom button must both execute through TLS'
 print('PASS: production Android touch window -> TLS server -> pointer output: tap, move, held drag, release')
 PY
 mkdir -p ../artifacts/ux
 adb pull /data/local/tmp/flownote-remote-dashboard.png ../artifacts/ux/dashboard-android.png
 adb pull /data/local/tmp/flownote-remote-clients.png ../artifacts/ux/clients-android.png
 adb pull /data/local/tmp/flownote-remote-touch-remote.png ../artifacts/ux/touch-remote-android.png
+adb pull /data/local/tmp/flownote-remote-touch-buttons.png ../artifacts/ux/touch-buttons-android.png
