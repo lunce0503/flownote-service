@@ -42,7 +42,7 @@ public static class ServerCommand
             listener.Listen(4);
             await hub.StartAsync(address, port, certificate);
             Console.Error.WriteLine($"READY {hub.Address} · SHA256 {Protocol.Pin(certificate)} · gestures OFF");
-            Console.Error.WriteLine("Use another terminal: flownote-remote invite / devices / gestures on. Ctrl+C stops the server.");
+            Console.Error.WriteLine("Use another terminal: flownote-remote invite / devices. Open the phone touch remote to control a Windows client. Ctrl+C stops the server.");
             await LocalControl.ServeAsync(listener, async words =>
             {
                 if (words.Length == 0 || words.Length > 2 || words.Any(w => w is null)) throw new ArgumentException("Invalid command.");

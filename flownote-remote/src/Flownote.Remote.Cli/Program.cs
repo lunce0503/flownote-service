@@ -14,7 +14,7 @@ namespace Flownote.Remote.Cli
             flownote-remote status|invite|devices|tasks [--data-dir PATH]
             flownote-remote allow|pause|revoke <device UUID> [--data-dir PATH]
             flownote-remote target|voice-target <device UUID> [--data-dir PATH]
-            flownote-remote gestures on|off [--data-dir PATH]
+            flownote-remote gestures off [--data-dir PATH]  # on is suspended
             flownote-remote volume-up|volume-down|mute|unmute <device UUID> [--data-dir PATH]
 
             flownote-remote voice [--workspace PATH] [--thread UUID] [--codex PATH]
@@ -24,7 +24,8 @@ namespace Flownote.Remote.Cli
             flownote-remote doctor [--codex PATH]
             flownote-remote mcp [--data-dir PATH]  # restricted media tools over stdio
 
-            server: private/VPN IPv4 only; gestures start OFF. Manage through the
+            server: private/VPN IPv4 only; gestures are suspended. Use the phone
+            touch remote for a Windows output client. Manage through the
             owner's local Unix socket. Clients extract skeletons; server needs no
             Node/model/browser. invite prints a 2-minute one-time link.
             voice --native: open Codex's own terminal; enter /voice there. Uses

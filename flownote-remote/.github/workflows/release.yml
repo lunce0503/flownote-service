@@ -99,12 +99,11 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
           log-accepted-android-sdk-licenses: false
-      - name: Prepare real server vision worker for device acceptance
+      - name: Prepare native vision models for device acceptance
         if: github.event_name != 'pull_request'
         run: |
           npm ci --ignore-scripts
           node scripts/prepare-vision.mjs
-          npx playwright install --with-deps chromium
       - name: Validate versions and signing configuration
         shell: bash
         env:
