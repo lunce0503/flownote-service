@@ -47,7 +47,7 @@ final class TouchRemoteDialog extends Dialog {
         status=text(root,"서버에 연결한 뒤 기기를 선택하세요.",14);status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         text(root,"드래그 영역",20);text(root,"손가락으로 커서 이동 · 가볍게 탭하여 클릭",13);
         pad=new TouchPadView(getContext(),this::pointer);pad.setId(View.generateViewId());int height=Math.max(160,Math.min(240,(int)(getContext().getResources().getDisplayMetrics().heightPixels/getContext().getResources().getDisplayMetrics().density*.27)));root.addView(pad,new LinearLayout.LayoutParams(-1,dp(height)));
-        drag=new Switch(getContext());drag.setText("누른 채 드래그");drag.setMinHeight(dp(48));drag.setOnCheckedChangeListener((v,on)->pad.setDragMode(on));root.addView(drag);
+        drag=new Switch(getContext());drag.setText("누른 채 드래그");drag.setContentDescription("누른 채 드래그");drag.setMinHeight(dp(48));drag.setOnCheckedChangeListener((v,on)->pad.setDragMode(on));root.addView(drag);
         text(root,"버튼 영역",20);buttons=column();root.addView(buttons);renderButtons();
         button(root,"＋ 커스텀 버튼 추가",()->{if(entries.size()<8)edit(-1);else status.setText("버튼은 최대 8개까지 만들 수 있어요.");});
         text(root,"버튼의 ⋯에서 이름과 실행할 명령을 바꿀 수 있어요.",13);
