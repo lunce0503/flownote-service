@@ -20,7 +20,14 @@ for attempt in $(seq 1 90); do
 done
 test -s android/app/src/androidTest/assets/session.json
 cd android
-./gradlew connectedDebugAndroidTest
+device_status=0
+./gradlew connectedDebugAndroidTest || device_status=$?
+mkdir -p ../artifacts/ux
+# Only known dashboard/control captures; pairing/QR screens are never captured.
+for image in dashboard clients clients-paused touch-remote; do
+  adb pull "/data/local/tmp/flownote-remote-$image.png" "../artifacts/ux/$image-android.png" || true
+done
+if [[ "$device_status" != 0 ]]; then exit "$device_status"; fi
 python3 - <<'PY'
 import json
 from pathlib import Path

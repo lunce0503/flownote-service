@@ -166,6 +166,12 @@ jobs:
           name: android-ux
           path: artifacts/ux/*.png
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure() && github.event_name != 'pull_request'
+        with:
+          name: android-debug-ux
+          path: artifacts/ux/*.png
+          if-no-files-found: warn
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [windows, android, linux]

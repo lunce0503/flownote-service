@@ -103,7 +103,7 @@ public sealed partial class RemoteHub
         "interface.zoom_set" => c.Value is >= .5 and <= 2,
         "interface.pan_set" => c.X is >= -1 and <= 1 && c.Y is >= -1 and <= 1,
         "interface.reset" => true,
-        _ when c.Action.StartsWith("pointer.", StringComparison.Ordinal) => ValidPointer(c),
+        _ when c.Action?.StartsWith("pointer.", StringComparison.Ordinal) == true => ValidPointer(c),
         _ => false
     };
     private static bool ValidPointer(InterfaceCommand c)

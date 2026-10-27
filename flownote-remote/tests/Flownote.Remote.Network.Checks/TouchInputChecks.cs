@@ -52,7 +52,7 @@ internal static class TouchInputChecks
         await Until(()=>received.Count==count+33&&received.Last().Action=="pointer.up");
         ready=false;await Until(()=>!hub.Snapshot().Devices.Single(d=>d.Id==targetGrant.DeviceId).PointerReady);
         count=received.Count;await other.ControlAsync(targetGrant.DeviceId,"pointer.click");await Task.Delay(100);Check(received.Count==count,"Pointer readiness bypassed");
-        foreach(var invalid in new[]{new InterfaceCommand(Guid.NewGuid(),"precision","pointer.move",X:129),new InterfaceCommand(Guid.NewGuid(),"precision","pointer.click",X:1),new InterfaceCommand(Guid.NewGuid(),"precision","pointer.scroll",Value:4),new InterfaceCommand(Guid.NewGuid(),"precision","pointer.key"),new InterfaceCommand(Guid.NewGuid(),"precision","pointer.move",X:double.NaN)})Check(!RemoteHub.ValidManual(invalid),"Invalid pointer command accepted");
+        foreach(var invalid in new[]{new InterfaceCommand(Guid.NewGuid(),"precision",null!),new InterfaceCommand(Guid.NewGuid(),"precision","pointer.move",X:129),new InterfaceCommand(Guid.NewGuid(),"precision","pointer.click",X:1),new InterfaceCommand(Guid.NewGuid(),"precision","pointer.scroll",Value:4),new InterfaceCommand(Guid.NewGuid(),"precision","pointer.key"),new InterfaceCommand(Guid.NewGuid(),"precision","pointer.move",X:double.NaN)})Check(!RemoteHub.ValidManual(invalid),"Invalid pointer command accepted");
         Console.WriteLine("PASS: TLS touch routing, bounded relative motion/click/drag, exclusive drag ownership, source/target pause, disconnect/idle release, readiness and strict command validation");
     }
 }

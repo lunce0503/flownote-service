@@ -62,7 +62,7 @@ public class NetworkDeviceTest {
     }
     private void exerciseTouchRemote(android.app.Activity activity)throws Exception {
         var instrumentation=InstrumentationRegistry.getInstrumentation();
-        click("터치 리모컨 열기");assertNotNull("Touch drag area missing",visible("드래그 영역"));
+        click("터치 리모컨 열기");assertNotNull("Touch drag area missing",visible("드래그 영역"));capture("touch-remote");
         var field=NetworkActivity.class.getDeclaredField("touchWindow");field.setAccessible(true);var dialog=(TouchRemoteDialog)field.get(activity);
         var padField=TouchRemoteDialog.class.getDeclaredField("pad");padField.setAccessible(true);var pad=(TouchPadView)padField.get(dialog);
         for(int i=0;i<40&&!pad.isEnabled();i++)SystemClock.sleep(100);assertTrue("Windows pointer target was not selected",pad.isEnabled());
@@ -165,7 +165,12 @@ public class NetworkDeviceTest {
             click("저장된 서버에 다시 연결");
             for(int i=0;i<18&&find(instrumentation.getUiAutomation().getRootInActiveWindow(),"Android real I/O acceptance 사용")==null;i++)scroll(true);
             assertNotNull("Client row and accessible toggle missing",visible("Android real I/O acceptance 사용"));
-            click("Android real I/O acceptance 사용");assertNotNull("Client pause was not reflected in the real dashboard",visible("사용 일시 중지"));
+            click("Android real I/O acceptance 사용");
+            var stateField=NetworkActivity.class.getDeclaredField("state");stateField.setAccessible(true);final android.app.Activity currentActivity=activity;boolean[] paused={false};
+            for(int i=0;i<50&&!paused[0];i++){instrumentation.runOnMainSync(()->{try{var current=(JSONObject)stateField.get(currentActivity);if(current!=null){var list=current.getJSONArray("devices");for(int j=0;j<list.length();j++){var device=list.getJSONObject(j);if(device.optString("id").equals(connection.optString("deviceId")))paused[0]=!device.optBoolean("enabled");}}}catch(Exception error){throw new AssertionError(error);}});if(!paused[0])SystemClock.sleep(100);}
+            assertTrue("Server state did not pause the source",paused[0]);
+            for(int i=0;i<4&&find(instrumentation.getUiAutomation().getRootInActiveWindow(),"사용 일시 중지")==null;i++)scroll(true);
+            capture("clients-paused");assertNotNull("Client pause summary was not visible after scrolling",visible("사용 일시 중지"));
             click("Android real I/O acceptance 사용");SystemClock.sleep(600);
             assertTrue("Client did not resume",visible("Android real I/O acceptance 사용").isChecked());
             capture("clients");
