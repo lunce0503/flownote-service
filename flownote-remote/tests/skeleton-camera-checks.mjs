@@ -62,6 +62,6 @@ try {
  assert.ok(partial.pose.some(p=>p.y>2&&p.visibility<.1),'Pinned partial body must reproduce an out-of-range hidden joint');
  const fixture='artifacts/tests/partial-body-skeleton.json';await writeFile(fixture,JSON.stringify(partial));
  execFileSync('dotnet',['run','--project','tests/Flownote.Remote.Network.Checks','-c','Release','--','--recovery-fixture',fixture],{stdio:'inherit'});
- console.log('PASS: real partial-body pose → rejected TLS frame → same session recovers normal gestures and output control');
+ console.log('PASS: real partial-body pose → rejected TLS frame → same session recovers tracking/manual control with gestures suspended');
  console.log('PASS: real local hand model/overlay, fake-camera capture, skeleton-only live bridge, explicit precision, stop tracks, rear exact/no fallback and local QR path');
 } finally {await browser.close();}

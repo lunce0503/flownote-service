@@ -112,6 +112,9 @@ public sealed class RemoteClient : IAsyncDisposable
                     case "welcome":
                         ReadState(message); welcome.TrySetResult(true); Activity?.Invoke("서버 연결됨"); break;
                     case "state": ReadState(message); break;
+                    case "pointer.result":
+                        if (!message.GetProperty("accepted").GetBoolean()) Activity?.Invoke("마우스 입력이 적용되지 않았습니다. 대상 기기의 허용 상태를 확인하세요.");
+                        break;
                     case "skeleton.result":
                         if (message.GetProperty("frameId").GetGuid() != pendingFrame) break;
                         bool rejected = message.TryGetProperty("accepted",out var accepted) && accepted.ValueKind == JsonValueKind.False;
@@ -129,7 +132,7 @@ public sealed class RemoteClient : IAsyncDisposable
                         InterfaceResult interfaceResult;
                         try
                         {
-                            if (!Enabled || control is null) interfaceResult = new(false, Error: "interface_unavailable");
+                            if ((!Enabled && instruction.Action != "pointer.up") || control is null) interfaceResult = new(false, Error: "interface_unavailable");
                             else if (controls.TryGetValue(instruction.CommandId, out var previous)) interfaceResult = previous;
                             else
                             {

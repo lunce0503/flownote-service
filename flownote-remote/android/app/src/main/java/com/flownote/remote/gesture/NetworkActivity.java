@@ -41,6 +41,7 @@ public final class NetworkActivity extends Activity {
     private View taskContent;private EditText exactValue,exactX,exactY;private TextView taskName,taskDetails;private FrameLayout taskSurface;
     private double viewZoom=1,viewX,viewY;private String taskSignature="";private JSONArray runningTasks=new JSONArray();
     private AlertDialog activeConnectionDialog;
+    private TouchRemoteDialog touchWindow;
 
     @Override public void onCreate(Bundle bundle){
         super.onCreate(bundle);
@@ -59,6 +60,8 @@ public final class NetworkActivity extends Activity {
         var join=row();button(join,"QR로 연결",this::scanQr,1);button(join,"연결 코드",()->showConnection(null),1);content.addView(join);
         reconnect=button(content,"저장된 서버에 다시 연결",this::reconnect);reconnect.setVisibility(View.GONE);
         text(content,"빠른 제어",20,INK);
+        var touch=card();text(touch,"↖  터치 리모컨",21,INK);text(touch,"휴대폰으로 커서를 움직이고 버튼으로 명령하세요.",14,MUTED);
+        button(touch,"터치 리모컨 열기",()->{stopCamera();if(touchWindow==null)touchWindow=new TouchRemoteDialog(this,this::log);touchWindow.show();touchWindow.refresh(link,state);});
         var sound=card();text(sound,"♪  소리",21,INK);soundSummary=text(sound,"목록에서 제어할 기기를 선택해 주세요.",14,MUTED);
         var audio=row();var down=button(audio,"−",()->command("volume_down"),1);down.setContentDescription("음량 줄이기");var up=button(audio,"＋",()->command("volume_up"),1);up.setContentDescription("음량 높이기");mute=button(audio,"음소거",()->command(selectedMuted()?"unmute":"mute"),1);sound.addView(audio);
         var cameraCard=card();cameraToggle=toggle(cameraCard,"◉  골격 전송",false);cameraToggle.setContentDescription("카메라 전송");cameraToggle.setOnCheckedChangeListener((v,on)->{if(updatingControls)return;if(on)startCamera();else stopCamera();});
@@ -66,6 +69,7 @@ public final class NetworkActivity extends Activity {
         var cameraView=new FrameLayout(this);cameraView.addView(preview,new FrameLayout.LayoutParams(-1,-1));overlay=new SkeletonOverlay(this);cameraView.addView(overlay,new FrameLayout.LayoutParams(-1,-1));cameraCard.addView(cameraView,new LinearLayout.LayoutParams(-1,dp(210)));
         button(cameraCard,"전면 / 후면 카메라 선택",this::chooseCamera);
         var gestures=card();gestureToggle=toggle(gestures,"✋  제스처",false);gestureToggle.setEnabled(false);gestureSummary=text(gestures,"서버 PC에서 명령 사용을 켤 수 있어요.",14,MUTED);text(gestures,"전체 · 중간 관리 · 세밀 조정",14,INK);button(gestures,"범주별 제스처 안내",this::gestureGuide);
+        cameraCard.setVisibility(View.GONE);gestures.setVisibility(View.GONE);cameraToggle.setEnabled(false);
         var speech=card();voiceEnabled=toggle(speech,"◌  이 기기 음성 알림",true);text(speech,"배터리·장치 오류·연결 끊김을 알려드려요.",14,MUTED);voiceEnabled.setOnCheckedChangeListener((v,on)->{if(link!=null)link.setVoiceAlerts(on);});
         clientTitle=text(content,"클라이언트",20,INK);text(content,"서버에서 기기의 사용 여부를 관리합니다. 이 기기는 직접 켜고 끌 수 있어요.",13,MUTED);
         emptyClients=text(content,"아직 연결된 클라이언트가 없어요. 서버 PC의 QR을 읽어 주세요.",15,MUTED);clients=column();content.addView(clients);
@@ -91,7 +95,7 @@ public final class NetworkActivity extends Activity {
     private Switch toggle(LinearLayout parent,String title,boolean checked){var view=new Switch(this);view.setText(title);view.setTextSize(18);view.setTextColor(INK);view.setChecked(checked);view.setMinHeight(dp(48));view.setPadding(0,dp(4),0,dp(4));parent.addView(view,new LinearLayout.LayoutParams(-1,-2));return view;}
     private void log(String message){runOnUiThread(()->{if(isDestroyed()||notice==null)return;if(history.length()>6000)history=history.substring(history.length()-3000);history+=message+"\n";notice.setText(message);});}
     private void showMore(View anchor){
-        var popup=new PopupMenu(this,anchor);String[] items={"연결 정보와 기록","카메라 방향","제스처 세부 설정","서버에 연결 / 연결 해제","지원 기능과 라이선스"};
+        var popup=new PopupMenu(this,anchor);String[] items={"연결 정보와 기록","카메라 방향","입력 진단 설정","서버에 연결 / 연결 해제","지원 기능과 라이선스"};
         for(int i=0;i<items.length;i++)popup.getMenu().add(0,i,i,items[i]);
         popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){
             case 0:new AlertDialog.Builder(this).setTitle("연결 정보와 기록").setMessage((saved==null?"저장된 서버 없음":saved.optString("address"))+"\n\n"+history).setPositiveButton("닫기",null).show();break;
@@ -155,7 +159,7 @@ public final class NetworkActivity extends Activity {
                         public void control(JSONObject command,java.util.function.Consumer<JSONObject> done){runOnUiThread(()->applyControl(command,done));}
                         public void alert(JSONObject alert){runOnUiThread(()->{if(current==generation)voice.speak(alert,voiceEnabled.isChecked());});}
                         public void disconnected(boolean intentional){runOnUiThread(()->{if(current!=generation)return;stopCamera();connectionStatus.setText("서버 연결이 끊겼어요. 다시 연결해 주세요.");markOffline();if(!intentional)voice.disconnected(voiceEnabled.isChecked());failure.accept("연결이 종료됐어요. 코드·네트워크·서버 실행 상태를 확인해 주세요.");});}
-                        public void error(String message){if(current==generation)log(message);}
+                        public void error(String message){runOnUiThread(()->{if(current==generation){if(touchWindow!=null&&message.startsWith("마우스 입력"))touchWindow.stopInput();log(message);}});}
                     });link.setVoiceAlerts(voiceEnabled.isChecked());link.connect();
                 }catch(Exception e){connectionStatus.setText("연결하지 못했어요.");failure.accept("서버 지문과 등록 정보를 확인해 주세요.");}});
             }catch(Exception e){runOnUiThread(()->{if(current==generation){connectionStatus.setText("연결하지 못했어요.");failure.accept("새 QR과 같은 네트워크인지 확인하고 다시 연결해 주세요.");}});}
@@ -174,7 +178,8 @@ public final class NetworkActivity extends Activity {
             if(selected==null){for(int i=0;i<devices.length();i++){var d=devices.getJSONObject(i);if(d.optBoolean("connected")&&d.optBoolean("enabled",true)){selected=d;target=d.getString("id");if(target.equals(value.optString("gestureTarget")))break;}}}
             soundSummary.setText(selected==null?"클라이언트 목록에서 제어 대상을 선택하세요.":selected.optString("name")+" · "+(selected.optBoolean("muted")?"음소거":Math.round(selected.optDouble("volume")*100)+"%"));mute.setText(selectedMuted()?"음소거 해제":"음소거");
             clientTitle.setText(String.format(java.util.Locale.getDefault(),"클라이언트 · %d대 연결",connected));emptyClients.setVisibility(clientRows.isEmpty()?View.VISIBLE:View.GONE);
-            updatingControls=true;gestureToggle.setChecked(value.optBoolean("gesturesEnabled"));updatingControls=false;gestureSummary.setText(value.optBoolean("gesturesEnabled")?"서버에서 제스처 명령을 허용하고 있어요.":"서버 PC에서 제스처 명령 사용을 켤 수 있어요.");
+            updatingControls=true;gestureToggle.setChecked(false);updatingControls=false;gestureSummary.setText("제스처 중지 · 터치 리모컨을 사용하세요.");
+            if(touchWindow!=null)touchWindow.refresh(link,value);
             renderTasks(value);
             if(link!=null&&!link.enabled())stopCamera();
             if(tracker!=null&&value.optDouble("detectionThreshold",.8)>tracker.threshold+.0001){stopCamera();log("인식 기준이 바뀌었습니다. 카메라를 다시 켜 주세요.");}
@@ -197,6 +202,7 @@ public final class NetworkActivity extends Activity {
             var parts=new java.util.ArrayList<String>();
             if(!connected)parts.add("오프라인");else if(!active)parts.add(allowed?"사용 일시 중지":"서버에서 사용 중지");else{
                 parts.add(value.optString("platform","클라이언트"));parts.add(value.optBoolean("outputReady",true)?value.optBoolean("muted")?"소리 음소거":"소리 "+Math.round(value.optDouble("volume")*100)+"%":"출력 장치 확인 필요");
+                if(value.optBoolean("pointerReady"))parts.add("마우스 제어");
                 if(value.optBoolean("cameraActive"))parts.add("카메라 전송 중");if(id.equals(state.optString("voiceTarget"))&&value.optBoolean("speakAlerts",true))parts.add("음성 알림");if(id.equals(target))parts.add("제어 대상");
             }summary.setText(TextUtils.join(" · ",parts));
         }
@@ -229,6 +235,7 @@ public final class NetworkActivity extends Activity {
         taskChoice.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int index,long id){if(updatingControls||link==null||index>=runningTasks.length())return;try{String chosen=runningTasks.getJSONObject(index).getString("id");if(state!=null&&!chosen.equals(state.optString("selectedTask")))link.selectTask(chosen);}catch(Exception e){log("작업을 선택하지 못했습니다.");}}});
         text(pane,"세밀 조정 · 정확한 값은 키보드로 입력",15,INK);precisionChoice=new Spinner(this);precisionChoice.setContentDescription("조정할 값");precisionChoice.setMinimumHeight(dp(48));precisionChoice.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"음량 (%)","확대·축소 (%)","위치 (가로·세로 %)"}));pane.addView(precisionChoice);
         precisionEnabled=new CheckBox(this);precisionEnabled.setText("핀치 조정 허용 · 기본 꺼짐");precisionEnabled.setTextColor(INK);precisionEnabled.setMinHeight(dp(48));pane.addView(precisionEnabled);
+        precisionEnabled.setEnabled(false);precisionEnabled.setVisibility(View.GONE);
         precisionEnabled.setOnCheckedChangeListener((v,on)->updatePrecision());precisionChoice.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int index,long id){updatePrecision();if(exactValue!=null)exactValue.setText(index==1?"100":"50");}});
         exactValue=number(pane,"음량 0–100 / 확대 50–200", "50");exactX=number(pane,"가로 위치 -100–100", "0");exactY=number(pane,"세로 위치 -100–100", "0");
         button(pane,"키보드 값 적용",()->{
@@ -272,36 +279,11 @@ public final class NetworkActivity extends Activity {
     @Override public boolean onKeyUp(int code,android.view.KeyEvent event){if(code==android.view.KeyEvent.KEYCODE_ESCAPE){precisionEnabled.setChecked(false);return true;}return super.onKeyUp(code,event);}
     private void markOffline(){runningTasks=new JSONArray();taskSignature="";if(taskChoice!=null)taskChoice.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"연결되지 않음"}));if(taskName!=null)taskName.setText("연결되지 않음");if(taskDetails!=null)taskDetails.setVisibility(View.GONE);for(var view:clientRows.values()){view.updating=true;view.enabled.setChecked(false);view.enabled.setEnabled(false);view.updating=false;view.summary.setText("오프라인");}clientTitle.setText("클라이언트 · 연결 안 됨");soundSummary.setText("클라이언트를 연결해 주세요.");}
     private void command(String action){try{if(link==null||!link.connected()||!link.enabled()||target==null){log("사용 중인 기기로 연결한 뒤 제어 대상을 선택해 주세요.");return;}link.command(target,action);}catch(Exception e){log("명령을 보내지 못했어요.");}}
-    private void startCamera(){
-        if(link==null||!link.connected()||!link.enabled()||!link.skeletonSupported()){setCameraToggle(false);log("골격을 지원하는 서버에 연결한 뒤 카메라를 켜 주세요.");return;}
-        if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){setCameraToggle(false);requestPermissions(new String[]{Manifest.permission.CAMERA},41);return;}
-        stopCamera();final int token=++cameraGeneration;final double minimum=state==null?.8:state.optDouble("detectionThreshold",.8);
-        setCameraToggle(true);detection.setText("이 기기의 손·자세 모델 준비 중…");
-        worker.execute(()->{
-            try {var local=new SkeletonTracker(NetworkActivity.this,minimum);if(token!=cameraGeneration||isFinishing()){local.close();return;}
-                runOnUiThread(()->{if(token!=cameraGeneration||isFinishing()){try{worker.execute(local::close);}catch(java.util.concurrent.RejectedExecutionException e){local.close();}return;}tracker=local;
-                    camera=new CameraSource(NetworkActivity.this,new CameraSource.Listener(){
-                        public void frame(byte[] jpeg){
-                            if(token!=cameraGeneration||!inferenceBusy.compareAndSet(false,true))return;
-                            worker.execute(()->{try{
-                                if(token!=cameraGeneration)return;
-                                var bitmap=BitmapFactory.decodeByteArray(jpeg,0,jpeg.length);if(bitmap==null)return;
-                                JSONObject skeleton=local.detect(bitmap,rear,precisionMode);
-                                if(token==cameraGeneration&&link!=null)link.skeleton(skeleton);
-                                runOnUiThread(()->{if(token==cameraGeneration){preview.setScaleX(rear?1:-1);overlay.setScaleX(rear?1:-1);preview.setImageBitmap(bitmap);preview.setVisibility(View.VISIBLE);overlay.show(skeleton);}});
-                            }catch(Exception error){log("골격을 추출하지 못했습니다. 카메라를 다시 켜 주세요.");runOnUiThread(NetworkActivity.this::stopCamera);}finally{inferenceBusy.set(false);}});
-                        }
-                        public void error(String message){log(message);runOnUiThread(NetworkActivity.this::stopCamera);}
-                    });
-                    try{camera.start(rear);detection.setText((rear?"후면":"전면")+" · 골격만 서버로 전송합니다.");}catch(Exception error){log("선택한 카메라를 사용할 수 없습니다.");stopCamera();}
-                });
-            }catch(Exception error){runOnUiThread(()->{if(token==cameraGeneration){log("인식 모델을 준비하지 못했습니다.");stopCamera();}});}
-        });
-    }
+    private void startCamera(){setCameraToggle(false);log("제스처 입력은 중지됐습니다. 터치 리모컨을 사용하세요.");}
     private void setCameraToggle(boolean value){updatingControls=true;cameraToggle.setChecked(value);updatingControls=false;}
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);if(request==41){if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)startCamera();else log("카메라 권한이 거절됐어요. 수동 소리 제어는 사용할 수 있어요.");}}
     private void stopCamera(){cameraGeneration++;if(precisionEnabled!=null)precisionEnabled.setChecked(false);boolean wasActive=camera!=null;if(camera!=null){camera.close();camera=null;}if(wasActive&&link!=null)link.stopCamera();if(tracker!=null){var previous=tracker;tracker=null;worker.execute(previous::close);}if(overlay!=null)overlay.show(null);setCameraToggle(false);if(preview!=null){preview.setImageDrawable(null);preview.setVisibility(View.GONE);}if(detection!=null)detection.setText("카메라 꺼짐");}
-    private void disconnect(){generation++;stopCamera();if(link!=null){link.close();link=null;}target=null;state=null;if(connectionStatus!=null)connectionStatus.setText("서버에 연결되지 않았어요.");markOffline();}
+    private void disconnect(){generation++;if(touchWindow!=null)touchWindow.stopInput();stopCamera();if(link!=null){link.close();link=null;}target=null;state=null;if(touchWindow!=null)touchWindow.refresh(null,null);if(connectionStatus!=null)connectionStatus.setText("서버에 연결되지 않았어요.");markOffline();}
     @Override protected void onStop(){if(activeConnectionDialog!=null)activeConnectionDialog.dismiss();disconnect();super.onStop();}
     @Override protected void onDestroy(){disconnect();if(voice!=null)voice.close();worker.shutdown();super.onDestroy();}
 }

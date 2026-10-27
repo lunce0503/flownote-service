@@ -1,5 +1,8 @@
 # Flownote Remote
 
+현재 개발 버전 0.6.0은 **휴대폰 터치 리모컨**을 기본 입력으로 사용합니다. 제스처 명령은 서버에서 중지되며 예전 설정으로 다시 켤 수 없습니다. 휴대폰의 ‘터치 리모컨 열기’에서 십자·그리드 드래그 영역으로 Windows 커서를 이동하고 탭·누른 채 드래그할 수 있습니다. 버튼 영역은 아이콘과 이름을 표시하며 ⋯에서 이름/명령 변경·삭제, 아래에서 추가할 수 있습니다. 사용법과 현재 범위는 [터치 리모컨](docs/TOUCH.md)을 따릅니다. 아래 카메라·제스처 설명은 기존 진단 기능과 0.5.x 이력입니다.
+
+
 Windows PC 또는 Linux CLI 서버가 제스처·명령·상태 알림을 관리하고 Android·Windows 클라이언트가 카메라·소리·조작 화면을 담당하는 원격 앱이다. 프로젝트 폴더는 `flownote-remote/`다.
 
 독립 배포 저장소: [lunce0503/flownote-remote-service](https://github.com/lunce0503/flownote-remote-service).

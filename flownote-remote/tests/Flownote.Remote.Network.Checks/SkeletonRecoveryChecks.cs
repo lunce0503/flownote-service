@@ -59,7 +59,7 @@ internal static class SkeletonRecoveryChecks
         await Task.Delay(250);await FrameAck(Frame());
         Check(executions==0,"The invalid frame did not reset the held gesture");
         for(int i=0;i<4;i++){await Task.Delay(110);await FrameAck(Frame());}
-        await Until(()=>executions==1&&muted);
+        Check(executions==0&&!muted,"Suspended gestures still executed after recovery");
         // Invalid input never executes commands and cannot poison the accepted sequence.
         var badVersion=Frame();badVersion["schemaVersion"]=2;await FrameAck(badVersion,"invalid_frame");
         var badHands=Frame();badHands["hands"]=new JsonArray(new JsonObject{["side"]="Right",["points"]=new JsonArray()});await FrameAck(badHands,"invalid_hand");
@@ -73,15 +73,15 @@ internal static class SkeletonRecoveryChecks
         var futureInvalid=Frame();futureInvalid["sequence"]=long.MaxValue;futureInvalid["pose"]![0]!["y"]=3;
         await FrameAck(futureInvalid,"landmark_out_of_range");
         var accepted=Frame();await FrameAck(accepted);await FrameAck(accepted,"stale_sequence");
-        await FrameAck(Frame());Check(executions==1,"Rejected/replayed frames executed an action");
+        await FrameAck(Frame());Check(executions==0,"Rejected/replayed frames executed an action");
         long seen=hub.Snapshot().Devices.Single(d=>d.Id==cameraGrant.DeviceId).LastSeenMs;await Task.Delay(20);
         await Send(new{type="heartbeat",health=new{volume=0,muted=false,outputReady=false,platform="Android"}});
         await Until(()=>hub.Snapshot().Devices.Single(d=>d.Id==cameraGrant.DeviceId).LastSeenMs>seen);
         await Send(new{type="command",commandId=Guid.NewGuid(),targetId=outputGrant.DeviceId,action="volume_up"});
-        await Until(()=>executions==2&&volume>.4f);
+        await Until(()=>executions==1&&volume>.4f);
         var diagnostics=logs.Where(l=>l.Contains("골격 프레임 제외",StringComparison.Ordinal)).ToArray();
         Check(diagnostics.Length==1&&diagnostics[0].Contains("landmark_out_of_range",StringComparison.Ordinal),"Missing or unbounded rejection logs");
         Check(!logs.Any(l=>l.Contains("private_payload_marker",StringComparison.Ordinal)||l.Contains(cameraGrant.Token,StringComparison.Ordinal)||l.Contains("2.33",StringComparison.Ordinal)),"Logs exposed skeleton values or credentials");
-        Console.WriteLine("PASS: real TLS camera session rejects an invisible y=2.33 foot, resets gesture hold, keeps heartbeat/manual control, recovers tracking/gesture, rejects schema/size/replay and rate-limits safe diagnostics");
+        Console.WriteLine("PASS: real TLS camera session rejects an invisible y=2.33 foot, resets gesture hold, keeps heartbeat/manual control, recovers tracking with gestures suspended, rejects schema/size/replay and rate-limits safe diagnostics");
     }
 }

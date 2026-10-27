@@ -27,6 +27,7 @@ public sealed class ClientRow(Guid id) : INotifyPropertyChanged
             features.Add(device.Platform);
             features.Add(device.OutputReady ? (device.Muted ? "소리 음소거" : $"소리 {device.Volume:P0}") : "출력 장치 확인 필요");
             if (device.CameraActive) features.Add("카메라 전송 중");
+            if (device.PointerReady) features.Add("마우스 제어");
             if (state.VoiceTarget == device.Id && device.SpeakAlerts) features.Add("음성 알림");
             if (state.GestureTarget == device.Id) features.Add("제어 대상");
         }

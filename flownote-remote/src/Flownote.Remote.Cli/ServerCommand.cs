@@ -53,7 +53,8 @@ public static class ServerCommand
                         hub.RenewPairing(); return hub.Invitation(Protocol.Pin(certificate)).Encode();
                     case "gestures" when words.Length == 2 && words[1] is "on" or "off":
 
-                        settings.GesturesEnabled = words[1] == "on"; hub.Configure(settings); store.SaveSettings(settings); return "OK: gestures " + words[1];
+                        if (words[1] == "on") return "ERROR: gestures are suspended; use the phone touch remote.";
+                        settings.GesturesEnabled = false; hub.Configure(settings); store.SaveSettings(settings); return "OK: gestures off";
                 }
                 if (words.Length == 2 && words[0] == "task.upsert") { await hub.UpsertTaskAsync(JsonSerializer.Deserialize<RemoteTask>(words[1],Protocol.Json) ?? throw new ArgumentException()); return "OK"; }
                 if (words.Length == 2 && words[0] == "task.remove") { await hub.RemoveTaskAsync(Guid.Parse(words[1])); return "OK"; }

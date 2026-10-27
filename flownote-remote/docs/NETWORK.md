@@ -1,5 +1,16 @@
 # 서버와 입출력 클라이언트
 
+## 터치 입력 전환 (0.6.0 현재)
+
+제스처 명령은 서버 생성·설정 변경 때 항상 OFF다. `gestureRecognition=false`, `scopedGestures=false`, `touchInput=true`를 광고한다. 골격 검증/복구는 유지하지만 동작을 실행하지 않는다. UX·제어 범위는 [TOUCH.md](TOUCH.md)가 소유한다. 아래 제스처 실행 설명은 0.5.x 이력이다.
+
+기존 `control`/`InterfaceCommand(scope=precision)`에 `pointer.move(x,y 각각 ±128)`, `pointer.click`, `pointer.right_click`, `pointer.down`, `pointer.up`, `pointer.hold`, `pointer.scroll(value ±3)`를 추가한다. 모든 숫자는 유한하며 버튼 명령에는 value/x/y=0, 이동에는 value=0, scroll에는 x/y=0을 요구한다. 임의 키/셸/URL은 허용하지 않는다. source enabled, target connected/enabled/interfaceReady/pointerReady를 검사한다. `HealthSample`과 `DeviceState`의 `pointerReady`는 기본 false이며 Windows 출력만 광고한다. 구버전 메시지에서 역량을 추정하지 않는다.
+
+소스에 `pointer.result {commandId,accepted,error}`를 응답한다. accepted는 서버 전달 접수를 뜻하며 OS 적용 결과는 기존 출력 `control.result`로 받는다. 고정 error는 source_paused/pointer_unavailable/pointer_busy/input_rate_limited/input_backpressure/duplicate_input/invalid_pointer_state다. 기존 장치 허용·TLS 고정 지문·토큰·일회용 등록 규약을 유지한다. 입력 속도·대기량 거부는 정상 세션을 끊지 않는다. 잘못된 스키마/비허용 명령은 기존 정책에 따라 차단한다.
+
+드래그 소유자는 인증된 소켓 객체로 식별한다. 다른 소스는 hold/up/이동을 가로채지 못한다. up은 속도 제한을 면제한다. pause/소스 종료/유휴 시 서버가 up을 보내며 출력 클라이언트는 비활성 상태에서도 해제만 허용한다. Windows는 네트워크와 별도로 1.5초 유휴 해제를 수행한다. pointer 결과는 기존 확대/위치 상태를 덮어쓰지 않고 전체 상태 방송·정상 로그를 생략한다. 실패 진단은 고정 문구로 최대 5초마다 기록한다.
+
+
 ## 역할과 적용 범위
 
 2026-10-23 사용자 요구에 따라 `flownote-remote`는 Windows PC 서버와 Android/Windows 입출력 클라이언트로 구성한다. **이 앱에 한해** PC 서버 실행과 사설/VPN 네트워크의 직접 HTTPS/WSS 통신을 허용한다. 기존 Flownote 웹·API의 cloud URL 전용 정책이나 배포 방식을 변경하지 않는다. PC의 서버도 카메라·스피커를 사용할 때는 같은 인증 프로토콜의 로컬 클라이언트로 등록된다.

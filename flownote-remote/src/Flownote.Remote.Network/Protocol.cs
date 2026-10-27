@@ -12,11 +12,11 @@ public sealed record PairResult(Guid DeviceId, string Token);
 public sealed record GestureSample(string? Gesture, double Confidence);
 public sealed record DeviceState(Guid Id, string Name, bool Connected, bool CameraActive, float Volume, bool Muted, int? BatteryPercent, long LastSeenMs,
     bool Enabled = true, bool Allowed = true, bool OutputReady = true, bool SpeakAlerts = true, string Platform = "클라이언트",
-    bool InterfaceReady = false, double Zoom = 1, double PanX = 0, double PanY = 0);
+    bool InterfaceReady = false, double Zoom = 1, double PanX = 0, double PanY = 0, bool PointerReady = false);
 public sealed record HubCapabilities(bool CameraFrames = false, bool GestureRecognition = true, bool OutputVolume = true,
     bool HealthVoiceAlerts = true, bool AudioTransport = false, bool AudioSeparation = false, bool ScreenLayout = false,
     bool ProjectorOutput = false, bool ConversationalAssistant = false, bool ClientParticipation = false,
-    bool SkeletonFrames = false, bool ScopedGestures = false, bool InterfaceControl = false);
+    bool SkeletonFrames = false, bool ScopedGestures = false, bool InterfaceControl = false, bool TouchInput = false);
 public sealed record RemoteTask(Guid Id, string Name, string Kind = "codex.voice");
 public sealed record HubState(DeviceState[] Devices, Guid? GestureTarget, Guid? VoiceTarget, bool GesturesEnabled, HubCapabilities? Capabilities = null,
     RemoteTask[]? Tasks = null, Guid? SelectedTask = null, double DetectionThreshold = .8);
@@ -34,6 +34,9 @@ public sealed record InterfaceCommand(Guid CommandId, string Scope, string Actio
             "interface.zoom_set" => Value is >= .5 and <= 2,
             "interface.pan" => X is >= -.08 and <= .08 && Y is >= -.08 and <= .08,
             "interface.pan_set" => X is >= -1 and <= 1 && Y is >= -1 and <= 1,
+            "pointer.move" => Value == 0 && Math.Abs(X) <= 128 && Math.Abs(Y) <= 128,
+            "pointer.scroll" => X == 0 && Y == 0 && Value is >= -3 and <= 3,
+            "pointer.click" or "pointer.right_click" or "pointer.down" or "pointer.up" or "pointer.hold" => Value == 0 && X == 0 && Y == 0,
             _ => false
         };
         if (!valid) throw new ArgumentException("Unsupported interface command.");
@@ -44,7 +47,7 @@ public sealed record OutputCommand(Guid CommandId, float Volume, bool Muted, boo
 public sealed record OutputResult(bool Applied, float Volume, bool Muted, string? Error = null);
 public sealed record AlertNotice(Guid Id, string Code, string Severity, string Message, string English, bool Speak);
 public sealed record HealthSample(float Volume, bool Muted, int? BatteryPercent = null, bool OutputReady = true, int? MemoryLoadPercent = null,
-    bool SpeakAlerts = true, string Platform = "클라이언트", bool InterfaceReady = false);
+    bool SpeakAlerts = true, string Platform = "클라이언트", bool InterfaceReady = false, bool PointerReady = false);
 
 public static class Protocol
 {

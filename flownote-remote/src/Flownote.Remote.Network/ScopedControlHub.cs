@@ -39,7 +39,7 @@ public sealed partial class RemoteHub
                 if (frame.Sequence <= peer.Sequence) throw new SkeletonFrameException("stale_sequence");
                 peer.Sequence = frame.Sequence;
                 if (Enabled(peer) && Environment.TickCount64-peer.LastFrame >= 60)
-                { peer.LastFrame = Environment.TickCount64; peer.CameraActive = true; action = peer.Motion.Observe(settings, frame, peer.LastFrame); }
+                { peer.LastFrame = Environment.TickCount64; peer.CameraActive = true; /* Gesture commands are suspended in touch-input mode. */ }
             }
         }
         catch (SkeletonFrameException error) { await RejectSkeletonAsync(peer,id,error.Code); return; }
@@ -103,8 +103,11 @@ public sealed partial class RemoteHub
         "interface.zoom_set" => c.Value is >= .5 and <= 2,
         "interface.pan_set" => c.X is >= -1 and <= 1 && c.Y is >= -1 and <= 1,
         "interface.reset" => true,
+        _ when c.Action.StartsWith("pointer.", StringComparison.Ordinal) => ValidPointer(c),
         _ => false
     };
+    private static bool ValidPointer(InterfaceCommand c)
+    { try { c.Validate(); return true; } catch (ArgumentException) { return false; } }
     public async Task RouteControlAsync(Guid target, InterfaceCommand command)
     {
         if (command.Action == "audio.set") { if (!ValidManual(command)) throw new ArgumentException(); await VolumeAsync(target,command.Value,true,command.CommandId); return; }
@@ -114,9 +117,14 @@ public sealed partial class RemoteHub
         {
             if (!peers.TryGetValue(target,out peer) || !Enabled(peer) || !peer.InterfaceReady) return;
             if (peer.PendingControls.ContainsKey(command.CommandId)) return;
-            foreach (var old in peer.PendingControls.Where(x => Environment.TickCount64-x.Value > 5000).Select(x => x.Key).ToArray()) peer.PendingControls.Remove(old);
-            if (peer.PendingControls.Count >= 32) throw new InvalidOperationException("화면 응답을 기다리고 있습니다.");
-            peer.PendingControls.Add(command.CommandId,Environment.TickCount64);
+            foreach (var old in peer.PendingControls.Where(x => Environment.TickCount64-x.Value.Seen > 5000).Select(x => x.Key).ToArray()) peer.PendingControls.Remove(old);
+            if (peer.PendingControls.Count >= 32 && command.Action != "pointer.up")
+            {
+                if (command.Action.StartsWith("pointer.", StringComparison.Ordinal)) return;
+                throw new InvalidOperationException("화면 응답을 기다리고 있습니다.");
+            }
+            if (peer.PendingControls.Count < 32)
+                peer.PendingControls.Add(command.CommandId,(Environment.TickCount64, command.Action.StartsWith("pointer.", StringComparison.Ordinal)));
         }
         await SendAsync(peer,new { type = "interface.set", command });
     }

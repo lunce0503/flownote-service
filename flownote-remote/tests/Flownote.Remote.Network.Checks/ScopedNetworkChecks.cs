@@ -31,16 +31,13 @@ internal static class ScopedNetworkChecks
         async Task Feed(SkeletonFrame frame,int count=4)
         {for(int i=0;i<count;i++){await a.SendSkeletonAsync(frame with{Sequence=++seq});await Task.Delay(100);}}
         await Feed(TestSkeletons.Frame(TestSkeletons.Pose("wide")));
-        await Until(()=>first.Count==1&&second.Count==1);
-        Check(first[0].Scope=="all"&&second[0].Action=="interface.minimize","Global scope fanout");
-        await Feed(TestSkeletons.Frame(TestSkeletons.Pose("wide")),5);
-        Check(first.Count==1&&second.Count==1,"Held global repeated over wire");
+        Check(first.Count==0&&second.Count==0&&!hub.Snapshot().GesturesEnabled,"Gesture commands must be suspended even with saved enabled settings");
+        hub.Configure(settings);Check(!hub.Snapshot().GesturesEnabled,"Configuration re-enabled gestures");
         var task1=new RemoteTask(Guid.NewGuid(),"Voice one");var task2=new RemoteTask(Guid.NewGuid(),"Voice two");
         await hub.UpsertTaskAsync(task1);await hub.UpsertTaskAsync(task2);
         await Feed(TestSkeletons.Frame(hands:[TestSkeletons.Hand()]));
         await Feed(TestSkeletons.Frame(hands:[TestSkeletons.Hand("fist")]),1);
-        await Until(()=>second.Any(c=>c.Action=="task.focus"));
-        Check(first.Count==1&&second.Last().TaskId==task1.Id,"Management target isolation");
+        Check(first.Count==0&&second.Count==0,"Management gesture escaped touch-only policy");
         await a.SelectTaskAsync(task2.Id);await Until(()=>hub.Snapshot().SelectedTask==task2.Id);
         await hub.RemoveTaskAsync(task2.Id);await Until(()=>a.State?.SelectedTask==task1.Id);
         await a.ControlAsync(grant2.DeviceId,"interface.zoom_set",1.75);await Until(()=>hub.Snapshot().Devices.Single(d=>d.Id==grant2.DeviceId).Zoom==1.75);
@@ -79,6 +76,6 @@ internal static class ScopedNetworkChecks
         await a.SendSkeletonAsync(TestSkeletons.Frame(sequence:seq));
         Check(a.Connected&&replay?.Gesture=="Rejected","Replay must be discarded without disconnecting");
         await a.SendSkeletonAsync(TestSkeletons.Frame(sequence:++seq));Check(a.Connected,"Tracking did not recover after replay");
-        Console.WriteLine("PASS: skeleton-only TLS negotiation, global fanout, selected-task routing, keyboard values, actual acknowledgements, deduplication, pause guards and image/schema/replay rejection");
+        Console.WriteLine("PASS: skeleton-only TLS negotiation, gesture suspension, selected-task routing, keyboard values, actual acknowledgements, deduplication, pause guards and image/schema/replay rejection");
     }
 }

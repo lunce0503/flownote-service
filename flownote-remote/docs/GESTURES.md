@@ -1,5 +1,8 @@
 # 범주별 제스처와 골격 입력 (0.5.0)
 
+**0.6.0 현재 정책:** 제스처 명령을 중지하고 [터치 리모컨](TOUCH.md)으로 전환했습니다. 서버는 저장된 활성 설정을 무시하며 CLI `gestures on`도 거부합니다. 아래 0.5.x 동작은 과거 구현·합성 엔진 진단의 기록입니다. 카메라 골격 프레임 검증/복구는 호환 진단용으로 유지하지만 명령을 생성하지 않습니다. Android 대시보드에서는 골격/핀치 입력을 제공하지 않습니다.
+
+
 클라이언트가 MediaPipe Hand Landmarker와 Pose Landmarker로 관절을 추출하고 카메라 위에 뼈대를 그린다. 서버는 관절의 위치와 시간에 따른 움직임으로 아래 명령을 결정한다. Windows는 WebView2, Android는 네이티브 MediaPipe Tasks Vision 1.1.1을 사용한다. 양쪽 안내의 단일 카탈로그는 [`config/scoped-gestures.json`](../config/scoped-gestures.json)이다.
 
 | 범주 | 동작 | 명령 |

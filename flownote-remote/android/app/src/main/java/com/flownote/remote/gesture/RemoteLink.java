@@ -117,6 +117,9 @@ final class RemoteLink implements AutoCloseable {
                         case "welcome":connected=true;readState(message.getJSONObject("state"));listener.connected();
                             timer.scheduleWithFixedDelay(RemoteLink.this::heartbeat,0,3,TimeUnit.SECONDS);break;
                         case "state":readState(message.getJSONObject("state"));break;
+                        case "pointer.result":
+                            if(!message.optBoolean("accepted"))listener.error("마우스 입력이 적용되지 않았습니다. 대상 기기의 허용 상태를 확인하세요.");
+                            break;
                         case "skeleton.result":
                             String expectedFrame=pendingFrame.get();
                             if(expectedFrame!=null&&expectedFrame.equals(message.getString("frameId"))&&pendingFrame.compareAndSet(expectedFrame,null)){

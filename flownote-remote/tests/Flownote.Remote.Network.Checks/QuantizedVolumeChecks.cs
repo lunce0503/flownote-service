@@ -25,15 +25,10 @@ internal static class QuantizedVolumeChecks
         long seq=0;
         for(int i=0;i<5;i++){await client.SendSkeletonAsync(TestSkeletons.Frame(hands:[TestSkeletons.Hand("pinch")],mode:"volume",sequence:++seq));await Task.Delay(100);}
         for(int i=1;i<=4;i++){await client.SendSkeletonAsync(TestSkeletons.Frame(hands:[TestSkeletons.Hand("pinch",y:-.02*i)],mode:"volume",sequence:++seq));await Task.Delay(160);}
-        await Until(()=>executions==7);
-        Check(index==6&&Math.Abs(last!.Volume-.37f)<.002,"Sub-step pinch input must accumulate instead of stalling or forcing full steps");
-        // A physical output change supersedes the fractional gesture accumulator.
-        await client.SendSkeletonAsync(TestSkeletons.Frame(mode:"volume",sequence:++seq));
+        Check(executions==3&&index==5,"Suspended pinch changed quantized hardware volume");
         index=8;await Until(()=>Math.Abs(hub.Snapshot().Devices[0].Volume-8/15f)<.001);
-        await client.SendSkeletonAsync(TestSkeletons.Frame(hands:[TestSkeletons.Hand("pinch")],mode:"volume",sequence:++seq));await Task.Delay(300);
-        await client.SendSkeletonAsync(TestSkeletons.Frame(hands:[TestSkeletons.Hand("pinch")],mode:"volume",sequence:++seq));await Task.Delay(150);
-        await client.SendSkeletonAsync(TestSkeletons.Frame(hands:[TestSkeletons.Hand("pinch",y:-.02)],mode:"volume",sequence:++seq));
-        await Until(()=>executions==8);Check(Math.Abs(last!.Volume-(8/15f+.01f))<.002,"External output change did not reset fine input");
-        Console.WriteLine("PASS: exact volume repeat stability, fractional pinch accumulation and hardware-change resync on a real TLS session with a 15-step output adapter");
+        await client.ControlAsync(grant.DeviceId,"audio.set",.6);await Until(()=>executions==4);
+        Check(index==9,"Manual input did not resync after physical hardware change");
+        Console.WriteLine("PASS: exact volume repeat stability, suspended pinch and manual resync on a TLS session with a 15-step output adapter");
     }
 }

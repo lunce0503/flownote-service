@@ -74,7 +74,8 @@ try {
     # Details are reached through the overflow menu; the initial screen is the dashboard.
     Find-Control $app.Root 'ClientList' | Out-Null
     Find-Control $app.Root 'CameraControl' | Out-Null
-    if ((Find-Control $app.Root 'PinchEnabled').GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Current.ToggleState -ne [System.Windows.Automation.ToggleState]::Off) { throw 'Pinch must default OFF' }
+    if ((Find-Control $app.Root 'AllowGestures').Current.IsEnabled) { throw 'Gesture activation must be suspended' }
+    if ((Find-Control $app.Root 'AllowPointer').GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Current.ToggleState -ne [System.Windows.Automation.ToggleState]::On) { throw 'Phone pointer control must be available' }
     Invoke-Control (Find-Control $app.Root 'ChooseCameraSource')
     $source=Find-ProcessControl $app.Process.Id 'CameraSourceDialog'
     $choice=Find-Control $source 'CameraSourceChoice'

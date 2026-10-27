@@ -1,5 +1,8 @@
 # Linux 서버와 Codex 음성 CLI
 
+0.6.0에서는 서버가 휴대폰 터치 입력을 Windows 출력 클라이언트로 전달합니다. `gestures on`은 중지 안내와 함께 거부하며, 서버는 항상 제스처 OFF를 유지합니다. Linux CLI 서버 자체에는 데스크톱 마우스를 주입하지 않습니다. Windows 클라이언트에서 마우스 제어를 허용한 뒤 휴대폰에서 대상을 선택하세요. 기존 0.5.x 제스처 활성 예제 대신 [터치 입력](TOUCH.md)을 사용합니다.
+
+
 0.4.0부터 `flownote-remote` CLI를 제공한다. Linux x64 서버가 기존 Android/Windows 입출력 클라이언트와 같은 HTTPS/WSS v1 규약을 사용한다. 기존 웹/API의 cloud 정책과 별개다. Linux GUI·카메라 캡처 앱은 포함하지 않는다. 음성은 CLI의 별도 Codex 세션이며 Android/Windows 앱의 마이크를 전달하는 기능은 아직 없다.
 
 ## 설치와 서버

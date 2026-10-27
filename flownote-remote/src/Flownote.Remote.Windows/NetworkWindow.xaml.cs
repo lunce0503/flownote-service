@@ -18,6 +18,7 @@ public partial class NetworkWindow : Window
     private readonly Func<RemoteSettings> readSettings;
     private readonly VisionHost vision = new();
     private readonly AssistantVoice voice = new();
+    private readonly NativePointer pointer = new();
     private readonly ObservableCollection<ClientRow> rows = [];
     private readonly string[] addresses;
     private readonly string settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Flownote", "Remote", "settings.json");
@@ -95,7 +96,7 @@ public partial class NetworkWindow : Window
             if (closed) return; e.Cancel = true; if (closing) return; closing = true; IsEnabled = false;
             connectionDialog?.Close(); invitationDialog?.Close();
             try { await StopAllAsync(); } catch (Exception) { Log("연결 종료 중 오류가 발생했습니다."); }
-            finally { vision.Dispose(); voice.Dispose(); closed = true; Close(); }
+            finally { pointer.Dispose(); vision.Dispose(); voice.Dispose(); closed = true; Close(); }
         };
     }
     private void Log(string message)
@@ -108,7 +109,7 @@ public partial class NetworkWindow : Window
     private async Task Guard(Func<Task> action)
     { try { await action(); } catch (Exception) { Log("요청 실패: 연결 상태와 권한을 확인해 주세요. 세부 연결 정보는 더 보기에서 확인할 수 있어요."); } }
     private RemoteSettings ServerSettings()
-    { var settings = readSettings(); settings.GesturesEnabled = AllowGestures.IsChecked == true; return settings; }
+    { var settings = readSettings(); settings.GesturesEnabled = false; return settings; }
     private async void StartServer_Click(object sender, RoutedEventArgs e) => await Guard(async () =>
     {
         if (hub is not null) return;
@@ -155,20 +156,22 @@ public partial class NetworkWindow : Window
         int count = value.Devices.Count(d => d.Connected); ClientsTitle.Text = $"클라이언트 · {count}대 연결";
         EmptyClients.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         ConnectionStatus.Text = hub is not null ? $"이 PC가 서버입니다 · {count}대 연결됨" : $"서버에 연결됨 · {count}대 참여 중";
-        AllowGestures.IsEnabled = hub is not null; AllowGestures.IsChecked = value.GesturesEnabled;
-        GestureSummary.Text = value.GesturesEnabled ? "제스처 명령 사용 중" : "꺼짐 · 켜면 손 모양으로 제어합니다.";
+        AllowGestures.IsEnabled = false; AllowGestures.IsChecked = false;
+        GestureSummary.Text = "제스처 중지 · 휴대폰 터치 입력을 사용하세요.";
         RefreshScopedState(value);
         if (client is not null && value.Devices.Any(d => d.Id == client.DeviceId && !d.Enabled))
-            _ = Guard(StopCameraAsync);
+        { pointer.Release(); _ = Guard(StopCameraAsync); }
         } finally { refreshing = false; }
     }
     private async Task AttachAsync(string address, string pin, PairResult grant)
     {
-        var attached = new RemoteClient(NativeOutput.ApplyAsync, () => NativeOutput.Health() with { SpeakAlerts = speakEnabled, Platform = "Windows" }, ApplyInterfaceAsync);
+        pointer.Allowed = AllowPointer.IsChecked == true;
+        var attached = new RemoteClient(NativeOutput.ApplyAsync, () => NativeOutput.Health() with { SpeakAlerts = speakEnabled, Platform = "Windows", PointerReady = pointer.Allowed }, ApplyInterfaceAsync);
         client = attached;
         attached.Activity += message =>
         {
             Log(message);
+            if (!attached.Connected) pointer.Release();
             if (!attached.Connected) Dispatcher.BeginInvoke(async () => { if (!closed && !closing && ReferenceEquals(client, attached)) { await Guard(StopCameraAsync); ClearScopedState(); ConnectionStatus.Text = "연결이 끊겼습니다. 서버에 다시 연결해 주세요."; } });
         };
         attached.Alert += alert => Dispatcher.BeginInvoke(() => { if (!closing && ReferenceEquals(client, attached)) { voice.Enabled = speakEnabled; voice.Speak(alert); } });
@@ -178,6 +181,7 @@ public partial class NetworkWindow : Window
     }
     private async Task DisconnectAsync()
     {
+        pointer.Release();
         await StopCameraAsync();
         if (client is not null) { var previous = client; client = null; await previous.DisposeAsync(); }
         rows.Clear(); state = null; target = null; EmptyClients.Visibility = Visibility.Visible;
@@ -210,6 +214,7 @@ public partial class NetworkWindow : Window
     private void Licenses_Click(object sender, RoutedEventArgs e) => MainWindow.OpenLicenses(this);
     private async void Stop_Click(object sender, RoutedEventArgs e) => await Guard(StopAllAsync);
     private async void Gestures_Click(object sender, RoutedEventArgs e) => await Guard(() => { if (refreshing || !((ToggleButton)sender).IsLoaded) return Task.CompletedTask; hub?.Configure(ServerSettings()); RefreshServer(); return Task.CompletedTask; });
+    private void Pointer_Click(object sender, RoutedEventArgs e) => pointer.Allowed = AllowPointer.IsChecked == true;
     private void Voice_Click(object sender, RoutedEventArgs e) { if (refreshing || !((ToggleButton)sender).IsLoaded) return; speakEnabled = ((ToggleButton)sender).IsChecked == true; voice.Enabled = speakEnabled; }
     private async void CameraToggle_Click(object sender, RoutedEventArgs e) => await Guard(async () =>
     {

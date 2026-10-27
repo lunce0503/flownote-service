@@ -68,7 +68,7 @@ try
     Check((await Control("mute", grant.DeviceId.ToString())).StartsWith("ERROR:", StringComparison.Ordinal), "Paused output accepted");
     await Control("allow", grant.DeviceId.ToString()); await Until(() => client.Enabled);
     await Control("mute", grant.DeviceId.ToString()); await Until(() => muted);
-    Check(await Control("gestures", "on") == "OK: gestures on", "Skeleton server must work without Node vision");
+    Check((await Control("gestures", "on")).StartsWith("ERROR:"), "Touch mode must refuse gesture activation");
     foreach (string file in new[] { "server.pfx", "grants.json", "owner.sock", "server.lock" }) StateStore.VerifyPrivate(Path.Combine(directory, file));
     using (var second = Launch()) { await second.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10)); Check(second.ExitCode != 0, "Duplicate server replaced owner socket"); }
     Check((await Control("devices")).Contains(grant.DeviceId.ToString(), StringComparison.Ordinal), "Original owner socket was replaced");
@@ -102,8 +102,8 @@ try
         Check(recognized?.Gesture=="Tracking" && commands==0,"Legacy thumb must not execute scoped command");
         await camera.StopCameraAsync();
         for(int i=1;i<=6;i++) { await camera.SendSkeletonAsync(TestSkeletons.Frame(TestSkeletons.Pose("crossed"),sequence:i)); await Task.Delay(150); }
-        await Until(()=>isMuted);
-        Check(commands==1,"Held skeleton gesture repeated");
+        Check(commands==0&&!isMuted,"Gesture command escaped suspension");
+        await camera.CommandAsync(cameraGrant.DeviceId,"mute");await Until(()=>isMuted);Check(commands==1,"Manual command failed");
         var task=new RemoteTask(Guid.NewGuid(),"Acceptance voice session");
         Check(await Control("task.upsert",JsonSerializer.Serialize(task,Protocol.Json))=="OK","Owner task registration failed");
         await Until(()=>camera.State?.Tasks?.Length==1);

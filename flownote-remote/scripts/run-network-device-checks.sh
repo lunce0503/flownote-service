@@ -21,6 +21,16 @@ done
 test -s android/app/src/androidTest/assets/session.json
 cd android
 ./gradlew connectedDebugAndroidTest
+python3 - <<'PY'
+import json
+from pathlib import Path
+actions=json.loads(Path('../artifacts/tests/touch-events.json').read_text())
+for expected in ['pointer.click','pointer.move','pointer.down','pointer.hold','pointer.up']:
+    assert expected in actions, f'Android production touch window did not reach TLS output: {expected}'
+assert actions.index('pointer.down') < actions.index('pointer.up')
+print('PASS: production Android touch window -> TLS server -> pointer output: tap, move, held drag, release')
+PY
 mkdir -p ../artifacts/ux
 adb pull /data/local/tmp/flownote-remote-dashboard.png ../artifacts/ux/dashboard-android.png
 adb pull /data/local/tmp/flownote-remote-clients.png ../artifacts/ux/clients-android.png
+adb pull /data/local/tmp/flownote-remote-touch-remote.png ../artifacts/ux/touch-remote-android.png

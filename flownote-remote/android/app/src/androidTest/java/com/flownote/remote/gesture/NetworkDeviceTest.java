@@ -60,23 +60,23 @@ public class NetworkDeviceTest {
         return new JSONObject().put("schemaVersion",1).put("sequence",sequence).put("width",480).put("height",480).put("facing","back")
             .put("detectionThreshold",.7).put("precisionMode","off").put("pose",pose).put("hands",new org.json.JSONArray());
     }
-    private void exerciseLivePreview(android.app.Activity activity)throws Exception {
+    private void exerciseTouchRemote(android.app.Activity activity)throws Exception {
         var instrumentation=InstrumentationRegistry.getInstrumentation();
-        var toggleField=NetworkActivity.class.getDeclaredField("cameraToggle");toggleField.setAccessible(true);
-        var previewField=NetworkActivity.class.getDeclaredField("preview");previewField.setAccessible(true);
-        var linkField=NetworkActivity.class.getDeclaredField("link");linkField.setAccessible(true);
-        var toggle=(android.widget.CompoundButton)toggleField.get(activity);var preview=(android.widget.ImageView)previewField.get(activity);
-        instrumentation.runOnMainSync(()->toggle.setChecked(true));boolean[] ready={false};
-        try{
-            for(int i=0;i<120;i++){
-                instrumentation.runOnMainSync(()->ready[0]=toggle.isChecked()&&preview.getDrawable()!=null);
-                if(ready[0])break;SystemClock.sleep(100);
-            }
-            assertTrue("Production rear camera/model pipeline never rendered a preview",ready[0]);
-            SystemClock.sleep(1200);
-            assertTrue("Production skeleton stream disconnected immediately after preview",((RemoteLink)linkField.get(activity)).connected());
-        }finally{instrumentation.runOnMainSync(()->toggle.setChecked(false));}
-        assertTrue("Camera stop disconnected the live client",((RemoteLink)linkField.get(activity)).connected());
+        click("터치 리모컨 열기");assertNotNull("Touch drag area missing",visible("드래그 영역"));
+        var field=NetworkActivity.class.getDeclaredField("touchWindow");field.setAccessible(true);var dialog=(TouchRemoteDialog)field.get(activity);
+        var padField=TouchRemoteDialog.class.getDeclaredField("pad");padField.setAccessible(true);var pad=(TouchPadView)padField.get(dialog);
+        for(int i=0;i<40&&!pad.isEnabled();i++)SystemClock.sleep(100);assertTrue("Windows pointer target was not selected",pad.isEnabled());
+        long start=SystemClock.uptimeMillis();
+        java.util.function.BiConsumer<Integer,float[]> send=(action,xy)->instrumentation.runOnMainSync(()->{var event=android.view.MotionEvent.obtain(start,SystemClock.uptimeMillis(),action,xy[0],xy[1],0);pad.onTouchEvent(event);event.recycle();});
+        send.accept(android.view.MotionEvent.ACTION_DOWN,new float[]{70,70});send.accept(android.view.MotionEvent.ACTION_UP,new float[]{70,70});SystemClock.sleep(150);
+        send.accept(android.view.MotionEvent.ACTION_DOWN,new float[]{70,70});send.accept(android.view.MotionEvent.ACTION_MOVE,new float[]{110,90});SystemClock.sleep(100);send.accept(android.view.MotionEvent.ACTION_UP,new float[]{110,90});
+        for(int i=0;i<8&&find(instrumentation.getUiAutomation().getRootInActiveWindow(),"누른 채 드래그")==null;i++)scroll(true);
+        click("누른 채 드래그");send.accept(android.view.MotionEvent.ACTION_DOWN,new float[]{70,70});SystemClock.sleep(500);send.accept(android.view.MotionEvent.ACTION_MOVE,new float[]{110,100});SystemClock.sleep(80);send.accept(android.view.MotionEvent.ACTION_UP,new float[]{110,100});SystemClock.sleep(200);
+        for(int i=0;i<14&&find(instrumentation.getUiAutomation().getRootInActiveWindow(),"＋ 커스텀 버튼 추가")==null;i++)scroll(true);
+        click("＋ 커스텀 버튼 추가");var name=visible("커스텀 버튼 이름");assertNotNull(name);var args=new android.os.Bundle();args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,"내 클릭");assertTrue(name.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,args));click("저장");
+        assertTrue("Custom button did not persist",activity.getSharedPreferences("touch-remote-v1",Context.MODE_PRIVATE).getString("buttons","").contains("내 클릭"));
+        for(int i=0;i<12;i++)scroll(false);capture("touch-remote");click("닫기");
+        instrumentation.runOnMainSync(()->{var fresh=new TouchRemoteDialog(activity,m->{});fresh.show();try{var saved=TouchRemoteDialog.class.getDeclaredField("entries");saved.setAccessible(true);assertTrue("Custom button was not restored in a new window",saved.get(fresh).toString().contains("내 클릭"));}catch(ReflectiveOperationException e){throw new AssertionError(e);}fresh.dismiss();});
     }
     @Test public void realTlsCameraGestureOutputAndAlert()throws Exception {
         var instrumentation=InstrumentationRegistry.getInstrumentation();Context context=instrumentation.getTargetContext();
@@ -142,9 +142,10 @@ public class NetworkDeviceTest {
             link.stopCamera();SystemClock.sleep(200);
             // Synthetic temporal pose verifies routing separately from the real native model above.
             for(int i=1;i<=8;i++){link.skeleton(crossedPose(i));SystemClock.sleep(200);}
-            assertTrue("Skeleton server gesture missing",gesture.await(5,TimeUnit.SECONDS));
+            assertFalse("Gesture command escaped suspension",audio.isStreamMute(AudioManager.STREAM_MUSIC));
+            link.command(connection.getString("deviceId"),"mute");
             for(int i=0;i<40&&!audio.isStreamMute(AudioManager.STREAM_MUSIC);i++)SystemClock.sleep(100);
-            assertTrue("Skeleton command did not mute actual Android output",audio.isStreamMute(AudioManager.STREAM_MUSIC));
+            assertTrue("Manual button command did not mute output",audio.isStreamMute(AudioManager.STREAM_MUSIC));
             link.command(connection.getString("deviceId"),"unmute");
             for(int i=0;i<40&&audio.isStreamMute(AudioManager.STREAM_MUSIC);i++)SystemClock.sleep(100);
             assertFalse("Output did not unmute",audio.isStreamMute(AudioManager.STREAM_MUSIC));
@@ -161,12 +162,6 @@ public class NetworkDeviceTest {
             assertNotNull("Dashboard title missing",visible("Flownote Remote"));
             assertNull("Advanced server address must not be on the home screen",find(instrumentation.getUiAutomation().getRootInActiveWindow(),"서버 HTTPS 주소"));
             click("더 보기");assertNotNull("Overflow settings missing",visible("연결 정보와 기록"));instrumentation.getUiAutomation().performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK);
-            for(int i=0;i<10&&find(instrumentation.getUiAutomation().getRootInActiveWindow(),"전면 / 후면 카메라 선택")==null;i++)scroll(true);
-            click("전면 / 후면 카메라 선택");click("후면 카메라");
-            assertTrue("Rear camera preference not saved",context.getSharedPreferences("camera-source-v1",Context.MODE_PRIVATE).getBoolean("rear",false));
-            android.app.Activity previous=activity;instrumentation.runOnMainSync(previous::finish);
-            activity=instrumentation.startActivitySync(new Intent(context,NetworkActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            var rearField=NetworkActivity.class.getDeclaredField("rear");rearField.setAccessible(true);assertTrue("Rear selection did not restore",rearField.getBoolean(activity));
             click("저장된 서버에 다시 연결");
             for(int i=0;i<18&&find(instrumentation.getUiAutomation().getRootInActiveWindow(),"Android real I/O acceptance 사용")==null;i++)scroll(true);
             assertNotNull("Client row and accessible toggle missing",visible("Android real I/O acceptance 사용"));
@@ -175,11 +170,11 @@ public class NetworkDeviceTest {
             assertTrue("Client did not resume",visible("Android real I/O acceptance 사용").isChecked());
             capture("clients");
             for(int i=0;i<18;i++)scroll(false);
-            exerciseLivePreview(activity);
+            exerciseTouchRemote(activity);
             for(int i=0;i<18;i++)scroll(false);
             capture("dashboard");
             click("연결 코드");click("확인하고 연결");assertNotNull("Pairing must require explicit server confirmation",visible("내 서버의 QR 또는 지문인지 확인해 주세요."));click("닫기");
-            System.out.println("PASS: actual QR pixels/parser, Android Camera2, native hand skeleton extraction/overlay, landmark-only TLS/WSS, synthetic pose command, AudioManager, alerts, overflow dashboard at 320dp/font1.3, saved reconnect, accessible client pause/resume and required pairing confirmation");
+            System.out.println("PASS: actual QR pixels/parser, Android Camera2, native hand skeleton extraction/overlay, landmark-only TLS/WSS, suspended gestures, touch window/custom button persistence, AudioManager, alerts, overflow dashboard at 320dp/font1.3, saved reconnect, accessible client pause/resume and required pairing confirmation");
         }finally{
             if(camera[0]!=null)camera[0].close();link.close();
             if(activity!=null){android.app.Activity open=activity;instrumentation.runOnMainSync(open::finish);}

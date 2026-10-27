@@ -25,8 +25,12 @@ public sealed partial class RemoteHub : IAsyncDisposable
         public long Sequence;
         public long RejectedFrames, LastSkeletonLog = -10000;
         public bool InterfaceReady;
+        public bool PointerReady;
+        public long PointerWindow;
+        public int PointerCount;
         public double Zoom = 1, PanX, PanY;
-        public readonly Dictionary<Guid,long> PendingControls = [];
+        public readonly Dictionary<Guid,(long Seen, bool Pointer)> PendingControls = [];
+        public long LastPointerError = -10000;
         public long LastSeen = Environment.TickCount64, LastFrame;
         public float Volume = 0.7f;
         public bool Muted, CameraActive, Leaving, Participating = true, OutputReady = true, SpeakAlerts = true;
@@ -62,7 +66,8 @@ public sealed partial class RemoteHub : IAsyncDisposable
         HubCapabilities? capabilities = null)
     {
         this.settings = RemoteSettings.Parse(settings.ToJson());
-        this.capabilities = (capabilities ?? new()) with { ClientParticipation = true, CameraFrames = false, SkeletonFrames = true, ScopedGestures = true, InterfaceControl = true, GestureRecognition = true };
+        this.settings.GesturesEnabled = false;
+        this.capabilities = (capabilities ?? new()) with { ClientParticipation = true, CameraFrames = false, SkeletonFrames = true, ScopedGestures = false, InterfaceControl = true, GestureRecognition = false, TouchInput = true };
         grants = (knownDevices ?? []).Take(8).ToDictionary(g => g.Id);
         RenewPairing();
     }
@@ -84,6 +89,7 @@ public sealed partial class RemoteHub : IAsyncDisposable
             GrantsChanged?.Invoke(grants.Values.ToArray());
         }
         Changed?.Invoke(); await BroadcastStateAsync();
+        await SweepPointersAsync();
     }
     private bool Enabled(Peer peer) => grants.TryGetValue(peer.Grant.Id, out var grant) && grant.Allowed && peer.Participating;
     private async Task BroadcastStateAsync()
@@ -96,6 +102,7 @@ public sealed partial class RemoteHub : IAsyncDisposable
     public void Configure(RemoteSettings value)
     {
         var copy = RemoteSettings.Parse(value.ToJson());
+        copy.GesturesEnabled = false;
         lock (gate) { settings = copy; foreach (var p in peers.Values) { p.Gate.Reset(); p.Motion.Reset(); p.FineVolume = null; } }
         Changed?.Invoke();
     }
@@ -105,7 +112,7 @@ public sealed partial class RemoteHub : IAsyncDisposable
     {
         lock (gate) return new(grants.Values.Select(g => peers.TryGetValue(g.Id, out var p)
             ? new DeviceState(g.Id, g.Name, true, p.CameraActive && Enabled(p), p.Volume, p.Muted, p.Battery, p.LastSeen,
-                Enabled(p), g.Allowed, p.OutputReady, p.SpeakAlerts, p.Platform, p.InterfaceReady, p.Zoom, p.PanX, p.PanY)
+                Enabled(p), g.Allowed, p.OutputReady, p.SpeakAlerts, p.Platform, p.InterfaceReady, p.Zoom, p.PanX, p.PanY, p.PointerReady)
             : new DeviceState(g.Id, g.Name, false, false, 0, false, null, 0, false, g.Allowed, false, false)).ToArray(),
             gestureTarget, voiceTarget, settings.GesturesEnabled, capabilities, tasks.Values.ToArray(), selectedTask, settings.ConfidenceThreshold);
     }
@@ -223,6 +230,7 @@ public sealed partial class RemoteHub : IAsyncDisposable
             }
             if (removed && !stop.IsCancellationRequested && !peer.Leaving)
                 await AnnounceAsync("device.offline:" + grant.Id, "warning", $"{grant.Name}의 연결이 끊어졌습니다.", "A client has disconnected.");
+            if (!stop.IsCancellationRequested) await SweepPointersAsync(peer);
             Changed?.Invoke();
         }
     }
@@ -234,7 +242,7 @@ public sealed partial class RemoteHub : IAsyncDisposable
         {
             case "device.enabled":
                 lock (gate) { peer.Participating = message.GetProperty("enabled").GetBoolean(); peer.Gate.Reset(); peer.Motion.Reset(); peer.FineVolume = null; if (!Enabled(peer)) peer.CameraActive = false; }
-                await BroadcastStateAsync(); Changed?.Invoke(); break;
+                await SweepPointersAsync(); await BroadcastStateAsync(); Changed?.Invoke(); break;
             case "heartbeat":
                 var health = message.GetProperty("health").Deserialize<HealthSample>(Protocol.Json) ?? throw new ArgumentException();
                 if (!float.IsFinite(health.Volume) || health.Volume is < 0 or > 1 || health.BatteryPercent is < 0 or > 100 || health.MemoryLoadPercent is < 0 or > 100) throw new ArgumentException();
@@ -245,6 +253,7 @@ public sealed partial class RemoteHub : IAsyncDisposable
                     peer.Volume = health.Volume; peer.Muted = health.Muted; peer.Battery = health.BatteryPercent;
                     peer.OutputReady = health.OutputReady; peer.SpeakAlerts = health.SpeakAlerts;
                     peer.InterfaceReady = health.InterfaceReady;
+                    peer.PointerReady = health.PointerReady && health.InterfaceReady && health.Platform == "Windows";
                     peer.Platform = health.Platform is "Windows" or "Android" ? health.Platform : "클라이언트";
                     int batteryLevel = health.BatteryPercent is <= 5 ? 2 : health.BatteryPercent is <= 15 ? 1 : 0;
                     int memoryLevel = health.MemoryLoadPercent is >= 97 ? 2 : health.MemoryLoadPercent is >= 90 ? 1 : 0;
@@ -286,6 +295,7 @@ public sealed partial class RemoteHub : IAsyncDisposable
                 var control = message.GetProperty("command").Deserialize<InterfaceCommand>(Protocol.Json) ?? throw new ArgumentException();
                 if (!ValidManual(control)) throw new ArgumentException("허용되지 않은 제어 명령입니다.");
                 Guid targetId = message.GetProperty("targetId").GetGuid();
+                if (control.Action.StartsWith("pointer.", StringComparison.Ordinal)) { await RoutePointerAsync(peer, targetId, control); break; }
                 await RouteControlAsync(targetId, control with { Scope = "precision" }); break;
             case "task.select":
                 lock (gate) { if (!Enabled(peer)) return; }
@@ -294,10 +304,18 @@ public sealed partial class RemoteHub : IAsyncDisposable
                 var result = message.GetProperty("result").Deserialize<InterfaceResult>(Protocol.Json) ?? throw new ArgumentException();
                 if (!double.IsFinite(result.Zoom) || result.Zoom is < .5 or > 2 || !double.IsFinite(result.PanX) || !double.IsFinite(result.PanY) ||
                     result.PanX is < -1 or > 1 || result.PanY is < -1 or > 1 || result.Error?.Length > 64) throw new ArgumentException();
+                bool pointerResult;
                 lock (gate)
                 {
-                    if (!peer.PendingControls.Remove(message.GetProperty("commandId").GetGuid())) return;
-                    if (result.Applied) { peer.Zoom = result.Zoom; peer.PanX = result.PanX; peer.PanY = result.PanY; }
+                    if (!peer.PendingControls.Remove(message.GetProperty("commandId").GetGuid(), out var pending)) return;
+                    pointerResult = pending.Pointer;
+                    if (result.Applied && !pointerResult) { peer.Zoom = result.Zoom; peer.PanX = result.PanX; peer.PanY = result.PanY; }
+                }
+                if (pointerResult)
+                {
+                    if (!result.Applied && Environment.TickCount64-peer.LastPointerError >= 5000)
+                    { peer.LastPointerError = Environment.TickCount64; Activity?.Invoke($"{peer.Grant.Name} 마우스 입력 실패 · 기기의 허용 상태와 대상 앱 권한을 확인하세요."); }
+                    break;
                 }
                 Activity?.Invoke(result.Applied ? $"{peer.Grant.Name} 화면 제어 적용됨" : $"{peer.Grant.Name} 화면 제어 실패");
                 await BroadcastStateAsync(); Changed?.Invoke(); break;
@@ -354,6 +372,7 @@ public sealed partial class RemoteHub : IAsyncDisposable
         {
             while (await timer.WaitForNextTickAsync(stop.Token))
             {
+                await SweepPointersAsync();
                 Guid[] expired;
                 lock (gate) foreach (var peer in peers.Values)
                     if (Environment.TickCount64 - peer.LastSeen > 12000) peer.Socket.Abort();

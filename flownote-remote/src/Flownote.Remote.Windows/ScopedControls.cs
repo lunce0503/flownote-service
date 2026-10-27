@@ -61,6 +61,7 @@ public partial class NetworkWindow
     {
         try
         {
+            if (command.Action.StartsWith("pointer.", StringComparison.Ordinal)) return pointer.Apply(command);
             command.Validate(); viewport.Apply(command.Action,command.Value,command.X,command.Y);
             switch (command.Action)
             {

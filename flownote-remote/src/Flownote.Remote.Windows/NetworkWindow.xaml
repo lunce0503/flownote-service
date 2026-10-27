@@ -9,7 +9,7 @@
     <StackPanel><TextBlock Text="Flownote Remote" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="연결된 기기로, 손쉽게 제어하세요." Foreground="#61736A"/></StackPanel>
     <Button x:Name="DashboardMore" Grid.Column="1" Content="⋯" FontSize="26" Padding="0" Margin="0" AutomationProperties.Name="더 보기" Click="More_Click">
      <Button.ContextMenu><ContextMenu>
-      <MenuItem x:Name="OpenSettingsMenu" Header="제스처 세부 설정" Click="Settings_Click"/>
+      <MenuItem x:Name="OpenSettingsMenu" Header="입력 진단 설정" Click="Settings_Click"/>
       <MenuItem Header="서버 연결 설정" Click="ServerOptions_Click"/>
       <MenuItem x:Name="OpenDetailsMenu" Header="연결 정보와 기록" Click="Details_Click"/>
       <MenuItem Header="서버에 연결 / 연결 해제" Click="ConnectionMenu_Click"/>
@@ -26,6 +26,10 @@
     <Button x:Name="JoinServer" Content="서버에 연결" Click="Join_Click"/>
    </WrapPanel>
    <TextBlock Text="빠른 제어" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,12"/>
+   <Border Style="{StaticResource Card}"><StackPanel>
+    <CheckBox x:Name="AllowPointer" Content="휴대폰 마우스 제어 허용" IsChecked="True" Click="Pointer_Click" MinHeight="48"/>
+    <TextBlock Text="휴대폰에서 ‘터치 리모컨’을 열면 이 PC의 커서·클릭·드래그를 조작할 수 있어요." TextWrapping="Wrap"/>
+   </StackPanel></Border>
    <UniformGrid x:Name="FeatureGrid" Columns="2">
     <Border Style="{StaticResource Card}"><StackPanel>
      <TextBlock Text="♪  소리" FontSize="21" FontWeight="SemiBold"/>
@@ -39,10 +43,10 @@
      <Button Content="QR로 빠르게 연결" Click="ScanQr_Click"/>
     </StackPanel></Border>
     <Border Style="{StaticResource Card}"><StackPanel>
-     <Grid><TextBlock Text="✋  제스처" FontSize="21" FontWeight="SemiBold"/><ToggleButton x:Name="AllowGestures" Style="{StaticResource Switch}" HorizontalAlignment="Right" AutomationProperties.Name="제스처 명령 허용" Checked="Gestures_Click" Unchecked="Gestures_Click"/></Grid>
-     <TextBlock Text="전체 · 중간 관리 · 세밀 조정" Foreground="#61736A" MinHeight="42"/>
+     <Grid><TextBlock Text="✋  제스처" FontSize="21" FontWeight="SemiBold"/><ToggleButton x:Name="AllowGestures" IsEnabled="False" Style="{StaticResource Switch}" HorizontalAlignment="Right" AutomationProperties.Name="제스처 명령 허용" Checked="Gestures_Click" Unchecked="Gestures_Click"/></Grid>
+     <TextBlock Text="제스처 입력 중지 · 휴대폰 터치로 조작" Foreground="#61736A" MinHeight="42"/>
      <Button Content="범주별 제스처 안내" Click="GestureGuide_Click"/>
-     <TextBlock x:Name="GestureSummary" Text="서버에서 켤 수 있어요."/>
+     <TextBlock x:Name="GestureSummary" Text="터치 리모컨을 사용하세요."/>
     </StackPanel></Border>
     <Border Style="{StaticResource Card}"><StackPanel>
      <Grid><TextBlock Text="◌  음성 알림" FontSize="21" FontWeight="SemiBold"/><ToggleButton x:Name="SpeakAlerts" Style="{StaticResource Switch}" IsChecked="True" HorizontalAlignment="Right" AutomationProperties.Name="이 기기 음성 알림" Checked="Voice_Click" Unchecked="Voice_Click"/></Grid>
@@ -71,7 +75,7 @@
     </Grid>
     <TextBlock Text="세밀 조정 · 정확한 값은 키보드로 입력" FontWeight="SemiBold"/>
     <ComboBox x:Name="PrecisionChoice" SelectedIndex="0" SelectionChanged="Precision_Changed" AutomationProperties.Name="조정할 값" MinHeight="40"><ComboBoxItem Content="음량 (%)"/><ComboBoxItem Content="확대·축소 (%)"/><ComboBoxItem Content="위치 (가로·세로 %)"/></ComboBox>
-    <CheckBox x:Name="PinchEnabled" Content="핀치 조정 허용 · 기본 꺼짐 (Esc로 해제)" Checked="Precision_Changed" Unchecked="Precision_Changed" Margin="0,8"/>
+    <CheckBox x:Name="PinchEnabled" IsEnabled="False" Visibility="Collapsed" Content="핀치 조정 허용 · 기본 꺼짐 (Esc로 해제)" Checked="Precision_Changed" Unchecked="Precision_Changed" Margin="0,8"/>
     <WrapPanel>
      <StackPanel><TextBlock Text="음량 0–100 / 확대 50–200"/><TextBox x:Name="ExactValue" Text="50" Width="180" AutomationProperties.Name="정확한 조정 값"/></StackPanel>
      <StackPanel Margin="10,0"><TextBlock Text="가로 -100–100"/><TextBox x:Name="ExactX" Text="0" Width="110" AutomationProperties.Name="가로 위치"/></StackPanel>
