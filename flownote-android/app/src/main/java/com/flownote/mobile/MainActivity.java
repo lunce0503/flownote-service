@@ -107,10 +107,16 @@ public final class MainActivity extends Activity {
         errorPanel.addView(retry);
         webContainer.addView(errorPanel, new FrameLayout.LayoutParams(-1, -1));
         errorPanel.setVisibility(View.GONE);
-        updater = new AppUpdater(this, content);
+        updater = new AppUpdater(this, this::publishUpdateState);
 
         web.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                if (trusted(request.getUrl()) && request.getUrl().getPath() != null
+                    && request.getUrl().getPath().startsWith("/__flownote_native__/")) {
+                    if (UpdateSettingsPolicy.mayOpen(BuildConfig.WEB_URL, view.getUrl(), request.getUrl().toString(),
+                        request.isForMainFrame(), request.hasGesture(), request.getMethod())) updater.showDetails();
+                    return true;
+                }
                 if (trusted(request.getUrl())) return false;
                 openExternal(request.getUrl());
                 return true;
@@ -123,6 +129,7 @@ public final class MainActivity extends Activity {
             @Override public void onPageFinished(WebView view, String url) {
                 progress.setVisibility(View.GONE);
                 CookieManager.getInstance().flush();
+                publishUpdateState();
                 if (trusted(Uri.parse(url))) view.evaluateJavascript(
                     "if(!window.__flownoteDownloadListener){window.__flownoteDownloadListener=true;document.addEventListener('click',e=>{"
                     + "const a=e.target instanceof Element?e.target.closest('a[download]'):null;"
@@ -176,6 +183,15 @@ public final class MainActivity extends Activity {
         web.setDownloadListener(this::download);
         if (state == null || web.restoreState(state) == null) web.loadUrl(BuildConfig.WEB_URL);
         if (Build.VERSION.SDK_INT >= 33) getOnBackInvokedDispatcher().registerOnBackInvokedCallback(0, this::goBack);
+    }
+
+    private void publishUpdateState() {
+        if (web == null || updater == null || isFinishing() || isDestroyed()
+            || !trusted(Uri.parse(web.getUrl() == null ? "" : web.getUrl()))) return;
+        // Native-to-web display data only. No callable JavascriptInterface or caller-supplied URL/file.
+        web.evaluateJavascript("if(location.origin===" + JSONObject.quote(BuildConfig.WEB_URL) + "){"
+            + "window.__flownoteAndroidUpdateState=" + updater.snapshot().toString() + ";"
+            + "window.dispatchEvent(new Event('flownote-android-update-state'));}", null);
     }
 
     private boolean trusted(Uri uri) {

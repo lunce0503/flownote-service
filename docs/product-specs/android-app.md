@@ -14,6 +14,7 @@
 - 전체 메뉴는 enabled 역량의 모든 루트 경로를 제공한다. 기존 development 역량은 ‘개발 중’으로 표시하며, 관리자 화면의 기존 서버 권한 검사를 유지한다. 이 메뉴 표시는 웹 서비스가 중지된 기능을 복구하거나 권한을 부여하지 않는다.
 - 캔버스 상세에서는 하단 메뉴를 숨기고 목록 복귀 버튼과 기존 캔버스 도구를 제공한다.
 - Android 뒤로가기는 앱 안의 이전 페이지로, 이력이 없으면 앱 종료로 이어진다.
+- 1.3.1 후보에서는 하단 네이티브 업데이트 바를 제거한다. **전체 → 설정 → 앱 업데이트**에서 설치 버전·상태를 보고, **업데이트 확인·설치·이력**으로 네이티브 관리 창을 연다. 확인/다운로드 중 상태와 최근 이력이 갱신되며 뒤로가기·닫기는 웹 설정 화면으로 돌아온다. 현재 운영 1.3.0은 하단 바를 유지하고 새 웹 설정 카드에 기존 버튼 안내를 표시한다. 1.3.1 배포는 노트 편집 통합 이후 진행한다.
 
 ## 디자인
 
@@ -30,16 +31,24 @@
 
 ## 배포와 검증
 
-Debug APK는 staging origin 및 별도 패키지 `.staging`을 사용하고 서명 release APK는 production origin을 사용한다. 배포는 `node scripts/deploy-cloud.mjs release web`으로 staging-first를 따른다. 설치 안내는 `/android.html`, 현재 APK는 `/downloads/flownote-1.2.0.apk`다. 이전 다운로드는 이력과 기존 링크 호환을 위해 유지한다.
+Debug APK는 staging origin 및 별도 패키지 `.staging`을 사용하고 서명 release APK는 production origin을 사용한다. 배포는 `node scripts/deploy-cloud.mjs release web`으로 staging-first를 따른다. 설치 안내는 `/android.html`, 현재 운영 APK는 `/downloads/flownote-1.3.0.apk`다. 1.3.1(13100)은 통합 전 빌드 후보이며 아직 공개 피드를 변경하지 않았다. 이전 다운로드는 이력과 기존 링크 호환을 위해 유지한다.
 
 웹 E2E에는 Android UA의 최초 로그인·세션 유지·전체 기능 메뉴·헤더 제거·휴대폰/태블릿 overflow·캔버스 상세 탐색을 포함한다. Android 빌드/lint/서명 검증과 실제 기기 WebView 실행 검증은 구분하여 기록한다.
 
 ## 1.2.0 자동 업데이트
 
-- 시작·재개 시와 실행 중 1시간마다 확인한다. 자동 확인은 최소 15분 간격이며 하단 네이티브 업데이트 표시에서 수동 재시도·변경 내용·최근 이력·설치를 제공한다.
+- 시작·재개 시와 실행 중 1시간마다 확인한다. 자동 확인은 최소 15분 간격이다. 1.3.0까지 하단 네이티브 표시를 사용하고 1.3.1 후보부터 설정에서 수동 확인·변경 내용·최근 이력·설치를 제공한다. 이 UI 이동은 자동 확인·다운로드 정책을 바꾸지 않는다.
 - release는 production, debug는 staging 고정 HTTPS origin의 `/updates/<channel>/android.json`만 사용한다. 채널별 APK 이름과 패키지(`com.flownote.mobile` / `.staging`)를 분리한다.
 - 앱에 고정한 RSA 공개키로 feed 서명을 검사하고 버전/versionCode·URL·크기·SHA-256을 확인한다. APK 패키지·버전·서명 인증서를 현재 설치와 대조하고 설치 직전 재검증한다. 다른 채널·패키지·서명 및 downgrade는 차단한다.
 - 자동 다운로드는 앱 내부 `files/updates/`에 저장하며 부분 파일은 설치에 노출하지 않는다. 검증된 캐시를 재사용하고 실패 시 부분 파일을 제거해 다음 확인에서 재시도한다. 사용자 자료 폴더·WebView 저장소는 삭제하지 않는다.
 - 사용자가 ‘설치’를 누른 뒤 필요하면 ‘이 출처 허용’을 켜고 Android 설치 확인을 완료한다. `REQUEST_INSTALL_PACKAGES`는 직접 APK 배포용이며 무인 설치를 의미하지 않는다.
 - 비공개 `UpdateProvider`가 검증된 APK 한 파일만 OS 설치기에 read-only content URI로 전달한다. native JS bridge는 추가하지 않는다.
 - 기존 1.0.0은 updater가 없으므로 1.1.0을 한 번 직접 설치한다. 기존 앱을 삭제하면 안 된다.
+
+## 업데이트 설정 연결의 경계
+
+`MainActivity`는 앱의 고정 HTTPS origin에서 `/settings`를 보고 있을 때, 사용자가 누른 main-frame GET `/__flownote_native__/updates`만 소비해 관리 창을 연다. iframe·사용자 동작 없는 스크립트·다른 origin·쿼리/fragment·임의 URL/파일/명령을 허용하지 않는다. 이 경로는 서버 API가 아니며 WebView 이력에 추가되지 않는다. `JavascriptInterface`나 호출 가능한 JS 객체는 없다. 네이티브가 버전/채널/상태 표시 데이터만 현재 동일 origin 문서에 주입하고 이벤트로 갱신한다. 웹 표시 데이터는 인증이나 서명 검증 근거가 아니다. 설치는 항상 네이티브 UI와 Android의 명시적 확인을 거친다.
+
+새 웹은 기존 앱의 updater를 그대로 이용하는 안내를 제공한다. 새 바이너리는 설정 카드가 있는 웹을 staging에서 검증한 뒤 공개하고, 웹 롤백 시에도 이 카드와 고정 경로 계약을 보존한다. 번들 전체 로드가 불가능하면 공개 설치 안내에서 같은 서명의 APK를 직접 설치할 수 있다.
+
+`node scripts/test-app-updates.mjs`는 서명·채널·버전·아티팩트 정책과 설정 진입 제약의 순수 JVM 검사를 포함한다. `settings-update-smoke.mjs`는 기존 설치본 호환·서명된 실제 staging feed 다운로드·캐시 재사용·시스템 설치 확인·초안/세션/이력 보존·설정 뒤로가기·WebView 반환 높이를 API35 에뮬레이터에서 확인한다. 통합 전 `--inject-candidate-settings`는 후보 컴포넌트를 현재 cloud 화면에 테스트 목적으로 마운트하며 실제 배포/통합 gate 통과로 간주하지 않는다. 통합 후 이 옵션 없이 새 staging 웹과 피드로 다시 실행한다.

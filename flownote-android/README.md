@@ -34,6 +34,8 @@ Java 17, Android SDK 35, Build Tools 35.0.0을 사용한다.
 
 1.1.0/versionCode 11000부터 네이티브 `AppUpdater`가 시작/재개/1시간 주기에 새 APK를 자동 다운로드한다. 무료 모바일 계정/Expo와 무관하며 직접 배포 APK 전용이다. OS 설치 확인 및 ‘이 출처 허용’은 사용자가 수행한다. 기존 앱을 삭제하지 않고 같은 서명키로 설치하면 WebView 로그인·초안을 유지한다. 1.0.0은 updater가 없어 한 번 수동 설치가 필요하다.
 
+1.3.1(13100) 후보는 하단 네이티브 바를 없애고 **전체 → 설정 → 앱 업데이트**에서 버전·상태·확인·설치·이력을 제공한다. 네이티브가 제한된 HTTPS/main-frame/사용자 클릭 경로만 처리하며 범용 JavaScript interface를 노출하지 않는다. 서명·해시·고정 채널·롤백 방어·설치 확인은 유지한다. 현재 공개 피드는 여전히 1.3.0이며 노트 편집 통합 후 staging-first 배포에서 갱신한다.
+
 저장소 루트에서 서명키 경로를 `FLOWNOTE_UPDATE_SIGNING_KEY` 환경에 넣고 `node scripts/sign-app-update.mjs android staging 1.3.0 flownote/public/downloads 13000` 및 production을 실행한다. feed 서명키는 APK 서명키와 별개이며 앱에 공개키를 고정한다. 상세 채널·파일 검증 계약은 [소유 사양](../docs/product-specs/android-app.md#120-자동-업데이트)을 따른다.
 
 책장 원본과 읽기 기록은 현재 앱의 계정별 IndexedDB에 보관한다. 앱 업데이트 시 삭제하지 않으며 서버 책장 동기화는 제공하지 않는다. 일반 Android API35 에뮬레이터에서 `node flownote-android/scripts/library-smoke.mjs <new-debug-apk>`로 시스템 파일 선택·100MiB 등록·1.2→1.3 보존·내보내기 해시를 확인한다. 실제 하드웨어 검증과 구분한다.
