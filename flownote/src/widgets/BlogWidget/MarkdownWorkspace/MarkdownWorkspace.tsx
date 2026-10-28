@@ -169,7 +169,7 @@ function Workspace({ owner }: { owner: string }) {
     if (menu) { e.stopPropagation(); menu.open = false; menu.querySelector('summary')?.focus(); }
   }} className="note-workspace workspace-surface" data-testid="markdown-workspace" aria-label="노트 작업 공간">
     <header className="note-topbar">
-      <button ref={toggle} aria-label="탐색기 토글" aria-expanded={drawer} aria-controls="note-explorer" onClick={() => setDrawer(v => !v)}><PanelLeft size={19} /></button>
+      <button ref={toggle} aria-label="탐색기 토글" title="탐색기 토글" aria-expanded={drawer} aria-controls="note-explorer" onClick={() => setDrawer(v => !v)}><PanelLeft size={19} /></button>
       <div className="note-breadcrumb" title={[selectedFolder?.category, selectedFolder?.name, selected?.title].filter(Boolean).join(' / ')}>
         노트 / {selectedFolder ? `${selectedFolder.category || '카테고리 없음'} / ${selectedFolder.name} / ` : ''}{selected?.title ?? '작업 공간'}
       </div>

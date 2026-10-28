@@ -23,11 +23,11 @@ export default function MathComposer({ initial, apply, close }: { initial: MathD
         <button type="button" aria-pressed={draft.kind === 'inline'} onClick={() => setDraft(value => ({ ...value, kind: 'inline' }))}>문장 안</button>
         <button type="button" aria-pressed={draft.kind === 'block'} onClick={() => setDraft(value => ({ ...value, kind: 'block' }))}>독립된 여러 줄</button>
       </div>
-      <label>LaTeX 수식<textarea ref={input} value={draft.latex} spellCheck={false} rows={4} onChange={event => { setDraft(value => ({ ...value, latex: event.target.value })); setCursor(event.target.selectionStart); }}
+      <label htmlFor="note-latex-input">LaTeX 수식</label><textarea id="note-latex-input" ref={input} value={draft.latex} spellCheck={false} rows={4} onChange={event => { setDraft(value => ({ ...value, latex: event.target.value })); setCursor(event.target.selectionStart); }}
         onSelect={event => setCursor(event.currentTarget.selectionStart)} onKeyDown={event => {
           if (completion && event.key === 'Tab' && !event.shiftKey) { event.preventDefault(); choose(completion.items[0]); }
           if (completion && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setDismissed(`${draft.latex}:${cursor}`); }
-        }} /></label>
+        }} />
       <LatexSuggestions completion={completion} choose={choose} />
       <p className="note-math-help">문장 안은 $ 수식 $, 여러 줄은 $$ 사이에 입력하세요. \frac, \sqrt, \sum 등의 명령어를 추천합니다.</p>
       <div className="note-math-preview" aria-label="수식 미리보기" dangerouslySetInnerHTML={{ __html: katex.renderToString(draft.latex, { displayMode: draft.kind === 'block', trust: false, throwOnError: false, strict: 'ignore' }) }} />

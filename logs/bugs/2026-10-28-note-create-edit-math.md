@@ -14,3 +14,5 @@
 ## 검증 진행
 
 수식/동기화 모델4개 통과. 서버 없이 독립 ProseMirror 인메모리 브라우저 검사에서 실제 키 입력의 단일 `$`, 여러 줄 `$$`, 앞 문자 보존·Markdown 직렬화/재파싱 통과(`/tmp/flownote-note-math-browser-unit.log`). 프런트 verify 통과. 새 생성/아이콘/한 줄/수식의 Chromium1440·390/WebKit820 실제 staging 시나리오12개를 추가했다. 이 변경의 실제 cloud/native/production은 아직 검증 전이다. 이전116개 gate를 이번 완료로 사용하지 않는다.
+
+추가 인메모리 React/Tiptap 실제 키 검사에서 한 줄 중간 삽입·undo/redo·CDP 한글 조합·추천 Tab 삽입/괄호 내부 커서·수식창 클릭 삽입이 모두 통과했다(`/tmp/flownote-note-react-final.log`). 추천 선택 후 textarea 값이 암묵적 label 이름에 포함되는 접근성 문제는 분리된 htmlFor/id로 고쳤다. 이 검사는 실제 클라우드·Windows 설치본 검증의 대체물이 아니다.

@@ -116,11 +116,11 @@ export default function LiveMarkdownEditor({ value, disabled, toolsOpen, onChang
   if (!editor) return <p role="status">편집기를 준비하고 있습니다…</p>;
   return <div className="note-live-editor" data-testid="markdown-live-editor">
     {toolsOpen && <div className="note-live-formatting" role="toolbar" aria-label="Markdown 서식">
-      <button type="button" aria-label="굵게" aria-pressed={state?.bold} disabled={disabled} onClick={() => edit(() => { editor.chain().focus().toggleBold().run(); })}><Bold size={17} /></button>
-      <button type="button" aria-label="기울임" aria-pressed={state?.italic} disabled={disabled} onClick={() => edit(() => { editor.chain().focus().toggleItalic().run(); })}><Italic size={17} /></button>
-      <button type="button" aria-label="제목 2" aria-pressed={state?.heading} disabled={disabled} onClick={() => edit(() => { editor.chain().focus().toggleHeading({ level: 2 }).run(); })}><Heading2 size={17} /></button>
-      <button type="button" aria-label="글머리 목록" aria-pressed={state?.bullet} disabled={disabled} onClick={() => edit(() => { editor.chain().focus().toggleBulletList().run(); })}><List size={17} /></button>
-      <button type="button" aria-label="코드 블록" aria-pressed={state?.code} disabled={disabled} onClick={() => edit(() => { editor.chain().focus().toggleCodeBlock().run(); })}><Code size={17} /></button>
+      <button type="button" aria-label="굵게" title="굵게" aria-pressed={state?.bold} disabled={disabled} onClick={() => edit(() => { editor.chain().focus().toggleBold().run(); })}><Bold size={17} /></button>
+      <button type="button" aria-label="기울임" title="기울임" aria-pressed={state?.italic} disabled={disabled} onClick={() => edit(() => { editor.chain().focus().toggleItalic().run(); })}><Italic size={17} /></button>
+      <button type="button" aria-label="제목 2" title="제목 2" aria-pressed={state?.heading} disabled={disabled} onClick={() => edit(() => { editor.chain().focus().toggleHeading({ level: 2 }).run(); })}><Heading2 size={17} /></button>
+      <button type="button" aria-label="글머리 목록" title="글머리 목록" aria-pressed={state?.bullet} disabled={disabled} onClick={() => edit(() => { editor.chain().focus().toggleBulletList().run(); })}><List size={17} /></button>
+      <button type="button" aria-label="코드 블록" title="코드 블록" aria-pressed={state?.code} disabled={disabled} onClick={() => edit(() => { editor.chain().focus().toggleCodeBlock().run(); })}><Code size={17} /></button>
       <button type="button" aria-label="수식 추가" title="수식 추가" disabled={disabled} onClick={() => setMath({ latex: '', kind: 'inline' })}><Sigma size={17} /></button>
     </div>}
     <EditorContent editor={editor} />

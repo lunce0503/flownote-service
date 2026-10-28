@@ -41,9 +41,8 @@ export function registerNoteEditing(width: number, engine: 'chromium' | 'webkit'
       const editor = page.getByRole('textbox', { name: '노트 편집', exact: true });
       await expect(editor).toBeVisible(); return editor;
     }
-    test.afterEach(async ({ page }) => {
-      // Use the session cookie through same-origin fetch, without exposing credentials.
-      await page.evaluate(async ids => { for (const id of ids) await fetch(`/web-api/api/notes/${id}`, { method: 'DELETE' }); }, ids);
+    test.afterEach(async ({ request }) => {
+      for (const id of ids) expect((await request.delete(`${api}/api/notes/${id}`, { headers: { Authorization: `Bearer ${actor.token}` } })).ok()).toBe(true);
     });
     test('both new-note actions work without prompt and expose only compact, accessible editing tools', async ({ page }) => {
       await page.goto(`${web}/blog`); const editor = await create(page);
