@@ -28,7 +28,13 @@ async function request(route, method, body, token) {
   assert(response.ok, `Staging ${method} ${route}: ${response.status}`);
   const text = await response.text(); return text ? JSON.parse(text) : null;
 }
+const failures = [];
 for (const executablePath of process.argv.slice(2)) {
+  const kind = executablePath.includes('FlownotePortable') ? 'portable' : 'installer';
+  const failed = (phase, error) => {
+    failures.push({ kind, phase, error: String(error.message).slice(0, 1600) });
+    console.error(`FAIL ${kind} ${phase}: ${error.message}`);
+  };
   const email = `native-feedback-${randomUUID()}@example.com`, password = randomUUID();
   await request('/api/users', 'POST', { email, password, username: `nf-${randomUUID().slice(0, 8)}`, nickname: 'Synthetic native web release' });
   const { token } = await request('/api/users/login', 'POST', { email, password });
@@ -93,12 +99,17 @@ for (const executablePath of process.argv.slice(2)) {
     await page.waitForFunction(() => document.querySelector('[data-testid="canvas-input-surface"]')?.getAttribute('data-ready') === 'true');
     await page.getByTestId('canvas-tool-pointer').waitFor({ state: 'attached' });
     assert.equal(await page.getByTestId('canvas-tool-pointer').count(), 1);
-    await verifyNoteEditing(page, token);
-    await verifyReader(page);
+    try { await verifyNoteEditing(page, token); } catch (error) { failed('note editing', error); }
+    try { await verifyReader(page); } catch (error) { failed('existing reader', error); }
     console.log('PASS existing published Windows app: current staging entry SHA-256, reload/process restart, login/draft preservation and new tool-pointer presentation');
+  } catch (error) {
+    failed('shared app setup', error);
   } finally {
     if (app) await app.close();
-    await request(`/api/canvas/documents/${canvas.id}`, 'DELETE', null, token);
-    await request('/api/users/logout', 'POST', null, token);
+    try {
+      await request(`/api/canvas/documents/${canvas.id}`, 'DELETE', null, token);
+      await request('/api/users/logout', 'POST', null, token);
+    } catch (error) { failed('synthetic cleanup', error); }
   }
 }
+assert.equal(failures.length, 0, JSON.stringify(failures));
