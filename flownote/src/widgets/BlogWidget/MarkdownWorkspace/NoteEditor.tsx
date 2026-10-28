@@ -101,7 +101,7 @@ function Editor({ owner, initial, draft, draftError, onSaved, reload, registerRe
   const markdown = isMarkdown(note.content) ? note.content : null;
   const legacy = Array.isArray(note.content) ? note.content : markdown?.legacy_original;
   const converted = Array.isArray(note.content) ? convertLegacy(note.content) : null;
-  return <div className="note-document">
+  return <div className="note-document" data-note-id={initial.id}>
     {(recovery || needsReview) && <div className="note-notice" role="alert">
       {recovery ? '기기에 저장된 입력이 있습니다. 서버본과 초안을 확인한 뒤 선택하세요.' : '다른 창의 변경을 확인해야 합니다. 자동 저장을 멈췄습니다.'}
       {recovery && <>

@@ -12,8 +12,9 @@ export async function verifyNoteEditing(page, token) {
     assert.equal(await editor.textContent(), expected);
   };
   const create = async () => {
+    const previous = page.url();
     await page.getByRole('button', { name: '새 노트', exact: true }).first().click();
-    await page.waitForURL(/\/blog\/[a-z0-9-]+$/);
+    await page.waitForURL(url => /\/blog\/[a-z0-9-]+$/.test(url.pathname) && url.href !== previous);
     ids.push(page.url().split('/').at(-1));
     const editor = page.getByRole('textbox', { name: '노트 편집', exact: true });
     await editor.waitFor(); return editor;
@@ -31,10 +32,12 @@ export async function verifyNoteEditing(page, token) {
     await editor.press('Home'); for (let i = 0; i < 6; i++) await editor.press('ArrowRight');
     for (let i = 0; i < 4; i++) await editor.press('Shift+ArrowRight');
     const cdp = await page.context().newCDPSession(page);
+    await editor.evaluate(node => { node.setAttribute('data-ime-ends', '0'); node.addEventListener('compositionend', () => node.setAttribute('data-ime-ends', String(Number(node.getAttribute('data-ime-ends')) + 1))); });
     await cdp.send('Input.imeSetComposition', { text: '한', selectionStart: 1, selectionEnd: 1 });
     await cdp.send('Input.imeSetComposition', { text: '한글', selectionStart: 2, selectionEnd: 2 });
     await cdp.send('Input.insertText', { text: '한글 ' }); await cdp.detach();
     await text(editor, 'alpha 한글 beta gamma');
+    assert.equal(await editor.getAttribute('data-ime-ends'), '1', 'Multi-step IME must finish once, with no duplicate commit');
     assert.equal(await editor.locator('p').count(), 1);
     await editor.press('End'); await editor.press('Backspace'); await editor.pressSequentially('!');
     await text(editor, 'alpha 한글 beta gamm!');

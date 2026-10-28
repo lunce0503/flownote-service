@@ -111,12 +111,16 @@ const created = await fetch('https://flownote-api-staging.up.railway.app/api/use
 assert(created.ok, `Staging fixture registration: ${created.status}`);
 const envelope = await (await fetch(origin + '/updates/staging/android.json')).json();
 const manifest = JSON.parse(Buffer.from(envelope.payload, 'base64'));
+const priorHardwareIme = adb('shell', 'settings', 'get', 'secure', 'show_ime_with_hard_keyboard').trim();
 assert(manifest.versionCode >= 13000 && manifest.versionCode <= 13100, 'Expected current 1.3.0 or integrated 1.3.1 staging feed');
 if (!inject) {
   assert.equal(manifest.versionCode, 13100);
   assert.equal(createHash('sha256').update(readFileSync(candidate)).digest('hex'), manifest.artifacts.apk.sha256, 'Test the exact publicly served staging APK');
 }
 try {
+  // CDP emulates a hardware IME. Do not let Gboard independently finish each
+  // provisional composition between commands; restore the emulator preference below.
+  adb('shell', 'settings', 'put', 'secure', 'show_ime_with_hard_keyboard', '0');
   await restart(root + 'flownote/public/downloads/flownote-1.3.0-staging.apk', true);
   await page.goto(origin + '/login');
   await page.getByLabel('이메일').fill(email); await page.getByLabel('비밀번호', { exact: true }).fill(password);
@@ -223,4 +227,8 @@ try {
     const login = await fetch('https://flownote-api-staging.up.railway.app/api/users/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
     assert(login.ok); const { token } = await login.json(); await verifyNoteEditing(page, token);
   }
-} finally { if (browser) await browser.close(); }
+} finally {
+  if (browser) await browser.close();
+  if (priorHardwareIme === 'null') adb('shell', 'settings', 'delete', 'secure', 'show_ime_with_hard_keyboard');
+  else adb('shell', 'settings', 'put', 'secure', 'show_ime_with_hard_keyboard', priorHardwareIme);
+}

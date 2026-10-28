@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 // Raw Markdown assertions still verify exact data; live rendering has separate user-input coverage.
 export async function markdownSource(page: Page) {
+  await page.waitForFunction(() => document.querySelector('.note-document')?.getAttribute('data-note-id') === location.pathname.split('/').at(-1));
   const source = page.getByRole('button', { name: '원문', exact: true });
   if (!await source.isVisible()) {
     const tools = page.getByRole('button', { name: '편집 도구', exact: true });

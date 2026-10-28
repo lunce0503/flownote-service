@@ -24,7 +24,9 @@ export function registerNoteEditing(width: number, engine: 'chromium' | 'webkit'
       try {
         await page.goto(`${web}/blog`);
         const tree = page.getByRole('treeitem', { name: 'Synthetic destination', exact: true });
-        if (!await tree.isVisible()) await page.getByRole('button', { name: '탐색기 토글', exact: true }).click();
+        const toggle = page.getByRole('button', { name: '탐색기 토글', exact: true });
+        if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+        await expect(tree).toBeVisible();
         await tree.click();
         await page.route(`**/api/note-folders/${folder.id}/notes/*`, route => route.fulfill({ status: 503, contentType: 'application/json', body: '{"detail":"Synthetic placement failure"}' }));
         await create(page);
@@ -35,8 +37,9 @@ export function registerNoteEditing(width: number, engine: 'chromium' | 'webkit'
       } finally { expect((await request.delete(`${api}/api/note-folders/${folder.id}`, { headers })).ok()).toBe(true); }
     });
     async function create(page: Page) {
+      const previous = page.url();
       await page.getByRole('button', { name: '새 노트', exact: true }).first().click();
-      await expect(page).toHaveURL(/\/blog\/[a-z0-9-]+$/);
+      await expect(page).toHaveURL(url => /\/blog\/[a-z0-9-]+$/.test(url.pathname) && url.href !== previous);
       ids.push(page.url().split('/').at(-1)!);
       const editor = page.getByRole('textbox', { name: '노트 편집', exact: true });
       await expect(editor).toBeVisible(); return editor;
@@ -74,17 +77,22 @@ export function registerNoteEditing(width: number, engine: 'chromium' | 'webkit'
     test('editing the middle of one line keeps its caret, neighbours, undo and final Korean composition', async ({ page }) => {
       await page.goto(`${web}/blog`); const editor = await create(page);
       await editor.pressSequentially('alpha beta gamma');
-      await editor.press('Home'); for (let n = 0; n < 6; n++) await editor.press('ArrowRight');
-      await editor.pressSequentially('new '); await expect(editor).toHaveText('alpha new beta gamma');
-      await editor.press('ControlOrMeta+z'); await expect(editor).toHaveText('alpha beta gamma');
-      await editor.press('ControlOrMeta+Shift+z'); await expect(editor).toHaveText('alpha new beta gamma');
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await editor.press('Home'); for (let n = 0; n < 6; n++) await editor.press('ArrowRight');
+        await editor.pressSequentially('new '); await expect(editor).toHaveText('alpha new beta gamma');
+        await editor.press('ControlOrMeta+z'); await expect(editor).toHaveText('alpha beta gamma');
+        await editor.press('ControlOrMeta+Shift+z'); await expect(editor).toHaveText('alpha new beta gamma');
+        if (attempt < 2) { await editor.press('ControlOrMeta+z'); await expect(editor).toHaveText('alpha beta gamma'); }
+      }
       await editor.press('Home'); for (let n = 0; n < 6; n++) await editor.press('ArrowRight');
       for (let n = 0; n < 4; n++) await editor.press('Shift+ArrowRight');
       if (engine === 'chromium') {
+        await editor.evaluate(node => { node.setAttribute('data-ime-ends', '0'); node.addEventListener('compositionend', () => node.setAttribute('data-ime-ends', String(Number(node.getAttribute('data-ime-ends')) + 1))); });
         const cdp = await page.context().newCDPSession(page);
         await cdp.send('Input.imeSetComposition', { text: '한', selectionStart: 1, selectionEnd: 1 });
         await cdp.send('Input.imeSetComposition', { text: '한글', selectionStart: 2, selectionEnd: 2 });
         await cdp.send('Input.insertText', { text: '한글 ' }); await cdp.detach();
+        await expect(editor).toHaveAttribute('data-ime-ends', '1');
       } else await editor.pressSequentially('한글 ');
       await expect(editor).toHaveText('alpha 한글 beta gamma'); await expect(editor.locator('p')).toHaveCount(1);
       await editor.press('End'); await editor.press('Backspace'); await editor.pressSequentially('!');

@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { EditorView } from '@tiptap/pm/view';
+import type { Editor } from '@tiptap/core';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
@@ -36,18 +38,65 @@ export default function LiveMarkdownEditor({ value, disabled, toolsOpen, onChang
   const [dismissed, setDismissed] = useState('');
   const completionRef = useRef<MathCompletion | null>(null);
   const chooseRef = useRef<(command: LatexCommand) => void>(() => {});
-  const mathOptions = { katexOptions: { trust: false, throwOnError: false, strict: 'ignore' as const } };
-  const editor = useEditor({
+  const currentEditor = useRef<Editor | null>(null);
+  const latest = useRef({ disabled, onChange });
+  useLayoutEffect(() => { latest.current = { disabled, onChange }; }, [disabled, onChange]);
+  const inlineClick = useCallback((node: ProseMirrorNode, pos: number) => {
+    if (!latest.current.disabled) setMath({ latex: String(node.attrs.latex), pos, kind: 'inline' });
+  }, []);
+  const blockClick = useCallback((node: ProseMirrorNode, pos: number) => {
+    if (!latest.current.disabled) setMath({ latex: String(node.attrs.latex), pos, kind: 'block' });
+  }, []);
+  const compositionEnd = useCallback((view: EditorView) => {
+    // Windows IME finishes its DOM transaction after compositionend.
+    setTimeout(() => {
+      const editor = currentEditor.current;
+      if (!editor || editor.isDestroyed || view.composing || !view.editable) return;
+      const markdown = editor.getMarkdown();
+      if (markdown !== lastChange.current) { lastChange.current = markdown; sync.emit(markdown); latest.current.onChange(markdown); }
+    }, 0);
+    return false;
+  }, [sync]);
+  const keydown = useCallback((view: EditorView, event: KeyboardEvent) => {
+    if (view.composing || event.isComposing || event.keyCode === 229) return false;
+    const completion = completionRef.current;
+    if (completion && event.key === 'Tab' && !event.shiftKey) { event.preventDefault(); chooseRef.current(completion.items[0]); return true; }
+    if (completion && event.key === 'Escape') { event.preventDefault(); setDismissed(view.state.doc.textBetween(0, view.state.selection.from, '\n', '\ufffc')); return true; }
+    if (event.key.length === 1 || ['Enter', 'Backspace', 'Delete', 'Tab'].includes(event.key) || ((event.ctrlKey || event.metaKey) && /[bzivy]/i.test(event.key))) editedViews.add(view);
+    return false;
+  }, []);
+  const paste = useCallback((view: EditorView, event: ClipboardEvent) => {
+    if (!view.editable) return false;
+    const text = event.clipboardData?.getData('text/plain');
+    if (!text || event.clipboardData?.getData('text/html')) return false;
+    if (!view.dom.closest('[data-testid="markdown-live-editor"]')) return false;
+    const editor = currentEditor.current;
+    if (!editor) return false;
+    event.preventDefault(); editor.commands.insertContent(text, { contentType: 'markdown' }); return true;
+  }, []);
+  const update = useCallback(({ editor }: { editor: Editor }) => {
+    if (latest.current.disabled || editor.view.composing || !editedViews.has(editor.view)) return;
+    const markdown = editor.getMarkdown();
+    if (markdown === lastChange.current) return;
+    lastChange.current = markdown; sync.emit(markdown); latest.current.onChange(markdown);
+  }, [sync]);
+  // Tiptap updates its view when options/extension identities change. Keep normal
+  // React typing/save/selection renders from restoring an older PM selection.
+  // configure() stores the event callbacks; it never invokes their ref reads during render.
+  // eslint-disable-next-line react-hooks/refs
+  const [options] = useState(() => {
+    const mathOptions = { katexOptions: { trust: false, throwOnError: false, strict: 'ignore' as const } };
+    return {
     immediatelyRender: false,
     extensions: [StarterKit.configure({
       link: { openOnClick: false, isAllowedUri: url => !!safeMarkdownUrl(url),
         HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' } },
       underline: false,
     }), Markdown.configure({ marked: parser }),
-    NoteInlineMath.configure({ ...mathOptions, onClick: (node, pos) => { if (!disabled) setMath({ latex: String(node.attrs.latex), pos, kind: 'inline' }); } }),
-    NoteBlockMath.configure({ ...mathOptions, katexOptions: { ...mathOptions.katexOptions, displayMode: true }, onClick: (node, pos) => { if (!disabled) setMath({ latex: String(node.attrs.latex), pos, kind: 'block' }); } }),
+    NoteInlineMath.configure({ ...mathOptions, onClick: inlineClick }),
+    NoteBlockMath.configure({ ...mathOptions, katexOptions: { ...mathOptions.katexOptions, displayMode: true }, onClick: blockClick }),
     TableKit, TaskList, TaskItem.configure({ nested: true }), SafeImage.configure({ allowBase64: false })],
-    content: value, contentType: 'markdown', editable: !disabled,
+    content: value, contentType: 'markdown',
     editorProps: { attributes: { role: 'textbox', 'aria-label': '노트 편집', 'aria-multiline': 'true',
       class: 'note-markdown note-live-content', spellcheck: 'false' },
       handleDOMEvents: {
@@ -55,43 +104,17 @@ export default function LiveMarkdownEditor({ value, disabled, toolsOpen, onChang
         paste(view) { editedViews.add(view); return false; },
         drop(view) { editedViews.add(view); return false; },
         compositionstart(view) { editedViews.add(view); return false; },
-        compositionend(view) {
-          // Windows IME finishes its DOM transaction after compositionend.
-          setTimeout(() => {
-            if (!editor || editor.isDestroyed || view.composing || !view.editable) return;
-            const markdown = editor.getMarkdown();
-            if (markdown !== lastChange.current) { lastChange.current = markdown; sync.emit(markdown); onChange(markdown); }
-          }, 0);
-          return false;
-        },
-        keydown(view, event) {
-          if (view.composing || event.isComposing || event.keyCode === 229) return false;
-          const completion = completionRef.current;
-          if (completion && event.key === 'Tab' && !event.shiftKey) { event.preventDefault(); chooseRef.current(completion.items[0]); return true; }
-          if (completion && event.key === 'Escape') { event.preventDefault(); setDismissed(view.state.doc.textBetween(0, view.state.selection.from, '\n', '\ufffc')); return true; }
-          if (event.key.length === 1 || ['Enter', 'Backspace', 'Delete', 'Tab'].includes(event.key) || ((event.ctrlKey || event.metaKey) && /[bzivy]/i.test(event.key))) editedViews.add(view);
-          return false;
-        },
+        compositionend: compositionEnd,
+        keydown,
       },
-      handlePaste(view, event) {
-        if (!view.editable) return false;
-        const text = event.clipboardData?.getData('text/plain');
-        if (!text || event.clipboardData?.getData('text/html')) return false;
-        const active = view.dom.closest('[data-testid="markdown-live-editor"]');
-        if (!active) return false;
-        // The Markdown parser preserves tables, tasks and math instead of pasting raw delimiters.
-        const current = editor;
-        if (!current) return false;
-        event.preventDefault(); current.commands.insertContent(text, { contentType: 'markdown' }); return true;
-      },
+      handlePaste: paste,
     },
-    onUpdate({ editor }) {
-      if (disabled || editor.view.composing || !editedViews.has(editor.view)) return;
-      const markdown = editor.getMarkdown();
-      if (markdown === lastChange.current) return;
-      lastChange.current = markdown; sync.emit(markdown); onChange(markdown);
-    },
+    onUpdate: update,
+    } satisfies Parameters<typeof useEditor>[0];
   });
+  const liveOptions = useMemo(() => ({ ...options, editable: !disabled }), [options, disabled]);
+  const editor = useEditor(liveOptions);
+  useLayoutEffect(() => { currentEditor.current = editor; }, [editor]);
   const edit = (action: () => void) => { if (editor) editedViews.add(editor.view); action(); };
   const state = useEditorState({ editor, selector: ({ editor }) => ({
     bold: editor?.isActive('bold') ?? false, italic: editor?.isActive('italic') ?? false,
@@ -107,7 +130,7 @@ export default function LiveMarkdownEditor({ value, disabled, toolsOpen, onChang
     edit(() => { editor.chain().focus().insertContentAt({ from, to: editor.state.selection.from }, { type: 'text', text: command.insert }).setTextSelection(from + command.cursor).run(); });
   };
   useEffect(() => { completionRef.current = completion; chooseRef.current = choose; });
-  useEffect(() => { editor?.setEditable(!disabled, false); }, [editor, disabled]);
+  useLayoutEffect(() => { if (editor && editor.isEditable !== !disabled) editor.setEditable(!disabled, false); }, [editor, disabled]);
   useEffect(() => {
     if (!editor || editor.view.composing || !sync.receive(value)) return;
     // Recovery or explicit source changes are applied without producing a second save or resetting a typing cursor.
