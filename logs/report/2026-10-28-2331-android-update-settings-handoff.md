@@ -49,7 +49,7 @@ API35 Android 시스템 WebView를 실제 APK로 실행했다. 로컬 제품 웹
 - native alertTitle을 기준으로 iframe과 사용자 활성 상태 없는 script 요청이 창을 열지 못함을 확인했다. Playwright evaluate 자체가 userGesture를 부여하므로 그 transient activation 만료를 먼저 CDP로 확인한 뒤 userGesture=false 요청으로 검증했다. 실제 링크 클릭은 실제 mouse input으로 검증하고44px 이상 hit area를 확인했다.
 - 아래 두 화면을 직접 열어 카드/버튼/이력/닫기/확인 버튼의 잘림·겹침 없음을 확인했다: `/tmp/flownote-note-native-settings.png`, `/tmp/flownote-note-native-update-dialog.png`.
 
-추가 설치 허용 경로는 기존 허용 상태에 의존하지 않도록 synthetic test package의 install app-op만 revoke한 뒤 실제 시스템 설정 switch를 거치는 새 실행을 진행 중이다: `/tmp/flownote-note-native-settings-smoke.log`. native 실행 코드는 핵심 PASS 이후 바뀌지 않았다. 이 추가 검증을 생략하지 않으며 부모 웹 통합 및 staging 실행과 병행해 최종 결과를 기록한다. 에뮬레이터 컨테이너 `flownote-note-native-emulator`를 재사용하고 중복 실행하지 않는다. 물리 기기 검증은 아니다.
+추가 설치 허용 경로는 기존 허용 상태에 의존하지 않도록 synthetic test package의 install app-op만 revoke한 뒤 실제 시스템 설정 switch를 거치는 새 실행은 권한 안내와 설정 열기까지 진행했으나 Android 설정 화면의 switch locator를 찾지 못해 실패했다: `/tmp/flownote-note-native-settings-smoke.log`. native 실행 코드는 핵심 PASS 이후 바뀌지 않았다. 이 추가 검증을 생략하지 않는다. 다음 조치는 실제 시스템 설정 화면 구조/로딩 상태를 확인해 locator 또는 필요한 앱 동작을 수정하고 부모 웹 통합 및 staging 실행과 병행해 재검증하는 것이다. 핵심 PASS 기록을 이 추가 경로의 완료 증거로 대체하지 않는다. 에뮬레이터 컨테이너 `flownote-note-native-emulator`를 재사용하고 중복 실행하지 않는다. 물리 기기 검증은 아니다.
 
 이미 실제 측정한 후보 WebView bounds는 기존 `[0,63,1080,1731]` → 새 앱 `[0,63,1080,1857]`이며 **126 물리 px(48dp)**가 웹에 반환되었다. innerHeight 684 CSS px × DPR 2.625와 새 native WebView 높이1794px가 일치한다. width/documentWidth 모두412px여서 가로 넘침이 없다.
 
