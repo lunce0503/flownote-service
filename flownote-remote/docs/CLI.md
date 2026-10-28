@@ -7,11 +7,11 @@
 
 ## 설치와 서버
 
-공개 릴리스의 `Flownote-Remote-0.6.0-linux-x64.tar.gz`를 내려받아 체크섬을 확인하고 압축을 푼다. .NET 런타임은 포함한다. 0.5.0 골격 서버는 Node/Chromium 없이 실행한다. 음성 세션에만 Node.js 24와 Playwright Chromium/시스템 라이브러리가 필요하다. 사용자 계정으로 실행한다.
+공개 릴리스의 `Flownote-Remote-0.6.1-linux-x64.tar.gz`를 내려받아 체크섬을 확인하고 압축을 푼다. .NET 런타임은 포함한다. 0.5.0 골격 서버는 Node/Chromium 없이 실행한다. 음성 세션에만 Node.js 24와 Playwright Chromium/시스템 라이브러리가 필요하다. 사용자 계정으로 실행한다.
 
 ```bash
-tar -xzf Flownote-Remote-0.6.0-linux-x64.tar.gz
-cd Flownote-Remote-0.6.0-linux-x64
+tar -xzf Flownote-Remote-0.6.1-linux-x64.tar.gz
+cd Flownote-Remote-0.6.1-linux-x64
 ./flownote-remote server --listen 192.168.0.10
 ```
 

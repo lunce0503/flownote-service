@@ -9,7 +9,7 @@ public static class VoiceCommand
     public const int SampleRate = 24000;
     private static async Task InitializeAccountAsync(CodexRpc rpc, CancellationToken token)
     {
-        await rpc.RequestAsync("initialize", new { clientInfo = new { name = "flownote_remote_cli", version = "0.6.0" },
+        await rpc.RequestAsync("initialize", new { clientInfo = new { name = "flownote_remote_cli", version = "0.6.1" },
             capabilities = new { experimentalApi = true } }, token);
         await rpc.NotifyAsync("initialized", new { }, token);
         var account = await rpc.RequestAsync("account/read", new { refreshToken = false }, token);
