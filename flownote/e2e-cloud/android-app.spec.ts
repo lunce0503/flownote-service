@@ -1,4 +1,4 @@
-import { markdownSource } from './helpers/markdown';
+import { markdownSource, noteSettings } from './helpers/markdown';
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
@@ -109,6 +109,7 @@ test('Android preserves the structured original and saves Markdown through the s
     }, { token, user });
     await page.goto(`/blog/${id}`);
     await expect(page.getByLabel('노트 제목')).toHaveValue('Android structured note');
+    await noteSettings(page);
     await page.getByRole('button', { name: '원본 보기', exact: true }).click();
     await expect(page.getByTestId('legacy-original')).toContainText('서식 노트 원본');
     const untouched = await (await request.get(`${api}/api/notes/${id}`, { headers })).json();

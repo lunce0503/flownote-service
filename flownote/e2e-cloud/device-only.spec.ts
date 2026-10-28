@@ -48,7 +48,6 @@ test('cloud material is available offline and device edits reconcile on re-enabl
     await expect(page.getByTestId('note-save-status')).toHaveText('기기에 저장됨 · 동기화 꺼짐');
     await (await markdownSource(page)).fill('second offline revision of cloud note');
     await expect(page.getByTestId('note-save-status')).toHaveText('기기에 저장됨 · 동기화 꺼짐');
-    page.once('dialog', dialog => dialog.accept('Device note'));
     await page.getByRole('button', { name: '새 노트', exact: true }).first().click();
     await expect(page).toHaveURL(/\/blog\/device-/);
     await (await markdownSource(page)).fill('# 기기만의 원고\n\nDo not upload');
@@ -197,17 +196,17 @@ test('device mode is isolated by account and unavailable storage cannot silently
   await expect(page.getByRole('alert')).toBeVisible();
   await expect(page.getByRole('switch', { name: '앱 동기화', exact: true })).toHaveAttribute('aria-checked', 'true');
   await page.reload(); await toggle(page, false);
-  await page.goto('/blog'); page.once('dialog', dialog => dialog.accept('Only account A'));
-  await page.getByRole('button', { name: '새 노트', exact: true }).first().click(); await expect(page.getByLabel('노트 제목')).toHaveValue('Only account A');
+  await page.goto('/blog');
+  await page.getByRole('button', { name: '새 노트', exact: true }).first().click(); await expect(page.getByLabel('노트 제목')).toHaveValue('제목 없음'); await page.getByLabel('노트 제목').fill('Only account A'); await expect(page.getByTestId('note-save-status')).toHaveText('기기에 저장됨 · 동기화 꺼짐');
   await page.evaluate(({ user }) => { localStorage.setItem('flownote_auth_user', JSON.stringify({ ...user, id: `${user.id}-other` })); localStorage.setItem(`flownote.device-mode:${user.id}-other`, 'device'); }, { user });
   await page.goto('/blog'); await expect(page.getByRole('button', { name: 'Only account A', exact: true })).toHaveCount(0);
   await page.evaluate(({ user }) => localStorage.setItem('flownote_auth_user', JSON.stringify(user)), { user });
   await page.goto('/blog'); await expect(page.getByRole('button', { name: 'Only account A', exact: true })).toBeVisible();
   await page.evaluate(() => { IDBObjectStore.prototype.put = function () { throw new DOMException('Synthetic quota', 'QuotaExceededError'); }; });
-  page.once('dialog', dialog => dialog.accept('Must not be called saved'));
+
   await page.getByRole('button', { name: '새 노트', exact: true }).first().click();
   await expect(page.locator('div[role="alert"]')).toContainText('파일 작업에 실패');
-  await page.reload(); await expect(page.getByRole('button', { name: 'Must not be called saved', exact: true })).toHaveCount(0);
+  await page.reload(); await expect(page.getByRole('button', { name: '제목 없음', exact: true })).toHaveCount(0);
   expect((await (await request.get(`${api}/api/notes`, { headers: { Authorization: `Bearer ${token}` } })).json())).toEqual([]);
 });
 
@@ -226,7 +225,7 @@ test('phone and desktop app markers restore an independent device workspace with
       await expect(page.getByRole('switch', { name: '앱 동기화', exact: true })).toHaveAttribute('aria-checked', 'false');
       await expect(page.getByRole('button', { name: '프로필 저장', exact: true })).toBeDisabled();
       await expect(page.locator('header')).toHaveCount(0);
-      await page.goto(`${web}/blog`); page.once('dialog', dialog => dialog.accept('Device restore'));
+      await page.goto(`${web}/blog`);
       await page.getByRole('button', { name: '새 노트', exact: true }).first().click();
       await (await markdownSource(page)).fill('Stored only on this device');
       await expect(page.getByTestId('note-save-status')).toHaveText('기기에 저장됨 · 동기화 꺼짐');

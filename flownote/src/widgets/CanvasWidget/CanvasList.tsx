@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, ChevronDown, ChevronRight, Clock3, Ellipsis, FileText, Files, Folder, FolderPlus, Loader2, PanelLeft, PanelsTopLeft, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Clock3, Ellipsis, FilePlus2, FileText, Files, Folder, FolderPlus, Loader2, PanelLeft, PanelsTopLeft, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { addNoteToFolder, createNoteFolder, deleteNote, deleteNoteFolder, getNoteFolders, getNoteSummaries, noteDrafts, postNoteData, removeNoteFromFolder, updateNoteFolder, updateNoteTitle, type NoteSummary, type NoteFolder } from '@/entities/blog';
 import { useAuth } from '@/features/auth';
 import { pauseNoteSave, waitForNoteSave } from '@/features/blog';
@@ -46,6 +46,7 @@ export default function CanvasList() {
 }
 function WorkspaceList({ owner }: { owner: string }) {
     const navigate = useNavigate();
+    const noteCreating = useRef(false);
     const [location, setLocation] = useState('recent');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [search, setSearch] = useState('');
@@ -370,19 +371,24 @@ function WorkspaceList({ owner }: { owner: string }) {
         } finally { setMovingCanvasId(null); }
     };
     const handleCreateNote = async () => {
-        const title = window.prompt('새 노트 이름', '제목 없음'); if (!title?.trim()) return;
+        if (isCreating || noteCreating.current) return;
+        noteCreating.current = true;
         setIsCreating(true); setError(null);
         try {
-            const saved = await postNoteData({ id: newWorkspaceId(), title: title.trim(), content: { format: 'markdown', version: 1, markdown: '' },
+            const saved = await postNoteData({ id: newWorkspaceId(), title: '제목 없음', content: { format: 'markdown', version: 1, markdown: '' },
                 created_at: new Date().toISOString(), revision: 1, client_id: getSyncClientId() });
             if (getAuthUser()?.id !== owner) return;
-            if (selectedNoteFolder) await addNoteToFolder(selectedNoteFolder.id, saved.id);
-            navigate(`/blog/${saved.id}`);
+            let warning = '';
+            if (selectedNoteFolder) {
+                try { await addNoteToFolder(selectedNoteFolder.id, saved.id); }
+                catch { warning = '노트는 만들었지만 폴더에 넣지 못했습니다. 미분류에서 이동을 다시 시도하세요.'; }
+            }
+            if (getAuthUser()?.id === owner) navigate(`/blog/${saved.id}`, { state: { noteCreationWarning: warning, createdNoteId: saved.id } });
         } catch {
             await loadLibrary();
             setError('파일 작업에 실패했습니다. 노트를 만들지 못했으며 기존 목록은 유지했습니다.');
         }
-        finally { setIsCreating(false); }
+        finally { noteCreating.current = false; setIsCreating(false); }
     };
     const beginRename = (document: WorkspaceFile) => {
         setEditingCanvasId(workspaceFileKey(document)); setEditingCanvasTitle(document.title);
@@ -465,7 +471,7 @@ function WorkspaceList({ owner }: { owner: string }) {
             <h1>작업 공간</h1><span className="canvas-path-divider">/</span><span className="canvas-path" title={locationName}>{locationName}</span>
             <div className="canvas-topbar-actions">
                 <button className="canvas-new-document" aria-label="새 캔버스" onClick={() => void handleCreateCanvas(selectedFolder?.id)} disabled={isCreating}><Plus size={16} /><span>새 캔버스</span></button>
-                <button aria-label="새 노트" onClick={() => void handleCreateNote()} disabled={isCreating}><FileText size={16} /><span>새 노트</span></button>
+                <button aria-label="새 노트" title="새 노트" onClick={() => void handleCreateNote()} disabled={isCreating}><FilePlus2 size={19} /></button>
                 <button aria-label="새 폴더" title="새 폴더" onClick={() => { setFolderKind(selectedNoteFolder ? 'note' : 'canvas'); setShowFolderForm(value => !value); setEditingFolderId(null); }}><FolderPlus size={18} /></button>
             </div>
         </header>

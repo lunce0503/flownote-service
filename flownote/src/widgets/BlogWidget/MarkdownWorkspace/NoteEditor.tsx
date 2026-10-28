@@ -6,6 +6,8 @@ import { getAuthUser } from '@/shared/api';
 import { isDeviceOnly } from '@/shared/lib/deviceMode';
 import { getSyncClientId, subscribeSyncEvents } from '@/shared/lib/sync';
 import { createNoteSaveQueue, waitForNoteSave } from '@/features/blog';
+import { Code, Columns2, Download, Eye, MoreVertical, Pencil, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import MarkdownSource from './MarkdownSource';
 
 import { downloadNote } from './downloadNote';
 
@@ -60,6 +62,7 @@ function Editor({ owner, initial, draft, draftError, onSaved, reload, registerRe
   const [recovery, setRecovery] = useState(state !== 'matched' ? draft : null);
   const [status, setStatus] = useState(draftError ? '기기 초안 저장소를 사용할 수 없습니다 — 내보내기 필요' : state === 'matched' ? isDeviceOnly() ? '기기에 저장됨 · 동기화 꺼짐' : '서버에 저장됨' : '복구 확인 필요');
   const [mode, setMode] = useState<'edit' | 'source' | 'preview' | 'split'>('edit');
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [original, setOriginal] = useState(false);
   const [remoteChanged, setRemoteChanged] = useState(false);
   const [queue] = useState(() => createNoteSaveQueue(owner, initial, async snapshot => {
@@ -117,25 +120,38 @@ function Editor({ owner, initial, draft, draftError, onSaved, reload, registerRe
       }}>서버본 확인</button>}
     </div>}
     <div className="note-document-heading">
-      <input aria-label="노트 제목" value={note.title} disabled={!!recovery || needsReview}
+      <input aria-label="노트 제목" value={note.title} disabled={!!recovery || needsReview} autoFocus={initial.title === '제목 없음'} onFocus={event => { if (event.target.value === '제목 없음') event.target.select(); }}
         onChange={e => change({ ...noteRef.current, title: e.target.value })}
         onCompositionEnd={e => change({ ...noteRef.current, title: e.currentTarget.value })} />
       <span role="status" data-testid="note-save-status">{status}</span>
     </div>
-    <div className="note-document-tools">
+    <div className="note-document-tools" onKeyDown={event => {
+      if (event.key !== 'Escape') return;
+      const menu = event.currentTarget.querySelector<HTMLDetailsElement>('details[open]');
+      if (menu) { menu.open = false; menu.querySelector('summary')?.focus(); }
+    }}>
       {markdown && <>
-        <button onClick={() => {
-          if (!queue.hasPending || window.confirm('미저장 입력이 있습니다. 저장 실패가 있다면 먼저 .md로 내보내세요. 서버본과 기기 초안을 다시 확인할까요?')) reload();
-        }}>서버본·초안 확인</button>
-        {(['edit', 'source', 'preview', 'split'] as const).map((value, i) => <button key={value} aria-pressed={mode === value} onClick={() => setMode(value)}>{['편집', '원문', '미리보기', '나란히'][i]}</button>)}
-        <button onClick={() => downloadNote(`${note.title.replace(/\.md$/i, '') || 'note'}.md`, markdown.markdown)}>.md 내보내기</button>
-        <button disabled={!!recovery || needsReview} onClick={() => queue.retry()}>저장 다시 시도</button>
+        <button aria-label="편집" title="편집" aria-pressed={mode !== 'preview'} onClick={() => setMode('edit')}><Pencil size={18} /></button>
+        <button aria-label="미리보기" title="미리보기" aria-pressed={mode === 'preview'} onClick={() => { setMode('preview'); setToolsOpen(false); }}><Eye size={18} /></button>
+        {mode !== 'preview' && <button aria-label="편집 도구" title="편집 도구" aria-expanded={toolsOpen} aria-controls="note-input-tools" onClick={() => setToolsOpen(value => !value)}><SlidersHorizontal size={18} /></button>}
       </>}
-      {legacy && <>
-        <button aria-expanded={original} onClick={() => setOriginal(v => !v)}>원본 보기</button>
-        <button onClick={() => downloadNote(`${note.title}-original.json`, JSON.stringify(legacy, null, 2), 'application/json')}>원본 JSON 내보내기</button>
-      </>}
+      <details className="note-settings-menu"><summary aria-label="노트 세부 설정" title="노트 세부 설정"><MoreVertical size={19} /></summary><div onClick={event => { if ((event.target as Element).closest('button')) event.currentTarget.closest('details')?.removeAttribute('open'); }}>
+        {markdown && <>
+          <button onClick={() => downloadNote(`${note.title.replace(/\.md$/i, '') || 'note'}.md`, markdown.markdown)}><Download size={16} />.md 내보내기</button>
+          <button disabled={!!recovery || needsReview} onClick={() => queue.retry()}><RefreshCw size={16} />저장 다시 시도</button>
+          <button onClick={() => { if (!queue.hasPending || window.confirm('미저장 입력이 있습니다. 저장 실패가 있다면 먼저 .md로 내보내세요. 서버본과 기기 초안을 다시 확인할까요?')) reload(); }}>서버본·초안 확인</button>
+        </>}
+        {legacy && <>
+          <button aria-expanded={original} onClick={() => setOriginal(value => !value)}>원본 보기</button>
+          <button onClick={() => downloadNote(`${note.title}-original.json`, JSON.stringify(legacy, null, 2), 'application/json')}>원본 JSON 내보내기</button>
+        </>}
+      </div></details>
     </div>
+    {markdown && mode !== 'preview' && toolsOpen && <div id="note-input-tools" className="note-input-tools" role="group" aria-label="Markdown 입력 방식">
+      <button aria-label="실시간 편집" title="실시간 편집" aria-pressed={mode === 'edit'} onClick={() => setMode('edit')}><Pencil size={17} /><span>실시간</span></button>
+      <button aria-label="원문" title="Markdown 원문" aria-pressed={mode === 'source'} onClick={() => setMode('source')}><Code size={17} /><span>원문</span></button>
+      <button aria-label="나란히" title="원문과 미리보기 나란히" aria-pressed={mode === 'split'} onClick={() => setMode('split')}><Columns2 size={17} /><span>나란히</span></button>
+    </div>}
     {original && <pre className="note-original" data-testid="legacy-original">{JSON.stringify(legacy, null, 2)}</pre>}
     {converted && <div className="note-notice">
       <p>기존 문서입니다. 열기만 해서는 변경되지 않습니다. 전환 후에도 모든 블록은 원본 JSON으로 보관됩니다.</p>
@@ -147,11 +163,9 @@ function Editor({ owner, initial, draft, draftError, onSaved, reload, registerRe
       {mode === 'preview' && <Suspense fallback={<p>미리보기 준비 중…</p>}><Preview source={converted.content.markdown} /></Suspense>}
     </div>}
     {markdown && <div className={`note-editors note-editors-${mode}`}>
-      {mode === 'edit' && <Suspense fallback={<p role="status">편집기 준비 중…</p>}><LiveEditor value={markdown.markdown} disabled={!!recovery || needsReview}
+      {mode === 'edit' && <Suspense fallback={<p role="status">편집기 준비 중…</p>}><LiveEditor value={markdown.markdown} disabled={!!recovery || needsReview} toolsOpen={toolsOpen}
         onChange={value => change({ ...noteRef.current, content: { ...markdown, markdown: value } })} /></Suspense>}
-      {(mode === 'source' || mode === 'split') && <textarea aria-label="Markdown 본문" spellCheck={false} value={markdown.markdown}
-        disabled={!!recovery || needsReview} onChange={e => change({ ...noteRef.current, content: { ...markdown, markdown: e.target.value } })}
-        onCompositionEnd={e => change({ ...noteRef.current, content: { ...markdown, markdown: e.currentTarget.value } })} />}
+      {(mode === 'source' || mode === 'split') && <MarkdownSource value={markdown.markdown} disabled={!!recovery || needsReview} onChange={value => change({ ...noteRef.current, content: { ...markdown, markdown: value } })} />}
       {(mode === 'preview' || mode === 'split') && <Suspense fallback={<p role="status">미리보기 준비 중…</p>}><Preview source={markdown.markdown} /></Suspense>}
     </div>}
   </div>;

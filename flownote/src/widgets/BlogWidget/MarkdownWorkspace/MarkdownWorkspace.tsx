@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronDown, ChevronRight, FileText, Folder, FolderPlus, PanelLeft, Plus, RefreshCw } from 'lucide-react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { ChevronDown, ChevronRight, FilePlus2, FileText, Folder, FolderPlus, MoreVertical, PanelLeft, RefreshCw } from 'lucide-react';
 import { addNoteToFolder, createNoteFolder, deleteNote, deleteNoteFolder, getNoteFolders, getNoteSummaries,
   noteDrafts, postNoteData, removeNoteFromFolder, updateNoteFolder, updateNoteTitle } from '@/entities/blog';
 import type { BlockDataProps, NoteFolder, NoteSummary } from '@/entities/blog';
@@ -20,11 +20,14 @@ export default function MarkdownWorkspace() {
 function Workspace({ owner }: { owner: string }) {
   const { noteId } = useParams<{ noteId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const creationWarning = location.state?.createdNoteId === noteId ? location.state?.noteCreationWarning : '';
   const [notes, setNotes] = useState<NoteSummary[]>([]);
   const [folders, setFolders] = useState<NoteFolder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const operationBusy = useRef(false);
   const [drawer, setDrawer] = useState(() => window.matchMedia('(min-width: 701px)').matches);
   const [folderId, setFolderId] = useState('');
   const [collapsed, setCollapsed] = useState<string[]>(() => {
@@ -102,24 +105,28 @@ function Workspace({ owner }: { owner: string }) {
     setNotes(current => current.some(note => note.id === saved.id) ? current.map(note => note.id === saved.id ? summary : note) : [summary, ...current]);
   }, [owner]);
   const run = async (action: () => Promise<void>) => {
-    if (busy) return;
+    if (operationBusy.current) return;
+    operationBusy.current = true;
     setBusy(true); setError('');
     try { await action(); await refresh(); }
     catch { setError('파일 작업에 실패했습니다. 최신 목록을 확인하고 다시 시도하세요. 입력과 원본은 유지됩니다.'); }
-    finally { setBusy(false); }
+    finally { operationBusy.current = false; setBusy(false); }
   };
   const openNote = (id: string) => { navigate(`/blog/${id}`); if (window.matchMedia('(max-width: 700px)').matches) setDrawer(false); };
   const toggleFolder = (id: string) => setCollapsed(ids => ids.includes(id) ? ids.filter(v => v !== id) : [...ids, id]);
   const newNote = () => void run(async () => {
-    const title = window.prompt('새 노트 이름', '제목 없음'); if (!title?.trim()) return;
-    const saved = await postNoteData({ id: newWorkspaceId(), title: title.trim(),
+    const saved = await postNoteData({ id: newWorkspaceId(), title: '제목 없음',
       content: { format: 'markdown', version: 1, markdown: '' }, created_at: new Date().toISOString(), revision: 1, client_id: getSyncClientId() });
+    if (getAuthUser()?.id !== owner) return;
+    let warning = '';
     if (activeFolder) {
       try { await addNoteToFolder(activeFolder.id, saved.id); }
-      catch { openNote(saved.id); throw new Error('폴더 배치 실패'); }
+      catch { warning = '노트는 만들었지만 폴더에 넣지 못했습니다. 미분류에서 이동을 다시 시도하세요.'; }
       setCollapsed(ids => ids.filter(v => v !== activeFolder.id));
     }
-    openNote(saved.id);
+    if (getAuthUser()?.id !== owner) return;
+    navigate(`/blog/${saved.id}`, { state: { noteCreationWarning: warning, createdNoteId: saved.id } });
+    if (window.matchMedia('(max-width: 700px)').matches) setDrawer(false);
   });
   const newFolder = () => void run(async () => {
     const name = window.prompt('새 폴더 이름'); if (!name?.trim()) return;
@@ -139,7 +146,7 @@ function Workspace({ owner }: { owner: string }) {
       title={note.title} onClick={() => { setFolderId(parent?.id ?? ''); openNote(note.id); }}>
       <FileText size={16} /><span>{(note.title || '제목 없음').replace(/\.md$/i, '')}.md</span>
     </button>
-    <details className="note-file-menu"><summary aria-label={`${note.title} 파일 동작`}>⋯</summary><div>
+    <details className="note-file-menu"><summary aria-label={`${note.title} 파일 동작`}><MoreVertical size={17} /></summary><div>
       <button disabled={busy} onClick={() => renameNote(note)}>이름 변경</button>
       <label>노트 이동<select aria-label={`${note.title} 이동`} value={parent?.id ?? ''} disabled={busy}
         onChange={e => { const target = e.target.value; void run(async () => {
@@ -166,8 +173,8 @@ function Workspace({ owner }: { owner: string }) {
       <div className="note-breadcrumb" title={[selectedFolder?.category, selectedFolder?.name, selected?.title].filter(Boolean).join(' / ')}>
         노트 / {selectedFolder ? `${selectedFolder.category || '카테고리 없음'} / ${selectedFolder.name} / ` : ''}{selected?.title ?? '작업 공간'}
       </div>
-      <button onClick={newNote} disabled={busy}><Plus size={16} /><span>새 노트</span></button>
-      <button onClick={newFolder} disabled={busy} aria-label="새 폴더"><FolderPlus size={18} /></button>
+      <button onClick={newNote} disabled={busy} aria-label="새 노트" title="새 노트"><FilePlus2 size={19} /></button>
+      <button onClick={newFolder} disabled={busy} aria-label="새 폴더" title="새 폴더"><FolderPlus size={18} /></button>
     </header>
     <div className="note-workspace-body">
       {drawer && <button className="note-drawer-scrim" aria-label="탐색기 닫기" onClick={() => setDrawer(false)} />}
@@ -199,7 +206,7 @@ function Workspace({ owner }: { owner: string }) {
                   onClick={() => { setFolderId(folder.id); toggleFolder(folder.id); }}>
                   {collapsed.includes(folder.id) ? <ChevronRight size={15} /> : <ChevronDown size={15} />}<Folder size={16} /><span title={folder.name}>{folder.name}</span>
                 </button>
-                <details className="note-file-menu"><summary aria-label={`${folder.name} 폴더 동작`}>⋯</summary><div>
+                <details className="note-file-menu"><summary aria-label={`${folder.name} 폴더 동작`}><MoreVertical size={17} /></summary><div>
                   <button disabled={busy} onClick={() => void run(async () => {
                     const name = window.prompt('폴더 이름 변경', folder.name); if (!name?.trim()) return;
                     const category = window.prompt('카테고리 변경', folder.category); if (category === null) return;
@@ -218,6 +225,7 @@ function Workspace({ owner }: { owner: string }) {
         {!loading && notes.length === 0 && !error && <p>아직 노트가 없습니다. 새 노트로 시작하세요.</p>}
       </aside>
       <main className="note-content" aria-label="문서">
+        {creationWarning && <p role="alert" className="note-notice">{creationWarning}<button onClick={() => navigate(location.pathname, { replace: true, state: null })}>닫기</button></p>}
         {error && <p role="alert" className="note-notice">{error}</p>}
         {noteId ? <NoteEditor key={`${owner}:${noteId}`} owner={owner} id={noteId} registerRename={registerRename} onSaved={handleSaved} /> :
           <div className="note-workspace-empty"><FileText size={32} /><h1>노트 작업 공간</h1><p>폴더에서 노트를 선택하거나 Markdown 문서를 만드세요.</p><button onClick={newNote} disabled={busy}>새 노트</button></div>}

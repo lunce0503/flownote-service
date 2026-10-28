@@ -22,6 +22,8 @@
 
 ## 진행 중인 작업
 
+- [노트 생성·편집·수식과 Android 업데이트 설정](exec-plan/active/2026-10-28-note-editing.md): 노트 생성/한 줄 편집, 접히는 아이콘 도구, LaTeX 입력·추천 및 Android 설정/릴리스 검증.
+
 - [책 읽기 조작·두 쪽 보기·한국어 사전](exec-plan/active/2026-10-27-library-reader-korean.md): 완료. 전체116개·핵심9개·기존 앱을 검증하고 동일 소스 운영 반영했다.
 
 - [작업 공간·책장·캔버스 UX 갱신](exec-plan/active/2026-10-26-workspace-library-ux.md): 책장 클라우드/사전, 노트·캔버스 통합 목록, 실시간 Markdown, 모바일 커서·저장 상태·전체 화면 버튼 정리.

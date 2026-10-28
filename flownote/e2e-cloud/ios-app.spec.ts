@@ -1,4 +1,4 @@
-import { markdownSource } from './helpers/markdown';
+import { markdownSource, noteSettings } from './helpers/markdown';
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
@@ -51,6 +51,7 @@ test('iOS shared notes save through the cloud and export exact Markdown and cale
     await page.goto(`/blog/${id}`); await expect((await markdownSource(page))).toHaveValue(markdown);
     const updated = markdown + '\n저장 동기화'; await (await markdownSource(page)).fill(updated);
     await expect.poll(async () => (await (await request.get(`${api}/api/notes/${id}`, { headers })).json()).content.markdown).toBe(updated);
+    await noteSettings(page);
     await page.getByRole('button', { name: '.md 내보내기', exact: true }).click();
     await expect.poll(() => page.evaluate(() => (window as unknown as { nativeExports: unknown[] }).nativeExports.length)).toBe(1);
     const file = await page.evaluate(() => (window as unknown as { nativeExports: {type:string;mime:string;base64:string;name:string}[] }).nativeExports[0]);

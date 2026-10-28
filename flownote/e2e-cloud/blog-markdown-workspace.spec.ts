@@ -1,4 +1,4 @@
-import { markdownSource } from './helpers/markdown';
+import { markdownSource, noteSettings } from './helpers/markdown';
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
@@ -73,6 +73,7 @@ test('metadata shell does not fetch bodies/renderers; selection, preview safety 
   expect(await page.evaluate(() => (window as Window & { blogInjected?: boolean }).blogInjected)).toBeUndefined();
   expect(await page.getByTestId('markdown-preview').locator('a').evaluateAll(nodes => nodes.every(n => !n.getAttribute('href')?.startsWith('javascript:')))).toBeTruthy();
   const downloadPromise = page.waitForEvent('download');
+  await noteSettings(page);
   await page.getByRole('button', { name: '.md 내보내기', exact: true }).click();
   const download = await downloadPromise; expect(download.suggestedFilename()).toMatch(/\.md$/);
   const stream = await download.createReadStream(); const chunks: Buffer[] = [];
@@ -112,6 +113,7 @@ test('fast route changes, failed saves and reload keep the latest draft', async 
   await page.getByRole('button', { name: '초안 복구', exact: true }).click();
   await expect((await markdownSource(page))).toHaveValue(text);
   await page.unroute('**/web-api/api/notes');
+  await noteSettings(page);
   await page.getByRole('button', { name: '저장 다시 시도', exact: true }).click();
   await expect(page.getByTestId('note-save-status')).toHaveText('서버에 저장됨');
 });
@@ -199,7 +201,6 @@ test('real folder movement does not resave note body; folder deletion leaves not
 test('sidebar creates, renames, moves and deletes files without arbitrary nesting', async ({ page, request }) => {
   await page.goto('/blog');
   const initialIds = new Set(ids);
-  page.once('dialog', dialog => dialog.accept('UI synthetic note'));
   await page.getByRole('button', { name: '새 노트', exact: true }).first().click();
   await expect((await markdownSource(page))).toBeVisible();
   const id = page.url().split('/').at(-1)!;
