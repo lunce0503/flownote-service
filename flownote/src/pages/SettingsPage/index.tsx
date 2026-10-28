@@ -21,6 +21,7 @@ import { useAuth } from "@/features/auth";
 import { postFeedback, listMyFeedback, FEEDBACK_CATEGORIES, FeedbackStatus, type FeedbackItem } from "@/entities/feedback";
 import { readPreferences, applyPreferences, defaultPreferences, PREF_STORAGE_KEY, type UserPreferences } from "@/shared/lib/userPreferences";
 import DeviceSyncSettings from './DeviceSyncSettings';
+import AndroidUpdateSettings from './AndroidUpdateSettings';
 import { isDeviceOnly } from '@/shared/lib/deviceMode';
 
 type Language = "ko" | "en";
@@ -177,6 +178,7 @@ const SettingsPage = () => {
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-4">
+            <AndroidUpdateSettings />
             {isInstalledApp && user && <DeviceSyncSettings />}
             <section className="rounded-2xl border border-stone-200 bg-white p-4">
               <div className="mb-4 flex items-center gap-2">

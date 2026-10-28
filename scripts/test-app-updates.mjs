@@ -11,3 +11,5 @@ execFileSync('node', ['--test', 'flownote-desktop/test/updater.test.cjs'], { cwd
 const output = mkdtempSync(path.join(tmpdir(), 'flownote-update-jvm-'));
 execFileSync('javac', ['-d', output, 'flownote-android/app/src/main/java/com/flownote/mobile/UpdatePolicy.java', 'flownote-android/app/src/test/java/com/flownote/mobile/UpdatePolicyTest.java'], { cwd: root, stdio: 'inherit' });
 execFileSync('java', ['-cp', output, 'com.flownote.mobile.UpdatePolicyTest'], { stdio: 'inherit' });
+execFileSync('javac', ['-d', output, 'flownote-android/app/src/main/java/com/flownote/mobile/UpdateSettingsPolicy.java', 'flownote-android/app/src/test/java/com/flownote/mobile/UpdateSettingsPolicyTest.java'], { cwd: root, stdio: 'inherit' });
+execFileSync('java', ['-cp', output, 'com.flownote.mobile.UpdateSettingsPolicyTest'], { stdio: 'inherit' });

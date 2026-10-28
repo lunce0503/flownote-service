@@ -7,8 +7,8 @@ android {
         applicationId = "com.flownote.mobile"
         minSdk = 29
         targetSdk = 35
-        versionCode = providers.gradleProperty("testVersionCode").orNull?.toInt() ?: 13000
-        versionName = providers.gradleProperty("testVersionName").orNull ?: "1.3.0"
+        versionCode = providers.gradleProperty("testVersionCode").orNull?.toInt() ?: 13100
+        versionName = providers.gradleProperty("testVersionName").orNull ?: "1.3.1"
     }
     signingConfigs {
         create("distribution") {
