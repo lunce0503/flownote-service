@@ -10,7 +10,8 @@ const pinned = createPublicKey(readFileSync(path.join(root, 'flownote-desktop/up
 if (!pinned.equals(createPublicKey(key).export({ type: 'spki', format: 'der' }))) throw new Error('Signing key does not match the key pinned in the applications');
 const notes = ['동기화 OFF 전 서버 자료·이미지 기기 저장과 오프라인 편집', '동기화 ON 시 기준본 기반 조정·재시도와 충돌 복구본 보존', '시작·재개·주기 확인 후 새 버전 자동 다운로드', '서명·SHA-256 검증, 업데이트 이력·진행·재시도', platform === 'windows' ? '설치형은 확인 후 설치 실행, 포터블은 검증된 ZIP을 직접 압축 해제' : 'APK 자동 다운로드 후 Android 설치 확인 · 기존 자료 보존'];
 if (platform === 'windows' && version === '1.1.1') notes.unshift('GitHub 다운로드 주소 전환 중 자동 다운로드가 중단되던 문제 수정');
-if (version === '1.3.0' || version === '1.3.1') notes.unshift('전공서 책장: PDF 기기 보관·표지·이어 읽기·책갈피', '원본 PDF 100MiB까지 내보내기 · 책장은 기기별 저장');
+if (platform === 'android' && version === '1.3.1') notes.unshift('업데이트 확인·설치·이력을 전체 → 설정으로 이동 · 하단 업데이트 바 제거', '새 노트 생성·접히는 편집 도구·인라인/여러 줄 수식과 명령어 추천', '책장 원본·읽기 기록·단어장의 계정별 클라우드 연결과 기기 전용 편집');
+else if (version === '1.3.0' || version === '1.3.1') notes.unshift('전공서 책장: PDF 기기 보관·표지·이어 읽기·책갈피', '원본 PDF 100MiB까지 내보내기 · 책장은 기기별 저장');
 const manifest = { schema: 1, platform, channel, version, publishedAt: new Date().toISOString(), notes, artifacts: {} };
 // Release assets were built/tested and SHA256SUMS-verified by the Windows job.
 // GitHub's upload digest avoids moving two large binaries through this host.

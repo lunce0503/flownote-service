@@ -4,7 +4,8 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync } from 'node:fs';
+import { verifyNoteEditing } from '../../flownote-desktop/scripts/note-web-smoke.mjs';
 import { build } from '../../flownote/node_modules/esbuild/lib/main.js';
 import { chromium } from '../../flownote/node_modules/playwright-core/index.mjs';
 
@@ -57,6 +58,9 @@ async function connect() {
 }
 async function restart(apk, downgrade = false) {
   if (browser) { await browser.close(); browser = null; }
+  if (/topResumedActivity=.*com.android.settings/.test(adb('shell', 'dumpsys', 'activity', 'activities'))) {
+    adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
+  }
   if (/topResumedActivity=.*InstallSuccess/.test(adb('shell', 'dumpsys', 'activity', 'activities'))) {
     const xml = ui();
     const done = ['DONE', 'Done', '완료'].find(value => xml.includes(`text="${value}"`));
@@ -108,6 +112,10 @@ assert(created.ok, `Staging fixture registration: ${created.status}`);
 const envelope = await (await fetch(origin + '/updates/staging/android.json')).json();
 const manifest = JSON.parse(Buffer.from(envelope.payload, 'base64'));
 assert(manifest.versionCode >= 13000 && manifest.versionCode <= 13100, 'Expected current 1.3.0 or integrated 1.3.1 staging feed');
+if (!inject) {
+  assert.equal(manifest.versionCode, 13100);
+  assert.equal(createHash('sha256').update(readFileSync(candidate)).digest('hex'), manifest.artifacts.apk.sha256, 'Test the exact publicly served staging APK');
+}
 try {
   await restart(root + 'flownote/public/downloads/flownote-1.3.0-staging.apk', true);
   await page.goto(origin + '/login');
@@ -150,8 +158,11 @@ try {
   if (ui().includes('text="앱 업데이트 설치 허용"')) {
     tap('설정 열기');
     await pause(1000);
-    const toggle = (ui().match(/<node\b[^>]*>/g) || []).find(value => value.includes('android.widget.Switch'));
-    assert(toggle, 'Full API35 emulator must provide the actual permission Settings screen');
+    assert(/topResumedActivity=.*com.android.settings/.test(adb('shell', 'dumpsys', 'activity', 'activities')), 'Actual OS settings must be foreground');
+    // API35 Settings uses Compose: the switch is an accessible checkable View.
+    const toggles = (ui().match(/<node\b[^>]*>/g) || []).filter(value => value.includes('checkable="true"'));
+    assert.equal(toggles.length, 1, 'Unknown-app-source screen must expose exactly one permission switch');
+    const toggle = toggles[0];
     const [, l, t, r, b] = toggle.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
     if (toggle.includes('checked="false"')) adb('shell', 'input', 'tap', String((+l + +r) / 2), String((+t + +b) / 2));
     adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
@@ -208,4 +219,8 @@ try {
   writeFileSync('/tmp/flownote-note-native-update-dialog.png', execFileSync(adbPath, ['exec-out', 'screencap', '-p']));
   tap('닫기');
   console.log('PASS Android 1.3.0→1.3.1: session/draft/history persistence, fixed Settings action, live state/manual check, no downgrade, dialog Back/close/reopen, iframe/no-gesture rejection and full available WebView height');
+  if (!inject) {
+    const login = await fetch('https://flownote-api-staging.up.railway.app/api/users/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+    assert(login.ok); const { token } = await login.json(); await verifyNoteEditing(page, token);
+  }
 } finally { if (browser) await browser.close(); }
