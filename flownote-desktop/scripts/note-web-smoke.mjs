@@ -5,6 +5,7 @@ export async function verifyNoteEditing(page, token) {
   const web = 'https://flownote-react-staging.vercel.app';
   const api = 'https://flownote-api-staging.up.railway.app';
   const ids = [];
+  const inlineMath = latex => page.waitForFunction(value => Array.from(document.querySelectorAll('[data-type="inline-math"]')).some(node => node.getAttribute('data-latex') === value), latex);
   const saved = () => page.waitForFunction(() => document.querySelector('[data-testid="note-save-status"]')?.textContent?.trim() === '서버에 저장됨');
   const text = async (editor, expected) => {
     await page.waitForFunction(value => document.querySelector('[role="textbox"][aria-label="노트 편집"]')?.textContent === value, expected);
@@ -52,7 +53,7 @@ export async function verifyNoteEditing(page, token) {
     await editor.pressSequentially('$ \\fr'); await page.getByRole('group', { name: 'LaTeX 명령어 추천', exact: true }).waitFor();
     await editor.press('Tab'); await editor.pressSequentially('a'); await editor.press('ArrowRight'); await editor.press('ArrowRight');
     await editor.pressSequentially('b'); await editor.press('ArrowRight'); await editor.pressSequentially(' $');
-    await editor.locator('[data-type="inline-math"][data-latex="\\frac{a}{b}"]').waitFor();
+    await inlineMath('\\frac{a}{b}');
     await page.getByRole('button', { name: '편집 도구', exact: true }).click();
     await page.getByRole('button', { name: '수식 추가', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: '수식 편집', exact: true });
@@ -61,7 +62,7 @@ export async function verifyNoteEditing(page, token) {
     assert.equal(await dialog.getByLabel('LaTeX 수식', { exact: true }).inputValue(), '\\sqrt{}');
     await dialog.getByLabel('LaTeX 수식', { exact: true }).fill('\\sqrt{4}');
     await dialog.getByRole('button', { name: '수식 적용', exact: true }).click();
-    await editor.locator('[data-latex="\\sqrt{4}"]').waitFor(); await saved();
+    await inlineMath('\\sqrt{4}'); await saved();
     await page.reload(); await editor.locator('[data-type="block-math"]').waitFor();
     assert.equal(await editor.locator('[data-type="block-math"]').getAttribute('data-latex'), 'x = 1\ny = 2');
     await page.getByRole('button', { name: '편집 도구', exact: true }).click();

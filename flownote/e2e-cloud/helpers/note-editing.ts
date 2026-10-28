@@ -106,12 +106,12 @@ export function registerNoteEditing(width: number, engine: 'chromium' | 'webkit'
       await editor.pressSequentially('$ \\fr');
       const suggestions = page.getByRole('group', { name: 'LaTeX 명령어 추천', exact: true }); await expect(suggestions).toContainText('\\frac');
       await editor.press('Tab'); await editor.pressSequentially('a'); await editor.press('ArrowRight'); await editor.press('ArrowRight'); await editor.pressSequentially('b'); await editor.press('ArrowRight'); await editor.pressSequentially(' $');
-      await expect(editor.locator('[data-type=inline-math][data-latex="\\frac{a}{b}"]')).toBeVisible();
+      await expect.poll(() => editor.locator('[data-type=inline-math]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-latex')))).toContain('\\frac{a}{b}');
       await page.getByRole('button', { name: '편집 도구', exact: true }).click(); await page.getByRole('button', { name: '수식 추가', exact: true }).click();
       const dialog = page.getByRole('dialog', { name: '수식 편집' }); await dialog.getByLabel('LaTeX 수식', { exact: true }).fill('\\sq');
       await dialog.getByRole('button', { name: /\\sqrt/ }).click(); await expect(dialog.getByLabel('LaTeX 수식', { exact: true })).toHaveValue('\\sqrt{}');
       await dialog.getByLabel('LaTeX 수식', { exact: true }).fill('\\sqrt{4}'); await dialog.getByRole('button', { name: '수식 적용', exact: true }).click();
-      await expect(editor.locator('[data-latex="\\sqrt{4}"]')).toBeVisible();
+      await expect.poll(() => editor.locator('[data-type=inline-math]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-latex')))).toContain('\\sqrt{4}');
       await expect(page.getByTestId('note-save-status')).toHaveText('서버에 저장됨');
       await page.reload(); await expect(editor.locator('[data-type=block-math]')).toHaveAttribute('data-latex', 'x = 1\ny = 2');
       const source = await markdownSource(page); await expect(source).toHaveValue(/\$\$\nx = 1\ny = 2\n\$\$/);
