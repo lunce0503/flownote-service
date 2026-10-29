@@ -54,6 +54,10 @@ node scripts/deploy-cloud.mjs release all
 6. `.release/staging-<target>.json`에 소스 SHA-256, 배포 ID, 검증 시각을 기록한다. 이 파일은 인증값을 포함하지 않으며 git에서 제외한다.
 7. 같은 소스의 24시간 이내 통과 기록이 있어야 production을 배포한다. 소스 변경 또는 테스트 실패 시 중단한다.
 
+2026-10-29 staging 인증 gateway는 `serviceSleepPolicy('staging')['flownote-api']=false` 예외를 사용한다. 첫 signup의502와 API container 기동 시각을 확인한 뒤 사용자 요청으로 적용했으며 다른 staging 서비스와 production 정책은 유지한다. 설정 성공 메시지만으로 실제 반영을 판단하지 않는다. desired 서비스 인스턴스와 active deployment 메타의 `sleepApplication=false`, health·실제 인증 경로를 함께 확인한다. [적용 기록](../logs/report/2026-10-29-1512-staging-api-warm-release-blocked.md)을 따른다.
+
+`configure-cloud.mjs`와 환경 정책은 **실행한 deploy 스크립트의 controlRoot**가 소유한다. 현재 앱 관리 후보는 `/tmp/flownote-note-editing-20261028/scripts/deploy-cloud.mjs` 자체를 실행하며, 예전 reader worktree의 스크립트로 새 후보를 배포하지 않는다. 다른 source snapshot을 `FLOWNOTE_RELEASE_SOURCE_ROOT`로 지정할 때도 신뢰하는 control의 정책을 먼저 확인한다. Docker 검증 의존성은 source의 node_modules가 있으면 그것을 선택하고, 의존성을 제외한 snapshot이면 기존 control의 node_modules로 fallback한 뒤 realpath를 read-only로 마운트한다. 이는 host dependency symlink와 기존 feedback-auto snapshot 계약을 보존하며 로컬 웹/API fallback을 추가하지 않는다.
+
 단계를 나누어 실행할 수도 있다.
 
 ```bash
@@ -83,7 +87,7 @@ node scripts/deploy-cloud.mjs production all
 - 웹·모바일은 LAN/loopback URL을 다른 주소로 치환하지 않고 거부한다. EAS development/preview는 staging, production은 production API를 사용한다.
 - Expo Go는 Railway `flownote-expo-go`의 HTTPS manifest/bundle을 사용한다. PC의 Metro 주소나 LAN QR를 사용하지 않는다. 이 서비스는 `all`에서 제외하고 Serverless를 켜며, 필요할 때 `node scripts/deploy-cloud.mjs staging expo`처럼 환경과 단일 대상을 명시해 배포한다. 사용 후에는 다시 중지한다.
 - Expo Go staging은 `flownote-expo-go-staging` 서비스와 `https://flownote-expo-go-staging-staging.up.railway.app`을 사용한다. 기본 worker는 1개이고 Node old-space는 최초 번들 생성에 필요한 384MiB로 제한한다.
-- staging의 모든 앱 서비스에는 Serverless를 기본 적용한다. production에서 중지된 `flownote-ai`, 모바일 정적 웹, Expo Go는 staging에서도 중지한다. PostgreSQL과 Redis는 데이터 계층이므로 계속 가동한다. production에서 가동 중인 앱 서비스는 콜드 스타트를 피하기 위해 always-on으로 운영한다. `flownote-sub`의 소스 디렉터리와 Go 모듈명은 `flownote-serve`로 유지한다.
+- staging 공개 gateway인 `flownote-api`는 always-on 예외이며, 다른 앱 서비스에는 Serverless를 기본 적용한다. production에서 중지된 `flownote-ai`, 모바일 정적 웹, Expo Go는 staging에서도 중지한다. PostgreSQL과 Redis는 데이터 계층이므로 계속 가동한다. production에서 가동 중인 앱 서비스는 콜드 스타트를 피하기 위해 always-on으로 운영한다. `flownote-sub`의 소스 디렉터리와 Go 모듈명은 `flownote-serve`로 유지한다.
 - Vercel Git 직접 자동 배포는 `git.deploymentEnabled: false`로 차단한다. [공식 설정 기준](https://vercel.com/docs/project-configuration/git-configuration)을 따르며 release 스크립트의 CLI 배포만 사용한다.
 - 로컬 Ollama 전용 agent-note는 제거됐다. AI 서비스가 중지돼도 게이트웨이가 capability의 disabled/removed 상태와 기존 기능 경로의 410을 직접 반환한다. Gemini agent 소스는 명시적인 AI 단일 배포를 위해 유지한다.
 - 폐기한 로컬 컨테이너와 Docker 네트워크는 제거했지만 기존 DB·업로드·모델 볼륨은 삭제하지 않는다.

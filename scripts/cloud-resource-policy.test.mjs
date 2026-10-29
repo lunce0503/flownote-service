@@ -21,13 +21,13 @@ test('all deployments mirror the production services that are currently active',
   assert.equal(allDeploymentTargets.includes('mobile'), false);
 });
 
-test('every staging application service uses serverless by default', () => {
+test('staging keeps the public auth gateway warm and other application sleep defaults', () => {
   assert.deepEqual(serviceSleepPolicy('staging'), {
     'flownote-main': true,
     'flownote-canvas': true,
     'flownote-sub': true,
     'flownote-ai': true,
-    'flownote-api': true,
+    'flownote-api': false,
     mobile: true,
     expo: true,
   });

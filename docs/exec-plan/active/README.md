@@ -2,7 +2,7 @@
 
 ## 진행 중
 
-- [노트 생성·편집·수식과 Android 업데이트 설정](2026-10-28-note-editing.md): 구현·집중12개·Windows Notes 통과. 전체128은122통과/6실패이며 provider402 회복과 전체 gate 통과 전 운영 승격·공개 릴리스를 보류한다.
+- [노트 생성·편집·수식과 Android 업데이트 설정](2026-10-28-note-editing.md): 새 진단 full123통과/5사전 실패. staging API always-on 적용과 Windows Notes 검증을 마쳤으며, 충전 완료 통보·최종 frozen full gate 전 운영 승격/공개 릴리스를 보류한다.
 
 - [책 읽기 조작·두 쪽 보기·한국어 사전](2026-10-27-library-reader-korean.md): 완료. 이번116개 gate·기존 앱 검증·동일 소스 운영 반영 증거를 기록했다.
 

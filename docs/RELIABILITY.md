@@ -34,7 +34,8 @@
 - Railway 공개 게이트웨이는 `https://flownote-api-production.up.railway.app`이다.
 - Railway 서비스의 `railway.json` healthcheck가 성공해야 배포 성공으로 판단한다.
 - sleep이 켜진 서비스는 첫 연결에 콜드 스타트가 발생할 수 있다. 게이트웨이는 연결 수립 실패를 재시도하지만 Spring 초기화가 재시도 시간보다 길면 첫 요청이 502가 될 수 있다.
-- `scripts/cloud-resource-policy.mjs`가 환경별 sleep 계약을 소유한다. staging의 모든 앱 서비스는 Serverless를 기본 사용하고 PostgreSQL·Redis만 계속 가동한다. production에서 중지된 AI·모바일 정적 웹·Expo Go는 staging에서도 중지하며 `all` 배포 대상에서 제외한다. production에서 가동 중인 앱 서비스는 always-on으로 운영한다.
+- `scripts/cloud-resource-policy.mjs`가 환경별 sleep 계약을 소유한다. 2026-10-29부터 staging의 공개 인증 gateway(`flownote-api`)는 첫 요청의 edge cold-wake502를 줄이기 위해 always-on으로 운영한다. 다른 staging 앱의 Serverless 기본값과 PostgreSQL·Redis 정책은 유지한다. production에서 중지된 AI·모바일 정적 웹·Expo Go는 staging에서도 중지하며 `all` 배포 대상에서 제외한다. production에서 가동 중인 앱 서비스의 기존 always-on 정책은 바꾸지 않는다.
+- Serverless의 desired 설정과 이미 실행 중인 container 설정은 구분한다. 설정 변경 후 active deployment의 `meta.serviceManifest.deploy.sleepApplication` 및 health를 확인한다. 기존 deployment의 `redeploy`는 이전 build/deploy 설정도 재사용하므로 새 정책을 적용했다는 증거가 아니다. 같은 API 소스의 새 upload가 필요한 경우 먼저 source diff를 확인한다. [Railway Serverless](https://docs.railway.com/deployments/serverless), [Deployment Actions](https://docs.railway.com/deployments/deployment-actions).
 - Spring은 256MiB 최대 힙과 작은 Hikari 풀을 사용한다. staging 풀은 idle connection을 0까지 회수해 sleep을 방해하지 않아야 하며, production은 최소 연결 1개를 유지한다.
 
 ## 관측과 복구

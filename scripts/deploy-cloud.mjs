@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 import { allDeploymentTargets } from './cloud-resource-policy.mjs';
+import { releaseDependencies } from './release-dependencies.mjs';
 import { sourceFingerprint } from '../automation/codex/lib/source-snapshot.mjs';
 
 const controlRoot = fileURLToPath(new URL('../', import.meta.url));
@@ -191,7 +192,7 @@ if (mode !== 'production') {
   // Browser tests exercise cloud staging, never a local application or production DB.
   if (process.env.CI) run('yarn', ['e2e', '--retries=0'], { cwd: path.join(root, 'flownote') });
   else run('docker', ['run', '--rm', '-v', `${root}:/work`,
-    ...(root !== controlRoot ? ['-v', `${controlRoot}/flownote/node_modules:/work/flownote/node_modules:ro`] : []),
+    '-v', `${releaseDependencies(root, controlRoot)}:/work/flownote/node_modules:ro`,
     '-w', '/work/flownote', '-e', 'CI=true',
     'mcr.microsoft.com/playwright:v1.62.1-noble', 'yarn', 'e2e', '--retries=0']);
   if (revision !== fingerprint()) throw new Error('Source changed while staging was being verified. Production is blocked.');

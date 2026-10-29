@@ -2,6 +2,8 @@
 
 작성: 2026-10-29 14:20, 최종 입력 검증 보강 14:31 Asia/Seoul. 기존 application manage 세션의 통합 작업 기록이다. **전체 목표 미완료, production 승격 및 Android 공개 릴리스 미완료**다. 충전 응답 없이 provider를 무한 재조회하지 않고, 확인한 소스/검증과 남은 재개 절차를 정리한다. 결제·키 변경, 테스트 skip/mock, production 시험 데이터 쓰기를 실행하지 않았다.
 
+후속 상태: [staging API 실제 절전 해제·123/5 진단·최신 재개 절차](2026-10-29-1512-staging-api-warm-release-blocked.md)가 이 기록을 보완한다. 아래8991401 지문/검증은 당시 기록이며 최종 소스 matching receipt가 아니다. 충전 완료 통보 전 승격하지 않는다.
+
 ## 소스와 실제 배포
 
 - canonical: `/tmp/flownote-note-editing-20261028`, `codex/note-editing-20261028`. 부모 웹28351c9/9eda439와 native3779bd4를 통합하고 후속 수정을 push했다. 마지막 앱 runtime 소스는 `a0628ad2676ad32bd4b26e21550b3e311c3391ca`다. 이번 정리는 검사 드라이버·진단·소유 문서만 바꾸며 웹/Java runtime 및 APK 바이트는 바꾸지 않았다.
@@ -66,10 +68,10 @@ IME 분리 결과는 다음처럼 구분한다.
 FLOWNOTE_RELEASE_SOURCE_ROOT=/tmp/flownote-note-editing-20261028 \
 FLOWNOTE_RELEASE_RESUME_DEPLOYMENTS='{"staging/web":"https://flownote-react-staging-6ptmx5ox1-flownote-service.vercel.app"}' \
 RAILWAY_AGENT_SESSION=flownote-note-editing-20261028 \
-node /tmp/flownote-library-reader-korean-20261027/scripts/deploy-cloud.mjs staging web
+node /tmp/flownote-note-editing-20261028/scripts/deploy-cloud.mjs staging web
 ```
 
-이는 canonical 소스와 실제 node_modules가 있는 기존 control worktree를 사용한다. 로컬 앱 서버는 시작하지 않는다. 이전122/6이나 독립12개를 성공 receipt로 대체하지 않는다.
+canonical 스크립트 자체를 신뢰 control로 사용한다. 예전 reader worktree의 스크립트는 옛 API=true 정책을 다시 적용할 수 있어 사용하지 않는다. Docker 의존성은 source 우선/control fallback을 realpath로 마운트한다. 로컬 앱 서버는 시작하지 않는다. 이전122/6이나 독립12개를 성공 receipt로 대체하지 않는다.
 
 3. 같은 후보 Windows installer/portable Notes와 **Reader까지** CI를 완료한다. 기존 Reader402 실패를 삭제/skip하지 않는다. 익명 첫 케이스가 다시 실패하면 새 passive 진단의 HTTP/asset/DOM 상태를 근거로 원인을 수정하고 전체 gate를 다시 실행한다.
 4. 일치하는 `<24시간` receipt가 생긴 뒤에만 다음 승격을 실행한다. 현재는 receipt가 없고 provider 차단이 있어 **실행하지 않았다**.
@@ -77,7 +79,7 @@ node /tmp/flownote-library-reader-korean-20261027/scripts/deploy-cloud.mjs stagi
 ```bash
 FLOWNOTE_RELEASE_SOURCE_ROOT=/tmp/flownote-note-editing-20261028 \
 RAILWAY_AGENT_SESSION=flownote-note-editing-20261028 \
-node /tmp/flownote-library-reader-korean-20261027/scripts/deploy-cloud.mjs production web
+node /tmp/flownote-note-editing-20261028/scripts/deploy-cloud.mjs production web
 ```
 
 5. production alias/자산/health/auth/mobile config/8서명 feed·APK 해시·서명을 읽기 전용으로 확인하고 Android 기존 채널 `android-v1.3.1`에 정확한 운영 서명 APK와 checksum을 공개한다. 새 Windows/iOS 바이너리 릴리스로 과장하지 않는다. 계획/앱 문서/이 기록을 완료 상태로 정정하고 commit/push한다.

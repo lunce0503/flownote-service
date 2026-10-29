@@ -11,7 +11,8 @@ const stagingSleepPolicy = {
   'flownote-canvas': true,
   'flownote-sub': true,
   'flownote-ai': true,
-  'flownote-api': true,
+  // Public auth gateway must accept the first request without an edge cold-wake 502.
+  'flownote-api': false,
   mobile: true,
   expo: true,
 };
