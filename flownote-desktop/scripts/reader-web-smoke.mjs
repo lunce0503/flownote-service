@@ -37,8 +37,23 @@ export async function verifyReader(page,{touch=false}={}) {
   await action.click();const result=page.getByRole('region',{name:'단어 보관 상태'});await result.waitFor();
   const dictionary=page.getByRole('dialog',{name:'사전과 단어장'}),words=dictionary.getByRole('region',{name:'저장한 단어장'});
   await dictionary.getByText('자동 사전 조회는 잠시 준비 중입니다.',{exact:false}).waitFor();assert((await words.textContent()).includes('2쪽'));
-  await words.getByRole('button',{name:'뜻·메모 편집',exact:true}).click();await words.getByLabel('derivative 뜻과 메모').fill('Synthetic native reader memo');await words.getByRole('button',{name:'뜻·메모 저장',exact:true}).click();await words.getByText('Synthetic native reader memo',{exact:true}).waitFor();
-  await dictionary.getByRole('button',{name:'단어 보관',exact:true}).click();assert((await words.textContent()).includes('Synthetic native reader memo'));
+  const memo='Synthetic native reader memo';
+  await words.getByRole('button',{name:'뜻·메모 편집',exact:true}).click();await words.getByLabel('derivative 뜻과 메모').fill(memo);
+  // A controlled textarea also matches getByText(memo). Require the actual save ACK,
+  // editor closure and rendered paragraph before testing repeated word preservation.
+  const saveResponse=page.waitForResponse(r=>/\/api\/library\/books\/[^/]+\/terms$/.test(r.url())&&r.request().method()==='POST'&&r.request().postDataJSON()?.definition===memo);
+  await words.getByRole('button',{name:'뜻·메모 저장',exact:true}).click();
+  const savedResponse=await saveResponse;assert(savedResponse.ok(),'Native vocabulary save HTTP');const saved=await savedResponse.json();assert.equal(saved.definition,memo);
+  await words.locator('textarea').waitFor({state:'hidden'});await words.locator('article p').filter({hasText:memo}).waitFor();
+  const checkStoredMemo=async()=>{
+    const response=await page.request.get(savedResponse.url(),{headers:{'X-Flownote-Web':'1'}});assert(response.ok(),'Native vocabulary readback HTTP');
+    const remote=await response.json();assert.equal(remote.terms.find(t=>t.id===saved.id)?.definition,memo,'Native API memo preserved');
+    const local=await page.evaluate(id=>new Promise((resolve,reject)=>{const open=indexedDB.open('flownote-textbook-library',2);open.onerror=()=>reject(Error('Native vocabulary IDB open'));open.onsuccess=()=>{const db=open.result,request=db.transaction('terms').objectStore('terms').getAll();request.onsuccess=()=>{db.close();const term=request.result.find(t=>t.id===id||t.cloudId===id);resolve(term?{definition:term.definition,pending:!!term.pending}:null);};request.onerror=()=>{db.close();reject(Error('Native vocabulary IDB read'));};};}),saved.id);
+    assert.deepEqual(local,{definition:memo,pending:false},'Native IDB memo preserved');
+  };
+  await checkStoredMemo();
+  const storeWord=dictionary.getByRole('button',{name:'단어 보관',exact:true});await storeWord.click();await until(()=>storeWord.isEnabled(),'Native repeated word save finished');
+  await words.locator('article p').filter({hasText:memo}).waitFor();await checkStoredMemo();
   await page.reload();await page.getByRole('button',{name:title+' 표지 보기',exact:true}).click();await page.getByRole('button',{name:'책 읽기',exact:true}).click();await tools();await page.getByRole('button',{name:'읽기 메뉴',exact:true}).click();await page.getByRole('menuitem',{name:'사전·단어장'}).click();await page.getByRole('region',{name:'저장한 단어장'}).getByText('Synthetic native reader memo',{exact:true}).waitFor();assert((await page.getByRole('region',{name:'저장한 단어장'}).textContent()).includes('2쪽'));
   await page.getByRole('dialog',{name:'사전과 단어장'}).getByRole('button',{name:'대화상자 닫기',exact:true}).click();
   await page.getByRole('button',{name:'읽기 메뉴',exact:true}).click();await page.getByRole('menuitem',{name:'표지로 돌아가기'}).click();

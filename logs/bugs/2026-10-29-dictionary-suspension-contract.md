@@ -14,3 +14,9 @@
 미완성 변경은 `/tmp/flownote-opendict-deferred-20261029-224538`의 patch/파일/manifest/재개 메모에 보관했다. 실제 키 문자열이 포함되지 않았음을 검사한 뒤 본 작업의 tracked14/untracked5만 ec3 기준으로 복원했다. 공유 root/원본 .env는 수정하지 않았고 stage 키는 그대로 보존, production 새 키 등록/새 provider 호출은 하지 않는다. 별도 재개 승인이 오면 현재 운영 변경과 비교해 선택적으로 적용한다.
 
 검증 명령/실제 배포와 앱 릴리스 결과는 이번 실행 보고서에 기록한다. 기존 자동 조회 테스트를 skip하거나 Reader를 통째로 삭제해 green으로 표시하지 않는다.
+
+## Windows 반복 보관 검사의 저장 대기 정정
+
+Windows CI 40927877884에서 installer Reader만 반복 보관 직후 메모 본문 assertion이 실패했고 portable Reader와 양쪽 Notes는 통과했다. 실제 Android WebView에서 같은 helper를 세 번 계측한 `/tmp/flownote-reader-memo-diagnostic.log`는 기존 `getByText(memo).waitFor()`가 controlled textarea를 매칭해 편집 중/pending=true/API ACK 전 반환함을 보여 준다. 저장 ACK 뒤에는 textarea가 닫히고 rendered paragraph, API POST/GET, IDB pending=false 모두 메모를 보존했다. 반복 보관·reload도 세 번 모두 보존했다. 이 증거는 기존 CI의 데이터 유실을 뜻하지 않으며 runtime 변경 근거로 사용하지 않는다.
+
+helper는 실제 memo POST 응답/뜻 값, textarea hidden, 본문 paragraph, 저장 및 반복 보관 후 API와 IDB 값(pending=false), reload/page-two를 검증한다. 단순 지연/완화 대신 지속 저장 계약을 강화했다. helper는 fingerprint 대상이므로 이전 receipt로 production을 통과시키지 않고, e1fcca5와 동일한 staging 런타임만 명시 재사용해 변경된 최종 소스로 전체129 gate와 native aggregate를 다시 실행한다.
