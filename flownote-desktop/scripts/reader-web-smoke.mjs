@@ -46,8 +46,11 @@ export async function verifyReader(page,{touch=false}={}) {
   const savedResponse=await saveResponse;assert(savedResponse.ok(),'Native vocabulary save HTTP');const saved=await savedResponse.json();assert.equal(saved.definition,memo);
   await words.locator('textarea').waitFor({state:'hidden'});await words.locator('article p').filter({hasText:memo}).waitFor();
   const checkStoredMemo=async()=>{
-    const response=await page.request.get(savedResponse.url(),{headers:{'X-Flownote-Web':'1'}});assert(response.ok(),'Native vocabulary readback HTTP');
-    const remote=await response.json();assert.equal(remote.terms.find(t=>t.id===saved.id)?.definition,memo,'Native API memo preserved');
+    // Fetch inside the existing WebView session: Android CDP does not implement
+    // Storage.getCookies, which Playwright's APIRequestContext requires.
+    const response=await page.evaluate(async url=>{const r=await fetch(url,{headers:{'X-Flownote-Web':'1'}});return {ok:r.ok,status:r.status,data:r.ok?await r.json():null};},savedResponse.url());
+    assert(response.ok,`Native vocabulary readback HTTP ${response.status}`);
+    assert.equal(response.data.terms.find(t=>t.id===saved.id)?.definition,memo,'Native API memo preserved');
     const local=await page.evaluate(id=>new Promise((resolve,reject)=>{const open=indexedDB.open('flownote-textbook-library',2);open.onerror=()=>reject(Error('Native vocabulary IDB open'));open.onsuccess=()=>{const db=open.result,request=db.transaction('terms').objectStore('terms').getAll();request.onsuccess=()=>{db.close();const term=request.result.find(t=>t.id===id||t.cloudId===id);resolve(term?{definition:term.definition,pending:!!term.pending}:null);};request.onerror=()=>{db.close();reject(Error('Native vocabulary IDB read'));};};}),saved.id);
     assert.deepEqual(local,{definition:memo,pending:false},'Native IDB memo preserved');
   };
