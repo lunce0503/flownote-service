@@ -22,10 +22,8 @@
 
 ## 진행 중인 작업
 
-- [사전 자동 조회 보류와 앱 릴리스](exec-plan/active/2026-10-29-dictionary-suspension-release.md): 사용자 명시 범위 변경. 외부 조회0/단어장·메모 보존으로 새129개 gate와 기존 앱 검증 후 노트/업데이트를 배포한다. 사전 복구 대기는 이번 릴리스 조건이 아니다.
 
 
-- [노트 생성·편집·수식과 Android 업데이트 설정](exec-plan/active/2026-10-28-note-editing.md): 구현·Windows 양쪽 Notes 통과, 이전123/5는 자동 사전 계약의 진단이다. 최신 사용자 요청으로 사전 자동 조회를 보류하고 새129개 보존/수동 편집 계약으로 검증·운영/앱 공개를 진행한다. staging API always-on은 유지한다.
 
 - [책 읽기 조작·두 쪽 보기·한국어 사전](exec-plan/active/2026-10-27-library-reader-korean.md): 완료. 전체116개·핵심9개·기존 앱을 검증하고 동일 소스 운영 반영했다.
 
@@ -39,6 +37,9 @@
 장기 실행 계획은 `docs/exec-plan/active/`에 일급 아티팩트로 저장한다(작성 요령: `docs/exec-plan/README.md`). 완료되면 의사결정 로그를 채워 `docs/exec-plan/completed/`로 옮기고, 남은 부채는 `docs/exec-plan/tech-debt-tracker.md`에 등재한다. 반복될 계획은 `docs/design-docs/` 또는 `docs/product-specs/`로 승격한다.
 
 ## 완료된 작업
+
+- [노트 생성·편집·수식과 Android 업데이트 설정](exec-plan/completed/2026-10-28-note-editing.md): 최종129/129와 Windows 양쪽 Notes+Reader/Android 검증 후 같은 소스 운영 반영, Android1.3.1 공개 완료.
+- [사전 자동 조회 보류와 앱 릴리스](exec-plan/completed/2026-10-29-dictionary-suspension-release.md): 사용자 보류 계약·외부 HTTP0·단어장/수동 메모 유지. 8서명 feed/공개 APK readback 완료.
 
 - [게시글 Markdown 작업 공간과 로딩 개선](exec-plan/completed/2026-10-19-blog-markdown-workspace.md): staging E2E 47개 통과 후 canvas/web 운영 배포 완료.
 

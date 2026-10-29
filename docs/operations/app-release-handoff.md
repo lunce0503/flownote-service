@@ -32,3 +32,8 @@ Android·iOS/iPadOS·Windows에서 [전공서 책장](../product-specs/textbook-
 [실행 계획](../exec-plan/active/2026-10-26-workspace-library-ux.md)의 여섯 요구사항 전체를 유지한다. 회색 저장 중/단순 체크·배경 없음, Android/iOS 펜 접촉 중 커서 숨김·큰 지우개 원, 책장 원본/메타/단어장의 클라우드 연결과 선택 사전·읽기 도구/세부 메뉴, 노트·캔버스 통합 목록, 기본 실시간 Markdown 편집, 캔버스 전체 화면 버튼 제거가 모두 완료 기준이다.
 
 배포 대상은 `library`이며 main(Flyway V22) → canvas(library API) → api(경로/본문 제한) → web을 staging-first로 같은 소스로 배포한다. 웹만 배포하면 새 책장 계약이 깨지므로 축소하지 않는다. 책장 소유권·화면/서버 계정 불일치·100MiB 해시·다른 기기의 메타/원본/단어장·삭제 tombstone·OFF/ON·텍스트 드래그·실시간 편집/IME·원본/초안 보존을 실제 클라우드에서 확인한다. 네이티브 실행 소스가 같으면 기존 설치본이 새 웹을 받는 것을 확인하고 새 바이너리 출시로 과장하지 않는다. 실패하는 새 요구사항을 제거해 기존 검사만 통과시켜 완료하지 않는다.
+
+
+## 2026-10-30 노트·사전 보류 릴리스 완료
+
+기존 앱 관리 세션에서129/129·Windows 설치형/portable Notes+Reader·동일 Android APK를 검증하고 같은 소스 canvas/web을 운영 반영했다. 기존 draft427822649의 Android1.3.1(13100)을 공개하고8서명 feed/실제 APK·checksum·기존 인증서를 확인했다. 자동 사전 조회는 사용자 보류이며 단어 보관/뜻·메모는 유지한다. [완료 기록](../../logs/report/2026-10-30-0316-note-app-release-dictionary-paused.md)에 소스 지문·배포 ID·실제 검증과 물리 기기 한계를 남겼다. 새 Windows/iOS 바이너리 출시나 EAS 제출은 아니다.

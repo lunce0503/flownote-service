@@ -26,15 +26,15 @@ Java 17, Android SDK 35, Build Tools 35.0.0을 사용한다.
 ## 배포
 
 1. 정적 검사와 `assembleDebug lintRelease`, 서명 release APK 검증을 수행한다.
-2. 이번 후보 release APK는 `flownote/public/downloads/flownote-1.3.1.apk`, staging debug APK는 `flownote-1.3.1-staging.apk`로 분리한다. 이전 파일은 유지한다.
+2. release APK는 `flownote/public/downloads/flownote-1.3.1.apk`, staging debug APK는 `flownote-1.3.1-staging.apk`로 분리한다. 이전 파일은 유지한다.
 3. `node scripts/deploy-cloud.mjs release web`으로 staging E2E 통과 후 같은 소스를 production에 배포한다.
-4. 승격 후 `/android.html` 안내와 `/downloads/flownote-1.3.1.apk`의 HTTP 상태·SHA-256을 확인한다. 2026-10-29 현재 production은 아직 1.3.0이며 아래 후보 상태와 구분한다.
+4. 승격 후 `/android.html` 안내와 `/downloads/flownote-1.3.1.apk`의 HTTP 상태·SHA-256을 확인한다. 2026-10-30 production과 GitHub android-v1.3.1 공개 및 서명/해시 readback을 완료했다.
 
 ## 자동 업데이트
 
 1.1.0/versionCode 11000부터 네이티브 `AppUpdater`가 시작/재개/1시간 주기에 새 APK를 자동 다운로드한다. 무료 모바일 계정/Expo와 무관하며 직접 배포 APK 전용이다. OS 설치 확인 및 ‘이 출처 허용’은 사용자가 수행한다. 기존 앱을 삭제하지 않고 같은 서명키로 설치하면 WebView 로그인·초안을 유지한다. 1.0.0은 updater가 없어 한 번 수동 설치가 필요하다.
 
-1.3.1(13100) 후보는 하단 네이티브 바를 없애고 **전체 → 설정 → 앱 업데이트**에서 버전·상태·확인·설치·이력을 제공한다. 네이티브가 제한된 HTTPS/main-frame/사용자 클릭 경로만 처리하며 범용 JavaScript interface를 노출하지 않는다. 서명·해시·고정 채널·롤백 방어·설치 확인은 유지한다. 현재 staging 웹의 APK/서명 피드는 1.3.1이며 production 웹의 Android 피드는 1.3.0이다. 전체 gate 미통과로 운영 승격과 GitHub 공개 릴리스는 보류한다.
+1.3.1(13100)은 하단 네이티브 바를 없애고 **전체 → 설정 → 앱 업데이트**에서 버전·상태·확인·설치·이력을 제공한다. 네이티브가 제한된 HTTPS/main-frame/사용자 클릭 경로만 처리하며 범용 JavaScript interface를 노출하지 않는다. 서명·해시·고정 채널·롤백 방어·설치 확인은 유지한다. 현재 staging/production APK와 Android 서명 피드는 모두1.3.1이다. 최종129/129 및 Windows 양쪽 Notes+Reader/정확한 Android APK 검증 뒤 운영 승격·[GitHub 공개](https://github.com/lunce0503/flownote-service/releases/tag/android-v1.3.1)를 완료했다. [최종 기록](../logs/report/2026-10-30-0316-note-app-release-dictionary-paused.md)을 따른다. 자동 사전 조회는 사용자 요청으로 보류하며 단어 보관·직접 메모는 유지한다.
 
 저장소 루트에서 서명키 경로를 `FLOWNOTE_UPDATE_SIGNING_KEY` 환경에 넣고 `node scripts/sign-app-update.mjs android staging 1.3.1 flownote/public/downloads 13100` 및 production을 실행한다. 이 파일 서명만으로 운영 피드가 바뀌지 않으며 staging 검증 후 같은 소스를 승격해야 한다. feed 서명키는 APK 서명키와 별개이며 앱에 공개키를 고정한다. 상세 채널·파일 검증 계약은 [소유 사양](../docs/product-specs/android-app.md#120-자동-업데이트)을 따른다.
 

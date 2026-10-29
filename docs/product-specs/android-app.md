@@ -14,7 +14,7 @@
 - 전체 메뉴는 enabled 역량의 모든 루트 경로를 제공한다. 기존 development 역량은 ‘개발 중’으로 표시하며, 관리자 화면의 기존 서버 권한 검사를 유지한다. 이 메뉴 표시는 웹 서비스가 중지된 기능을 복구하거나 권한을 부여하지 않는다.
 - 캔버스 상세에서는 하단 메뉴를 숨기고 목록 복귀 버튼과 기존 캔버스 도구를 제공한다.
 - Android 뒤로가기는 앱 안의 이전 페이지로, 이력이 없으면 앱 종료로 이어진다.
-- 1.3.1 후보에서는 하단 네이티브 업데이트 바를 제거한다. **전체 → 설정 → 앱 업데이트**에서 설치 버전·상태를 보고, **업데이트 확인·설치·이력**으로 네이티브 관리 창을 연다. 확인/다운로드 중 상태와 최근 이력이 갱신되며 뒤로가기·닫기는 웹 설정 화면으로 돌아온다. 현재 운영 1.3.0은 하단 바를 유지하고 새 웹 설정 카드에 기존 버튼 안내를 표시한다. 1.3.1은 실제 staging 통합 후보이며 전체 gate 미통과로 운영 승격·GitHub 공개 릴리스는 보류 중이다.
+- 1.3.1(13100)부터 하단 네이티브 업데이트 바를 제거한다. **전체 → 설정 → 앱 업데이트**에서 버전·상태·업데이트 확인·설치·이력을 제공한다. 자동 다운로드/서명/해시/채널/롤백 방어와 OS 설치 확인은 유지한다. 기존1.3.0은 하단 바를 유지하며 새 웹 설정 카드에 기존 버튼 안내를 표시한다. 1.3.1은 staging129/129와 실제 Windows/Android 검증 뒤 운영/공개 완료했다.
 
 ## 디자인
 
@@ -31,13 +31,13 @@
 
 ## 배포와 검증
 
-Debug APK는 staging origin 및 별도 패키지 `.staging`을 사용하고 서명 release APK는 production origin을 사용한다. 배포는 `node scripts/deploy-cloud.mjs release web`으로 staging-first를 따른다. 설치 안내는 `/android.html`, 현재 운영 APK는 `/downloads/flownote-1.3.0.apk`다. 2026-10-29 staging 웹의 후보 APK/서명 피드는 1.3.1(13100), production 웹의 Android 피드는 1.3.0(13000)이다. 서명 release 1.3.1과 양 채널 feed는 소스에 준비됐지만 운영 배포·GitHub 릴리스는 완료하지 않았다. 이전 다운로드는 이력과 기존 링크 호환을 위해 유지한다. 실제 배포·검증과 남은 항목은 [통합 작업 기록](../../logs/report/2026-10-29-1420-note-editing-app-release-pending.md)이 소유한다.
+Debug APK는 staging origin 및 별도 패키지 `.staging`을 사용하고 서명 release APK는 production origin을 사용한다. 이번 노트·사전 보류 릴리스는 target blog(canvas/web)를 staging-first로 같은 소스 배포했다. 설치 안내 `/android.html`, 운영 APK `/downloads/flownote-1.3.1.apk`, Android 양 채널 피드1.3.1(13100), [GitHub 공개 릴리스](https://github.com/lunce0503/flownote-service/releases/tag/android-v1.3.1)다. 기존 다운로드 링크는 유지한다. 실제 배포/서명/검증/물리 기기 한계는 [완료 기록](../../logs/report/2026-10-30-0316-note-app-release-dictionary-paused.md)이 소유한다. 자동 사전 조회는 준비 중이며 단어 보관·뜻/메모 편집·클라우드/OFF/ON은 유지한다.
 
 웹 E2E에는 Android UA의 최초 로그인·세션 유지·전체 기능 메뉴·헤더 제거·휴대폰/태블릿 overflow·캔버스 상세 탐색을 포함한다. Android 빌드/lint/서명 검증과 실제 기기 WebView 실행 검증은 구분하여 기록한다.
 
 ## 1.2.0 자동 업데이트
 
-- 시작·재개 시와 실행 중 1시간마다 확인한다. 자동 확인은 최소 15분 간격이다. 1.3.0까지 하단 네이티브 표시를 사용하고 1.3.1 후보부터 설정에서 수동 확인·변경 내용·최근 이력·설치를 제공한다. 이 UI 이동은 자동 확인·다운로드 정책을 바꾸지 않는다.
+- 시작·재개 시와 실행 중 1시간마다 확인한다. 자동 확인은 최소 15분 간격이다. 1.3.0까지 하단 네이티브 표시를 사용하고 1.3.1부터 설정에서 수동 확인·변경 내용·최근 이력·설치를 제공한다. 이 UI 이동은 자동 확인·다운로드 정책을 바꾸지 않는다.
 - release는 production, debug는 staging 고정 HTTPS origin의 `/updates/<channel>/android.json`만 사용한다. 채널별 APK 이름과 패키지(`com.flownote.mobile` / `.staging`)를 분리한다.
 - 앱에 고정한 RSA 공개키로 feed 서명을 검사하고 버전/versionCode·URL·크기·SHA-256을 확인한다. APK 패키지·버전·서명 인증서를 현재 설치와 대조하고 설치 직전 재검증한다. 다른 채널·패키지·서명 및 downgrade는 차단한다.
 - 자동 다운로드는 앱 내부 `files/updates/`에 저장하며 부분 파일은 설치에 노출하지 않는다. 검증된 캐시를 재사용하고 실패 시 부분 파일을 제거해 다음 확인에서 재시도한다. 사용자 자료 폴더·WebView 저장소는 삭제하지 않는다.
