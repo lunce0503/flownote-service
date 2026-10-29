@@ -8,14 +8,40 @@ const androidUA = 'Mozilla/5.0 (Linux; Android 15; Pixel 8) AppleWebKit/537.36 (
 test.use({ userAgent: androidUA, viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true });
 
 test('Android login persists, original header is absent, all feature routes remain reachable', async ({ page, request }) => {
+  // Passive startup diagnostics: no request bodies, cookies, query strings or user data.
+  // Preserve the original first-navigation expectation and timeout when diagnosing a blank page.
+  const assets: { path: string; status?: number; failed?: string }[] = [];
+  const startupErrors: string[] = [];
+  page.on('response', response => {
+    if (['document', 'script', 'stylesheet'].includes(response.request().resourceType())) {
+      assets.push({ path: new URL(response.url()).pathname, status: response.status() });
+    }
+  });
+  page.on('requestfailed', request => {
+    if (['document', 'script', 'stylesheet'].includes(request.resourceType())) {
+      assets.push({ path: new URL(request.url()).pathname, failed: request.failure()?.errorText });
+    }
+  });
+  page.on('pageerror', error => startupErrors.push(error.name));
   const email = `android-${randomUUID()}@example.com`;
   const password = randomUUID();
   const signup = await request.post(`${api}/api/users`, { data: {
     email, password, username: `android-${randomUUID().slice(0, 8)}`, nickname: 'Android verification',
   } });
-  expect(signup.ok()).toBeTruthy();
-  await page.goto('/');
-  await expect(page).toHaveURL(/\/login$/);
+  expect(signup.ok(), `Synthetic Android registration HTTP ${signup.status()}`).toBeTruthy();
+  try {
+    await page.goto('/');
+    await expect(page).toHaveURL(/\/login$/);
+  } catch (error) {
+    console.error(JSON.stringify({ anonymousStartup: { assets, errors: startupErrors,
+      document: await page.evaluate(() => ({ ready: document.readyState,
+        rootChildren: document.getElementById('root')?.childElementCount,
+        installedApp: document.documentElement.getAttribute('data-installed-app'),
+        appNavigation: document.querySelectorAll('nav[aria-label="앱 기능"]').length,
+      })),
+    } }));
+    throw error;
+  }
   await expect(page.getByRole('navigation', { name: '앱 기능' })).toHaveCount(0);
   await page.getByLabel('이메일').fill(email);
   await page.getByLabel('비밀번호', { exact: true }).fill(password);

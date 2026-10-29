@@ -1,7 +1,20 @@
 import assert from 'node:assert/strict';
 
+// Keep the same three real CDP inputs and their connection order. Android WebView
+// can finish composition during host round trips even in a plain contenteditable.
+// Pipeline its commands without sleeps, synthetic DOM events or weaker assertions.
+export async function sendKoreanComposition(cdp, pipelined = false) {
+  const inputs = [
+    ['Input.imeSetComposition', { text: '한', selectionStart: 1, selectionEnd: 1 }],
+    ['Input.imeSetComposition', { text: '한글', selectionStart: 2, selectionEnd: 2 }],
+    ['Input.insertText', { text: '한글 ' }],
+  ];
+  if (pipelined) await Promise.all(inputs.map(([method, params]) => cdp.send(method, params)));
+  else for (const [method, params] of inputs) await cdp.send(method, params);
+}
+
 /** Real published Electron/Android WebView input; synthetic cloud staging notes only. */
-export async function verifyNoteEditing(page, token) {
+export async function verifyNoteEditing(page, token, { androidWebView = false } = {}) {
   const web = 'https://flownote-react-staging.vercel.app';
   const api = 'https://flownote-api-staging.up.railway.app';
   const ids = [];
@@ -62,14 +75,18 @@ export async function verifyNoteEditing(page, token) {
       });
     });
     const cdp = await page.context().newCDPSession(page);
-    await cdp.send('Input.imeSetComposition', { text: '한', selectionStart: 1, selectionEnd: 1 });
-    await cdp.send('Input.imeSetComposition', { text: '한글', selectionStart: 2, selectionEnd: 2 });
-    await cdp.send('Input.insertText', { text: '한글 ' });
+    await sendKoreanComposition(cdp, androidWebView);
+    try { await page.waitForFunction(() => Reflect.get(document.querySelector('[role="textbox"][aria-label="노트 편집"]'), '__flownoteImeCounts')?.ends === 1); }
+    catch (error) { throw new Error(`Native IME commit failed: ${JSON.stringify(await diagnostics(editor))}\n${error.stack}`); }
+    const imeEvents = await editor.evaluate(node => Reflect.get(node, '__flownoteImeCounts').events);
+    assert.equal(imeEvents.filter(event => event.type === 'compositionstart').length, 1);
+    assert.deepEqual(imeEvents.filter(event => event.type === 'compositionupdate').slice(0, 2).map(event => event.data), ['한', '한글']);
     await text(editor, 'alpha 한글 beta gamma');
     assert.equal(await editor.evaluate(node => Reflect.get(node, '__flownoteImeCounts').ends), 1, 'Multi-step IME must finish once, with no duplicate commit');
     await cdp.detach();
     await text(editor, 'alpha 한글 beta gamma');
     assert.equal(await editor.evaluate(node => Reflect.get(node, '__flownoteImeCounts').ends), 1);
+    console.log('PASS native note IME: exact middle replacement, 한→한글 provisional updates, one composition start/end');
     assert.equal(await editor.locator('p').count(), 1);
     await editor.press('End'); await editor.press('Backspace'); await editor.pressSequentially('!');
     await text(editor, 'alpha 한글 beta gamm!');

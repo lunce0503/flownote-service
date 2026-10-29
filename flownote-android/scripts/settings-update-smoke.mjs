@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { writeFileSync, readFileSync } from 'node:fs';
 import { verifyNoteEditing } from '../../flownote-desktop/scripts/note-web-smoke.mjs';
+import { verifyCompositionControl } from './ime-control-smoke.mjs';
 import { build } from '../../flownote/node_modules/esbuild/lib/main.js';
 import { chromium } from '../../flownote/node_modules/playwright-core/index.mjs';
 
@@ -15,6 +16,11 @@ assert(candidate && downloadFixture, 'Usage: node settings-update-smoke.mjs <1.3
 const inject = process.argv.includes('--inject-candidate-settings');
 const adbPath = process.env.FLOWNOTE_TEST_ADB || '/tmp/flownote-app-android-sdk/platform-tools/adb';
 const adb = (...args) => execFileSync(adbPath, args, { encoding: 'utf8', timeout: 60000 });
+const avdConfigPath = process.env.FLOWNOTE_TEST_AVD_CONFIG || '/tmp/flownote-library-avds/library.avd/config.ini';
+assert(/^hw\.keyboard\s*=\s*yes\s*$/m.test(readFileSync(avdConfigPath, 'utf8')),
+  'CDP IME setup: enable hw.keyboard=yes in the AVD config and restart; FLOWNOTE_TEST_AVD_CONFIG selects that file.');
+assert(/(?:^|-)qwerty(?:-|$)/m.test(adb('shell', 'am', 'get-config')),
+  'CDP IME requires an emulator hardware keyboard: set AVD hw.keyboard=yes and restart. A soft-IME preference alone is insufficient.');
 const pkg = 'com.flownote.mobile.staging', origin = 'https://flownote-react-staging.vercel.app';
 const action = `${origin}/__flownote_native__/updates`;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -225,7 +231,13 @@ try {
   console.log('PASS Android 1.3.0→1.3.1: session/draft/history persistence, fixed Settings action, live state/manual check, no downgrade, dialog Back/close/reopen, iframe/no-gesture rejection and full available WebView height');
   if (!inject) {
     const login = await fetch('https://flownote-api-staging.up.railway.app/api/users/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
-    assert(login.ok); const { token } = await login.json(); await verifyNoteEditing(page, token);
+    assert(login.ok); const { token } = await login.json();
+    // The native fixed-action navigation is intentionally consumed. Start a real
+    // cloud route before locator-driven input, clearing that pending navigation.
+    await page.goto(origin + '/blog');
+    await page.getByRole('button', { name: '새 노트', exact: true }).first().waitFor();
+    await verifyCompositionControl(page);
+    await verifyNoteEditing(page, token, { androidWebView: true });
   }
 } finally {
   if (browser) await browser.close();

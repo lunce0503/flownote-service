@@ -2,6 +2,8 @@
 
 작성: 2026-10-28 23:31, 핵심 에뮬레이터 PASS 확인 23:36 Asia/Seoul. 이 보고서는 Android 독립 구현 단계의 기록이다. 현재 native 소스의 핵심 회귀는 완료했다. 전체 노트 편집 목표와 앱 운영 배포는 아직 완료되지 않았으며 부모의 병렬 소스 통합을 위한 작업 분담에 따라 scoped commit을 먼저 전달한다.
 
+2026-10-29 정정: 아래는 **통합 전 시점의 기록**이다. 부모가 native3779bd4를 canonical에 통합한 이후 앱 관리가 실제 staging에1.3.1 APK/양 채널 feed/웹을 배포했다. 운영은 여전히1.3.0이다. 추가 설치 허용 경로는 실제 Android 설정의 checkable View와 OS 설치 확인까지 후속 검사에서 통과했다. canonical 운영 서명 후보 APK SHA-256은 `f2bae34c4a4f8f0b2672e52af8ff01275b97fc7418d853ce68e3a5c1ba288f64`로 아래 sibling 임시 APK와 구분한다. 최신 검증·전체 gate 실패·공개 릴리스 보류와 재개 절차는 [통합 작업 기록](2026-10-29-1420-note-editing-app-release-pending.md)을 따른다.
+
 ## 소스와 소유 범위
 
 - worktree `/tmp/flownote-note-native-20261028`, branch `codex/note-native-20261028`, 기준 `058828a0534ba9b161232d5cbfe6dcc70bca5496`.

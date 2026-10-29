@@ -22,7 +22,7 @@
 
 ## 진행 중인 작업
 
-- [노트 생성·편집·수식과 Android 업데이트 설정](exec-plan/active/2026-10-28-note-editing.md): 노트 생성/한 줄 편집, 접히는 아이콘 도구, LaTeX 입력·추천 및 Android 설정/릴리스 검증.
+- [노트 생성·편집·수식과 Android 업데이트 설정](exec-plan/active/2026-10-28-note-editing.md): 구현·집중12/12·Windows 양쪽 Notes 통과. 전체128은122통과/6실패로 provider402와 익명 시작 간헐 실패를 기록했으며 운영 승격·Android 공개 릴리스는 보류 중이다.
 
 - [책 읽기 조작·두 쪽 보기·한국어 사전](exec-plan/active/2026-10-27-library-reader-korean.md): 완료. 전체116개·핵심9개·기존 앱을 검증하고 동일 소스 운영 반영했다.
 

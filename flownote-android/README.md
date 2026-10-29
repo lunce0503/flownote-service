@@ -26,20 +26,22 @@ Java 17, Android SDK 35, Build Tools 35.0.0을 사용한다.
 ## 배포
 
 1. 정적 검사와 `assembleDebug lintRelease`, 서명 release APK 검증을 수행한다.
-2. release APK를 `flownote/public/downloads/flownote-1.3.0.apk`에 복사한다. staging debug APK는 `flownote-1.3.0-staging.apk`로 분리한다.
+2. 이번 후보 release APK는 `flownote/public/downloads/flownote-1.3.1.apk`, staging debug APK는 `flownote-1.3.1-staging.apk`로 분리한다. 이전 파일은 유지한다.
 3. `node scripts/deploy-cloud.mjs release web`으로 staging E2E 통과 후 같은 소스를 production에 배포한다.
-4. `/android.html` 안내와 `/downloads/flownote-1.3.0.apk`의 HTTP 상태·SHA-256을 확인한다.
+4. 승격 후 `/android.html` 안내와 `/downloads/flownote-1.3.1.apk`의 HTTP 상태·SHA-256을 확인한다. 2026-10-29 현재 production은 아직 1.3.0이며 아래 후보 상태와 구분한다.
 
 ## 자동 업데이트
 
 1.1.0/versionCode 11000부터 네이티브 `AppUpdater`가 시작/재개/1시간 주기에 새 APK를 자동 다운로드한다. 무료 모바일 계정/Expo와 무관하며 직접 배포 APK 전용이다. OS 설치 확인 및 ‘이 출처 허용’은 사용자가 수행한다. 기존 앱을 삭제하지 않고 같은 서명키로 설치하면 WebView 로그인·초안을 유지한다. 1.0.0은 updater가 없어 한 번 수동 설치가 필요하다.
 
-1.3.1(13100) 후보는 하단 네이티브 바를 없애고 **전체 → 설정 → 앱 업데이트**에서 버전·상태·확인·설치·이력을 제공한다. 네이티브가 제한된 HTTPS/main-frame/사용자 클릭 경로만 처리하며 범용 JavaScript interface를 노출하지 않는다. 서명·해시·고정 채널·롤백 방어·설치 확인은 유지한다. 현재 공개 피드는 여전히 1.3.0이며 노트 편집 통합 후 staging-first 배포에서 갱신한다.
+1.3.1(13100) 후보는 하단 네이티브 바를 없애고 **전체 → 설정 → 앱 업데이트**에서 버전·상태·확인·설치·이력을 제공한다. 네이티브가 제한된 HTTPS/main-frame/사용자 클릭 경로만 처리하며 범용 JavaScript interface를 노출하지 않는다. 서명·해시·고정 채널·롤백 방어·설치 확인은 유지한다. 현재 staging 웹의 APK/서명 피드는 1.3.1이며 production 웹의 Android 피드는 1.3.0이다. 전체 gate 미통과로 운영 승격과 GitHub 공개 릴리스는 보류한다.
 
-저장소 루트에서 서명키 경로를 `FLOWNOTE_UPDATE_SIGNING_KEY` 환경에 넣고 `node scripts/sign-app-update.mjs android staging 1.3.0 flownote/public/downloads 13000` 및 production을 실행한다. feed 서명키는 APK 서명키와 별개이며 앱에 공개키를 고정한다. 상세 채널·파일 검증 계약은 [소유 사양](../docs/product-specs/android-app.md#120-자동-업데이트)을 따른다.
+저장소 루트에서 서명키 경로를 `FLOWNOTE_UPDATE_SIGNING_KEY` 환경에 넣고 `node scripts/sign-app-update.mjs android staging 1.3.1 flownote/public/downloads 13100` 및 production을 실행한다. 이 파일 서명만으로 운영 피드가 바뀌지 않으며 staging 검증 후 같은 소스를 승격해야 한다. feed 서명키는 APK 서명키와 별개이며 앱에 공개키를 고정한다. 상세 채널·파일 검증 계약은 [소유 사양](../docs/product-specs/android-app.md#120-자동-업데이트)을 따른다.
 
-책장 원본과 읽기 기록은 현재 앱의 계정별 IndexedDB에 보관한다. 앱 업데이트 시 삭제하지 않으며 서버 책장 동기화는 제공하지 않는다. 일반 Android API35 에뮬레이터에서 `node flownote-android/scripts/library-smoke.mjs <new-debug-apk>`로 시스템 파일 선택·100MiB 등록·1.2→1.3 보존·내보내기 해시를 확인한다. 실제 하드웨어 검증과 구분한다.
+책장 원본·메타·단어장은 [책장 클라우드 계약](../docs/product-specs/textbook-library.md)에 따라 계정별로 동기화하며 IndexedDB와 기기 전용 OFF/ON 편집도 유지한다. 앱 업데이트 시 이를 삭제하지 않는다. 일반 Android API35 에뮬레이터에서 `node flownote-android/scripts/library-smoke.mjs <new-debug-apk>`로 시스템 파일 선택·100MiB 등록·1.2→1.3 보존·내보내기 해시를 확인한다. 실제 하드웨어 검증과 구분한다.
 
 `node scripts/test-app-updates.mjs`는 Node updater 및 순수 JVM 정책 테스트다. debug에만 `-PtestVersionCode=10001 -PtestVersionName=1.0.1`로 업데이트 이전 버전을 만들어 cloud staging에서 시험할 수 있다. release 작업은 test version override를 거부한다.
+
+통합 검사는 `node flownote-android/scripts/settings-update-smoke.mjs <정확한 공개 staging APK> <동일 구현의 낮은 버전 debug fixture APK>`로 실행한다. 주입 옵션 없이 실제 cloud Settings·업데이트·OS 허용/설치·노트/수식을 검사한다. CDP 한글 조합 검사는 AVD `hw.keyboard=yes`로 재시작한 에뮬레이터가 필요하다. 스크립트는 AVD 설정 파일(`FLOWNOTE_TEST_AVD_CONFIG`로 경로 지정 가능)의 keyboard=yes와 QWERTY 구성을 함께 확인하고 화면 키보드 옵션을 임시 제어·복원한다. `hw.keyboard=no`에서 옵션0만으로는 일반 contenteditable의 조기 종료·중복을 막지 못했고, hardware=yes 및 IME 비활성화 단독 대조에서도 실패가 남았다. 이를 앱 버그로 단정하지 않는다. Android CDP 드라이버는 같은 세 입력 명령을 같은 연결 순서로 pipeline 전송해 호스트 round trip 사이의 간섭을 줄인다. 명령/문자/단계 수는 유지하며 Windows의 순차 전송은 바꾸지 않는다. 동일 문장·중간 4글자 선택·같은 CDP 세션 순서의 React 없는 대조군 5회와 앱 검사를 함께 수행하며 정확한 문자와 조합 시작/종료 1회 조건을 유지한다. 이는 물리 Gboard/손가락 입력 검증이 아니다.
 
 사용자 동작 사양은 [Android 앱 사양](../docs/product-specs/android-app.md)을 따른다.

@@ -1,6 +1,6 @@
 # 노트 생성·편집·수식과 Android 업데이트 설정
 
-상태: 진행 중. 운영 기준 058828a / dpl_BmWBxsWc4ffYw3DwuM4V3m8EfS55를 실제 조회했다. 이전 읽기 기능의 116개 통과 기록을 이번 완료 증거로 사용하지 않는다.
+상태: 구현·staging/native 검증 진행, 운영 승격 보류. 운영 기준 058828a / dpl_BmWBxsWc4ffYw3DwuM4V3m8EfS55는 유지됐다. 최신 전체128은122통과/6실패이며 전체 목표는 미완료다. 이전 읽기 기능의116개 통과 기록을 이번 완료 증거로 사용하지 않는다. [현재 증거·차단점·재개 절차](../../../logs/report/2026-10-29-1420-note-editing-app-release-pending.md)를 따른다.
 
 ## 사용자 요구와 완료 기준
 
@@ -29,3 +29,17 @@
 ## 보존과 롤백
 
 기존 문서의 원본/초안/legacy_original을 보존하고 열기만으로 변환하지 않는다. 서식 명령은 사용자 조작에서만 실행한다. 브리지에는 고정된 업데이트 설정 열기 동작만 허용하고 origin/main-frame을 확인한다. 웹은 이전 Ready 배포로 복구하며 네이티브는 더 높은 수정 버전으로 배포한다. 사용자 데이터·인증·서명키는 삭제하지 않는다.
+
+## 2026-10-29 확인과 남은 완료 기준
+
+- [x] prompt 없는 두 생성 경로·아이콘/접힘·수식 입력/추천/직렬화 구현. 연속 inline math의 구분 공백을 보존하고 빠른 단일 줄 Home/End를 공개 PM 선택 API로 확정한다.
+- [x] `yarn verify` 및 모델93/93, updater Node7/JVM 정책, Android 빌드/lint/기존 키 서명 검증. 이번 정리에서도 verify·93모델·updater 검사를 재실행했다.
+- [x] a0628ad runtime staging `dpl_2tkedvWgj14Lw9HAc37m1F9KbWzc` READY. 집중12/12와390/820/1440 실제 화면·adjacent inline 원문/재로드/미리보기 오류0 확인.
+- [x] 실제 Windows1.3.1 설치형·포터블 Notes 모두 PASS. CI40793742263의 aggregate 실패는 양쪽 기존 Reader의 provider402 결과 대기이며 Notes 실패로 보고하지 않는다.
+- [x] Android1.3.1(13100) 양 채널 서명 APK/feed/안내 준비 및 실제 staging 파일 해시 readback. production/GitHub 공개 릴리스 완료를 뜻하지 않는다.
+- [x] 같은 공개 staging APK에서 업데이트/설정 구간 PASS, canonical Android CDP 대조군5/5·실제 Notes 전체 PASS를 실행별로 확인했다. hw=yes/IMEoff 단독 실패도 정정했으며 원래 세 명령을 Android에서만 pipeline 전송한다. 물리 Gboard/입력기 검증은 별도 미완료다.
+- [ ] 같은 후보 최종128/128 통과. 기존 사전 관련5개는 Gemini402/prepayment depleted, 첫 Android 익명 진입1개는 빈 화면/login URL 타임아웃이다. 이후 독립 repeat3의 회원 생성2실패와 진단 보강 후3/3 성공도 함께 기록하며 원인을 확정하지 않는다. assertion/timeout/테스트 수는 유지한다.
+- [ ] provider 회복 뒤 Windows 양쪽 Reader를 포함한 aggregate 및 같은 소스 전체 gate를 다시 완료한다. Android는 같은 APK의 분리 실행 결과를 보고서에 구분하며 전체 native 단일 실행 성공으로 과장하지 않는다. 실제 입력기 미검증도 남겨 둔다.
+- [ ] 유효한 matching receipt 생성 후 production web 승격·alias/assets/auth/mobile config/8서명 feed/APK readback, 기존 채널 GitHub Android 공개 릴리스, 계획 완료 정정.
+
+2026-10-29 14:10 KST에도 provider402가 확인됐고 충전 응답은 없다. 결제/키 변경을 자동 실행하거나 mock/skip으로 통과시키지 않는다. 사용자의 후속 지시에 따라 native 검증과 소스/기록 commit·push를 정리한 뒤 외부 조건 회복을 기다린다. 운영 배포를 위해 추가 재승인을 요구하지 않으며, provider 회복 후 기존 승인 범위에서 남은 검증/승격/릴리스를 진행한다. 물리 Android/Gboard·iPad/Pencil 검증은 에뮬레이션과 구분한다.
