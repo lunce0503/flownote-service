@@ -18,7 +18,13 @@ export async function verifyNoteEditing(page, token, { androidWebView = false } 
   const web = 'https://flownote-react-staging.vercel.app';
   const api = 'https://flownote-api-staging.up.railway.app';
   const ids = [];
-  const inlineMath = latex => page.waitForFunction(value => Array.from(document.querySelectorAll('[data-type="inline-math"]')).some(node => node.getAttribute('data-latex') === value), latex);
+  const inlineMath = async latex => {
+    try { await page.waitForFunction(value => Array.from(document.querySelectorAll('[data-type="inline-math"]')).some(node => node.getAttribute('data-latex') === value), latex); }
+    catch (error) {
+      const state=await page.evaluate(()=>{const editor=document.querySelector('[role="textbox"][aria-label="노트 편집"]'),pm=editor&&Reflect.get(editor,'editor'),dialog=document.querySelector('dialog[aria-label="수식 편집"]');return {inline:Array.from(document.querySelectorAll('[data-type="inline-math"]')).map(n=>n.getAttribute('data-latex')),block:Array.from(document.querySelectorAll('[data-type="block-math"]')).map(n=>n.getAttribute('data-latex')),doc:pm?.getJSON(),selection:pm?[pm.state.selection.from,pm.state.selection.to]:null,active:document.activeElement?.getAttribute('aria-label'),dialogOpen:dialog?.open,draft:dialog?.querySelector('textarea')?.value,saveStatus:document.querySelector('[data-testid="note-save-status"]')?.textContent};});
+      throw new Error(`Native inline math missing; expected=${JSON.stringify(latex)}; syntheticState=${JSON.stringify(state)}\n${error.stack}`);
+    }
+  };
   const diagnostics = editor => editor.evaluate(node => ({
     text: node.textContent, active: document.activeElement?.getAttribute('aria-label'),
     domSelection: [getSelection()?.anchorOffset, getSelection()?.focusOffset],
