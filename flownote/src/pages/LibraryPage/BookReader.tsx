@@ -191,7 +191,7 @@ export default function BookReader({ book, owner, back, savePage, bookmark, chan
       <button aria-label={controls ? '읽기 도구 숨기기' : '읽기 도구 표시'} aria-expanded={controls} onClick={() => setControls(value => !value)}>{controls ? <ChevronDown size={16} /> : <ChevronUp size={16} />}</button>
       <span className="reader-progress-line" role="progressbar" aria-label="책 읽기 진행률" aria-valuemin={1} aria-valuemax={book.pages} aria-valuenow={page} style={{ '--reader-progress': `${page / book.pages * 100}%` } as React.CSSProperties} />
     </div>
-    {selection && <button className="reader-selection-action" onMouseDown={event => event.preventDefault()} onClick={() => setDictionary(selection)}><Search size={16} />“{selection.term.slice(0, 24)}” 사전 검색</button>}
+    {selection && <button className="reader-selection-action" onMouseDown={event => event.preventDefault()} onClick={() => setDictionary(selection)}><Search size={16} />“{selection.term.slice(0, 24)}” 단어 보관</button>}
     {dictionary && <ReaderDictionary key={`${dictionary.page}:${dictionary.term}`} owner={owner} book={book} page={dictionary.page} initialTerm={dictionary.term} close={() => { setDictionary(null); setSelection(null); window.getSelection()?.removeAllRanges(); window.setTimeout(() => menuTrigger.current?.focus(), 0); }} />}
     {settings && <LibraryDialog title="읽기 설정" close={() => setSettings(false)}><div className="reader-settings">
       <label>페이지 배치<select aria-label="페이지 배치 설정" value={layout} onChange={event => setSpread(event.target.value as ReaderLayout)}><option value="single">한 쪽 보기</option><option value="spread">두 쪽 보기</option></select></label>

@@ -1,12 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BookOpen, ExternalLink, Search, Trash2 } from 'lucide-react';
+import { BookOpen, Search, Trash2 } from 'lucide-react';
 import { deleteTerm, listTerms, lookupTerm, saveTermDefinition, type Book, type DictionaryResult, type LibraryTerm } from '@/features/library';
 import LibraryDialog from './LibraryDialog';
+
+function storedSource(raw: string) {
+  try {
+    const url = new URL(raw);
+    if (url.protocol === 'https:' && !url.username && !url.password && !url.port && !url.hash && !url.search && url.hostname === 'en.wiktionary.org' && url.pathname.startsWith('/wiki/')) return url.href;
+  } catch { /* Preserve stored text without opening an unsafe source. */ }
+  return undefined;
+}
 
 export default function ReaderDictionary({ owner, book, page, initialTerm, close }: {
   owner: string; book: Book; page: number; initialTerm: string; close: () => void;
 }) {
-  const parts: Record<string, string> = { noun: '명사', verb: '동사', adjective: '형용사', adverb: '부사', pronoun: '대명사', preposition: '전치사', conjunction: '접속사', interjection: '감탄사', 'proper noun': '고유명사', abbreviation: '약어', symbol: '기호', prefix: '접두사', suffix: '접미사', phrase: '구절' };
+
   const [query, setQuery] = useState(initialTerm);
   const [result, setResult] = useState<DictionaryResult | null>(null);
   const [terms, setTerms] = useState<LibraryTerm[]>([]);
@@ -26,7 +34,7 @@ export default function ReaderDictionary({ owner, book, page, initialTerm, close
     try {
       const found = await lookupTerm(owner, book.id, page, term);
       if (alive.current) setResult(found);
-    } catch (failure) { if (alive.current) setError(failure instanceof Error ? failure.message : '사전 검색에 실패했습니다.'); }
+    } catch (failure) { if (alive.current) setError(failure instanceof Error ? failure.message : '단어 보관에 실패했습니다.'); }
     finally { if (alive.current) { setBusy(false); void refresh().catch(() => {}); } }
   }, [owner, book.id, page, refresh]);
   useEffect(() => {
@@ -39,32 +47,15 @@ export default function ReaderDictionary({ owner, book, page, initialTerm, close
     return () => { alive.current = false; };
   }, [owner, book.id, initialTerm, search]);
   return <LibraryDialog title="사전과 단어장" close={close}>
-    <p className="library-muted">{book.title} · {page}쪽 · 검색한 단어와 뜻을 이 책의 단어장에 저장합니다.</p>
+    <p className="library-muted">{book.title} · {page}쪽 · 선택한 단어와 뜻·메모를 이 책의 단어장에 보관합니다.</p>
     <form className="reader-dictionary-search" onSubmit={event => { event.preventDefault(); void search(query); }}>
-      <label>선택한 단어<input aria-label="사전에서 검색할 단어" value={query} maxLength={120} onChange={event => setQuery(event.target.value)} /></label>
-      <button className="library-primary" disabled={busy || !query.trim()}><Search size={16} />{busy ? '검색·저장 중…' : '사전 검색'}</button>
+      <label>선택한 단어<input aria-label="보관할 단어" value={query} maxLength={120} onChange={event => setQuery(event.target.value)} /></label>
+      <button className="library-primary" disabled={busy || !query.trim()}><Search size={16} />{busy ? '보관 중…' : '단어 보관'}</button>
     </form>
-    <p className="library-muted">선택한 단어와 공개 사전의 뜻을 조회·번역 서비스에 전송해 한국어로 보여줍니다.</p>
+    <p role="status" className="library-muted">자동 사전 조회는 잠시 준비 중입니다. 단어 보관과 뜻·메모 편집은 계속 사용할 수 있습니다.</p>
     {error && <p role="alert">{error}</p>}
-    {result && <section className="reader-dictionary-result" aria-label="사전 검색 결과">
-      <h3>{result.term}</h3>
-      {result.found ? result.language === 'ko' && result.senses?.length ? <>
-        <p className="dictionary-translation-label">한국어 자동 번역 · {result.senses.length}개의 뜻</p>
-        <ol className="dictionary-senses">{result.senses.map((sense, index) => <li key={`${sense.partOfSpeech}:${index}`}>
-          <span className="dictionary-part">{parts[sense.partOfSpeech.toLowerCase()] || sense.partOfSpeech || '뜻'}</span>
-          <p lang="ko">{sense.translation}</p>
-          <details><summary>원문 뜻 보기</summary><p lang="en">{sense.definition}</p></details>
-        </li>)}</ol>
-        {terms.some(term => term.page === page && term.term === result.term && term.definition !== result.definition) && <button disabled={busy} onClick={() => {
-          const saved = terms.find(term => term.page === page && term.term === result.term);
-          if (!saved || !window.confirm('저장해 둔 뜻·메모를 이번 한국어 검색 결과로 바꿀까요?')) return;
-          setBusy(true); setError('');
-          void saveTermDefinition(owner, saved, result.definition).catch(failure => { if (alive.current) setError(String(failure)); })
-            .finally(() => { if (alive.current) { setBusy(false); void refresh().catch(() => {}); } });
-        }}>한국어 검색 결과를 단어장에 반영</button>}
-      </> : <p role="alert">한국어 뜻이 포함되지 않은 이전 검색 결과입니다. 잠시 뒤 다시 검색해 주세요.</p>
-        : <p>사전에 일치하는 뜻이 없습니다. 단어는 저장했으며, 단어장에서 뜻이나 메모를 직접 적을 수 있습니다.</p>}
-      <a href={`https://en.wiktionary.org/wiki/${encodeURIComponent(result.term)}`} target="_blank" rel="noopener noreferrer">Wiktionary · CC BY-SA <ExternalLink size={14} /></a>
+    {result && <section className="reader-dictionary-result" aria-label="단어 보관 상태">
+      <p>“{result.term}” 단어를 보관했습니다. 아래에서 뜻·메모를 직접 적을 수 있습니다.</p>
     </section>}
     <section aria-label="저장한 단어장" className="reader-word-list"><h3><BookOpen size={18} />저장한 단어 <span>{terms.length}</span></h3>
       {!terms.length && <p className="library-muted">페이지에서 단어를 드래그해 선택하거나 위에서 검색해 보세요.</p>}
@@ -83,7 +74,7 @@ export default function ReaderDictionary({ owner, book, page, initialTerm, close
         }}><textarea aria-label={`${term.term} 뜻과 메모`} value={definition} maxLength={8000} onChange={event => setDefinition(event.target.value)} />
           <button disabled={busy}>뜻·메모 저장</button><button type="button" onClick={() => setEditing('')}>취소</button></form>
           : <><p>{term.definition || '아직 저장한 뜻이 없습니다.'}</p><button disabled={busy} onClick={() => { setEditing(term.id); setDefinition(term.definition); }}>뜻·메모 편집</button></>}
-        <a href={`https://en.wiktionary.org/wiki/${encodeURIComponent(term.term)}`} target="_blank" rel="noopener noreferrer">Wiktionary 원문</a>
+        {storedSource(term.sourceUrl) && <a href={storedSource(term.sourceUrl)} target="_blank" rel="noopener noreferrer">단어 참고 링크</a>}
       </article>)}
     </section>
   </LibraryDialog>;

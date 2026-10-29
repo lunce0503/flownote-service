@@ -14,3 +14,5 @@
 - [flownote-agent의 Flownote 편입](2026-10-14-flownote-agent-integration.md): 연구 코드·학습 계획 편입 완료. 실제 도구 계약·평가부터 구현한다.
 
 진행 중 실행 계획이 없으면 비어 있다. 새 계획은 `YYYY-MM-DD-작업명.md`로 생성한다. 작성 요령은 [../README.md](../README.md).
+
+- [사전 자동 조회 보류와 앱 릴리스](2026-10-29-dictionary-suspension-release.md): 사용자 요청에 따라 사전 계약을 보류 상태로 바꾸고 새129개 전체 검증·운영/앱 공개를 진행한다.

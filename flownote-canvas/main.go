@@ -68,7 +68,7 @@ func main() {
 	notesHandler.Register(mux)
 
 	libraryRepo := library.NewRepo(pool, store)
-	library.NewHandler(libraryRepo, authenticator, library.NewDictionaryTranslator(cfg.DictionaryTranslationKey, cfg.DictionaryTranslationModel)).Register(mux)
+	library.NewHandler(libraryRepo, authenticator).Register(mux)
 	go func() {
 		for {
 			cleanupCtx, cleanupCancel := context.WithTimeout(ctx, 5*time.Minute)

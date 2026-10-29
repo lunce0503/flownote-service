@@ -66,14 +66,12 @@ test('private library API enforces ownership, chunk hashes, metadata revisions, 
     expect(createHash('sha256').update(await file.body()).digest('hex')).toBe(createHash('sha256').update(original).digest('hex'));
     const lookup = await request.post(`${api}/api/library/books/${book.id}/lookup`, { headers: headers(actor), data: { id: randomUUID(), page: 1, term: 'derivative' } });
     expect(lookup.ok()).toBeTruthy(); const found = await lookup.json();
-    expect(found.result.found).toBe(true); expect(found.result.definition.length).toBeGreaterThan(0);
-    expect(found.result.language).toBe('ko'); expect(found.result.senses.length).toBeGreaterThan(1);
-    expect(found.result.senses.every((sense: {translation:string}) => /[가-힣]/.test(sense.translation))).toBe(true);
+    expect(found.result.status).toBe('temporarily_unavailable');expect(found.result.found).toBe(false);expect(found.result.definition).toBe('');expect(found.result.senses).toEqual([]);
     expect(found.saved.bookId).toBe(book.id); expect(found.saved.page).toBe(1);
     const manual = await request.post(`${api}/api/library/books/${book.id}/terms`, { headers: headers(actor), data: { id: found.saved.id, page: 1, term: 'derivative', definition: 'Synthetic preserved study note' } });
     expect(manual.ok()).toBeTruthy();
     const again = await request.post(`${api}/api/library/books/${book.id}/lookup`, { headers: headers(actor), data: { page: 1, term: 'derivative' } });
-    expect(again.ok()).toBeTruthy(); expect((await again.json()).saved.definition).toBe('Synthetic preserved study note');
+    expect(again.ok()).toBeTruthy(); const preserved=await again.json();expect(preserved.result.status).toBe('temporarily_unavailable');expect(preserved.saved.definition).toBe('Synthetic preserved study note');expect(preserved.saved.sourceUrl).toBe(found.saved.sourceUrl);
     const terms = await (await request.get(`${api}/api/library/books/${book.id}/terms`, { headers: headers(actor) })).json();
     expect(terms.terms).toHaveLength(1); expect(terms.terms[0].definition).toBe('Synthetic preserved study note');
     await remove(request, actor, book.id);
@@ -192,9 +190,9 @@ test.describe('iPad WebKit cloud reader', () => {
       await a.mouse.move(bounds.x + 1, bounds.y + bounds.height / 2); await a.mouse.down();
       await a.mouse.move(bounds.x + bounds.width - 1, bounds.y + bounds.height / 2, { steps: 12 }); await a.mouse.up();
       await expect.poll(() => a.evaluate(() => window.getSelection()?.toString().trim())).toBe('textbook');
-      await a.getByRole('button', { name: /textbook.*사전 검색/ }).click();
+      await a.getByRole('button', { name: /textbook.*단어 보관/ }).click();
       const dictionary = a.getByRole('dialog', { name: '사전과 단어장' });
-      await expect(dictionary.getByRole('region', { name: '사전 검색 결과' })).toBeVisible({ timeout: 30000 });
+      await expect(dictionary.getByRole('region', { name: '단어 보관 상태' })).toBeVisible({ timeout: 30000 });
       await expect(dictionary.getByRole('region', { name: '저장한 단어장' })).toContainText('textbook');
       await dictionary.getByRole('button', { name: '대화상자 닫기' }).click();
       await a.getByRole('button', { name: '읽기 메뉴', exact: true }).click();
@@ -220,4 +218,22 @@ test.describe('iPad WebKit cloud reader', () => {
       await b.reload(); await expect(b.getByRole('button', { name: 'Renamed cross-device book 표지 보기' })).toHaveCount(0);
     } finally { await first.close(); await second.close(); await remove(request, actor, book.id); }
   });
+});
+
+test('suspended dictionary is explicit, preserves words and manual sources, and keeps ownership/page validation', async ({ request }) => {
+  const actor=await account(request),other=await account(request),original=textbookPdf(4096),book=metadata(original.length,'Suspended dictionary contract');
+  await upload(request,actor,original,book);
+  try {
+    for(const term of ['bank','derivative','은행']) {
+      const lookup=await request.post(`${api}/api/library/books/${book.id}/lookup`,{headers:headers(actor),data:{term,page:1}});expect(lookup.ok()).toBeTruthy();const value=await lookup.json();
+      expect(value.result.status).toBe('temporarily_unavailable');expect(value.result.found).toBe(false);expect(value.result.senses).toEqual([]);expect(value.result.definition).toBe('');expect(value.saved.term).toBe(term);
+    }
+    const saved=await request.post(`${api}/api/library/books/${book.id}/terms`,{headers:headers(actor),data:{page:1,term:'derivative',definition:'기존 메모를 그대로 보존'}});expect(saved.ok()).toBeTruthy();const prior=await saved.json();
+    const again=await request.post(`${api}/api/library/books/${book.id}/lookup`,{headers:headers(actor),data:{term:'derivative',page:1}});expect(again.ok()).toBeTruthy();const value=await again.json();expect(value.saved.definition).toBe(prior.definition);expect(value.saved.sourceUrl).toBe(prior.sourceUrl);
+    expect((await request.post(`${api}/api/library/books/${book.id}/lookup`,{headers:headers(other),data:{term:'derivative',page:1}})).status()).toBe(404);
+    expect((await request.post(`${api}/api/library/books/${book.id}/lookup`,{headers:headers(actor),data:{term:'derivative',page:0}})).status()).toBe(400);
+    expect((await request.post(`${api}/api/library/books/${book.id}/lookup`,{headers:headers(actor),data:{term:'x'.repeat(121),page:1}})).status()).toBe(400);
+    expect((await request.post(`${api}/api/library/books/${book.id}/terms`,{headers:headers(actor),data:{term:'derivative',page:1,definition:'unchanged',sourceProvider:'opendict'}})).status()).toBe(400);
+    const all=await(await request.get(`${api}/api/library/books/${book.id}/terms`,{headers:headers(actor)})).json();expect(all.terms).toHaveLength(3);expect(all.terms.find((term:{term:string})=>term.term==='derivative').definition).toBe(prior.definition);
+  } finally {await remove(request,actor,book.id);}
 });

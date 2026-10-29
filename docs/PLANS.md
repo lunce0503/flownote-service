@@ -22,7 +22,10 @@
 
 ## 진행 중인 작업
 
-- [노트 생성·편집·수식과 Android 업데이트 설정](exec-plan/active/2026-10-28-note-editing.md): 구현·Windows 양쪽 Notes 통과, 새 진단 full은123통과/5실패(모두 사전). staging API 절전 해제를 active 배포에서 확인했다. 사용자 충전 완료 통보와 최종 frozen 소스 full gate 전 운영 승격·Android 공개 릴리스는 보류한다.
+- [사전 자동 조회 보류와 앱 릴리스](exec-plan/active/2026-10-29-dictionary-suspension-release.md): 사용자 명시 범위 변경. 외부 조회0/단어장·메모 보존으로 새129개 gate와 기존 앱 검증 후 노트/업데이트를 배포한다. 사전 복구 대기는 이번 릴리스 조건이 아니다.
+
+
+- [노트 생성·편집·수식과 Android 업데이트 설정](exec-plan/active/2026-10-28-note-editing.md): 구현·Windows 양쪽 Notes 통과, 이전123/5는 자동 사전 계약의 진단이다. 최신 사용자 요청으로 사전 자동 조회를 보류하고 새129개 보존/수동 편집 계약으로 검증·운영/앱 공개를 진행한다. staging API always-on은 유지한다.
 
 - [책 읽기 조작·두 쪽 보기·한국어 사전](exec-plan/active/2026-10-27-library-reader-korean.md): 완료. 전체116개·핵심9개·기존 앱을 검증하고 동일 소스 운영 반영했다.
 

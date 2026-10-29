@@ -3,7 +3,8 @@ import { libraryError, libraryRequest, syncLibrary } from './cloud';
 import { acknowledgeTerm, activeLibraryLookups, listLocalTerms, mergeTermSnapshot, mutateLocalTerm, ownerCheck, putLocalTerm, type LibraryTerm } from './storage';
 
 export type DictionarySense = { partOfSpeech: string; definition: string; translation: string };
-export type DictionaryResult = { term: string; definition: string; sourceUrl: string; found: boolean; license: string; language?: string; senses?: DictionarySense[] };
+export type DictionaryResult = { term: string; definition: string; sourceUrl: string; found: boolean; license: string; language?: string; senses?: DictionarySense[]; status?: 'temporarily_unavailable' };
+const pausedResult = (term: string): DictionaryResult => ({ term, status: 'temporarily_unavailable', found: false, definition: '', sourceUrl: '', license: '', senses: [] });
 const termKey = (bookId: string, page: number, term: string) => JSON.stringify([bookId, page, term]);
 const source = (term: string) => `https://en.wiktionary.org/wiki/${encodeURIComponent(term)}`;
 export async function listTerms(owner: string, bookId: string, strict = false): Promise<LibraryTerm[]> {
@@ -28,14 +29,19 @@ export async function lookupTerm(owner: string, bookId: string, page: number, se
   const term = selected.trim().replace(/\s+/g, ' ');
   if (!term || [...term].length > 120 || [...term].some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) throw new Error('120자 이내의 단어나 짧은 구절을 선택해 주세요.');
   const existing = (await listLocalTerms(owner, bookId)).find(item => !item.deleted && item.page === page && item.term === term);
-  const record: LibraryTerm = { id: existing?.id ?? crypto.randomUUID(), bookId, page, term,
-    definition: existing?.definition ?? '', sourceUrl: source(term), createdAt: existing?.createdAt ?? new Date().toISOString(),
-    pending: true, localVersion: (existing?.localVersion ?? 0) + 1, cloudId: existing?.cloudId };
+  // Opening an existing word must never acknowledge an older cloud memo over local edits.
+  if (existing) {
+    if (!isDeviceOnly()) void syncLibrary(owner, true).catch(() => {});
+    return pausedResult(term);
+  }
+  const record: LibraryTerm = { id: crypto.randomUUID(), bookId, page, term,
+    definition: '', sourceUrl: source(term), createdAt: new Date().toISOString(),
+    pending: true, localVersion: 1 };
   const key = termKey(bookId, page, term);
   activeLibraryLookups.add(key);
   try {
     await putLocalTerm(owner, record);
-    if (isDeviceOnly()) throw new Error('단어를 기기에 저장했습니다. 사전 검색은 동기화를 켠 뒤 사용할 수 있습니다.');
+    if (isDeviceOnly()) return pausedResult(term);
     await syncLibrary(owner, true);
     const response = await libraryRequest<{ result: DictionaryResult; saved: LibraryTerm }>(owner, `/books/${bookId}/lookup`, {
       method: 'POST', data: { id: record.cloudId ?? record.id, page, term },
@@ -46,7 +52,7 @@ export async function lookupTerm(owner: string, bookId: string, page: number, se
     throw new Error(`${libraryError(error)} 선택한 단어는 기기에 보관했습니다.`, { cause: error });
   } finally {
     activeLibraryLookups.delete(key);
-    void syncLibrary(owner, true).catch(() => {});
+    if (!isDeviceOnly()) void syncLibrary(owner, true).catch(() => {});
   }
 }
 export async function saveTermDefinition(owner: string, term: LibraryTerm, definition: string) {

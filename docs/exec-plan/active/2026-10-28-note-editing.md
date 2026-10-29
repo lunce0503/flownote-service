@@ -2,6 +2,8 @@
 
 상태: 구현·staging/native 검증 진행, 운영 승격 보류. 운영 기준 058828a / dpl_BmWBxsWc4ffYw3DwuM4V3m8EfS55는 유지됐다. 최신 진단 전체128은123통과/5실패(모두 사전)이며 전체 목표는 미완료다. 정책/검사 도구 변경 후의 최종 matching gate는 아직 없다. 이전 읽기 기능의116개 통과 기록을 이번 완료 증거로 사용하지 않는다. [현재 증거·차단점·재개 절차](../../../logs/report/2026-10-29-1512-staging-api-warm-release-blocked.md)를 따른다.
 
+2026-10-29 최신 범위: 사용자가 사전 기능을 보류하고 다른 기능을 배포하라고 명시했다. 사전 복구/충전은 이번 릴리스의 선행 조건에서 제외하며 [사전 보류 릴리스 계획](2026-10-29-dictionary-suspension-release.md)의 외부 호출0·단어장 보존 계약으로 새 전체129개 gate를 수행한다. 기존123/5는 이전 계약 진단이며 새 성공 기록이 아니다.
+
 ## 사용자 요구와 완료 기준
 
 1. 통합 목록과 노트 편집 화면 모두 새 노트를 만들 수 있다. 네이티브에서 지원되지 않는 window.prompt에 의존하지 않는다. 연속 클릭 중 중복 생성을 막고 선택 폴더를 유지한다. 폴더 배치만 실패하면 만들어진 노트와 오류를 구분한다. 기기 전용 모드에서도 생성/편집/재시작을 유지한다.
@@ -39,8 +41,8 @@
 - [x] Android1.3.1(13100) 양 채널 서명 APK/feed/안내 준비 및 실제 staging 파일 해시 readback. production/GitHub 공개 릴리스 완료를 뜻하지 않는다.
 - [x] 같은 공개 staging APK에서 업데이트/설정 구간 PASS, canonical Android CDP 대조군5/5·실제 Notes 전체 PASS를 실행별로 확인했다. hw=yes/IMEoff 단독 실패도 정정했으며 원래 세 명령을 Android에서만 pipeline 전송한다. 물리 Gboard/입력기 검증은 별도 미완료다.
 - [x] staging API always-on 정책과 actual 배포 `eba08ed9-31fc-4cfc-904e-c18dc513d554` SUCCESS/sleep=false 확인. API 소스는0c8f5ac와 동일하고 실제 signup3/3·Android 최초 로그인1/1이 통과했다.
-- [ ] 같은 frozen 후보 최종128/128 통과. 8991401 기반 새 진단은123/5이며5개 모두 기존 사전 차단이다. 첫 익명 진입은 이번에 통과했지만 과거 빈 화면 원인은 미확정이다. 독립 signup2실패는 cold-wake502로 분리했다. assertion/timeout/테스트 수를 유지하며 정책/helper 변경 후 matching receipt는 없다.
-- [ ] provider 회복 뒤 Windows 양쪽 Reader를 포함한 aggregate 및 같은 소스 전체 gate를 다시 완료한다. Android는 같은 APK의 분리 실행 결과를 보고서에 구분하며 전체 native 단일 실행 성공으로 과장하지 않는다. 실제 입력기 미검증도 남겨 둔다.
-- [ ] 유효한 matching receipt 생성 후 production web 승격·alias/assets/auth/mobile config/8서명 feed/APK readback, 기존 채널 GitHub Android 공개 릴리스, 계획 완료 정정.
+- [ ] 사용자 보류 계약의 같은 frozen 후보129/129 통과. 자동 정의/다의어 결과 대신 명시적 보류·외부 호출0·단어/직접 메모·출처·2쪽 선택을 검증한다. 나머지 원래 기능·권한·OFF/ON·원본 보존 assertion은 유지한다.
+- [ ] Windows 양쪽 Notes+Reader의 보류 안내/단어·메모 저장/재로드까지 aggregate를 완료한다. Android 같은 APK에서 변경된 공통 웹을 확인하며 물리 입력기 검증과 구분한다.
+- [ ] 유효 matching blog receipt 뒤 같은 소스 canvas/web production 승격·alias/assets/auth/mobile config/8서명 feed/APK readback, Android 기존 draft target/보류 notes 갱신 후 공개와 문서 완료 정정.
 
-2026-10-29 14:48 KST에도 provider402가 확인됐다. 사용자는 충전 후 알려주겠다고 답했으며 아직 충전 완료 통보가 아니다. 완료 통보 전 provider 재조회·새 full 반복·production 승격을 보류한다. 결제/키 변경을 자동 실행하거나 mock/skip으로 통과시키지 않는다. 사용자의 후속 지시에 따라 native 검증과 소스/기록 commit·push를 정리한 뒤 외부 조건 회복을 기다린다. 운영 배포를 위해 추가 재승인을 요구하지 않으며, provider 회복 후 기존 승인 범위에서 남은 검증/승격/릴리스를 진행한다. 물리 Android/Gboard·iPad/Pencil 검증은 에뮬레이션과 구분한다.
+최신 명시적 범위 변경으로 사전 충전/우리말샘 구현은 이번 릴리스 조건이 아니다. 사전 기능을 보류하고 다른 기능을 운영/앱 공개까지 완료한다. 미완성 우리말샘 작업은 별도 secret-free backup에 보존했으며 새 재개 요청 전 호출/production 키 등록을 하지 않는다. API stage always-on과 노트/업데이트 기능은 유지한다. 추가 재승인 없이 현재 사용자 승인 범위에서 검증·승격·릴리스를 진행한다.

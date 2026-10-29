@@ -35,7 +35,7 @@ async function swipe(page:Page,engine:string,left=true,multi=false){
  }
 }
 export function registerReaderUpgrade(engine:'chromium'|'webkit',width:number){
- test.describe(`reader navigation and Korean dictionary ${engine} ${width}px`,()=>{
+ test.describe(`reader navigation and suspended dictionary ${engine} ${width}px`,()=>{
   test.use({viewport:{width,height:1000},hasTouch:true,...(engine==='chromium'&&width<600?{isMobile:true,userAgent:'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/132.0 Mobile Safari/537.36 FlownoteAndroid/1.3.0'}:{})});
   test('wheel, Space and spread layout preserve pages, odd end, progress, selection and remembered settings',async({page,request})=>{
    const actor=await createCloudActor(request);await openReader(page,actor);const viewport=page.getByTestId('library-reader-viewport');
@@ -64,7 +64,7 @@ export function registerReaderUpgrade(engine:'chromium'|'webkit',width:number){
    await showReaderTools(page);
    await page.screenshot({path:test.info().outputPath('reader-spread.png'),fullPage:true});
   });
-  test('the second PDF page selects real text and displays multiple Korean meanings saved on page two',async({page,request})=>{
+  test('the second PDF page selects real text and preserves paused dictionary words and manual notes on page two',async({page,request})=>{
    test.setTimeout(150000);const actor=await createCloudActor(request);await openReader(page,actor);await showReaderTools(page);await page.getByRole('button',{name:'두 쪽 보기',exact:true}).click();await expect.poll(()=>pageNumbers(page)).toEqual(['1','2']);
    await showReaderTools(page);
    const text=page.locator('[data-testid="library-pdf-text"][data-page="2"]');await expect(text).toContainText('derivative');
@@ -72,15 +72,16 @@ export function registerReaderUpgrade(engine:'chromium'|'webkit',width:number){
    await page.mouse.move(b.x+.3,b.y+b.h/2);await page.mouse.down();await page.mouse.move(b.x+b.w-.3,b.y+b.h/2,{steps:12});await page.mouse.up();
    await expect.poll(()=>page.evaluate(()=>getSelection()?.toString().trim())).toBe('derivative');
    await expect(page.locator('.reader-floating-toolbar')).toBeVisible();
-   const action=page.getByRole('button',{name:/derivative.*사전 검색/});await expect(action).toBeVisible();
+   const action=page.getByRole('button',{name:/derivative.*단어 보관/});await expect(action).toBeVisible();
    const actionBox=await action.boundingBox(),toolbarBox=await page.locator('.reader-floating-toolbar').boundingBox();expect(actionBox).not.toBeNull();expect(toolbarBox).not.toBeNull();expect(actionBox!.y+actionBox!.height).toBeLessThanOrEqual(toolbarBox!.y-8);
    await page.screenshot({path:test.info().outputPath('reader-selection-controls.png'),fullPage:true});
-   await page.getByRole('button',{name:/derivative.*사전 검색/}).click();const dictionary=page.getByRole('dialog',{name:'사전과 단어장'});const result=dictionary.getByRole('region',{name:'사전 검색 결과'});
-   await expect(result.locator('.dictionary-senses li').first()).toBeVisible({timeout:40000});expect(await result.locator('.dictionary-senses li').count()).toBeGreaterThan(1);
-   expect(await result.locator('p[lang=ko]').evaluateAll(nodes=>nodes.every(node=>/[가-힣]/.test(node.textContent||'')))).toBe(true);
-   await expect(result.locator('details p').first()).toBeHidden();await expect(dictionary.getByRole('region',{name:'저장한 단어장'})).toContainText('2쪽');
+   await page.getByRole('button',{name:/derivative.*단어 보관/}).click();const dictionary=page.getByRole('dialog',{name:'사전과 단어장'});const result=dictionary.getByRole('region',{name:'단어 보관 상태'});
+   await expect(result).toContainText('derivative');await expect(dictionary.getByText('자동 사전 조회는 잠시 준비 중입니다.',{exact:false})).toBeVisible();
+   const words=dictionary.getByRole('region',{name:'저장한 단어장'});await expect(words).toContainText('2쪽');
+   await words.getByRole('button',{name:'뜻·메모 편집',exact:true}).click();await words.getByLabel('derivative 뜻과 메모').fill('직접 쓴 수학 메모');await words.getByRole('button',{name:'뜻·메모 저장',exact:true}).click();await expect(words).toContainText('직접 쓴 수학 메모');
+   await dictionary.getByRole('button',{name:'단어 보관',exact:true}).click();await expect(words).toContainText('직접 쓴 수학 메모');
    const books=await(await request.get(`${api}/api/library/books`,{headers:{Authorization:`Bearer ${actor.token}`}})).json();const terms=await(await request.get(`${api}/api/library/books/${books.books[0].id}/terms`,{headers:{Authorization:`Bearer ${actor.token}`}})).json();
-   expect(terms.terms[0].page).toBe(2);expect(terms.terms[0].definition).toMatch(/[가-힣]/);
+   expect(terms.terms[0].page).toBe(2);expect(terms.terms[0].definition).toBe('직접 쓴 수학 메모');expect(terms.terms[0].sourceUrl).toBe('https://en.wiktionary.org/wiki/derivative');
   });
   test('finger swipes turn pages while zooming and multiple contacts preserve the current page',async({page,request})=>{
    const actor=await createCloudActor(request);await openReader(page,actor);await swipe(page,engine);await expect(page.getByTestId('library-pdf-page')).toHaveAttribute('data-page','2');

@@ -2,6 +2,8 @@
 
 작성: 2026-10-29 15:12, 소스 정리 15:16 Asia/Seoul. 이전 [앱 관리 보고서](2026-10-29-1420-note-editing-app-release-pending.md)의 후속이다. **전체 목표/운영 승격/Android 공개 릴리스는 미완료**다. 사용자는 충전 후 알려주겠다고 답했으며 충전 완료는 아니다. 이 응답 뒤 provider 반복 조회·새 full 반복·무단 결제/키 변경을 실행하지 않는다. 작업 취소/일시정지로 해석하지 않는다.
 
+후속 사용자 범위 정정: “일단 사전 기능은 보류하고 다른 기능을 적용해서 배포완료해”에 따라 이 기록의 사전 복구 선행 조건은 이번 릴리스에 적용하지 않는다. 현재 계약/배포 절차는 [사전 보류 릴리스 계획](../../docs/exec-plan/active/2026-10-29-dictionary-suspension-release.md)을 따른다. 기존123/5 진단은 새 보류 계약의 성공 기록이 아니다.
+
 ## 소스·배포와 수정 범위
 
 - canonical `/tmp/flownote-note-editing-20261028`, branch `codex/note-editing-20261028`, 이번 delta 기준89914017f0eab0eaae4d9843f4b50ce3f674a9ff. 부모는899 상태54파일을 공유 root에 검증 반영했다. 이번에도 root/Remote를 직접 수정하지 않았다.

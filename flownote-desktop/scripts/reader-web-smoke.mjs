@@ -33,13 +33,16 @@ export async function verifyReader(page,{touch=false}={}) {
   const box=await text.evaluate(layer=>{const node=Array.from(layer.querySelectorAll('span')).find(n=>n.textContent?.includes('derivative'))?.firstChild;if(!node)throw Error('Native PDF glyphs missing');const index=node.textContent.indexOf('derivative'),range=document.createRange();range.setStart(node,index);range.setEnd(node,index+10);const r=range.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height};});
   await page.mouse.move(box.x+.3,box.y+box.h/2);await page.mouse.down();await page.mouse.move(box.x+box.w-.3,box.y+box.h/2,{steps:12});await page.mouse.up();
   assert.equal(await page.evaluate(()=>getSelection()?.toString().trim()),'derivative');
-  const action=page.getByRole('button',{name:/derivative.*사전 검색/});await action.waitFor();const a=await action.boundingBox(),b=await page.locator('.reader-floating-toolbar').boundingBox();assert(a&&b&&a.y+a.height<=b.y-8,'Native selection action overlaps toolbar');
-  await action.click();const result=page.getByRole('region',{name:'사전 검색 결과'});await result.locator('.dictionary-senses li').first().waitFor({timeout:45000});
-  assert(await result.locator('.dictionary-senses li').count()>1);assert(await result.locator('p[lang=ko]').evaluateAll(nodes=>nodes.length>1&&nodes.every(n=>/[가-힣]/.test(n.textContent||''))));
-  assert((await page.getByRole('region',{name:'저장한 단어장'}).textContent()).includes('2쪽'));
+  const action=page.getByRole('button',{name:/derivative.*단어 보관/});await action.waitFor();const a=await action.boundingBox(),b=await page.locator('.reader-floating-toolbar').boundingBox();assert(a&&b&&a.y+a.height<=b.y-8,'Native selection action overlaps toolbar');
+  await action.click();const result=page.getByRole('region',{name:'단어 보관 상태'});await result.waitFor();
+  const dictionary=page.getByRole('dialog',{name:'사전과 단어장'}),words=dictionary.getByRole('region',{name:'저장한 단어장'});
+  await dictionary.getByText('자동 사전 조회는 잠시 준비 중입니다.',{exact:false}).waitFor();assert((await words.textContent()).includes('2쪽'));
+  await words.getByRole('button',{name:'뜻·메모 편집',exact:true}).click();await words.getByLabel('derivative 뜻과 메모').fill('Synthetic native reader memo');await words.getByRole('button',{name:'뜻·메모 저장',exact:true}).click();await words.getByText('Synthetic native reader memo',{exact:true}).waitFor();
+  await dictionary.getByRole('button',{name:'단어 보관',exact:true}).click();assert((await words.textContent()).includes('Synthetic native reader memo'));
+  await page.reload();await page.getByRole('button',{name:title+' 표지 보기',exact:true}).click();await page.getByRole('button',{name:'책 읽기',exact:true}).click();await tools();await page.getByRole('button',{name:'읽기 메뉴',exact:true}).click();await page.getByRole('menuitem',{name:'사전·단어장'}).click();await page.getByRole('region',{name:'저장한 단어장'}).getByText('Synthetic native reader memo',{exact:true}).waitFor();assert((await page.getByRole('region',{name:'저장한 단어장'}).textContent()).includes('2쪽'));
   await page.getByRole('dialog',{name:'사전과 단어장'}).getByRole('button',{name:'대화상자 닫기',exact:true}).click();
   await page.getByRole('button',{name:'읽기 메뉴',exact:true}).click();await page.getByRole('menuitem',{name:'표지로 돌아가기'}).click();
   page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'책장에서 삭제',exact:true}).click();
-  console.log('PASS native reader: wheel/Space, two-page PDF glyph drag, non-overlapping controls, Korean multiple meanings and page-two vocabulary');
+  console.log('PASS native reader: wheel/Space, two-page PDF glyph drag, non-overlapping controls, explicit dictionary suspension, manual memo save/reload and page-two vocabulary');
   await page.goto(prior);
 }

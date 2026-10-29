@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"html"
-	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -19,7 +18,6 @@ import (
 	"github.com/flownote/flownote-canvas/internal/httpjson"
 )
 
-var dictionaryClient = &http.Client{Timeout: 8 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 var tags = regexp.MustCompile(`<[^>]*>`)
 
 func plainDefinition(value string) string {
@@ -51,6 +49,7 @@ type DictionaryResult struct {
 	Found      bool              `json:"found"`
 	Language   string            `json:"language"`
 	Senses     []DictionarySense `json:"senses"`
+	Status     string            `json:"status,omitempty"`
 }
 type dictionaryEntry struct {
 	PartOfSpeech string `json:"partOfSpeech"`
@@ -133,29 +132,10 @@ func parseDefinitions(data []byte, term string) (DictionaryResult, error) {
 	result.Definition = strings.Join(definitions, "\n\n")
 	return result, nil
 }
-func lookupDictionary(ctx context.Context, term string) (DictionaryResult, error) {
-	result := DictionaryResult{Term: term, SourceURL: sourceURL(term), License: "Wiktionary · CC BY-SA"}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://en.wiktionary.org/api/rest_v1/page/definition/"+url.PathEscape(term), nil)
-	if err != nil {
-		return result, err
-	}
-	req.Header.Set("User-Agent", "Flownote/1.3 (private textbook dictionary; https://github.com/lunce0503/flownote-service)")
-	response, err := dictionaryClient.Do(req)
-	if err != nil {
-		return result, httpjson.Errorf(503, "사전에 연결하지 못했습니다. 단어는 직접 저장하거나 다시 검색할 수 있습니다.")
-	}
-	defer response.Body.Close()
-	if response.StatusCode == 404 {
-		return result, nil
-	}
-	if response.StatusCode != 200 {
-		return result, httpjson.Errorf(503, "사전이 응답하지 않습니다. 잠시 뒤 다시 검색해 주세요.")
-	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, 2*1024*1024+1))
-	if err != nil || len(data) > 2*1024*1024 {
-		return result, httpjson.Errorf(502, "사전 응답이 너무 크거나 완전하지 않습니다.")
-	}
-	return parseDefinitions(data, term)
+
+// User-requested suspension: this boundary has no outbound HTTP path, regardless of keys.
+func lookupDictionary(_ context.Context, term string) (DictionaryResult, error) {
+	return DictionaryResult{Term: term, Status: "temporarily_unavailable", Senses: []DictionarySense{}}, nil
 }
 
 type Term struct {
@@ -194,8 +174,8 @@ func (r *Repo) saveTerm(ctx context.Context, user string, t Term, overwrite bool
 	t.SourceURL = sourceURL(t.Term)
 	err = tx.QueryRow(ctx, `INSERT INTO library_terms(id,user_id,book_id,page,term,definition,source_url)
       SELECT $1,$2,$3,$4,$5,$6,$7 WHERE EXISTS(SELECT 1 FROM library_books WHERE id=$3 AND user_id=$2 AND deleted_at IS NULL)
-      ON CONFLICT(user_id,book_id,page,term) DO UPDATE SET definition=CASE WHEN $8 OR library_terms.definition='' THEN EXCLUDED.definition ELSE library_terms.definition END,source_url=EXCLUDED.source_url
-      RETURNING id::text,definition,created_at`, t.ID, user, t.BookID, t.Page, t.Term, t.Definition, t.SourceURL, overwrite).Scan(&t.ID, &t.Definition, &t.CreatedAt)
+      ON CONFLICT(user_id,book_id,page,term) DO UPDATE SET definition=CASE WHEN $8 OR library_terms.definition='' THEN EXCLUDED.definition ELSE library_terms.definition END,source_url=library_terms.source_url
+      RETURNING id::text,definition,source_url,created_at`, t.ID, user, t.BookID, t.Page, t.Term, t.Definition, t.SourceURL, overwrite).Scan(&t.ID, &t.Definition, &t.SourceURL, &t.CreatedAt)
 	if err != nil {
 		return t, rowError(err)
 	}
@@ -229,30 +209,12 @@ func (h *Handler) lookup(w http.ResponseWriter, r *http.Request) {
 		respond(w, nil, httpjson.Errorf(400, "페이지가 올바르지 않습니다."))
 		return
 	}
-	if !h.translator.Allow(auth.UserID(r.Context())) {
-		w.Header().Set("Retry-After", "60")
-		respond(w, nil, httpjson.Errorf(429, "사전 검색이 잠시 많습니다. 1분 뒤 다시 검색해 주세요."))
-		return
-	}
 	definition, err := lookupDictionary(r.Context(), req.Term)
 	if err != nil {
 		respond(w, nil, err)
 		return
 	}
-	if definition.Found {
-		translated, translationErr := h.translator.Translate(r.Context(), req.Term, definition.Senses)
-		if translationErr != nil {
-			respond(w, nil, translationErr)
-			return
-		}
-		definitions := []string{}
-		for index := range definition.Senses {
-			definition.Senses[index].Translation = translated[index]
-			definitions = append(definitions, strconv.Itoa(index+1)+". "+translated[index])
-		}
-		definition.Language = "ko"
-		definition.Definition = strings.Join(definitions, "\n\n")
-	}
+
 	term, err := h.repo.saveTerm(r.Context(), auth.UserID(r.Context()), Term{ID: req.ID, BookID: b.ID, Page: req.Page, Term: req.Term, Definition: definition.Definition}, false)
 	respond(w, map[string]any{"result": definition, "saved": term}, err)
 }
