@@ -48,7 +48,15 @@ whoami 인증·프로젝트07ae56ef-08be-432d-948b-8f3b6ecb6cd5·staging7e60dd1e
 
 후보1.3.1(13100)의 production 서명 APK는70,536bytes, SHA-256 `f2bae34c4a4f8f0b2672e52af8ff01275b97fc7418d853ce68e3a5c1ba288f64`다. 기존 운영 signer와 동일하며 바이너리는 이번 delta에서 바꾸지 않았다. checksum과 한국어 notes를 `/tmp/flownote-android-1.3.1-release/`, `/tmp/flownote-android-1.3.1-release-notes.md`에 준비했다.
 
-사용자 요청에 따라 최종 소스 commit/push 후 기존 `android-v1.3.1` tag/release 유무를 다시 조회하고 GitHub **draft**를 준비한다. 정확한 APK/checksum만 업로드하고 draft 상태·remote artifact를 확인해 아래에 추가한다. 권한/아티팩트 문제가 있으면 공개 우회 없이 기록한다. **draft 준비는 공개 앱 릴리스나 운영 feed 활성화가 아니다.** 현재 production Android feed는1.3.0이며 staging만1.3.1이다.
+2026-10-29 21:15 KST: 소스/정책 commit `2a954e59641ba6aba0bcc7feb00d8bacad011b5e`를 push한 뒤 tag/release가 모두 없음을 재조회하고 기존 채널의 **GitHub draft 준비를 완료했다**.
+
+- [Android1.3.1 draft](https://github.com/lunce0503/flownote-service/releases/tag/untagged-c0d072692c454b0ec7f3), release ID427822649, tag_name `android-v1.3.1`.
+- `draft=true`, `published_at=null`, target `2a954e59641ba6aba0bcc7feb00d8bacad011b5e`. 이 후속 기록 commit은 보고서만 바꾸며 소스 지문은 동일하다.
+- 자산은 `flownote-1.3.1.apk`70,536bytes와 `SHA256SUMS.txt`85bytes 두 개뿐이다. GitHub asset digest와 ID 기반 실제 다운로드 바이트를 모두 확인해 canonical APK/hash 및 checksum 한 줄과 일치했다.
+- APK SHA-256: `f2bae34c4a4f8f0b2672e52af8ff01275b97fc7418d853ce68e3a5c1ba288f64`. checksum 파일 SHA-256: `d271bd521037d839331df194a43022551b67445644140281f766cfc5d0fa044b`.
+- `/tmp/flownote-android-1.3.1-draft-verified.json`에 검증 상태와 공개 artifact metadata만 남겼다. 초기 tag endpoint404는 release 목록에서 draft ID를 조회해 구분했고 중복 생성하지 않았다.
+
+**draft 준비는 공개 앱 릴리스나 운영 feed 활성화가 아니다.** production Android feed1.3.0/staging1.3.1 상태를 바꾸지 않았다. 사용자 충전 완료 통보, 실제 사전 복구, 최종 frozen128/Windows Reader 검증, 같은 소스 production 승격/readback 전에는 publish하지 않는다. draft target은 승격 때 최종 검증 소스/바이트와 다시 대조한다.
 
 ## 충전 완료 통보 후 재개
 
@@ -78,3 +86,5 @@ node scripts/deploy-cloud.mjs production web
 문서만 정리했다는 이유로 production gate를 우회하지 않는다. 이번 허용된 backend 작업은 staging API의 설정 적용용 동일 소스 배포뿐이며 production API/DB/canvas/다른 제품은 미변경이다. 부모는 최종 clean HEAD의899 이후 delta만 baseline guard로 공유 root에 반영한다.
 
 최종 준비 기록: 2026-10-29 21:12 Asia/Seoul. 충전 완료 통보가 없어 provider 재조회/full 재반복/운영 승격을 실행하지 않았다. 신규 API 적용·실제123/5 진단 결과를 재사용하고 마지막 source fingerprint와 문서/릴리스 초안 준비를 정리한다.
+
+최종 문서 확인: source fingerprint900da0efb5415c0cd75de3b7e73b58a33556524ebaddf578a99188cf69bd4647 유지, 로컬 링크21개 누락0, git diff --check 통과. 새 provider 조회나 full/production 검증 반복 없이 공개 전 draft 자산만 실제 readback했다.
