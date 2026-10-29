@@ -6,9 +6,22 @@ export async function verifyNoteEditing(page, token) {
   const api = 'https://flownote-api-staging.up.railway.app';
   const ids = [];
   const inlineMath = latex => page.waitForFunction(value => Array.from(document.querySelectorAll('[data-type="inline-math"]')).some(node => node.getAttribute('data-latex') === value), latex);
-  const saved = () => page.waitForFunction(() => document.querySelector('[data-testid="note-save-status"]')?.textContent?.trim() === '서버에 저장됨');
+  const diagnostics = editor => editor.evaluate(node => ({
+    text: node.textContent, active: document.activeElement?.getAttribute('aria-label'),
+    domSelection: [getSelection()?.anchorOffset, getSelection()?.focusOffset],
+    pmSelection: Reflect.get(node, 'editor') ? [Reflect.get(node, 'editor').state.selection.from, Reflect.get(node, 'editor').state.selection.to] : null,
+    composing: Reflect.get(node, 'editor')?.view.composing,
+    ime: Reflect.get(node, '__flownoteImeCounts'),
+    keys: Reflect.get(node, '__flownoteNativeKeys'),
+    saveStatus: document.querySelector('[data-testid="note-save-status"]')?.textContent,
+  }));
+  const saved = async () => {
+    try { await page.waitForFunction(() => document.querySelector('[data-testid="note-save-status"]')?.textContent?.trim() === '서버에 저장됨'); }
+    catch (error) { throw new Error(`Native note save failed: ${JSON.stringify(await diagnostics(page.getByRole('textbox', { name: '노트 편집', exact: true })))}\n${error.stack}`); }
+  };
   const text = async (editor, expected) => {
-    await page.waitForFunction(value => document.querySelector('[role="textbox"][aria-label="노트 편집"]')?.textContent === value, expected);
+    try { await page.waitForFunction(value => document.querySelector('[role="textbox"][aria-label="노트 편집"]')?.textContent === value, expected); }
+    catch (error) { throw new Error(`Native note text mismatch; expected=${JSON.stringify(expected)}; actual=${JSON.stringify(await diagnostics(editor))}\n${error.stack}`); }
     assert.equal(await editor.textContent(), expected);
   };
   const create = async () => {
@@ -17,7 +30,17 @@ export async function verifyNoteEditing(page, token) {
     await page.waitForURL(url => /\/blog\/[a-z0-9-]+$/.test(url.pathname) && url.href !== previous);
     ids.push(page.url().split('/').at(-1));
     const editor = page.getByRole('textbox', { name: '노트 편집', exact: true });
-    await editor.waitFor(); return editor;
+    await editor.waitFor();
+    await editor.evaluate(node => {
+      const keys = []; Object.assign(node, { __flownoteNativeKeys: keys });
+      for (const type of ['keydown', 'keyup']) node.addEventListener(type, event => {
+        if (!['Home', 'End', 'Delete', 'ArrowRight'].includes(event.key)) return;
+        const editor = Reflect.get(node, 'editor');
+        keys.push({ type, key: event.key, dom: [getSelection()?.anchorOffset, getSelection()?.focusOffset], pm: editor ? [editor.state.selection.anchor, editor.state.selection.head] : null, active: document.activeElement?.getAttribute('aria-label') });
+        if (keys.length > 40) keys.shift();
+      }, true);
+    });
+    return editor;
   };
   try {
     await page.goto(web + '/blog');
@@ -31,13 +54,22 @@ export async function verifyNoteEditing(page, token) {
     await editor.press('ControlOrMeta+Shift+z'); await text(editor, 'alpha new beta gamma');
     await editor.press('Home'); for (let i = 0; i < 6; i++) await editor.press('ArrowRight');
     for (let i = 0; i < 4; i++) await editor.press('Shift+ArrowRight');
+    await editor.evaluate(node => {
+      const counts = { ends: 0, events: [] }; Object.assign(node, { __flownoteImeCounts: counts });
+      for (const type of ['compositionstart', 'compositionupdate', 'compositionend', 'focusout']) node.addEventListener(type, event => {
+        if (type === 'compositionend') counts.ends++;
+        counts.events.push({ type, data: event.data, text: node.textContent, active: document.activeElement?.getAttribute('aria-label') });
+      });
+    });
     const cdp = await page.context().newCDPSession(page);
-    await editor.evaluate(node => { node.setAttribute('data-ime-ends', '0'); node.addEventListener('compositionend', () => node.setAttribute('data-ime-ends', String(Number(node.getAttribute('data-ime-ends')) + 1))); });
     await cdp.send('Input.imeSetComposition', { text: '한', selectionStart: 1, selectionEnd: 1 });
     await cdp.send('Input.imeSetComposition', { text: '한글', selectionStart: 2, selectionEnd: 2 });
-    await cdp.send('Input.insertText', { text: '한글 ' }); await cdp.detach();
+    await cdp.send('Input.insertText', { text: '한글 ' });
     await text(editor, 'alpha 한글 beta gamma');
-    assert.equal(await editor.getAttribute('data-ime-ends'), '1', 'Multi-step IME must finish once, with no duplicate commit');
+    assert.equal(await editor.evaluate(node => Reflect.get(node, '__flownoteImeCounts').ends), 1, 'Multi-step IME must finish once, with no duplicate commit');
+    await cdp.detach();
+    await text(editor, 'alpha 한글 beta gamma');
+    assert.equal(await editor.evaluate(node => Reflect.get(node, '__flownoteImeCounts').ends), 1);
     assert.equal(await editor.locator('p').count(), 1);
     await editor.press('End'); await editor.press('Backspace'); await editor.pressSequentially('!');
     await text(editor, 'alpha 한글 beta gamm!');
@@ -53,7 +85,7 @@ export async function verifyNoteEditing(page, token) {
     await editor.pressSequentially('x = 1'); await editor.press('Enter'); await editor.pressSequentially('y = 2'); await editor.press('Enter'); await editor.pressSequentially('$$');
     await editor.locator('[data-type="block-math"]').waitFor();
     assert.equal(await editor.locator('[data-type="block-math"]').getAttribute('data-latex'), 'x = 1\ny = 2');
-    await editor.pressSequentially('$ \\fr'); await page.getByRole('group', { name: 'LaTeX 명령어 추천', exact: true }).waitFor();
+    await editor.pressSequentially('Pair: $ \\fr'); await page.getByRole('group', { name: 'LaTeX 명령어 추천', exact: true }).waitFor();
     await editor.press('Tab'); await editor.pressSequentially('a'); await editor.press('ArrowRight'); await editor.press('ArrowRight');
     await editor.pressSequentially('b'); await editor.press('ArrowRight'); await editor.pressSequentially(' $');
     await inlineMath('\\frac{a}{b}');
@@ -65,15 +97,19 @@ export async function verifyNoteEditing(page, token) {
     assert.equal(await dialog.getByLabel('LaTeX 수식', { exact: true }).inputValue(), '\\sqrt{}');
     await dialog.getByLabel('LaTeX 수식', { exact: true }).fill('\\sqrt{4}');
     await dialog.getByRole('button', { name: '수식 적용', exact: true }).click();
-    await inlineMath('\\sqrt{4}'); await saved();
+    await inlineMath('\\sqrt{4}'); await editor.press('End'); await editor.pressSequentially(' tail'); await saved();
     await page.reload(); await editor.locator('[data-type="block-math"]').waitFor();
     assert.equal(await editor.locator('[data-type="block-math"]').getAttribute('data-latex'), 'x = 1\ny = 2');
+    assert.deepEqual(await editor.locator('[data-type="inline-math"]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-latex'))), ['x^2', '\\frac{a}{b}', '\\sqrt{4}']);
     await page.getByRole('button', { name: '편집 도구', exact: true }).click();
     await page.getByRole('button', { name: '원문', exact: true }).click();
     const source = page.getByLabel('Markdown 본문', { exact: true });
     assert.match(await source.inputValue(), /\$\$\nx = 1\ny = 2\n\$\$/);
+    assert((await source.inputValue()).includes('Pair: $\\frac{a}{b}$ $\\sqrt{4}$ tail'));
     await page.getByRole('button', { name: '미리보기', exact: true }).click();
     await page.getByTestId('markdown-preview').locator('.katex-display').waitFor();
+    assert.equal(await page.getByTestId('markdown-preview').locator('.katex').count(), 4);
+    assert.equal(await page.getByTestId('markdown-preview').locator('.katex-error').count(), 0);
     await page.getByRole('button', { name: '편집', exact: true }).click();
     await create(); assert.notEqual(ids[0], ids[1]);
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));

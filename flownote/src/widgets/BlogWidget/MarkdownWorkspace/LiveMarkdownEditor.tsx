@@ -17,6 +17,10 @@ import { latexCompletion, type LatexCommand, type MathCompletion } from './mathI
 import LatexSuggestions from './LatexSuggestions';
 import MathComposer, { type MathDraft } from './MathComposer';
 import { markdownSync } from './markdownSync';
+import { separateAdjacentInlineMath } from './mathSerialization';
+import { singleLineBoundary } from './singleLineNavigation';
+
+const serialize = (editor: Editor) => editor.markdown!.serialize(separateAdjacentInlineMath(editor.getJSON()));
 
 const editedViews = new WeakSet<EditorView>();
 
@@ -52,13 +56,14 @@ export default function LiveMarkdownEditor({ value, disabled, toolsOpen, onChang
     setTimeout(() => {
       const editor = currentEditor.current;
       if (!editor || editor.isDestroyed || view.composing || !view.editable) return;
-      const markdown = editor.getMarkdown();
+      const markdown = serialize(editor);
       if (markdown !== lastChange.current) { lastChange.current = markdown; sync.emit(markdown); latest.current.onChange(markdown); }
     }, 0);
     return false;
   }, [sync]);
   const keydown = useCallback((view: EditorView, event: KeyboardEvent) => {
     if (view.composing || event.isComposing || event.keyCode === 229) return false;
+    if (singleLineBoundary(view, event)) return true;
     const completion = completionRef.current;
     if (completion && event.key === 'Tab' && !event.shiftKey) { event.preventDefault(); chooseRef.current(completion.items[0]); return true; }
     if (completion && event.key === 'Escape') { event.preventDefault(); setDismissed(view.state.doc.textBetween(0, view.state.selection.from, '\n', '\ufffc')); return true; }
@@ -76,7 +81,7 @@ export default function LiveMarkdownEditor({ value, disabled, toolsOpen, onChang
   }, []);
   const update = useCallback(({ editor }: { editor: Editor }) => {
     if (latest.current.disabled || editor.view.composing || !editedViews.has(editor.view)) return;
-    const markdown = editor.getMarkdown();
+    const markdown = serialize(editor);
     if (markdown === lastChange.current) return;
     lastChange.current = markdown; sync.emit(markdown); latest.current.onChange(markdown);
   }, [sync]);

@@ -23,7 +23,7 @@ export function registerNoteEditing(width: number, engine: 'chromium' | 'webkit'
       expect(response.ok()).toBe(true); const folder = await response.json();
       try {
         await page.goto(`${web}/blog`);
-        const tree = page.getByRole('treeitem', { name: 'Synthetic destination', exact: true });
+        const tree = page.locator(`[role="treeitem"][data-folder="note:${folder.id}"]`);
         const toggle = page.getByRole('button', { name: '탐색기 토글', exact: true });
         if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
         await expect(tree).toBeVisible();
@@ -87,12 +87,15 @@ export function registerNoteEditing(width: number, engine: 'chromium' | 'webkit'
       await editor.press('Home'); for (let n = 0; n < 6; n++) await editor.press('ArrowRight');
       for (let n = 0; n < 4; n++) await editor.press('Shift+ArrowRight');
       if (engine === 'chromium') {
-        await editor.evaluate(node => { node.setAttribute('data-ime-ends', '0'); node.addEventListener('compositionend', () => node.setAttribute('data-ime-ends', String(Number(node.getAttribute('data-ime-ends')) + 1))); });
+        await editor.evaluate(node => { const counts = { ends: 0 }; Object.assign(node, { __flownoteImeCounts: counts }); node.addEventListener('compositionend', () => { counts.ends++; }); });
         const cdp = await page.context().newCDPSession(page);
         await cdp.send('Input.imeSetComposition', { text: '한', selectionStart: 1, selectionEnd: 1 });
         await cdp.send('Input.imeSetComposition', { text: '한글', selectionStart: 2, selectionEnd: 2 });
-        await cdp.send('Input.insertText', { text: '한글 ' }); await cdp.detach();
-        await expect(editor).toHaveAttribute('data-ime-ends', '1');
+        await cdp.send('Input.insertText', { text: '한글 ' });
+        await expect(editor).toHaveText('alpha 한글 beta gamma');
+        await expect.poll(() => editor.evaluate(node => Reflect.get(node, '__flownoteImeCounts').ends)).toBe(1);
+        await cdp.detach();
+        await expect.poll(() => editor.evaluate(node => Reflect.get(node, '__flownoteImeCounts').ends)).toBe(1);
       } else await editor.pressSequentially('한글 ');
       await expect(editor).toHaveText('alpha 한글 beta gamma'); await expect(editor.locator('p')).toHaveCount(1);
       await editor.press('End'); await editor.press('Backspace'); await editor.pressSequentially('!');
@@ -111,7 +114,7 @@ export function registerNoteEditing(width: number, engine: 'chromium' | 'webkit'
       await editor.press('End'); await editor.press('Enter'); await editor.pressSequentially('$$'); await editor.press('Enter');
       await editor.pressSequentially('x = 1'); await editor.press('Enter'); await editor.pressSequentially('y = 2'); await editor.press('Enter'); await editor.pressSequentially('$$');
       await expect(editor.locator('[data-type=block-math]')).toHaveAttribute('data-latex', 'x = 1\ny = 2');
-      await editor.pressSequentially('$ \\fr');
+      await editor.pressSequentially('Pair: $ \\fr');
       const suggestions = page.getByRole('group', { name: 'LaTeX 명령어 추천', exact: true }); await expect(suggestions).toContainText('\\frac');
       await editor.press('Tab'); await editor.pressSequentially('a'); await editor.press('ArrowRight'); await editor.press('ArrowRight'); await editor.pressSequentially('b'); await editor.press('ArrowRight'); await editor.pressSequentially(' $');
       await expect.poll(() => editor.locator('[data-type=inline-math]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-latex')))).toContain('\\frac{a}{b}');
@@ -120,10 +123,16 @@ export function registerNoteEditing(width: number, engine: 'chromium' | 'webkit'
       await dialog.getByRole('button', { name: /\\sqrt/ }).click(); await expect(dialog.getByLabel('LaTeX 수식', { exact: true })).toHaveValue('\\sqrt{}');
       await dialog.getByLabel('LaTeX 수식', { exact: true }).fill('\\sqrt{4}'); await dialog.getByRole('button', { name: '수식 적용', exact: true }).click();
       await expect.poll(() => editor.locator('[data-type=inline-math]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-latex')))).toContain('\\sqrt{4}');
+      await editor.press('End'); await editor.pressSequentially(' tail');
       await expect(page.getByTestId('note-save-status')).toHaveText('서버에 저장됨');
       await page.reload(); await expect(editor.locator('[data-type=block-math]')).toHaveAttribute('data-latex', 'x = 1\ny = 2');
+      await expect.poll(() => editor.locator('[data-type=inline-math]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-latex')))).toEqual(['x^2', '\\frac{a}{b}', '\\sqrt{4}']);
       const source = await markdownSource(page); await expect(source).toHaveValue(/\$\$\nx = 1\ny = 2\n\$\$/);
+      await expect(source).toHaveValue(/Pair: \$\\frac\{a\}\{b\}\$ \$\\sqrt\{4\}\$ tail/);
       await page.getByRole('button', { name: '미리보기', exact: true }).click(); await expect(page.getByTestId('markdown-preview').locator('.katex-display')).toBeVisible();
+      await expect(page.getByTestId('markdown-preview').locator('.katex')).toHaveCount(4);
+      await expect(page.getByTestId('markdown-preview').locator('.katex-error')).toHaveCount(0);
+      await expect(page.getByTestId('markdown-preview')).toContainText('Pair:'); await expect(page.getByTestId('markdown-preview')).toContainText('tail');
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
       await page.screenshot({ path: test.info().outputPath('note-math-preview.png'), fullPage: true });
     });

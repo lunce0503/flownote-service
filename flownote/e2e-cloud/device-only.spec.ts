@@ -50,6 +50,7 @@ test('cloud material is available offline and device edits reconcile on re-enabl
     await expect(page.getByTestId('note-save-status')).toHaveText('기기에 저장됨 · 동기화 꺼짐');
     await page.getByRole('button', { name: '새 노트', exact: true }).first().click();
     await expect(page).toHaveURL(/\/blog\/device-/);
+    await page.getByLabel('노트 제목', { exact: true }).fill('Device note');
     await (await markdownSource(page)).fill('# 기기만의 원고\n\nDo not upload');
     await expect(page.getByTestId('note-save-status')).toHaveText('기기에 저장됨 · 동기화 꺼짐');
     await page.reload(); await expect((await markdownSource(page))).toHaveValue('# 기기만의 원고\n\nDo not upload');

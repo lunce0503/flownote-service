@@ -32,8 +32,8 @@ const failures = [];
 for (const executablePath of process.argv.slice(2)) {
   const kind = executablePath.includes('FlownotePortable') ? 'portable' : 'installer';
   const failed = (phase, error) => {
-    failures.push({ kind, phase, error: String(error.message).slice(0, 1600) });
-    console.error(`FAIL ${kind} ${phase}: ${error.message}`);
+    failures.push({ kind, phase, error: String(error.stack ?? error.message).slice(0, 5000) });
+    console.error(`FAIL ${kind} ${phase}: ${error.stack ?? error.message}`);
   };
   const email = `native-feedback-${randomUUID()}@example.com`, password = randomUUID();
   await request('/api/users', 'POST', { email, password, username: `nf-${randomUUID().slice(0, 8)}`, nickname: 'Synthetic native web release' });
